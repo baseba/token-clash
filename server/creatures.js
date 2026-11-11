@@ -1,7 +1,24 @@
-// Original creatures. A PokeTokenBar entry only tells us a species number, a rarity and the
-// individual's numbers (level, IVs, shiny). Everything a player sees here (name, look, element,
-// moves) is generated from those numbers, so the same species becomes the same original creature
-// for every colleague, and nothing from the source franchise is shown.
+// Creatures. A PokeTokenBar entry only tells us a species number, its evolution chain, a rarity and
+// the individual's numbers (level, IVs, shiny). Each evolution chain becomes an evolution line of
+// Tuxemon (an open-source creature game, art under CC BY-SA / CC BY, see public/creditos.txt), and
+// each stage of the chain the matching stage of that line: its name, sprites, element and attack
+// names. Same species, same creature for every colleague. Nothing from the source franchise is shown.
+
+import { readFileSync } from 'node:fs';
+
+const CATALOG = JSON.parse(readFileSync(new URL('./tuxemon.json', import.meta.url), 'utf8'));
+// Pools of lines per chain length. A one-form species can also be the last form of any line, and a
+// two-form chain the last two forms of a three-form line, so there are more distinct choices.
+function pools() {
+  const uniq = (ls) => [...new Map(ls.map((l) => [l.join(), l])).values()];
+  const { lines } = CATALOG;
+  return [
+    uniq([...lines.filter((l) => l.length === 1), ...lines.filter((l) => l.length > 1).map((l) => l.slice(-1))]),
+    uniq([...lines.filter((l) => l.length === 2), ...lines.filter((l) => l.length === 3).map((l) => l.slice(1))]),
+    lines.filter((l) => l.length === 3),
+  ];
+}
+const LINES_BY_LEN = pools();
 
 export function hash(str) {
   let h = 0x811c9dc5;
@@ -34,7 +51,6 @@ export const ELEMENTS = {
   roca: { label: 'Roca', hue: 30, sat: 35 },
   sombra: { label: 'Sombra', hue: 272, sat: 45 },
 };
-const ELEMENT_KEYS = Object.keys(ELEMENTS);
 
 // Two triangles: brasa > brote > marea > brasa, and chispa > sombra > roca > chispa.
 export const BEATS = { brasa: 'brote', brote: 'marea', marea: 'brasa', chispa: 'sombra', sombra: 'roca', roca: 'chispa' };
@@ -46,17 +62,6 @@ export function effectiveness(attackEl, defendEl) {
   return 1;
 }
 
-const SYL_START = ['ka', 'zu', 'mo', 'ri', 'bal', 'te', 'vo', 'nim', 'qua', 'sel', 'dra', 'po', 'fen', 'lu', 'gor', 'xi', 'ber', 'tam', 'cho', 'wi', 'yel', 'or', 'ux', 'ilo'];
-const SYL_MID = ['ra', 'lo', 'ki', 'mu', 'ne', 'ta', 'vi', 'so', 'ga', 'pe', 'ru', 'di', 'zo', 'ma', 'fi', 'le'];
-const SYL_END = {
-  brasa: ['dor', 'zar', 'cen', 'ix', 'ardo'],
-  marea: ['lin', 'mar', 'ola', 'uba', 'rin'],
-  brote: ['flor', 'eto', 'iza', 'bam', 'oto'],
-  chispa: ['tron', 'zik', 'vat', 'ix', 'ello'],
-  roca: ['gran', 'oto', 'urk', 'pedr', 'ant'],
-  sombra: ['nox', 'umbra', 'ush', 'eth', 'avel'],
-};
-
 const MOVE_NAMES = {
   brasa: { strike: ['Tizón', 'Zarpa de ceniza', 'Chamusco'], burst: ['Fogonazo', 'Volcán interior', 'Brasero'] },
   marea: { strike: ['Salpicón', 'Chorro frío', 'Golpe de ola'], burst: ['Marejada', 'Resaca', 'Tromba'] },
@@ -64,6 +69,7 @@ const MOVE_NAMES = {
   chispa: { strike: ['Calambre', 'Cortocircuito', 'Chasquido'], burst: ['Sobrecarga', 'Tormenta seca', 'Arco voltaico'] },
   roca: { strike: ['Guijarro', 'Canto rodado', 'Cabezazo pétreo'], burst: ['Alud', 'Derrumbe', 'Monolito'] },
   sombra: { strike: ['Susurro', 'Zarpazo umbrío', 'Mordida gris'], burst: ['Eclipse', 'Noche cerrada', 'Vacío'] },
+  neutro: { strike: ['Placaje', 'Arañazo', 'Cabezazo'], burst: ['Embestida total', 'Golpe final', 'Carga'] },
 };
 
 export const SUPPORT_MOVES = {
@@ -75,15 +81,30 @@ const QUICK_NAMES = ['Finta', 'Codazo rápido', 'Amague'];
 
 const RARITY_BASE = { common: 55, uncommon: 65, rare: 75, legendary: 90 };
 
-// Species: depends only on the evolution line (element) and the final species number (everything else).
-export function species(finalID, baseID, rarity) {
+// Which Tuxemon a save entry becomes. The line depends only on the start of the chain (baseID) and
+// its length, the stage on where finalID sits in it. Neighbouring dex numbers get different lines.
+export function tuxemonFor({ finalID, baseID, stage, chainLen }) {
+  let len = Number.isInteger(chainLen) && chainLen > 0 ? chainLen : null;
+  let st = Number.isInteger(stage) && stage >= 0 ? stage : null;
+  if (len === null) {
+    // Old entries without the chain: dex numbers of a chain are usually consecutive.
+    len = finalID === baseID ? 1 : Math.min(3, Math.max(2, finalID - baseID + 1));
+    st = len - 1;
+  }
+  len = Math.min(3, len);
+  const pool = LINES_BY_LEN[len - 1].length ? LINES_BY_LEN[len - 1] : CATALOG.lines;
+  const line = pool[(baseID * 7919) % pool.length];
+  const slug = line[Math.min(st ?? 0, line.length - 1)];
+  return { slug, ...CATALOG.species[slug] };
+}
+
+// Species: name, sprite, element and attack names from Tuxemon; stats from the species number.
+export function species(entry) {
+  const { finalID, rarity } = entry;
+  const tux = tuxemonFor(entry);
   const r = rng(`sp:${finalID}`);
-  const element = ELEMENT_KEYS[hash(`line:${baseID}`) % ELEMENT_KEYS.length];
-  const parts = [pick(r, SYL_START)];
-  if (r() < 0.55) parts.push(pick(r, SYL_MID));
-  parts.push(pick(r, SYL_END[element]));
-  const raw = parts.join('');
-  const name = raw[0].toUpperCase() + raw.slice(1);
+  const element = tux.element;
+  const names = MOVE_NAMES[element || 'neutro'];
 
   const base = RARITY_BASE[rarity] ?? RARITY_BASE.common;
   const stats = {
@@ -94,32 +115,23 @@ export function species(finalID, baseID, rarity) {
   };
 
   const supportKey = pick(r, Object.keys(SUPPORT_MOVES));
+  const strike = tux.moves.strike || pick(r, names.strike);
+  let burst = tux.moves.burst || pick(r, names.burst);
+  if (burst === strike) burst = pick(r, names.burst);
   const moves = [
-    { key: 'strike', name: pick(r, MOVE_NAMES[element].strike), element, power: 60, accuracy: 100, priority: 0 },
-    { key: 'burst', name: pick(r, MOVE_NAMES[element].burst), element, power: 95, accuracy: 85, priority: 0 },
-    { key: 'quick', name: pick(r, QUICK_NAMES), element: null, power: 40, accuracy: 100, priority: 1 },
+    { key: 'strike', name: strike, element, power: 60, accuracy: 100, priority: 0 },
+    { key: 'burst', name: burst, element, power: 95, accuracy: 85, priority: 0 },
+    { key: 'quick', name: tux.moves.quick && tux.moves.quick !== strike ? tux.moves.quick : pick(r, QUICK_NAMES), element: null, power: 40, accuracy: 100, priority: 1 },
     { key: supportKey, ...SUPPORT_MOVES[supportKey], power: 0, accuracy: 100, priority: 0 },
   ];
-
-  // Look: parameters the browser turns into an SVG. Same species, same look.
-  const look = {
-    body: between(r, 0, 3), // 0 round, 1 tall, 2 wide, 3 pear
-    ears: between(r, 0, 5), // 0 none, 1 pointy, 2 round, 3 antenna, 4 horns, 5 leaf
-    tail: between(r, 0, 3),
-    eyes: between(r, 0, 2),
-    pattern: between(r, 0, 3), // 0 none, 1 spots, 2 belly, 3 stripes
-    mouth: between(r, 0, 2),
-    hueShift: between(r, -18, 18),
-    feet: r() < 0.6,
-  };
-  return { id: finalID, name, element, stats, moves, look };
+  return { id: finalID, name: tux.name, sprite: tux.slug, element, stats, moves };
 }
 
 const scale = (base, iv, level, flat) => Math.floor(((2 * base + iv) * level) / 100) + flat;
 
 // A fighter as the battle and the browser see it.
 export function buildFighter(entry, { levelCap } = {}) {
-  const sp = species(entry.finalID, entry.baseID, entry.rarity);
+  const sp = species(entry);
   const level = levelCap ? levelCap : entry.level;
   const iv = entry.ivs;
   const stats = {
@@ -139,6 +151,6 @@ export function buildFighter(entry, { levelCap } = {}) {
     level,
     stats,
     moves: sp.moves.map((m) => ({ ...m })),
-    look: sp.look,
+    sprite: sp.sprite,
   };
 }

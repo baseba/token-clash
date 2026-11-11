@@ -31,7 +31,15 @@ function ivsFrom(profile, seedKey) {
   };
 }
 
-function entryFrom(raw, { finalID, baseID, defaultLevel, fallbackId }) {
+// Where finalID sits in its evolution chain (0 = first form) and how long the chain is.
+function chainInfo(chain, finalID, stageHint) {
+  if (!Array.isArray(chain) || chain.length < 1 || chain.length > 10 || !chain.every(Number.isInteger)) return {};
+  const stage = Number.isInteger(stageHint) ? stageHint : chain.indexOf(finalID);
+  if (stage < 0 || stage >= chain.length) return {};
+  return { stage, chainLen: chain.length };
+}
+
+function entryFrom(raw, { finalID, baseID, defaultLevel, fallbackId, chain, stageHint }) {
   if (!Number.isInteger(finalID) || finalID < 1 || finalID > 5000) return null;
   if (!Number.isInteger(baseID) || baseID < 1 || baseID > 5000) baseID = finalID;
   const profile = raw.profile && typeof raw.profile === 'object' ? raw.profile : null;
@@ -45,6 +53,7 @@ function entryFrom(raw, { finalID, baseID, defaultLevel, fallbackId }) {
     shiny: raw.isShiny === true,
     level: int(profile?.level, 1, 100, defaultLevel),
     ivs: ivsFrom(profile, id),
+    ...chainInfo(chain, finalID, stageHint),
   };
 }
 
@@ -74,14 +83,14 @@ export function parseSave(text) {
   const dex = Array.isArray(state.dex) ? state.dex : [];
   dex.forEach((d, i) => {
     if (!d || typeof d !== 'object' || d.releasedAt) return; // released ones were let go, not raised
-    add(entryFrom(d, { finalID: d.finalID, baseID: d.baseID, defaultLevel: 100, fallbackId: `dex-${i}-${d.finalID}` }));
+    add(entryFrom(d, { finalID: d.finalID, baseID: d.baseID, defaultLevel: 100, fallbackId: `dex-${i}-${d.finalID}`, chain: d.chainOrder }));
   });
 
   const a = state.active;
   if (a && typeof a === 'object' && Array.isArray(a.pathIDs)) {
     const stage = int(a.stageIndex, 0, a.pathIDs.length - 1, 0);
     const current = a.pathIDs[stage];
-    const e = entryFrom(a, { finalID: current, baseID: a.baseID, defaultLevel: 30, fallbackId: `active-${a.baseID}` });
+    const e = entryFrom(a, { finalID: current, baseID: a.baseID, defaultLevel: 30, fallbackId: `active-${a.baseID}`, chain: Array.isArray(a.plannedPathIDs) && a.plannedPathIDs.length >= a.pathIDs.length ? a.plannedPathIDs : a.pathIDs, stageHint: stage });
     if (e) {
       e.active = true;
       add(e);

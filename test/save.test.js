@@ -12,8 +12,10 @@ test('reads an export: finished + active, skips released', () => {
   const lux = roster[0];
   assert.deepEqual({ finalID: lux.finalID, shiny: lux.shiny, level: lux.level }, { finalID: 405, shiny: true, level: 100 });
   assert.deepEqual(lux.ivs, { hp: 31, atk: 16, def: 22, spd: 27 });
+  assert.deepEqual([lux.stage, lux.chainLen], [2, 3]);
   const active = roster.find((e) => e.active);
   assert.equal(active.finalID, 432);
+  assert.deepEqual([active.stage, active.chainLen], [1, 2]);
   assert.equal(active.level, 92);
   const old = roster.find((e) => e.finalID === 144);
   assert.equal(old.level, 100); // no profile: finished means full level

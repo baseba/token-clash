@@ -1,0 +1,328 @@
+Token Clash usa los sprites y nombres de criaturas del proyecto libre Tuxemon
+https://github.com/Tuxemon/Tuxemon (commit 9e6258ff726b786040a267e8bdbbf037b560285e).
+
+Arte de las criaturas: licencias CC BY-SA 4.0 y CC BY 4.0 según cada autor (abajo, copiado de
+ATTRIBUTIONS.md de Tuxemon). Los recortes a 64x64 de public/sprites/ se distribuyen bajo las mismas
+licencias. https://creativecommons.org/licenses/by-sa/4.0/
+
+Copyright (C) 2014-2026 William Edwards, Benjamin Bean y colaboradores de Tuxemon.
+
+--- Créditos de criaturas (Tuxemon ATTRIBUTIONS.md) ---
+* ["Bamboon"](https://git.tuxemon.org:3000/tuxemon/tuxemon/blob/development/resources/gfx/sprites/battle/bamboon-sheet.png)
+by [Mike Bramson](mailto:mnbramson@gmail.com) is licensed under
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Fruitera"](http://forum.tuxemon.org/viewtopic.php?pid=124#p124) by
+[Rawng](https://wiki.tuxemon.org/Rawng)
+is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) based on
+["Fruit bat starter"](https://www.deviantart.com/jozzer26/art/Fruit-bat-starter-504344836) by
+[jozzer26](https://www.deviantart.com/jozzer26)
+
+* ["Bigfin"](http://forum.tuxemon.org/viewtopic.php?id=43) by
+[Cavalcadeur](https://wiki.tuxemon.org/Cavalcadeur) and
+[rsg167](https://wiki.tuxemon.org/Rsg167)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Eyenemy"](http://forum.tuxemon.org/viewtopic.php?id=43) by
+[Cavalcadeur](https://wiki.tuxemon.org/Cavalcadeur)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Dollfin"](http://forum.tuxemon.org/viewtopic.php?id=43) by
+[Cavalcadeur](https://wiki.tuxemon.org/Cavalcadeur)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Magmaturtle"](http://forum.tuxemon.org/viewtopic.php?id=43) by
+[Cavalcadeur](https://wiki.tuxemon.org/Cavalcadeur)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Axolightl"](http://forum.tuxemon.org/viewtopic.php?id=43) by
+[Cavalcadeur](https://wiki.tuxemon.org/Cavalcadeur) and
+[josepharaoh99](https://wiki.tuxemon.org/Josepharaoh99)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Djinnbo"](http://forum.tuxemon.org/viewtopic.php?id=43) by
+[Cavalcadeur](https://wiki.tuxemon.org/Cavalcadeur) and
+[rsg167](https://wiki.tuxemon.org/Rsg167)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Nut & Bolt"](https://forum.tuxemon.org/viewtopic.php?id=59) by
+[TacoBot](https://wiki.tuxemon.org/TacoBot)
+is licensed under [Public Domain](https://creativecommons.org/publicdomain/zero/1.0/)
+
+* ["Sumobug"](https://forum.tuxemon.org/viewtopic.php?id=74) by
+[tamashihoshi](https://wiki.tuxemon.org/Tamashihoshi)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Pigabyte"](https://forum.tuxemon.org/viewtopic.php?id=72) by
+[josepharaoh99](https://wiki.tuxemon.org/Josepharaoh99)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Lambert"](https://forum.tuxemon.org/viewtopic.php?pid=406#p406) by
+[Sanglorian](https://wiki.tuxemon.org/index.php?title=Sanglorian)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Propellercat"](https://forum.tuxemon.org/viewtopic.php?id=74) by
+[tamashihoshi](https://wiki.tuxemon.org/Tamashihoshi)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Dune Pincher"](https://forum.tuxemon.org/viewtopic.php?pid=519#p519) by
+[tamashihoshi](https://wiki.tuxemon.org/Tamashihoshi)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Cateye"](https://forum.tuxemon.org/viewtopic.php?pid=505#p505) by
+[Cavalcadeur](https://wiki.tuxemon.org/Cavalcadeur)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Foxfire"](https://forum.tuxemon.org/viewtopic.php?pid=386#p386) by
+[Sanglorian](https://wiki.tuxemon.org/index.php?title=Sanglorian)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Eyesore"](https://forum.tuxemon.org/viewtopic.php?pid=366#p366) by
+[Cavalcadeur](https://wiki.tuxemon.org/Cavalcadeur) and
+[josepharaoh99](https://wiki.tuxemon.org/Josepharaoh99)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Arthrobolt"](https://forum.tuxemon.org/viewtopic.php?pid=543#p543) by
+[josepharaoh99](https://wiki.tuxemon.org/Josepharaoh99)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Rockitten Overworld Sprites"](https://forum.tuxemon.org/viewtopic.php?pid=539#p539) by
+[tamashihoshi](https://wiki.tuxemon.org/Tamashihoshi)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* "Tux" by [Hyperdriveguy](https://github.com/hyperdriveguy) is licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)
+
+* ["Dandylion"](https://forum.tuxemon.org/thread.php?pid=824#p824) by
+[Leo](https://wiki.tuxemon.org/index.php?title=Leo),
+[ProfessorGreen](https://wiki.tuxemon.org/ProfessorGreen), and
+[josepharaoh99](https://wiki.tuxemon.org/Josepharaoh99) is licensed under
+[CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Hydrone"](https://forum.tuxemon.org/thread.php?pid=773#p773) by
+[josepharaoh99](https://wiki.tuxemon.org/Josepharaoh99)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Nudiflot"](https://forum.tuxemon.org/thread.php?pid=803#p803) by
+[Sanglorian](https://wiki.tuxemon.org/index.php?title=Sanglorian)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Onaclov"](https://forum.tuxemon.org/thread.php?pid=773#p773) by
+[Leo](https://wiki.tuxemon.org/index.php?title=Leo) and
+[josepharaoh99](https://wiki.tuxemon.org/Josepharaoh99)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Simba"](https://forum.tuxemon.org/thread.php?pid=621#p621) by
+[Leo](https://wiki.tuxemon.org/index.php?title=Leo) and
+[josepharaoh99](https://wiki.tuxemon.org/Josepharaoh99)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Sludgehog"](https://forum.tuxemon.org/thread.php?pid=899#p899) by
+[josepharaoh99](https://wiki.tuxemon.org/Josepharaoh99)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Tumblecoon"](https://forum.tuxemon.org/thread.php?pid=790#p790) by
+[tamashihoshi](https://wiki.tuxemon.org/Tamashihoshi)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Tumbleworm"](https://forum.tuxemon.org/thread.php?pid=771#p771) by
+[tamashihoshi](https://wiki.tuxemon.org/Tamashihoshi)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Wrougon"](https://wiki.tuxemon.org/index.php?title=Wrougon) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004) and
+[Chickenshowman](https://forum.tuxemon.org/thread.php?id=192#p1748)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Allagon"](https://wiki.tuxemon.org/index.php?title=Allagon) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004) and
+[Chickenshowman](https://forum.tuxemon.org/thread.php?id=192#p1748)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Ferricran"](https://wiki.tuxemon.org/index.php?title=Ferricran) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004) and
+[Chickenshowman](https://forum.tuxemon.org/thread.php?id=192#p1748)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Anoleaf"](https://wiki.tuxemon.org/index.php?title=Anoleaf) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Gectile"](https://wiki.tuxemon.org/index.php?title=Gectile) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Velocitile"](https://wiki.tuxemon.org/index.php?title=Velocitile) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Chloragon"](https://wiki.tuxemon.org/index.php?title=Chloragon) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Sapragon"](https://wiki.tuxemon.org/index.php?title=Sapragon) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Dragarbor"](https://wiki.tuxemon.org/index.php?title=Dragarbor) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Tweesher"](https://wiki.tuxemon.org/index.php?title=Tweesher) by
+[Leo](https://wiki.tuxemon.org/index.php?title=Leo) and
+[DevilDman](https://wiki.tuxemon.org/index.php?title=DevilDman)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Heronquak"](https://wiki.tuxemon.org/index.php?title=Heronquak) by
+[Leo](https://wiki.tuxemon.org/index.php?title=Leo) and
+[DevilDman](https://wiki.tuxemon.org/index.php?title=DevilDman)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Eaglace"](https://wiki.tuxemon.org/index.php?title=Eaglace) by
+[Leo](https://wiki.tuxemon.org/index.php?title=Leo) and
+[DevilDman](https://wiki.tuxemon.org/index.php?title=DevilDman)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Merlicun"](https://wiki.tuxemon.org/index.php?title=Merlicun) by
+[Princess-pheonix](https://wiki.tuxemon.org/index.php?title=Princess-phoenix)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Firomenis"](https://wiki.tuxemon.org/index.php?title=Firomenis) by
+[Princess-pheonix](https://wiki.tuxemon.org/index.php?title=Princess-phoenix)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Legko"](https://wiki.tuxemon.org/index.php?title=Legko) by
+[Sanglorian](https://wiki.tuxemon.org/index.php?title=Sanglorian)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Moloch"](https://wiki.tuxemon.org/index.php?title=Moloch) by
+[Sanglorian](https://wiki.tuxemon.org/index.php?title=Sanglorian)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Arrdart"](https://wiki.tuxemon.org/index.php?title=Aardart) by
+[Magic-Purple-Hermit](https://wiki.tuxemon.org/index.php?title=Magic-Purple-Hermit)
+is licensed under [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)
+
+* ["Aardorn"](https://wiki.tuxemon.org/index.php?title=Aardorn) by
+[Magic-Purple-Hermit](https://wiki.tuxemon.org/index.php?title=Magic-Purple-Hermit)
+is licensed under [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)
+
+* ["Agnidon"](https://wiki.tuxemon.org/index.php?title=Agnidon) by
+[Leo](https://wiki.tuxemon.org/index.php?title=Leo)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Agnigon"](https://wiki.tuxemon.org/index.php?title=Agnigon) by
+[Leo](https://wiki.tuxemon.org/index.php?title=Leo)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Agnite"](https://wiki.tuxemon.org/index.php?title=Agnite) by
+[Leo](https://wiki.tuxemon.org/index.php?title=Leo),
+[Sanglorian](https://wiki.tuxemon.org/index.php?title=Sanglorian), and
+[extyrannomon](https://wiki.tuxemon.org/index.php?title=Extyrannomon&action=edit&redlink=1)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Cairfrey"](https://wiki.tuxemon.org/index.php?title=Cairfrey) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Possessun"](https://wiki.tuxemon.org/index.php?title=Possessun) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Capiti"](https://wiki.tuxemon.org/index.php?title=) by
+[Catch Challenger](https://wiki.tuxemon.org/index.php?title=Catch_Challenger)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Cardiling"](https://wiki.tuxemon.org/index.php?title=Cardiling) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004) and
+[Kyu](https://wiki.tuxemon.org/index.php?title=Kyu&action=edit&redlink=1)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Cardinale"](https://wiki.tuxemon.org/index.php?title=Cardinale) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Cardiwing"](https://wiki.tuxemon.org/index.php?title=Cardiwing) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Chillimp"](https://wiki.tuxemon.org/index.php?title=Chillimp) by
+[Chickenshowman](https://wiki.tuxemon.org/index.php?title=Chickenshowman)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Snowrilla"](https://wiki.tuxemon.org/index.php?title=Snowrilla) by
+[Chickenshowman](https://wiki.tuxemon.org/index.php?title=Chickenshowman)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Falcono"](https://wiki.tuxemon.org/index.php?title=Falcono) by
+[Catch Challenger](https://wiki.tuxemon.org/index.php?title=Catch_Challenger)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Corvix"](https://wiki.tuxemon.org/index.php?title=Corvix) by
+[Catch Challenger](https://wiki.tuxemon.org/index.php?title=Catch_Challenger)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Vamporm"](https://wiki.tuxemon.org/index.php?title=Vamporm) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Dracune"](https://wiki.tuxemon.org/index.php?title=Dracune) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Fluttaflap"](https://wiki.tuxemon.org/index.php?title=Fluttaflap) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Noctula"](https://wiki.tuxemon.org/index.php?title=Noctula) by
+[Catch Challenger](https://wiki.tuxemon.org/index.php?title=Catch_Challenger)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Noctalo"](https://wiki.tuxemon.org/index.php?title=Noctalo) by
+[Catch Challenger](https://wiki.tuxemon.org/index.php?title=Catch_Challenger)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Nostray"](https://wiki.tuxemon.org/index.php?title=Nostray) by
+[Sanglorian](https://wiki.tuxemon.org/index.php?title=Sanglorian)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Selket"](https://wiki.tuxemon.org/index.php?title=Selket) by
+[Catch Challenger](https://wiki.tuxemon.org/index.php?title=Catch_Challenger)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Selmatek"](https://wiki.tuxemon.org/index.php?title=Selmatek) by
+[Catch Challenger](https://wiki.tuxemon.org/index.php?title=Catch_Challenger)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Sharpfin"](https://wiki.tuxemon.org/index.php?title=Sharpfin) by
+[N/A](https://tuxemon.org)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Spycozeus"](https://wiki.tuxemon.org/index.php?title=Spycozeus) by
+[Catch Challenger](https://wiki.tuxemon.org/index.php?title=Catch_Challenger)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Zunna"](https://wiki.tuxemon.org/index.php?title=Zunna) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004) and
+[Sanglorian](https://wiki.tuxemon.org/index.php?title=Sanglorian)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Conifrost"](https://wiki.tuxemon.org/index.php?title=Conifrost) by
+[Spalding004](https://wiki.tuxemon.org/index.php?title=Spalding004) and
+[treetrnk](https://wiki.tuxemon.org/index.php?title=Treetrnk&action=edit&redlink=1)
+is licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+* ["Conileaf"](https://wiki.tuxemon.org/index.php?title=Conileaf). Catch Challenger is an open source project, with assets under Creative Commons Attribution. Original design and sprites by Catch Challenger. Face sprites by Sanglorian. Overland sprites by Catch Challenger.
+
+* ["Mk01 Alpha"](https://wiki.tuxemon.org/index.php?title=Mk01_Alpha) and ["Mk01 Beta"](https://wiki.tuxemon.org/index.php?title=Mk01_Beta) by Serpexnessie.
+
+* ["Chrome Robo"](https://wiki.tuxemon.org/index.php?title=Chrome_Robo), ["Dark Robo"](https://wiki.tuxemon.org/index.php?title=Dark_Robo) front sprite by Redshrike. Overland sprites by Catch Challenger.
+
+* ["Xeon"](https://wiki.tuxemon.org/index.php?title=Xeon) and ["Xeon-2"](https://wiki.tuxemon.org/index.php?title=Xeon-2) by Redshrike.
+
+* ["Pilthropus"](https://wiki.tuxemon.org/index.php?title=Pilthropus) and
+["Coproblight"](https://wiki.tuxemon.org/index.php?title=Coproblight)
+design and front sprite by [Tricoelacanth](https://twitter.com/@tricoelacanth),
+back and menu sprites by ultidonki based on the design by Tricoelacanth, all released under CC-BY-SA 4.0
+
+* ["Teddisun"](https://www.github.com/Tuxemon/Tuxemon/tree/development/mods/tuxemon/gfx/sprites/battle/teddisun-sheet.png)
+Character created by Leo (from Discord) and released under the CC-BY-SA 4.0+ license. Front, back, and menu sprites drawn by ultidonki, also released under the CC-BY-SA 4.0+ license based on the design by Leo (from Discord).

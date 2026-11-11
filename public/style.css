@@ -212,3 +212,20 @@ input[type=text]:focus, .btn:focus-visible, .mon:focus-visible { outline: 3px so
 @keyframes enter { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Tuxemon sprites: 64x64 pixel art, scaled without blur */
+.creature { position: relative; aspect-ratio: 1 / 1; }
+.creature img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; user-select: none; }
+.creature.is-shiny img { filter: hue-rotate(150deg) saturate(1.25) brightness(1.08); }
+.creature.legendary img { filter: drop-shadow(0 0 5px rgb(255 211 77 / .75)); }
+.creature.is-shiny.legendary img { filter: hue-rotate(150deg) saturate(1.25) drop-shadow(0 0 5px rgb(255 211 77 / .75)); }
+.creature.is-shiny::before, .creature.is-shiny::after {
+  content: "✦"; position: absolute; color: #fff6b0; font-size: .95rem; line-height: 1; pointer-events: none;
+  animation: twinkle 1.8s ease-in-out infinite;
+}
+.creature.is-shiny::before { left: 8%; top: 12%; }
+.creature.is-shiny::after { right: 10%; bottom: 18%; animation-delay: -.9s; }
+.mon .creature { width: 100%; max-width: 110px; }
+.bench .creature { display: inline-block; vertical-align: middle; }
+.credits { text-align: center; font-size: .78rem; color: var(--muted); padding: 2rem 1rem 1.5rem; }
+.credits a { color: inherit; }

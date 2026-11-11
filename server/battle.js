@@ -230,7 +230,7 @@ export function publicState(b) {
         hp: f.hp,
         boosts: f.boosts,
         uses: f.uses,
-        look: f.look,
+        sprite: f.sprite,
         moves: f.moves.map((m) => ({ name: m.name, element: m.element, power: m.power, accuracy: m.accuracy, priority: m.priority, kind: m.kind || 'attack', desc: m.desc, key: m.key })),
       })),
     })),

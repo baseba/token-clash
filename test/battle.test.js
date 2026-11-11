@@ -3,13 +3,24 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseSave } from '../server/save.js';
 import { createBattle, submit, autoAction, needsAction, validActions } from '../server/battle.js';
-import { rng, species, effectiveness } from '../server/creatures.js';
+import { rng, species, tuxemonFor, effectiveness } from '../server/creatures.js';
 
 const { roster } = parseSave(readFileSync(new URL('./fixtures/export.json', import.meta.url), 'utf8'));
 
-test('species are deterministic and original', () => {
-  assert.deepEqual(species(405, 403, 'common'), species(405, 403, 'common'));
-  assert.equal(species(405, 403).element, species(404, 403).element); // same line, same element
+const catalog = JSON.parse(readFileSync(new URL('../server/tuxemon.json', import.meta.url), 'utf8'));
+
+test('species are deterministic Tuxemon, one line per chain', () => {
+  const e = (finalID, stage) => ({ finalID, baseID: 403, rarity: 'common', stage, chainLen: 3 });
+  assert.deepEqual(species(e(405, 2)), species(e(405, 2)));
+  const line = [0, 1, 2].map((i) => tuxemonFor(e(403 + i, i)).slug);
+  assert.ok(catalog.lines.some((l) => l.join() === line.join()), `${line} is a real evolution line`);
+  for (const slug of line) assert.ok(catalog.species[slug].name);
+  // Neighbouring chains land on different lines.
+  const firsts = [1, 4, 7, 10, 13, 16].map((b) => tuxemonFor({ finalID: b, baseID: b, stage: 0, chainLen: 3 }).slug);
+  assert.equal(new Set(firsts).size, firsts.length);
+  // Old stored entries without chain info still resolve.
+  assert.ok(tuxemonFor({ finalID: 3, baseID: 1 }).slug);
+  for (const f of roster) assert.match(species(f).sprite, /^[a-z0-9_-]+$/);
   assert.equal(effectiveness('brasa', 'brote'), 1.5);
   assert.equal(effectiveness('brote', 'brasa'), 0.67);
   assert.equal(effectiveness(null, 'brasa'), 1);

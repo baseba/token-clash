@@ -1,4 +1,4 @@
-import { creatureSVG, ELEMENTS, effectiveness } from './creature.js';
+import { creatureHTML, ELEMENTS, effectiveness } from './creature.js';
 
 const $app = document.getElementById('app');
 const $who = document.getElementById('who');
@@ -30,7 +30,7 @@ function h(tag, attrs, ...kids) {
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v;
-    else if (k === 'svg') el.innerHTML = v; // only ever our own generated SVG
+    else if (k === 'html') el.innerHTML = v; // only ever creatureHTML(), which validates the sprite slug
     else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else el.setAttribute(k, v === true ? '' : String(v));
   }
@@ -92,7 +92,7 @@ function monCard(f, opts = {}) {
     },
     opts.badge ? h('span', { class: 'badge' }, opts.badge) : null,
     f.shiny ? h('span', { class: 'shiny', title: 'Brillante' }, '✨') : null,
-    h('div', { svg: creatureSVG(f) }),
+    h('div', { html: creatureHTML(f) }),
     h('div', { class: 'nm', title: f.name !== f.speciesName ? `${f.name} (${f.speciesName})` : f.name }, f.name),
     h('div', { class: 'meta' }, elChip(f.element), h('span', null, `Nv ${f.level}`), opts.rarity !== false ? h('span', null, RARITY[f.rarity] || '') : null),
     opts.stats
@@ -219,12 +219,7 @@ async function homePage() {
 }
 
 function demoMon(i) {
-  const looks = [
-    { element: 'brasa', look: { body: 0, ears: 1, tail: 2, eyes: 1, pattern: 2, mouth: 2, hueShift: 0, feet: true } },
-    { element: 'marea', look: { body: 2, ears: 3, tail: 1, eyes: 0, pattern: 1, mouth: 0, hueShift: 6, feet: true } },
-    { element: 'brote', look: { body: 3, ears: 5, tail: 3, eyes: 2, pattern: 3, mouth: 1, hueShift: -8, feet: false } },
-  ];
-  return { ...looks[i], shiny: i === 1, rarity: i === 2 ? 'legendary' : 'rare' };
+  return { sprite: ['agnite', 'dollfin', 'bamboon'][i], rarity: 'rare' };
 }
 
 function renderLanding() {
@@ -236,8 +231,8 @@ function renderLanding() {
         'div',
         null,
         h('h1', null, 'Tus tokens criaron criaturas. Ahora a pelear.'),
-        h('p', { class: 'lead' }, 'Sube el save de PokeTokenBar, arma un equipo de 3 y manda un link a tus colegas. Cada especie se convierte en una criatura original con su elemento, sus golpes y stats según el nivel que le diste a punta de tokens.'),
-        h('div', { class: 'hero-mons' }, [0, 1, 2].map((i) => h('div', { svg: creatureSVG(demoMon(i)) }))),
+        h('p', { class: 'lead' }, 'Sube el save de PokeTokenBar, arma un equipo de 3 y manda un link a tus colegas. Cada especie se convierte en una criatura de Tuxemon, con su evolución, su elemento, sus golpes y stats según el nivel que le diste a punta de tokens.'),
+        h('div', { class: 'hero-mons' }, [0, 1, 2].map((i) => h('div', { html: creatureHTML(demoMon(i)) }))),
       ),
       importCard({ onDone: renderHome }),
     ),
@@ -570,7 +565,7 @@ function battleUI(c, sendAction) {
     const key = `${sd.active}:${f.uid}`;
     if (spot.dataset.key !== key) {
       spot.dataset.key = key;
-      spot.innerHTML = creatureSVG(f, { flip: p === 'me' });
+      spot.innerHTML = creatureHTML(f, { back: p === 'me' });
       anim = anim || 'enter';
     }
     spot.className = `spot ${p}${f.hp <= 0 ? ' faint' : ''}`;
@@ -675,7 +670,7 @@ function battleUI(c, sendAction) {
         h('p', { class: 'muted small' }, st.phase === 'replace' ? '' : 'Cambiar (gasta el turno):'),
         h('div', { class: 'bench' }, sw.map((a) => {
           const t = meSide.team[a.to];
-          return h('button', { class: 'btn', onclick: () => act(a) }, h('span', { svg: creatureSVG(t) }), `${t.name} · ${t.hp}/${t.stats.hp}`);
+          return h('button', { class: 'btn', onclick: () => act(a) }, h('span', { html: creatureHTML(t) }), `${t.name} · ${t.hp}/${t.stats.hp}`);
         })),
       );
     }
