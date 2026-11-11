@@ -1,0 +1,19 @@
+{
+  "format": "poketokenbar.save",
+  "schema": 2,
+  "appVersion": "2.5.7",
+  "exportedAt": "2026-11-11T15:17:26Z",
+  "sourceDevice": "Mac de prueba",
+  "state": {
+    "usedSinceInstall": 17100000000,
+    "spentTokens": 0,
+    "dex": [
+      {"id":"0B51ABCF-FBF7-4712-B832-2A93DD76CC7B","baseID":403,"finalID":405,"chainOrder":[403,404,405],"rarity":"common","caughtAt":"2026-10-21T19:20:14Z","isShiny":true,"nature":"hardy","names":{"405":{"en":"X"}},
+       "profile":{"instanceID":"0B51ABCF-FBF7-4712-B832-2A93DD76CC7B","seed":8913987956299312698,"gender":"male","ivs":{"hp":31,"attack":23,"defense":31,"specialAttack":9,"specialDefense":13,"speed":27},"abilitySlot":1,"abilityName":"rivalry","abilityIsHidden":false,"level":100,"growthTokens":750000000,"moves":[{"name":"crunch","learnedAtLevel":42}]}},
+      {"id":"11111111-2222-3333-4444-555555555555","baseID":1,"finalID":3,"chainOrder":[1,2,3],"rarity":"rare","isShiny":false,"profile":{"instanceID":"11111111-2222-3333-4444-555555555555","level":100,"ivs":{"hp":10,"attack":20,"defense":5,"specialAttack":30,"specialDefense":12,"speed":18}}},
+      {"id":"aaaaaaaa-2222-3333-4444-555555555555","baseID":144,"finalID":144,"chainOrder":[144],"rarity":"legendary","isShiny":false},
+      {"id":"bbbbbbbb-2222-3333-4444-555555555555","baseID":10,"finalID":12,"chainOrder":[10,11,12],"rarity":"common","releasedAt":"2026-10-01T00:00:00Z"}
+    ],
+    "active": {"baseID":431,"pathIDs":[431,432],"plannedPathIDs":[431,432],"stageIndex":1,"usedAtStage":221352809,"rarity":"common","totalForms":2,"isShiny":false,"nature":"careful","profile":{"instanceID":"CCCCCCCC-0000-0000-0000-000000000001","level":92,"ivs":{"hp":20,"attack":20,"defense":20,"specialAttack":20,"specialDefense":20,"speed":20}}}
+  }
+}

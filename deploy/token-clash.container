@@ -1,0 +1,36 @@
+[Unit]
+Description=Token Clash (batallas entre colegas)
+
+[Container]
+Image=localhost/token-clash:latest
+ContainerName=token-clash
+Network=token-clash.network
+# No PublishPort on purpose: only cloudflared reaches the app.
+Environment=PORT=8080
+# Safe only because nothing but cloudflared can reach this container.
+Environment=TRUST_CF_CONNECTING_IP=1
+Environment=PUBLIC_ORIGIN=https://clash.mirrordev.xyz
+Volume=%h/code/token-clash/data:/data:Z,U
+
+ReadOnly=true
+DropCapability=ALL
+NoNewPrivileges=true
+Memory=256m
+PidsLimit=128
+
+HealthCmd=wget -qO- http://127.0.0.1:8080/healthz
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=10s
+HealthStartupCmd=wget -qO- http://127.0.0.1:8080/healthz
+HealthStartupInterval=2s
+HealthStartupSuccess=1
+Notify=healthy
+
+[Service]
+Restart=always
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

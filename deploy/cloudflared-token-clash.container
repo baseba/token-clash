@@ -1,0 +1,25 @@
+[Unit]
+Description=Cloudflare Tunnel for token-clash
+Wants=token-clash.service
+After=token-clash.service
+
+[Container]
+Image=docker.io/cloudflare/cloudflared:2026.10.3
+ContainerName=cloudflared-token-clash
+Network=token-clash.network
+Network=token-clash-egress.network
+Exec=tunnel --no-autoupdate --metrics 127.0.0.1:20241 run --url http://token-clash:8080
+# Created once: cloudflared tunnel token token-clash | podman secret create cloudflared-token-clash-token -
+Secret=cloudflared-token-clash-token,type=env,target=TUNNEL_TOKEN
+ReadOnly=true
+DropCapability=ALL
+NoNewPrivileges=true
+Memory=128m
+PidsLimit=64
+
+[Service]
+Restart=always
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

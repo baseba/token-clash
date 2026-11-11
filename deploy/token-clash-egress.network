@@ -1,0 +1,5 @@
+[Unit]
+Description=Outbound network for the token-clash tunnel only
+
+[Network]
+NetworkName=token-clash-egress

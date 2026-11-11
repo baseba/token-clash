@@ -1,0 +1,7 @@
+[Unit]
+Description=Private internal network for token-clash and its tunnel (no route out)
+
+[Network]
+NetworkName=token-clash
+# Internal: no gateway. The app cannot reach the host, the LAN, Tailscale or the internet.
+Internal=true
