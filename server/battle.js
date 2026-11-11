@@ -79,7 +79,7 @@ export function autoAction(b, s) {
     let bestScore = -1;
     for (const o of moves) {
       const m = me.moves[o.move];
-      const score = (m.power || 20) * effectiveness(m.element, foe.element) * (m.accuracy / 100) + b.random() * 10;
+      const score = (m.power || 20) * effectiveness(m.type, foe.types) * (m.accuracy / 100) + b.random() * 10;
       if (score > bestScore) [best, bestScore] = [o, score];
     }
     return best;
@@ -106,7 +106,7 @@ function useMove(b, s, moveIdx, events) {
   const foe = foeSide.team[foeSide.active];
   if (me.hp <= 0) return;
   const m = me.moves[moveIdx];
-  events.push({ t: 'move', side: s, name: me.name, move: m.name, element: m.element });
+  events.push({ t: 'move', side: s, name: me.name, move: m.name, type: m.type });
 
   if (m.kind === 'boost') {
     const cur = me.boosts[m.stat];
@@ -132,10 +132,10 @@ function useMove(b, s, moveIdx, events) {
   }
   const a = me.stats.atk * stageMult(me.boosts.atk);
   const d = foe.stats.def * stageMult(foe.boosts.def);
-  const eff = effectiveness(m.element, foe.element);
+  const eff = effectiveness(m.type, foe.types);
   const crit = b.random() < 1 / 16;
   const roll = 0.85 + b.random() * 0.15;
-  const own = m.element && m.element === me.element ? 1.15 : 1;
+  const own = m.type && me.types.includes(m.type) ? 1.5 : 1; // STAB
   const dmg = Math.max(1, Math.round(m.power * (a / (a + d)) * (0.5 + me.level / 70) * eff * own * roll * (crit ? 1.5 : 1)));
   foe.hp = Math.max(0, foe.hp - dmg);
   events.push({ t: 'damage', side: 1 - s, amount: dmg, hp: foe.hp, eff, crit });
@@ -222,7 +222,7 @@ export function publicState(b) {
         uid: f.uid,
         name: f.name,
         speciesName: f.speciesName,
-        element: f.element,
+        types: f.types,
         rarity: f.rarity,
         shiny: f.shiny,
         level: f.level,
@@ -231,7 +231,7 @@ export function publicState(b) {
         boosts: f.boosts,
         uses: f.uses,
         sprite: f.sprite,
-        moves: f.moves.map((m) => ({ name: m.name, element: m.element, power: m.power, accuracy: m.accuracy, priority: m.priority, kind: m.kind || 'attack', desc: m.desc, key: m.key })),
+        moves: f.moves.map((m) => ({ name: m.name, type: m.type, power: m.power, accuracy: m.accuracy, priority: m.priority, kind: m.kind || 'attack', desc: m.desc, key: m.key })),
       })),
     })),
   };

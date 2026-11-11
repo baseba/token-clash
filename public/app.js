@@ -1,4 +1,5 @@
-import { creatureHTML, ELEMENTS, effectiveness } from './creature.js?v=dev';
+import { creatureHTML } from './creature.js?v=dev';
+import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 
 const $app = document.getElementById('app');
 const $who = document.getElementById('who');
@@ -30,6 +31,7 @@ function h(tag, attrs, ...kids) {
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v); // CSSOM, so CSP-safe
     else if (k === 'html') el.innerHTML = v; // only ever creatureHTML(), which validates the sprite slug
     else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else el.setAttribute(k, v === true ? '' : String(v));
@@ -72,10 +74,14 @@ async function copy(text, okMsg = 'Copiado') {
   }
 }
 
-function elChip(element) {
-  if (!element) return h('span', { class: 'el el-none' }, 'Neutro');
-  const e = ELEMENTS[element];
-  return h('span', { class: `el el-${element}` }, `${e.icon} ${e.label}`);
+// A colored chip for one type. For a creature, pass its types array to render one chip per type.
+function typeChip(t) {
+  if (!t) return null;
+  const c = TYPES[t];
+  return h('span', { class: 'el', style: { background: c ? c.color : '#9099a1' } }, typeLabel(t));
+}
+function typeChips(types) {
+  return h('span', { class: 'els' }, ...(types || []).map(typeChip));
 }
 
 function monCard(f, opts = {}) {
@@ -94,7 +100,7 @@ function monCard(f, opts = {}) {
     f.shiny ? h('span', { class: 'shiny', title: 'Brillante' }, '✨') : null,
     h('div', { html: creatureHTML(f) }),
     h('div', { class: 'nm', title: f.name !== f.speciesName ? `${f.name} (${f.speciesName})` : f.name }, f.name),
-    h('div', { class: 'meta' }, elChip(f.element), h('span', null, `Nv ${f.level}`), opts.rarity !== false ? h('span', null, RARITY[f.rarity] || '') : null),
+    h('div', { class: 'meta' }, typeChips(f.types), h('span', null, `Nv ${f.level}`), opts.rarity !== false ? h('span', null, RARITY[f.rarity] || '') : null),
     opts.stats
       ? h('div', { class: 'stats' }, ...[['PV', 'hp'], ['ATQ', 'atk'], ['DEF', 'def'], ['VEL', 'spd']].map(([l, k]) => h('span', null, h('b', null, f.stats[k]), l)))
       : null,
@@ -231,7 +237,7 @@ function renderLanding() {
         'div',
         null,
         h('h1', null, 'Tus tokens criaron criaturas. Ahora a pelear.'),
-        h('p', { class: 'lead' }, 'Sube el save de PokeTokenBar, arma un equipo de 3 y manda un link a tus colegas. Cada especie pelea con su elemento, sus golpes y stats según el nivel que le diste a punta de tokens.'),
+        h('p', { class: 'lead' }, 'Sube el save de PokeTokenBar, arma un equipo de 3 y manda un link a tus colegas. Cada especie pelea con su tipo real, sus golpes y stats según el nivel que le diste a punta de tokens.'),
         h('div', { class: 'hero-mons' }, [0, 1, 2].map((i) => h('div', { html: creatureHTML(demoMon(i)) }))),
       ),
       importCard({ onDone: renderHome }),
@@ -579,7 +585,7 @@ function battleUI(c, sendAction) {
     const boosts = [f.boosts.atk ? `ATQ ${f.boosts.atk > 0 ? '+' : ''}${f.boosts.atk}` : null, f.boosts.def ? `DEF ${f.boosts.def > 0 ? '+' : ''}${f.boosts.def}` : null].filter(Boolean).join(' · ');
     els.hud[p].replaceChildren(
       h('div', { class: 'nm' }, h('span', null, f.shiny ? `✨ ${f.name}` : f.name), h('span', null, `Nv ${f.level}`)),
-      h('div', { class: 'sub' }, elChip(f.element), h('span', null, sd.name), boosts ? h('span', null, boosts) : null, h('span', { class: 'dots', 'aria-label': 'Equipo' }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null })))),
+      h('div', { class: 'sub' }, typeChips(f.types), h('span', null, sd.name), boosts ? h('span', null, boosts) : null, h('span', { class: 'dots', 'aria-label': 'Equipo' }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null })))),
       h('div', { class: 'hp' }, bar),
       h('div', { class: 'hpnum' }, `${f.hp} / ${f.stats.hp} PV`),
     );
@@ -654,12 +660,17 @@ function battleUI(c, sendAction) {
           'div',
           { class: 'moves' },
           f.moves.map((m, i) => {
-            const eff = m.kind === 'attack' ? effectiveness(m.element, foe.element) : 1;
+            const eff = m.kind === 'attack' ? effectiveness(m.type, foe.types) : 1;
+            const effTag =
+              eff === 0 ? h('span', { class: 'tag-weak' }, 'No afecta ×0')
+                : eff > 1 ? h('span', { class: 'tag-strong' }, `Fuerte ×${eff}`)
+                  : eff < 1 ? h('span', { class: 'tag-weak' }, `Débil ×${eff}`)
+                    : null;
             const info =
               m.kind === 'attack'
-                ? [h('span', null, `Poder ${m.power}`), h('span', null, `${m.accuracy}%`), m.priority > 0 ? h('span', null, 'Va primero') : null, eff > 1 ? h('span', { class: 'tag-strong' }, 'Fuerte ×1.5') : eff < 1 ? h('span', { class: 'tag-weak' }, 'Débil ×0.67') : null]
+                ? [h('span', null, `Poder ${m.power}`), h('span', null, `${m.accuracy}%`), m.priority > 0 ? h('span', null, 'Va primero') : null, effTag]
                 : [h('span', null, m.desc), m.key === 'mend' ? h('span', null, `· quedan ${f.uses?.mend ?? 0}`) : null];
-            return h('button', { class: 'move', disabled: !moveSet.has(i), onclick: () => act({ type: 'move', move: i }) }, h('span', { class: 'mv' }, m.name), h('span', { class: 'mi' }, elChip(m.element), info));
+            return h('button', { class: 'move', disabled: !moveSet.has(i), onclick: () => act({ type: 'move', move: i }) }, h('span', { class: 'mv' }, m.name), h('span', { class: 'mi' }, typeChip(m.type), info));
           }),
         ),
       );

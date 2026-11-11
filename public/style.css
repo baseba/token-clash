@@ -115,10 +115,8 @@ input[type=text]:focus, .btn:focus-visible, .mon:focus-visible { outline: 3px so
 .mon .edit:hover { color: var(--text); background: var(--card); }
 .mon .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-top: .35rem; font-size: .7rem; color: var(--muted); }
 .mon .stats b { display: block; color: var(--text); font-size: .8rem; }
-.el { display: inline-flex; align-items: center; gap: .2rem; padding: .05rem .45rem; border-radius: 999px; font-weight: 800; font-size: .72rem; color: #15122a; }
-.el-brasa { background: #ff8a5c; } .el-marea { background: #5cb8ff; } .el-brote { background: #7fd67a; }
-.el-chispa { background: #ffd84d; } .el-roca { background: #c9a77c; } .el-sombra { background: #b48cff; }
-.el-none { background: #cfc8ef; }
+.els { display: inline-flex; gap: .25rem; }
+.el { display: inline-flex; align-items: center; gap: .2rem; padding: .05rem .45rem; border-radius: 999px; font-weight: 800; font-size: .72rem; color: #fff; text-shadow: 0 1px 1px rgb(0 0 0 / .3); background: #9099a1; }
 
 .team-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
 .slot-empty { border: 2px dashed var(--line); border-radius: 14px; display: grid; place-items: center; min-height: 160px; color: var(--muted); font-size: .9rem; }

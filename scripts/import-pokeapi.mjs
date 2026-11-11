@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Downloads every species from PokeAPI (https://pokeapi.co) into the game's data:
-// - server/pokeapi.json: name, base stats, types (mapped to the six elements of Token Clash) and
-//   where each species sits in its evolution chain.
+// - server/pokeapi.json: name, base stats, real types and where each species sits in its
+//   evolution chain.
 // - public/sprites/<id>-front.png and <id>-back.png: the official front/back sprites.
 //
 // The server never calls PokeAPI (production has no egress): run this again to refresh the data.
@@ -17,16 +17,6 @@ const SPRITES = new URL('../public/sprites/', import.meta.url);
 const CONCURRENCY = 8;
 
 mkdirSync(SPRITES, { recursive: true });
-
-// PokeAPI types -> elements. Normal is neutral; a normal/flying species takes its second type.
-export const ELEMENT = {
-  fire: 'brasa', dragon: 'brasa',
-  water: 'marea', ice: 'marea',
-  grass: 'brote', bug: 'brote', poison: 'brote',
-  electric: 'chispa', flying: 'chispa',
-  rock: 'roca', ground: 'roca', steel: 'roca', fighting: 'roca',
-  ghost: 'sombra', dark: 'sombra', psychic: 'sombra', fairy: 'sombra',
-};
 
 async function get(url, tries = 4) {
   for (let i = 1; ; i++) {
@@ -95,7 +85,6 @@ await mapLimit(ids, async (id) => {
   species[id] = {
     name: esName || cap(sp.name.replace(/-/g, ' ')),
     types,
-    element: types.map((t) => ELEMENT[t]).find(Boolean) ?? null,
     stats: [stat.hp, stat.attack, stat.defense, stat['special-attack'], stat['special-defense'], stat.speed],
   };
   const sprites = mon.sprites || {};

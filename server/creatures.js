@@ -1,10 +1,14 @@
 // Creatures. Everything comes from PokeAPI (https://pokeapi.co), downloaded into the game by
-// scripts/import-pokeapi.mjs: server/pokeapi.json holds the name, base stats, types (mapped to the
-// six elements of Token Clash) and evolution placement of every species, and public/sprites/ holds
-// each species' official front/back sprites by dex number. The server never calls PokeAPI
-// (production has no egress); the move names are the game's own, chosen by element.
+// scripts/import-pokeapi.mjs: server/pokeapi.json holds the name, base stats, real types and
+// evolution placement of every species, and public/sprites/ holds each species' official
+// front/back sprites by dex number. The server never calls PokeAPI (production has no egress). The
+// type chart and labels live in public/types.js, shared with the browser; the move names here are
+// real Pokémon moves, picked by the species' own types so each attack matches its type.
 
 import { readFileSync } from 'node:fs';
+import { effectiveness } from '../public/types.js';
+
+export { effectiveness };
 
 const POKEAPI = JSON.parse(readFileSync(new URL('./pokeapi.json', import.meta.url), 'utf8')).species;
 
@@ -39,54 +43,53 @@ export function rng(seed) {
 const pick = (r, list) => list[Math.floor(r() * list.length)];
 const between = (r, lo, hi) => lo + Math.floor(r() * (hi - lo + 1));
 
-export const ELEMENTS = {
-  brasa: { label: 'Brasa', hue: 14, sat: 85 },
-  marea: { label: 'Marea', hue: 205, sat: 75 },
-  brote: { label: 'Brote', hue: 118, sat: 55 },
-  chispa: { label: 'Chispa', hue: 48, sat: 95 },
-  roca: { label: 'Roca', hue: 30, sat: 35 },
-  sombra: { label: 'Sombra', hue: 272, sat: 45 },
+// Real Pokémon move names per type: a weaker "strike" (power 60) and a stronger "burst" (power 95).
+const MOVE_NAMES = {
+  normal: { strike: ['Placaje', 'Golpe Cabeza', 'Doble Filo'], burst: ['Hiperrayo', 'Gigaimpacto', 'Última Baza'] },
+  fire: { strike: ['Ascuas', 'Colmillo Ígneo', 'Rueda Fuego'], burst: ['Lanzallamas', 'Llamarada', 'Envite Ígneo'] },
+  water: { strike: ['Pistola Agua', 'Hidropulso', 'Burbuja'], burst: ['Hidrobomba', 'Cascada', 'Acua Cola'] },
+  grass: { strike: ['Látigo Cepa', 'Hoja Afilada', 'Megaagotar'], burst: ['Rayo Solar', 'Bomba Germen', 'Lluevehojas'] },
+  electric: { strike: ['Impactrueno', 'Chispa', 'Colmillo Rayo'], burst: ['Rayo', 'Trueno', 'Voltio Cruel'] },
+  ice: { strike: ['Viento Hielo', 'Colmillo Hielo', 'Nieve Polvo'], burst: ['Rayo Hielo', 'Ventisca', 'Frío Polar'] },
+  fighting: { strike: ['Golpe Kárate', 'Patada Baja', 'Demolición'], burst: ['A Bocajarro', 'Puño Dinámico', 'Patada Salto Alta'] },
+  poison: { strike: ['Ácido', 'Colmillo Veneno', 'Puya Nociva'], burst: ['Bomba Lodo', 'Lanzamugre', 'Onda Tóxica'] },
+  ground: { strike: ['Bofetón Lodo', 'Disparo Lodo', 'Terratemblor'], burst: ['Terremoto', 'Fuerza Telúrica', 'Tierra Viva'] },
+  flying: { strike: ['Picotazo', 'Ataque Ala', 'Tajo Aéreo'], burst: ['Pájaro Osado', 'Vendaval', 'Vuelo'] },
+  psychic: { strike: ['Confusión', 'Psicorrayo', 'Cabezazo Zen'], burst: ['Psíquico', 'Psicocorte', 'Premonición'] },
+  bug: { strike: ['Picadura', 'Tijera X', 'Pin Misil'], burst: ['Megacuerno', 'Zumbido', 'Chupavidas'] },
+  rock: { strike: ['Lanzarrocas', 'Pedrada', 'Antiaéreo'], burst: ['Roca Afilada', 'Avalancha', 'Poder Pasado'] },
+  ghost: { strike: ['Lengüetazo', 'Garra Umbría', 'Puño Sombra'], burst: ['Bola Sombra', 'Golpe Fantasma', 'Infortunio'] },
+  dragon: { strike: ['Furia Dragón', 'Aliento Dragón', 'Garra Dragón'], burst: ['Enfado', 'Cometa Draco', 'Carga Dragón'] },
+  dark: { strike: ['Mordisco', 'Finta', 'Tajo Umbrío'], burst: ['Triturar', 'Pulso Umbrío', 'Juego Sucio'] },
+  steel: { strike: ['Garra Metal', 'Cola Férrea', 'Puño Bala'], burst: ['Foco Resplandor', 'Cabeza de Hierro', 'Puño Meteoro'] },
+  fairy: { strike: ['Viento Feérico', 'Beso Drenaje', 'Carantoña'], burst: ['Fuerza Lunar', 'Brillo Mágico', 'Voz Cautivadora'] },
 };
 
-// Two triangles: brasa > brote > marea > brasa, and chispa > sombra > roca > chispa.
-export const BEATS = { brasa: 'brote', brote: 'marea', marea: 'brasa', chispa: 'sombra', sombra: 'roca', roca: 'chispa' };
-
-export function effectiveness(attackEl, defendEl) {
-  if (!attackEl || !defendEl) return 1;
-  if (BEATS[attackEl] === defendEl) return 1.5;
-  if (BEATS[defendEl] === attackEl) return 0.67;
-  return 1;
-}
-
-const MOVE_NAMES = {
-  brasa: { strike: ['Tizón', 'Zarpa de ceniza', 'Chamusco'], burst: ['Fogonazo', 'Volcán interior', 'Brasero'] },
-  marea: { strike: ['Salpicón', 'Chorro frío', 'Golpe de ola'], burst: ['Marejada', 'Resaca', 'Tromba'] },
-  brote: { strike: ['Espina', 'Raíz trampa', 'Semillazo'], burst: ['Floración', 'Bosque súbito', 'Enredadera'] },
-  chispa: { strike: ['Calambre', 'Cortocircuito', 'Chasquido'], burst: ['Sobrecarga', 'Tormenta seca', 'Arco voltaico'] },
-  roca: { strike: ['Guijarro', 'Canto rodado', 'Cabezazo pétreo'], burst: ['Alud', 'Derrumbe', 'Monolito'] },
-  sombra: { strike: ['Susurro', 'Zarpazo umbrío', 'Mordida gris'], burst: ['Eclipse', 'Noche cerrada', 'Vacío'] },
-  neutro: { strike: ['Placaje', 'Arañazo', 'Cabezazo'], burst: ['Embestida total', 'Golpe final', 'Carga'] },
+// A real priority move for the quick slot, by type; types without one fall back to Ataque Rápido.
+const PRIORITY_MOVE = {
+  water: 'Acua Jet', steel: 'Puño Bala', fighting: 'Ultrapuño', dark: 'Golpe Bajo',
+  ghost: 'Sombra Vil', ice: 'Esquirla Helada', rock: 'Roca Veloz',
 };
 
 export const SUPPORT_MOVES = {
-  guard: { name: 'Coraza', kind: 'boost', stat: 'def', desc: 'Sube su defensa' },
-  focus: { name: 'Enfoque', kind: 'boost', stat: 'atk', desc: 'Sube su ataque' },
-  mend: { name: 'Respiro', kind: 'heal', amount: 0.3, uses: 2, desc: 'Recupera 30% de vida (2 usos)' },
+  guard: { name: 'Defensa Férrea', kind: 'boost', stat: 'def', desc: 'Sube su defensa' },
+  focus: { name: 'Danza Espada', kind: 'boost', stat: 'atk', desc: 'Sube su ataque' },
+  mend: { name: 'Recuperación', kind: 'heal', amount: 0.3, uses: 2, desc: 'Recupera 30% de vida (2 usos)' },
 };
-const QUICK_NAMES = ['Finta', 'Codazo rápido', 'Amague'];
 
 const RARITY_BASE = { common: 55, uncommon: 65, rare: 75, legendary: 90 };
 
-// Species: name, sprite, element and stats straight from PokeAPI; the move names are the game's
-// own, chosen by element. Physical and special stats are averaged, like the IVs in save.js. A
-// species PokeAPI doesn't know (unknown or newer) falls back to its dex number and stats derived
-// from rarity.
+// Species: name, sprite, types and stats straight from PokeAPI; the move names are real Pokémon
+// moves chosen by the species' types. Physical and special stats are averaged, like the IVs in
+// save.js. A species PokeAPI doesn't know (unknown or newer) falls back to its dex number, the
+// Normal type and stats derived from rarity.
 export function species(entry) {
   const { finalID, rarity } = entry;
   const data = speciesData(finalID);
   const r = rng(`sp:${finalID}`);
-  const element = data ? data.element : null;
-  const names = MOVE_NAMES[element || 'neutro'];
+  const types = data ? data.types : ['normal'];
+  const t1 = types[0];
+  const t2 = types[1] || types[0];
 
   let stats;
   if (data) {
@@ -102,18 +105,22 @@ export function species(entry) {
     };
   }
 
+  // One move per type (so both types of a dual get represented), a priority move and a support move.
   const supportKey = pick(r, Object.keys(SUPPORT_MOVES));
-  const strike = pick(r, names.strike);
-  let burst = pick(r, names.burst);
-  if (burst === strike) burst = pick(r, names.burst);
-  const quickName = pick(r, QUICK_NAMES);
+  const strike = pick(r, MOVE_NAMES[t1].strike);
+  const burst = pick(r, MOVE_NAMES[t2].burst);
+  const quick = PRIORITY_MOVE[t2]
+    ? { name: PRIORITY_MOVE[t2], type: t2 }
+    : PRIORITY_MOVE[t1]
+      ? { name: PRIORITY_MOVE[t1], type: t1 }
+      : { name: 'Ataque Rápido', type: 'normal' };
   const moves = [
-    { key: 'strike', name: strike, element, power: 60, accuracy: 100, priority: 0 },
-    { key: 'burst', name: burst, element, power: 95, accuracy: 85, priority: 0 },
-    { key: 'quick', name: quickName, element: null, power: 40, accuracy: 100, priority: 1 },
-    { key: supportKey, ...SUPPORT_MOVES[supportKey], power: 0, accuracy: 100, priority: 0 },
+    { key: 'strike', name: strike, type: t1, power: 60, accuracy: 100, priority: 0 },
+    { key: 'burst', name: burst, type: t2, power: 95, accuracy: 85, priority: 0 },
+    { key: 'quick', name: quick.name, type: quick.type, power: 40, accuracy: 100, priority: 1 },
+    { key: supportKey, ...SUPPORT_MOVES[supportKey], type: null, power: 0, accuracy: 100, priority: 0 },
   ];
-  return { id: finalID, name: data ? data.name : `#${finalID}`, sprite: String(finalID), element, stats, moves };
+  return { id: finalID, name: data ? data.name : `#${finalID}`, sprite: String(finalID), types, stats, moves };
 }
 
 const scale = (base, iv, level, flat) => Math.floor(((2 * base + iv) * level) / 100) + flat;
@@ -134,7 +141,7 @@ export function buildFighter(entry, { levelCap } = {}) {
     name: entry.nickname || sp.name,
     speciesName: sp.name,
     speciesId: sp.id,
-    element: sp.element,
+    types: sp.types,
     rarity: entry.rarity,
     shiny: entry.shiny,
     level,

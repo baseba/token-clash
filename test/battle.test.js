@@ -13,27 +13,36 @@ test('species are deterministic and sprited by dex number', () => {
   // The sprite is the species' own dex number.
   assert.equal(species(e(405)).sprite, '405');
   for (const f of roster) assert.match(species(f).sprite, /^[0-9]+$/);
-  assert.equal(effectiveness('brasa', 'brote'), 1.5);
-  assert.equal(effectiveness('brote', 'brasa'), 0.67);
-  assert.equal(effectiveness(null, 'brasa'), 1);
+  // Real type chart, with the product over a defender's two types and immunities.
+  assert.equal(effectiveness('fire', ['grass']), 2);
+  assert.equal(effectiveness('fire', ['water']), 0.5);
+  assert.equal(effectiveness('fire', ['grass', 'steel']), 4); // doble super efectivo
+  assert.equal(effectiveness('ground', ['flying']), 0); // inmune
+  assert.equal(effectiveness(null, ['fire']), 1);
 });
 
-test('name, sprite, element and stats come straight from PokeAPI', () => {
+test('name, sprite, types and stats come straight from PokeAPI', () => {
   const e = (finalID, extra = {}) => ({ finalID, baseID: finalID, rarity: 'common', ...extra });
-  // Element and stats are the species' own (attack/special and defense/special averaged).
-  assert.equal(speciesData(4).element, 'brasa');
+  // Real types and stats (attack/special and defense/special averaged).
+  assert.deepEqual(speciesData(4).types, ['fire']);
   const sp = species(e(4, { stage: 0, chainLen: 3 }));
-  assert.equal(sp.element, 'brasa');
+  assert.deepEqual(sp.types, ['fire']);
   assert.deepEqual(sp.stats, { hp: 39, atk: 56, def: 47, spd: 65 });
   // Real PokeAPI name and dex-number sprite.
   assert.equal(sp.name, speciesData(4).name);
   assert.equal(sp.sprite, '4');
-  // Normal/flying counts as its second type.
-  assert.equal(speciesData(16).element, 'chispa');
-  // A species PokeAPI doesn't know keeps working with rarity-based stats and a placeholder name.
+  // Dual-type species keep both types, in PokeAPI slot order.
+  assert.deepEqual(speciesData(1).types, ['grass', 'poison']);
+  assert.deepEqual(speciesData(16).types, ['normal', 'flying']);
+  // Damaging moves carry the species' own types (STAB), and there are four moves.
+  const moves = sp.moves;
+  assert.equal(moves.length, 4);
+  assert.equal(moves[0].type, 'fire');
+  // A species PokeAPI doesn't know keeps working with rarity-based stats and the Normal type.
   const unknown = species(e(4999));
   assert.equal(speciesData(4999), null);
   assert.ok(unknown.name && unknown.stats.hp > 0);
+  assert.deepEqual(unknown.types, ['normal']);
   assert.equal(unknown.sprite, '4999');
 });
 
