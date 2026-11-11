@@ -84,3 +84,20 @@ test('rejects invalid actions and waits for both sides', () => {
   assert.equal(ev[1].t, 'switch'); // switches happen before moves
   assert.ok(b);
 });
+
+test('events say who acts first and why, and whom a switch replaces', () => {
+  const b = createBattle({ id: 'o', random: rng(7), sides: [{ trainerId: 'a', name: 'A', entries: roster }, { trainerId: 'b', name: 'B', entries: roster.slice(1) }] });
+  submit(b, 0, { type: 'move', move: 0 });
+  const ev = submit(b, 1, { type: 'move', move: 0 });
+  const moves = ev.filter((e) => e.t === 'move');
+  assert.ok(['priority', 'speed', 'tie'].includes(moves[0].why));
+  assert.equal(moves[1]?.why, undefined);
+  for (const e of ev.filter((x) => x.t === 'damage')) assert.notEqual(e.side, ev[ev.indexOf(e) - 1].side); // damage lands on the other side
+
+  const c = createBattle({ id: 's', random: rng(2), sides: [{ trainerId: 'a', name: 'A', entries: roster }, { trainerId: 'b', name: 'B', entries: roster }] });
+  submit(c, 0, { type: 'switch', to: 1 });
+  const sw = submit(c, 1, { type: 'switch', to: 2 }).filter((e) => e.t === 'switch');
+  assert.equal(sw[0].from, c.sides[0].team[0].name);
+  assert.equal(sw[0].forced, false);
+  assert.equal(sw[1].name, c.sides[1].team[2].name);
+});
