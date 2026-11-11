@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseSave } from '../server/save.js';
 import { createBattle, submit, autoAction, needsAction, validActions } from '../server/battle.js';
-import { rng, species, tuxemonFor, effectiveness } from '../server/creatures.js';
+import { rng, species, speciesData, tuxemonFor, effectiveness } from '../server/creatures.js';
 
 const { roster } = parseSave(readFileSync(new URL('./fixtures/export.json', import.meta.url), 'utf8'));
 
@@ -24,6 +24,29 @@ test('species are deterministic Tuxemon, one line per chain', () => {
   assert.equal(effectiveness('brasa', 'brote'), 1.5);
   assert.equal(effectiveness('brote', 'brasa'), 0.67);
   assert.equal(effectiveness(null, 'brasa'), 1);
+});
+
+test('battle data comes from PokeAPI, looks from Tuxemon', () => {
+  const e = (finalID, baseID, extra = {}) => ({ finalID, baseID, rarity: 'common', ...extra });
+  // Element and stats are the species' own (attack/special and defense/special averaged).
+  assert.equal(speciesData(4).element, 'brasa');
+  const sp = species(e(4, 4, { stage: 0, chainLen: 3 }));
+  assert.equal(sp.element, 'brasa');
+  assert.deepEqual(sp.stats, { hp: 39, atk: 56, def: 47, spd: 65 });
+  // Normal/flying counts as its second type.
+  assert.equal(speciesData(16).element, 'chispa');
+  // Name and sprite still come from Tuxemon, of the same element when there are enough lines.
+  const tux = tuxemonFor(e(1, 1, { stage: 0, chainLen: 3 }));
+  assert.equal(sp.name, tuxemonFor(e(4, 4, { stage: 0, chainLen: 3 })).name);
+  assert.equal(tux.element, 'brote');
+  assert.ok(catalog.species[tux.slug]);
+  // Entries stored without the chain get it from PokeAPI.
+  assert.equal(tuxemonFor(e(405, 403)).slug, tuxemonFor(e(405, 403, { stage: 2, chainLen: 3 })).slug);
+  assert.equal(tuxemonFor(e(134, 133)).slug, tuxemonFor(e(134, 133, { stage: 1, chainLen: 2 })).slug);
+  // A species PokeAPI doesn't know keeps working with rarity-based stats.
+  const unknown = species(e(4999, 4999));
+  assert.equal(speciesData(4999), null);
+  assert.ok(unknown.name && unknown.stats.hp > 0);
 });
 
 function play(seed, levelCap = null) {

@@ -14,13 +14,28 @@ En vivo: **https://clash.mirrordev.xyz**
    si alguien no elige, su criatura ataca sola). Cualquiera más con el link puede mirar.
 4. Ranking de victorias en la portada. Opción "Todos a nivel 50" para que gane la estrategia.
 
-## Criaturas (Tuxemon)
+## Criaturas (PokeAPI + disfraz de Tuxemon)
 
-El save solo aporta números: especie, cadena evolutiva, rareza, nivel, IVs y si es brillante. Cada cadena evolutiva
-se convierte de forma determinista en una línea evolutiva de [Tuxemon](https://github.com/Tuxemon/Tuxemon), un juego
-de criaturas de código abierto, y cada etapa en la etapa equivalente: nombre, sprites de frente y espalda, elemento y
-nombres de ataques (en español cuando Tuxemon los tiene traducidos). La misma especie se ve igual para todos.
-No se muestran nombres, sprites ni ataques de ninguna franquicia comercial.
+El save solo aporta números: especie, cadena evolutiva, rareza, nivel, IVs y si es brillante. Cada criatura sale de
+dos fuentes que no se mezclan:
+
+- **Datos de batalla** de [PokeAPI](https://pokeapi.co), al día: stats base reales (ataque y ataque especial se
+  promedian, igual defensa y defensa especial), elemento según su tipo y etapa evolutiva. Viven en
+  `server/pokeapi.json`, que solo guarda números y tipos (ni nombres, ni sprites, ni ataques).
+- **Lo que se ve** es un disfraz de [Tuxemon](https://github.com/Tuxemon/Tuxemon), un juego de criaturas de código
+  abierto (`tuxemonFor()` en `server/creatures.js`). Cada cadena evolutiva se convierte de forma determinista en una
+  línea evolutiva de Tuxemon del mismo largo y, si hay al menos 4 líneas de ese largo, del mismo elemento. Cada etapa
+  pasa a ser la etapa equivalente: nombre, sprites de frente y espalda y nombres de ataques (en español cuando Tuxemon
+  los tiene traducidos y el disfraz comparte el elemento). La misma especie se ve igual para todos.
+
+No se muestran nombres, sprites ni ataques de ninguna franquicia comercial. El servidor nunca llama a la PokeAPI
+(en producción no tiene salida a internet). Para refrescar los datos:
+
+```sh
+node scripts/import-pokeapi.mjs   # ~35 s, reescribe server/pokeapi.json
+```
+
+Las especies que la PokeAPI no conoce usan stats según su rareza y el elemento de su disfraz.
 
 El arte de Tuxemon es CC BY-SA 4.0 / CC BY 4.0 según cada autor: los créditos están en `public/creditos.txt`
 (enlazado desde el pie de la página). Los sprites recortados (`public/sprites/`) y el catálogo
@@ -34,8 +49,8 @@ python3 scripts/import-tuxemon.py /tmp/tuxemon   # necesita Pillow y PyYAML
 Hay ~1000 especies y 363 criaturas, así que dos especies distintas a veces caen en la misma criatura (para eso
 están los apodos).
 
-Elementos: Brasa > Brote > Marea > Brasa, y Chispa > Sombra > Roca > Chispa (×1.5 / ×0.67). Los tipos de Tuxemon se
-agrupan en esos seis; los normales quedan como Neutro.
+Elementos: Brasa > Brote > Marea > Brasa, y Chispa > Sombra > Roca > Chispa (×1.5 / ×0.67). Los tipos de la PokeAPI
+(y los de Tuxemon) se agrupan en esos seis; el primer tipo no normal manda, y los solo normales quedan como Neutro.
 
 Del save se guarda solo eso (más el total de tokens para el ranking); el nombre del equipo, los logs y los
 nombres de especies se descartan. Saves importados antes de esta versión: "Actualizar save" para tomar la etapa
@@ -50,7 +65,8 @@ npm test        # parser, motor de batalla y flujo completo con WebSocket
 ```
 
 - `server/save.js`: lee el export (`format: "poketokenbar.save"`) o el estado crudo.
-- `server/creatures.js`: especie → criatura de Tuxemon (nombre, sprite, elemento, stats, golpes).
+- `server/creatures.js`: especie → datos de PokeAPI (stats, elemento) + disfraz de Tuxemon (nombre, sprite, golpes).
+- `scripts/import-pokeapi.mjs`: genera `server/pokeapi.json`.
 - `scripts/import-tuxemon.py`: genera `server/tuxemon.json`, `public/sprites/` y `public/creditos.txt`.
 - `server/battle.js`: motor puro de batalla (aleatoriedad inyectada).
 - `server/index.js`: HTTP + WebSocket, desafíos, ranking. Persistencia en `data/db.json`.
