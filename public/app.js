@@ -1,4 +1,4 @@
-import { creatureHTML, ELEMENTS, effectiveness } from './creature.js?v=2';
+import { creatureHTML, ELEMENTS, effectiveness } from './creature.js?v=dev';
 
 const $app = document.getElementById('app');
 const $who = document.getElementById('who');

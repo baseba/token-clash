@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,13 @@ const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || '';
 const TRUST_CF = process.env.TRUST_CF_CONNECTING_IP === '1';
 const TURN_MS = Number(process.env.TURN_MS || 60_000);
 const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
+// "?v=dev" in index.html and app.js becomes a hash of the code, so each deploy gets new URLs and
+// no browser keeps old code (Cloudflare stretches the cache of .js/.css to hours).
+const ASSET_VERSION = (() => {
+  const h = createHash('sha256');
+  for (const f of readdirSync(PUBLIC_DIR).filter((f) => /\.(js|css|html)$/.test(f)).sort()) h.update(f).update(readFileSync(join(PUBLIC_DIR, f)));
+  return h.digest('hex').slice(0, 10);
+})();
 const MAX_BODY = 9 * 1024 * 1024;
 
 const store = openStore(DATA_DIR);
@@ -251,7 +259,8 @@ async function serveStatic(req, res, path) {
   if (rel.includes('..')) return send(res, 404, 'not found');
   const file = join(PUBLIC_DIR, rel || 'index.html');
   try {
-    const body = await readFile(file);
+    let body = await readFile(file);
+    if (['.html', '.js'].includes(extname(file))) body = body.toString('utf8').replaceAll('?v=dev', `?v=${ASSET_VERSION}`);
     const type = MIME[extname(file)] || 'application/octet-stream';
     // Code revalidates on every load so a deploy shows up at once (Cloudflare would stretch a short
     // max-age to hours). Sprites never change under the same name, so they can be cached.
