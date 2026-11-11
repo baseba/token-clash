@@ -253,7 +253,10 @@ async function serveStatic(req, res, path) {
   try {
     const body = await readFile(file);
     const type = MIME[extname(file)] || 'application/octet-stream';
-    send(res, 200, body, { 'Content-Type': type, 'Cache-Control': extname(file) === '.html' ? 'no-cache' : 'public, max-age=300' });
+    // Code revalidates on every load so a deploy shows up at once (Cloudflare would stretch a short
+    // max-age to hours). Sprites never change under the same name, so they can be cached.
+    const cache = ['.png', '.ico'].includes(extname(file)) ? 'public, max-age=86400' : 'no-cache';
+    send(res, 200, body, { 'Content-Type': type, 'Cache-Control': cache });
   } catch {
     send(res, 404, 'not found');
   }
