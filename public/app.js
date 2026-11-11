@@ -525,19 +525,31 @@ function battleUI(c, sendAction) {
   let view = null; // what is on screen (lags behind frame while events play)
   let playing = false;
   let mine = 0;
-  let sent = false;
+  let sent = null; // label of the action we sent this turn, until the turn resolves
   let queue = Promise.resolve();
+  let lastElement = null; // element of the move being played, for the impact effect
 
+  const hud = (p) => {
+    const r = { name: h('span'), lvl: h('span'), sub: h('div', { class: 'sub' }), bar: h('i'), num: h('div', { class: 'hpnum' }) };
+    r.el = h('div', { class: `hud ${p}` }, h('div', { class: 'nm' }, r.name, r.lvl), r.sub, h('div', { class: 'hp' }, r.bar), r.num);
+    return r;
+  };
   const els = {
     turn: h('span', null, ''),
+    vs: h('span', { class: 'vs-line' }),
     timer: h('span', { class: 'timer' }, ''),
     spot: { foe: h('div', { class: 'spot foe' }), me: h('div', { class: 'spot me' }) },
-    hud: { foe: h('div', { class: 'hud foe' }), me: h('div', { class: 'hud me' }) },
+    hud: { foe: hud('foe'), me: hud('me') },
+    say: h('div', { class: 'say', 'aria-live': 'polite' }),
     controls: h('div', { class: 'card' }),
-    log: h('div', { class: 'card log', 'aria-live': 'polite' }),
+    log: h('div', { class: 'card log' }),
   };
-  const arena = h('div', { class: 'arena' }, els.spot.foe, els.spot.me, els.hud.foe, els.hud.me);
-  $app.replaceChildren(h('div', { class: 'status-line' }, els.turn, els.timer), arena, h('div', { class: 'battle-layout' }, els.controls, els.log));
+  const arena = h('div', { class: 'arena' }, els.spot.foe, els.spot.me, els.hud.foe.el, els.hud.me.el);
+  $app.replaceChildren(
+    h('div', { class: 'status-line' }, els.turn, els.vs, els.timer),
+    h('div', { class: 'stage' }, arena, els.say),
+    h('div', { class: 'battle-layout' }, els.controls, els.log),
+  );
 
   const tick = setInterval(() => {
     if (!frame?.deadline || frame.state.status !== 'active') {
@@ -551,37 +563,104 @@ function battleUI(c, sendAction) {
 
   const pos = (side) => (side === mine ? 'me' : 'foe');
   const activeOf = (side) => view.sides[side].team[view.sides[side].active];
+  const isYou = (side) => frame?.you === side;
+  // "tu Bigfin" / "Bigfin de Pedro": the same creature can be on both teams, so always say whose.
+  const mon = (side, name) => (isYou(side) ? ['tu ', h('b', null, name)] : [h('b', null, name), ` de ${view.sides[side].name}`]);
+  const capFirst = (parts) => {
+    const [first, ...rest] = parts.flat();
+    return typeof first === 'string' ? [first.replace(/\p{L}/u, (ch) => ch.toUpperCase()), ...rest] : [first, ...rest];
+  };
+  // Skip the show when the tab is hidden, so coming back doesn't replay a backlog.
+  const wait = (ms) => (document.hidden ? Promise.resolve() : sleep(ms));
 
-  function log(text, cls) {
-    els.log.append(h('p', { class: cls || null }, text));
+  function log(parts, cls) {
+    els.log.append(h('p', { class: cls || null }, parts));
     els.log.scrollTop = els.log.scrollHeight;
   }
+  function say(parts, side) {
+    els.say.className = `say${side == null ? '' : ` by-${pos(side)}`}`;
+    // The same nodes also go to the log, so the banner gets copies.
+    els.say.replaceChildren(h('span', null, [parts].flat(Infinity).map((n) => (n instanceof Node ? n.cloneNode(true) : n))));
+  }
+  function tell(parts, { side = null, cls = null, sub = false } = {}) {
+    const text = capFirst(parts);
+    say(text, side);
+    log(sub ? ['↳ ', ...text] : text, [side == null ? '' : `by-${pos(side)}`, sub ? 'sub' : '', cls || ''].filter(Boolean).join(' '));
+  }
 
-  function paint(side, anim) {
+  function anim(el, cls, ms = 600) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+    setTimeout(() => el.classList.remove(cls), ms);
+  }
+  // Floating text over a creature: damage numbers, "¡Falla!", "+20 PV"…
+  function float(side, text, cls) {
+    const spot = els.spot[pos(side)];
+    const el = h('span', { class: `float ${cls || ''}` }, text);
+    spot.append(el);
+    setTimeout(() => el.remove(), 1400);
+  }
+  function burst(side, element) {
+    const spot = els.spot[pos(side)];
+    const el = h('span', { class: 'burst' }, element ? ELEMENTS[element].icon : '💥');
+    spot.append(el);
+    setTimeout(() => el.remove(), 700);
+  }
+  function setActing(side) {
+    for (const p of ['me', 'foe']) els.hud[p].el.classList.toggle('acting', side != null && pos(side) === p);
+    for (const p of ['me', 'foe']) els.spot[p].classList.toggle('acting', side != null && pos(side) === p);
+  }
+
+  function countTo(el, from, to, max) {
+    const t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / 500);
+      el.textContent = `${Math.round(from + (to - from) * k)} / ${max} PV`;
+      if (k < 1 && el.dataset.to === String(to)) requestAnimationFrame(step);
+    };
+    el.dataset.to = String(to);
+    if (document.hidden || from === to) el.textContent = `${to} / ${max} PV`;
+    else requestAnimationFrame(step);
+  }
+
+  function paint(side, enter = false) {
     const p = pos(side);
     const sd = view.sides[side];
     const f = activeOf(side);
     const spot = els.spot[p];
-    const key = `${sd.active}:${f.uid}`;
-    if (spot.dataset.key !== key) {
+    const r = els.hud[p];
+    const key = `${side}:${sd.active}:${f.uid}`;
+    const fresh = spot.dataset.key !== key;
+    if (fresh) {
       spot.dataset.key = key;
       spot.innerHTML = creatureHTML(f, { back: p === 'me' });
-      anim = anim || 'enter';
+      enter = true;
     }
-    spot.className = `spot ${p}${f.hp <= 0 ? ' faint' : ''}`;
-    if (anim) {
-      void spot.offsetWidth;
-      spot.classList.add(anim);
-    }
+    spot.classList.toggle('faint', f.hp <= 0);
+    if (enter) anim(spot, 'enter', 500);
+
     const pct = Math.max(0, (f.hp / f.stats.hp) * 100);
-    const bar = h('i', { class: pct < 20 ? 'low' : pct < 50 ? 'mid' : null });
-    bar.style.width = `${pct}%`;
+    r.bar.className = pct < 20 ? 'low' : pct < 50 ? 'mid' : '';
+    if (fresh) {
+      r.bar.style.transition = 'none';
+      r.bar.style.width = `${pct}%`;
+      void r.bar.offsetWidth;
+      r.bar.style.transition = '';
+    } else r.bar.style.width = `${pct}%`;
+    const shown = Number(r.num.dataset.to);
+    countTo(r.num, fresh || Number.isNaN(shown) ? f.hp : shown, f.hp, f.stats.hp);
+
+    r.name.textContent = f.shiny ? `✨ ${f.name}` : f.name;
+    r.lvl.textContent = `Nv ${f.level}`;
     const boosts = [f.boosts.atk ? `ATQ ${f.boosts.atk > 0 ? '+' : ''}${f.boosts.atk}` : null, f.boosts.def ? `DEF ${f.boosts.def > 0 ? '+' : ''}${f.boosts.def}` : null].filter(Boolean).join(' · ');
-    els.hud[p].replaceChildren(
-      h('div', { class: 'nm' }, h('span', null, f.shiny ? `✨ ${f.name}` : f.name), h('span', null, `Nv ${f.level}`)),
-      h('div', { class: 'sub' }, elChip(f.element), h('span', null, sd.name), boosts ? h('span', null, boosts) : null, h('span', { class: 'dots', 'aria-label': 'Equipo' }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null })))),
-      h('div', { class: 'hp' }, bar),
-      h('div', { class: 'hpnum' }, `${f.hp} / ${f.stats.hp} PV`),
+    r.sub.replaceChildren(
+      ...[
+        elChip(f.element),
+        h('span', { class: 'owner' }, isYou(side) ? `${sd.name} (tú)` : sd.name),
+        boosts ? h('span', { class: 'boosts' }, boosts) : null,
+        h('span', { class: 'dots', 'aria-label': 'Equipo' }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
+      ].filter(Boolean),
     );
   }
 
@@ -589,6 +668,8 @@ function battleUI(c, sendAction) {
     paint(0);
     paint(1);
     els.turn.textContent = view.status === 'finished' ? 'Fin de la batalla' : `Turno ${view.turn}`;
+    const tag = (side) => h('span', { class: `who by-${pos(side)}` }, isYou(side) ? `${view.sides[side].name} (tú)` : view.sides[side].name);
+    els.vs.replaceChildren(tag(mine), h('span', { class: 'muted' }, ' vs '), tag(1 - mine));
   }
 
   function renderControls() {
@@ -599,6 +680,10 @@ function battleUI(c, sendAction) {
     box.replaceChildren();
 
     if (st.status === 'finished') {
+      if (playing) {
+        box.append(h('p', { class: 'pulse' }, 'Mirando el turno…'));
+        return;
+      }
       const won = st.winner === you;
       const title = st.winner === null ? 'Empate' : you === null ? `¡Gana ${st.sides[st.winner].name}!` : won ? '¡Ganaste! 🏆' : 'Perdiste… 😵';
       box.append(
@@ -631,16 +716,23 @@ function battleUI(c, sendAction) {
       return;
     }
 
+    if (playing) {
+      box.append(h('p', { class: 'pulse' }, 'Mirando el turno…'));
+      return;
+    }
     const acts = frame.actions;
-    if (!acts.length || sent || playing) {
-      box.append(h('p', { class: 'pulse' }, playing ? '…' : `Esperando a ${foeName}…`));
+    const foeReady = st.sides[1 - you].ready;
+    if (!acts.length || sent) {
+      const waitingFor = st.phase === 'replace' && st.sides[1 - you].mustSwitch ? `Esperando a que ${foeName} elija quién entra…` : `Esperando a ${foeName}…`;
+      if (sent) box.append(h('p', null, 'Elegiste: ', h('b', null, sent), '.'));
+      box.append(h('p', { class: 'pulse' }, waitingFor));
       return;
     }
     const meSide = st.sides[you];
     const f = meSide.team[meSide.active];
     const foe = st.sides[1 - you].team[st.sides[1 - you].active];
-    const act = (a) => {
-      sent = true;
+    const act = (a, label) => {
+      sent = label;
       sendAction(a);
       renderControls();
     };
@@ -659,7 +751,7 @@ function battleUI(c, sendAction) {
               m.kind === 'attack'
                 ? [h('span', null, `Poder ${m.power}`), h('span', null, `${m.accuracy}%`), m.priority > 0 ? h('span', null, 'Va primero') : null, eff > 1 ? h('span', { class: 'tag-strong' }, 'Fuerte ×1.5') : eff < 1 ? h('span', { class: 'tag-weak' }, 'Débil ×0.67') : null]
                 : [h('span', null, m.desc), m.key === 'mend' ? h('span', null, `· quedan ${f.uses?.mend ?? 0}`) : null];
-            return h('button', { class: 'move', disabled: !moveSet.has(i), onclick: () => act({ type: 'move', move: i }) }, h('span', { class: 'mv' }, m.name), h('span', { class: 'mi' }, elChip(m.element), info));
+            return h('button', { class: 'move', disabled: !moveSet.has(i), onclick: () => act({ type: 'move', move: i }, m.name) }, h('span', { class: 'mv' }, m.name), h('span', { class: 'mi' }, elChip(m.element), info));
           }),
         ),
       );
@@ -670,50 +762,104 @@ function battleUI(c, sendAction) {
         h('p', { class: 'muted small' }, st.phase === 'replace' ? '' : 'Cambiar (gasta el turno):'),
         h('div', { class: 'bench' }, sw.map((a) => {
           const t = meSide.team[a.to];
-          return h('button', { class: 'btn', onclick: () => act(a) }, h('span', { html: creatureHTML(t) }), `${t.name} · ${t.hp}/${t.stats.hp}`);
+          return h('button', { class: 'btn', onclick: () => act(a, `cambiar a ${t.name}`) }, h('span', { html: creatureHTML(t) }), `${t.name} · ${t.hp}/${t.stats.hp}`);
         })),
       );
     }
+    if (foeReady && st.phase === 'choose') box.append(h('p', { class: 'muted small' }, `${foeName} ya eligió.`));
   }
 
-  function describe(ev) {
+  const WHY = {
+    priority: 'golpe rápido, va primero',
+    speed: 'es más veloz, ataca primero',
+    tie: 'misma velocidad, le tocó primero',
+  };
+
+  // Plays one event on screen and in the log; returns how long to linger on it.
+  function play(ev) {
     const sd = (s) => view.sides[s];
     switch (ev.t) {
-      case 'turn': return log(`Turno ${ev.turn}`, 'turn');
-      case 'move': return log(`${ev.name} usa ${ev.move}`);
-      case 'miss': return log('…pero falla.', 'weak');
-      case 'nothing': return log('No pasa nada más.', 'weak');
+      case 'turn':
+        setActing(null);
+        els.turn.textContent = `Turno ${ev.turn}`;
+        log(`Turno ${ev.turn}`, 'turn');
+        return 350;
+      case 'move': {
+        lastElement = ev.element || null;
+        setActing(ev.side);
+        if (ev.kind === 'attack') anim(els.spot[pos(ev.side)], `lunge-${pos(ev.side)}`, 500);
+        else anim(els.spot[pos(ev.side)], 'power', 600);
+        tell([...mon(ev.side, ev.name), ' usa ', h('b', { class: 'mvname' }, ev.move), ev.element ? ` ${ELEMENTS[ev.element].icon}` : '', ev.why ? h('small', { class: 'why' }, ` · ${WHY[ev.why]}`) : ''], { side: ev.side });
+        return 750;
+      }
       case 'damage': {
-        activeOf(ev.side).hp = ev.hp;
-        paint(ev.side, 'hit');
-        const bits = [ev.crit ? '¡Crítico! ' : '', ev.eff > 1 ? '¡Golpe fuerte! ' : ev.eff < 1 ? 'Poco efectivo… ' : '', `−${ev.amount} PV`];
-        return log(bits.join(''), ev.eff > 1 || ev.crit ? 'strong' : ev.eff < 1 ? 'weak' : null);
-      }
-      case 'faint': {
-        activeOf(ev.side).hp = 0;
+        const f = activeOf(ev.side);
+        const before = f.hp;
+        f.hp = ev.hp;
+        burst(ev.side, lastElement);
         paint(ev.side);
-        return log(`${ev.name} cae rendido.`, 'ko');
+        anim(els.spot[pos(ev.side)], 'hit', 500);
+        anim(els.hud[pos(ev.side)].el, 'hurt', 600);
+        float(ev.side, `−${ev.amount}`, ev.crit || ev.eff > 1 ? 'dmg big' : ev.eff < 1 ? 'dmg small' : 'dmg');
+        const notes = [ev.crit ? '¡Golpe crítico!' : '', ev.eff > 1 ? '¡Es muy eficaz!' : ev.eff < 1 ? 'No es muy eficaz…' : ''].filter(Boolean).join(' ');
+        tell([...mon(ev.side, f.name), ` pierde ${ev.amount} PV (${before} → ${ev.hp})`, notes ? h('span', { class: ev.eff < 1 && !ev.crit ? 'weak' : 'strong' }, ` ${notes}`) : ''], { side: ev.side, sub: true });
+        return 1050;
       }
-      case 'switch': {
-        sd(ev.side).active = ev.to;
-        paint(ev.side);
-        return log(`${sd(ev.side).name} manda a ${ev.name}.`);
+      case 'miss': {
+        const t = 1 - ev.side;
+        anim(els.spot[pos(t)], 'dodge', 500);
+        float(t, '¡Esquiva!', 'miss');
+        tell(['falla: ', ...mon(t, activeOf(t).name), ' lo esquiva.'], { side: ev.side, sub: true, cls: 'weak' });
+        return 900;
       }
+      case 'nothing':
+        float(ev.side, 'Al máximo', 'miss');
+        tell(['ya está al máximo: no pasa nada.'], { side: ev.side, sub: true, cls: 'weak' });
+        return 800;
       case 'boost': {
         const f = activeOf(ev.side);
         f.boosts[ev.stat] = ev.stage;
         paint(ev.side);
-        return log(`${f.name} sube su ${ev.stat === 'atk' ? 'ataque' : 'defensa'}.`);
+        float(ev.side, ev.stat === 'atk' ? 'ATQ ▲' : 'DEF ▲', 'up');
+        tell([...mon(ev.side, f.name), ` sube su ${ev.stat === 'atk' ? 'ataque' : 'defensa'} (${ev.stage > 0 ? '+' : ''}${ev.stage}).`], { side: ev.side, sub: true });
+        return 900;
       }
       case 'heal': {
         const f = activeOf(ev.side);
+        const before = f.hp;
         f.hp = ev.hp;
         paint(ev.side);
-        return log(`${f.name} recupera ${ev.amount} PV.`);
+        float(ev.side, `+${ev.amount}`, 'heal');
+        tell([...mon(ev.side, f.name), ` recupera ${ev.amount} PV (${before} → ${ev.hp}).`], { side: ev.side, sub: true });
+        return 1000;
       }
-      case 'replace': return log(`${sd(ev.side).name} tiene que elegir otra criatura.`, 'weak');
-      case 'end': return log(ev.winner === null ? 'Empate.' : `¡${sd(ev.winner).name} gana la batalla!`, 'win');
+      case 'faint': {
+        const f = activeOf(ev.side);
+        f.hp = 0;
+        setActing(null);
+        paint(ev.side);
+        tell(['💀 ', ...mon(ev.side, f.name), ' cae rendido.'], { side: ev.side, cls: 'ko' });
+        return 1200;
+      }
+      case 'switch': {
+        const s = ev.side;
+        const from = ev.from || activeOf(s).name;
+        sd(s).active = ev.to;
+        paint(s);
+        const who = isYou(s) ? 'mandas' : `${sd(s).name} manda`;
+        if (ev.forced) tell([isYou(s) ? 'Mandas a ' : `${sd(s).name} manda a `, h('b', null, ev.name), '.'], { side: s });
+        else tell([isYou(s) ? 'Retiras a ' : `${sd(s).name} retira a `, h('b', null, from), ` y ${who} a `, h('b', null, ev.name), '.'], { side: s });
+        return 1000;
+      }
+      case 'replace':
+        tell([isYou(ev.side) ? 'Elige quién entra.' : `${sd(ev.side).name} elige quién entra…`], { side: ev.side, cls: 'weak' });
+        return 500;
+      case 'end':
+        setActing(null);
+        tell([ev.winner === null ? 'Empate.' : isYou(ev.winner) ? '¡Ganaste la batalla! 🏆' : `¡${sd(ev.winner).name} gana la batalla!`], { cls: 'win' });
+        return 900;
     }
+    return 0;
   }
 
   async function apply(msg) {
@@ -723,27 +869,33 @@ function battleUI(c, sendAction) {
     if (first) {
       mine = msg.you ?? 0;
       view = clone(msg.state);
+      for (const p of ['me', 'foe']) delete els.spot[p].dataset.key;
       paintAll();
-      if (msg.state.status === 'active' && !els.log.childElementCount) log(`${view.sides[0].name} vs ${view.sides[1].name}. ¡A pelear!`, 'turn');
-      if (msg.state.status === 'finished') log(msg.state.winner === null ? 'Empate.' : `¡${view.sides[msg.state.winner].name} ganó esta batalla!`, 'win');
+      if (msg.state.status === 'active' && !els.log.childElementCount) {
+        log(`${view.sides[0].name} vs ${view.sides[1].name}. ¡A pelear!`, 'turn');
+        say(msg.you == null ? `${view.sides[0].name} vs ${view.sides[1].name}` : '¡A pelear! Elige tu jugada.');
+      }
+      if (msg.state.status === 'finished') {
+        const w = msg.state.winner;
+        tell([w === null ? 'Empate.' : isYou(w) ? '¡Ganaste esta batalla! 🏆' : `¡${view.sides[w].name} ganó esta batalla!`], { cls: 'win' });
+      }
     } else if (msg.events?.length) {
       playing = true;
-      sent = false;
+      sent = null;
       renderControls();
-      if (msg.timedOut) log('Se acabó el tiempo: elige la máquina.', 'weak');
-      for (const ev of msg.events) {
-        describe(ev);
-        await sleep(ev.t === 'turn' || ev.t === 'replace' ? 300 : 750);
-      }
+      if (msg.timedOut) log('⏱ Se acabó el tiempo: la máquina eligió por quien no alcanzó.', 'weak');
+      for (const ev of msg.events) await wait(play(ev));
+      setActing(null);
       playing = false;
       view = clone(msg.state);
       paintAll();
+      if (view.status === 'active') say(frame.you == null ? 'Eligiendo…' : view.phase === 'replace' && !view.sides[frame.you].mustSwitch ? `${view.sides[1 - frame.you].name} elige quién entra…` : '¿Qué haces ahora?');
     } else if (msg.t === 'start' || msg.t === 'presence') {
-      sent = false;
       view = clone(msg.state);
       paintAll();
     }
-    if (msg.you !== null && msg.you !== undefined && msg.actions.length === 0) sent = false;
+    // Keep "Elegiste: …" while the server has our choice; a 'ready'/'presence' frame may race our own submit.
+    if (msg.you != null && !msg.state.sides[msg.you].ready && msg.t !== 'ready' && msg.t !== 'presence') sent = null;
     renderControls();
   }
 

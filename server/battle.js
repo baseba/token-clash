@@ -92,21 +92,21 @@ function doSwitch(b, s, to, events) {
   const old = side.team[side.active];
   old.boosts = { atk: 0, def: 0 };
   side.active = to;
-  events.push({ t: 'switch', side: s, to, name: side.team[to].name });
+  events.push({ t: 'switch', side: s, to, name: side.team[to].name, from: old.name, forced: old.hp <= 0 });
 }
 
 function speedOf(f) {
   return f.stats.spd;
 }
 
-function useMove(b, s, moveIdx, events) {
+function useMove(b, s, moveIdx, events, why = null) {
   const side = b.sides[s];
   const foeSide = b.sides[1 - s];
   const me = side.team[side.active];
   const foe = foeSide.team[foeSide.active];
   if (me.hp <= 0) return;
   const m = me.moves[moveIdx];
-  events.push({ t: 'move', side: s, name: me.name, move: m.name, element: m.element });
+  events.push({ t: 'move', side: s, name: me.name, move: m.name, element: m.element, kind: m.kind || 'attack', ...(why ? { why } : {}) });
 
   if (m.kind === 'boost') {
     const cur = me.boosts[m.stat];
@@ -171,8 +171,12 @@ function resolveTurn(b) {
     })
     .sort((x, y) => y.prio - x.prio || y.spd - x.spd || y.tie - x.tie);
 
+  // When both attack, say why the first one went first (priority move, faster, or a coin flip).
+  const why = movers.length === 2 ? (movers[0].prio !== movers[1].prio ? 'priority' : movers[0].spd !== movers[1].spd ? 'speed' : 'tie') : null;
+  movers.forEach((a, i) => (a.why = i === 0 ? why : null));
+
   for (const a of movers) {
-    useMove(b, a.s, a.move, events);
+    useMove(b, a.s, a.move, events, a.why);
     if (checkEnd(b, events)) return events;
   }
   b.turn += 1;
