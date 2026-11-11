@@ -16,8 +16,8 @@ export function effectiveness(a, d) {
 
 const SLUG = /^[a-z0-9_-]+$/;
 
-// A Tuxemon sprite (CC BY-SA / CC BY, see /creditos.txt). The player's own creature is seen from
-// behind, like in the classic battle view; everyone else from the front.
+// A PokeAPI sprite, served locally from /sprites/ by dex number. The player's own creature is seen
+// from behind, like in the classic battle view; everyone else from the front.
 export function creatureHTML(f, { back = false } = {}) {
   const slug = SLUG.test(f.sprite || '') ? f.sprite : 'missing';
   const cls = ['creature', f.shiny ? 'is-shiny' : '', f.rarity === 'legendary' ? 'legendary' : ''].filter(Boolean).join(' ');

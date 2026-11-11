@@ -219,7 +219,7 @@ async function homePage() {
 }
 
 function demoMon(i) {
-  return { sprite: ['agnite', 'dollfin', 'bamboon'][i], rarity: 'rare' };
+  return { sprite: ['4', '7', '1'][i], rarity: 'rare' };
 }
 
 function renderLanding() {
@@ -231,7 +231,7 @@ function renderLanding() {
         'div',
         null,
         h('h1', null, 'Tus tokens criaron criaturas. Ahora a pelear.'),
-        h('p', { class: 'lead' }, 'Sube el save de PokeTokenBar, arma un equipo de 3 y manda un link a tus colegas. Cada especie se convierte en una criatura de Tuxemon, con su evolución, su elemento, sus golpes y stats según el nivel que le diste a punta de tokens.'),
+        h('p', { class: 'lead' }, 'Sube el save de PokeTokenBar, arma un equipo de 3 y manda un link a tus colegas. Cada especie pelea con su elemento, sus golpes y stats según el nivel que le diste a punta de tokens.'),
         h('div', { class: 'hero-mons' }, [0, 1, 2].map((i) => h('div', { html: creatureHTML(demoMon(i)) }))),
       ),
       importCard({ onDone: renderHome }),

@@ -213,7 +213,7 @@ input[type=text]:focus, .btn:focus-visible, .mon:focus-visible { outline: 3px so
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
-/* Tuxemon sprites: 64x64 pixel art, scaled without blur */
+/* PokeAPI sprites: small pixel art, scaled without blur */
 .creature { position: relative; aspect-ratio: 1 / 1; }
 .creature img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; user-select: none; }
 .creature.is-shiny img { filter: hue-rotate(150deg) saturate(1.25) brightness(1.08); }

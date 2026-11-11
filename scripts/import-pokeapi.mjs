@@ -1,18 +1,22 @@
 #!/usr/bin/env node
-// Downloads the battle data of every species from PokeAPI (https://pokeapi.co) into
-// server/pokeapi.json: base stats, types (mapped to the six elements of Token Clash) and where each
-// species sits in its evolution chain. Only numbers and type words are kept: no names, sprites or
-// move names. What the player sees comes from Tuxemon (see server/creatures.js).
+// Downloads every species from PokeAPI (https://pokeapi.co) into the game's data:
+// - server/pokeapi.json: name, base stats, types (mapped to the six elements of Token Clash) and
+//   where each species sits in its evolution chain.
+// - public/sprites/<id>-front.png and <id>-back.png: the official front/back sprites.
 //
 // The server never calls PokeAPI (production has no egress): run this again to refresh the data.
 //
 //   node scripts/import-pokeapi.mjs
 
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { Buffer } from 'node:buffer';
 
 const API = 'https://pokeapi.co/api/v2';
 const OUT = new URL('../server/pokeapi.json', import.meta.url);
+const SPRITES = new URL('../public/sprites/', import.meta.url);
 const CONCURRENCY = 8;
+
+mkdirSync(SPRITES, { recursive: true });
 
 // PokeAPI types -> elements. Normal is neutral; a normal/flying species takes its second type.
 export const ELEMENT = {
@@ -38,6 +42,22 @@ async function get(url, tries = 4) {
   }
 }
 
+async function download(url, path, tries = 4) {
+  if (!url) return false;
+  for (let i = 1; ; i++) {
+    try {
+      const res = await fetch(url, { headers: { 'user-agent': 'token-clash-importer' } });
+      if (res.status === 404) return false;
+      if (!res.ok) throw new Error(`${res.status} ${url}`);
+      writeFileSync(path, Buffer.from(await res.arrayBuffer()));
+      return true;
+    } catch (err) {
+      if (i >= tries) throw err;
+      await new Promise((r) => setTimeout(r, 500 * 2 ** i));
+    }
+  }
+}
+
 async function mapLimit(items, fn) {
   const out = new Array(items.length);
   let next = 0;
@@ -55,10 +75,11 @@ async function mapLimit(items, fn) {
 }
 
 const idFromUrl = (url) => Number(url.match(/\/(\d+)\/?$/)[1]);
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const { count } = await get(`${API}/pokemon-species?limit=1`);
 const ids = Array.from({ length: count }, (_, i) => i + 1);
-console.error(`${count} especies: stats y tipos…`);
+console.error(`${count} especies: nombre, stats, tipos y sprites…`);
 
 const species = {};
 const chainIds = new Set();
@@ -70,11 +91,17 @@ await mapLimit(ids, async (id) => {
   if (!mon) return;
   const stat = Object.fromEntries(mon.stats.map((s) => [s.stat.name, s.base_stat]));
   const types = [...mon.types].sort((a, b) => a.slot - b.slot).map((t) => t.type.name);
+  const esName = sp.names.find((n) => n.language.name === 'es')?.name;
   species[id] = {
+    name: esName || cap(sp.name.replace(/-/g, ' ')),
     types,
     element: types.map((t) => ELEMENT[t]).find(Boolean) ?? null,
     stats: [stat.hp, stat.attack, stat.defense, stat['special-attack'], stat['special-defense'], stat.speed],
   };
+  const sprites = mon.sprites || {};
+  await download(sprites.front_default, new URL(`${id}-front.png`, SPRITES));
+  // Some species (newer gens) have no back sprite: fall back to the front one.
+  await download(sprites.back_default || sprites.front_default, new URL(`${id}-back.png`, SPRITES));
   if (sp.evolution_chain) {
     species[id].chainId = idFromUrl(sp.evolution_chain.url);
     chainIds.add(species[id].chainId);
