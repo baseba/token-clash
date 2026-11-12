@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node --test --test-timeout=120000 test/*.test.js"
+    "test": "node --test --test-timeout=120000 test/*.test.js",
+    "sprites": "node scripts/sprites.mjs",
+    "postinstall": "node scripts/sprites.mjs || echo 'No se pudieron descargar los sprites: corre npm run sprites cuando tengas conexión.'"
   },
   "dependencies": {
     "ws": "^8.18.0"

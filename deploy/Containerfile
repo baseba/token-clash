@@ -2,7 +2,10 @@ FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && rm -rf /root/.npm
+RUN npm ci --omit=dev --ignore-scripts && rm -rf /root/.npm
+COPY scripts/sprites.mjs ./scripts/sprites.mjs
+COPY server/pokeapi.json ./server/pokeapi.json
+RUN node scripts/sprites.mjs
 COPY server ./server
 COPY public ./public
 RUN mkdir -p /data && chown node:node /data
