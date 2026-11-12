@@ -271,9 +271,7 @@ input[type=text]:focus, .btn:focus-visible, .mon:focus-visible { outline: 3px so
 /* PokeAPI sprites: small pixel art, scaled without blur */
 .creature { position: relative; aspect-ratio: 1 / 1; }
 .creature img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; user-select: none; }
-.creature.is-shiny img { filter: hue-rotate(150deg) saturate(1.25) brightness(1.08); }
 .creature.legendary img { filter: drop-shadow(0 0 5px rgb(255 211 77 / .75)); }
-.creature.is-shiny.legendary img { filter: hue-rotate(150deg) saturate(1.25) drop-shadow(0 0 5px rgb(255 211 77 / .75)); }
 .creature.is-shiny::before, .creature.is-shiny::after {
   content: "✦"; position: absolute; color: #fff6b0; font-size: .95rem; line-height: 1; pointer-events: none;
   animation: twinkle 1.8s ease-in-out infinite;
