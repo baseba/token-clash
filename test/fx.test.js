@@ -1,26 +1,31 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { moveShape, SHAPE_NAMES } from '../public/fx.js';
-import { MOVE_INFO } from '../server/moves.js';
-import { SUPPORT_MOVES } from '../server/creatures.js';
+import { moveData } from '../server/creatures.js';
 
-test('every move in the game has a known visual effect', () => {
-  for (const [name, info] of Object.entries(MOVE_INFO)) {
-    const support = Object.values(SUPPORT_MOVES).find((m) => m.name === name);
-    const ev = { move: name, type: 'normal', kind: support?.kind ?? 'attack', category: info.category, flags: info.flags ?? [], multihit: !!info.multihit, drain: !!info.drain };
-    assert.ok(SHAPE_NAMES.includes(moveShape(ev)), `${name} → ${moveShape(ev)}`);
+const MOVEDEX = JSON.parse(readFileSync(new URL('../server/movedex.json', import.meta.url), 'utf8'));
+
+const eventFor = (m) => ({ move: m.name, key: m.key, type: m.type, kind: m.kind, category: m.category, flags: m.flags, multihit: !!m.multihit, drain: !!m.drain, effect: m.heal ? 'heal' : m.weather ? 'weather' : m.target === 'self' && m.boosts ? 'boost' : 'debuff', stat: m.boosts ? Object.keys(m.boosts)[0] : undefined });
+
+test('every move in the movedex has a known visual effect', () => {
+  for (const id of Object.keys(MOVEDEX)) {
+    const ev = eventFor(moveData(id));
+    assert.ok(SHAPE_NAMES.includes(moveShape(ev)), `${id} → ${moveShape(ev)}`);
   }
 });
 
-test('the effect follows the move: name first, then its flags', () => {
-  const ev = (move, extra = {}) => ({ move, type: 'fire', kind: 'attack', category: 'physical', flags: [], ...extra });
-  assert.equal(moveShape(ev('Lanzallamas')), 'stream');
-  assert.equal(moveShape(ev('Trueno')), 'bolt');
-  assert.equal(moveShape(ev('Terremoto')), 'quake');
-  assert.equal(moveShape(ev('X', { flags: ['contact', 'bite'] })), 'bite');
-  assert.equal(moveShape(ev('X', { flags: ['contact', 'punch'] })), 'punch');
-  assert.equal(moveShape(ev('X', { flags: ['contact'] })), 'strike');
-  assert.equal(moveShape(ev('X', { category: 'special' })), 'projectile');
-  assert.equal(moveShape(ev('Danza Espada', { kind: 'boost' })), 'boost');
-  assert.equal(moveShape(ev('Recuperación', { kind: 'heal' })), 'heal');
+test('the effect follows the move: id first, then its flags', () => {
+  const shape = (id) => moveShape(eventFor(moveData(id)));
+  assert.equal(shape('flamethrower'), 'stream');
+  assert.equal(shape('thunder'), 'bolt');
+  assert.equal(shape('earthquake'), 'quake');
+  assert.equal(shape('crunch'), 'bite');
+  assert.equal(shape('thunder-punch'), 'punch');
+  assert.equal(shape('tackle'), 'strike');
+  assert.equal(shape('swords-dance'), 'boost');
+  assert.equal(shape('recover'), 'heal');
+  assert.equal(shape('rain-dance'), 'weather');
+  assert.equal(shape('thunder-wave'), 'psywave');
+  assert.equal(shape('growl'), 'sound');
 });

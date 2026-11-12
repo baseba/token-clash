@@ -3,14 +3,37 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents } from '../server/battle.js';
 import { ABILITIES, INERT, abilityInfo } from '../server/abilities.js';
-import { abilityFor, floats, rng, species } from '../server/creatures.js';
+import { abilityFor, floats, rng, species, movepool, buildFighter } from '../server/creatures.js';
 
 const CATALOG = JSON.parse(readFileSync(new URL('../server/abilities.json', import.meta.url), 'utf8'));
 const SPECIES = JSON.parse(readFileSync(new URL('../server/pokeapi.json', import.meta.url), 'utf8')).species;
-const IVS = { hp: 31, atk: 31, def: 31, spd: 31 };
+const IVS = { hp: 31, atk: 31, def: 31, satk: 31, sdef: 31, spd: 31 };
+
+const plainAttack = (m) => m.kind === 'attack' && m.power > 0 && !m.flags.includes('charge') && !m.flags.includes('recharge') && !m.multihit && !m.fixedDamage && !m.ohko && !m.selfDestruct && (m.accuracy ?? 100) >= 70;
+const selfBoost = (m) => m.kind === 'status' && m.target === 'self' && !!m.boosts;
+
+function pickMoves(entry, wants = []) {
+  const pool = movepool(entry).filter((m) => m.supported).reverse();
+  const out = [];
+  const add = (pred) => {
+    const m = pool.find((x) => pred(x) && !out.includes(x.key));
+    if (m && out.length < 4) out.push(m.key);
+  };
+  wants.forEach(add);
+  for (const type of SPECIES[entry.finalID]?.types ?? []) add((m) => plainAttack(m) && m.type === type);
+  add(selfBoost);
+  add((m) => m.kind === 'status');
+  add(plainAttack);
+  return out.length ? out : undefined;
+}
 
 let n = 0;
-const mon = (finalID, ability, extra = {}) => ({ id: `t-${finalID}-${n++}`, finalID, baseID: finalID, rarity: 'common', shiny: false, level: 50, ivs: IVS, ability, ...extra });
+const mon = (finalID, ability, extra = {}) => {
+  const { want, ...rest } = extra;
+  const e = { id: `t-${finalID}-${n++}`, finalID, baseID: finalID, rarity: 'common', shiny: false, level: 50, ivs: IVS, ability, ...rest };
+  const moveset = pickMoves(e, want);
+  return moveset ? { ...e, moveset } : e;
+};
 
 function duel(a, b, { random = () => 0.5, benchA = [], benchB = [] } = {}) {
   return createBattle({
@@ -31,10 +54,15 @@ function turn(b, a0, a1) {
   return submit(b, 1, a1);
 }
 
-const supportIdx = (b, s) => moveIndex(b, s, (m) => m.kind && m.kind !== 'attack');
+const supportIdx = (b, s) => {
+  const self = moveIndex(b, s, selfBoost);
+  const i = self >= 0 ? self : moveIndex(b, s, (m) => m.kind === 'status');
+  assert.ok(i >= 0, `no status move for side ${s}`);
+  return i;
+};
 const idle = (b, s) => ({ type: 'move', move: supportIdx(b, s) });
 const attackOfType = (b, s, type) => {
-  const i = moveIndex(b, s, (m) => m.type === type && m.power > 0);
+  const i = moveIndex(b, s, (m) => m.type === type && plainAttack(m));
   assert.ok(i >= 0, `no ${type} move for side ${s}`);
   return { type: 'move', move: i };
 };
@@ -113,11 +141,12 @@ test('Elec. Estática paraliza a quien la golpea con contacto', () => {
 });
 
 test('Inmunidad evita el envenenamiento', () => {
-  const poisoning = (b) => ({ type: 'move', move: moveIndex(b, 0, (m) => m.secondary?.some((s) => s.status === 'psn' || s.status === 'tox')) });
-  const b = duel(mon(89, 'stench'), mon(143, 'immunity'), { random: () => 0.01 });
+  const poisons = (m) => m.kind === 'attack' && !!m.secondary?.some((s) => s.status === 'psn' || s.status === 'tox');
+  const poisoning = (b) => ({ type: 'move', move: moveIndex(b, 0, poisons) });
+  const b = duel(mon(89, 'stench', { want: [poisons] }), mon(143, 'immunity'), { random: () => 0.01 });
   turn(b, poisoning(b), idle(b, 1));
   assert.equal(fighter(b, 1).status, null);
-  const c = duel(mon(89, 'stench'), mon(143, 'thick-fat'), { random: () => 0.01 });
+  const c = duel(mon(89, 'stench', { want: [poisons] }), mon(143, 'thick-fat'), { random: () => 0.01 });
   turn(c, poisoning(c), idle(c, 1));
   assert.ok(['psn', 'tox'].includes(fighter(c, 1).status));
 });
@@ -147,10 +176,11 @@ test('the rival ability and moves stay hidden until they show up in battle', () 
   const b = duel(mon(9, 'torrent'), mon(436, 'levitate'));
   const seenBy = (viewer, s) => publicState(b, viewer).sides[s].team[0];
   assert.equal(seenBy(0, 0).abilityInfo.name, 'Torrente');
-  assert.equal(seenBy(0, 0).moves.length, 4);
+  assert.equal(seenBy(0, 0).moves.length, fighter(b, 0).moves.length);
   assert.equal(seenBy(0, 1).abilityInfo, null);
   assert.deepEqual(seenBy(0, 1).moves, []);
-  assert.deepEqual(seenBy(0, 1).uses, {});
+  assert.deepEqual(seenBy(0, 1).pp, {});
+  assert.ok(Object.values(seenBy(0, 0).pp).every((n) => n > 0));
   assert.equal(seenBy(null, 0).abilityInfo, null);
 
   turn(b, attackOfType(b, 0, 'water'), idle(b, 1));
@@ -251,6 +281,25 @@ test('the rival team stays hidden until each Pokémon is sent out', () => {
   assert.equal(publicState(b, 1).sides[1].team[2].name, 'Zoroark');
 });
 
+test('Nevada invoca granizo antiguo: daña 1/16 por turno a quien no es Hielo y Ventisca no falla', () => {
+  const b = duel(mon(460, 'snow-warning'), mon(143, 'thick-fat'), { random: () => 0.99 });
+  assert.equal(b.field.weather, 'hail');
+  const snorlax = fighter(b, 1);
+  const abomasnow = fighter(b, 0);
+  const ev = turn(b, idle(b, 0), idle(b, 1));
+  const hail = ev.filter((e) => e.t === 'hurt' && e.cause === 'hail');
+  assert.deepEqual(hail.map((e) => e.side), [1]);
+  assert.equal(hail[0].amount, Math.floor(snorlax.stats.hp / 16));
+  assert.equal(abomasnow.hp, abomasnow.stats.hp);
+
+  const c = duel(mon(460, 'snow-warning', { want: [(m) => m.key === 'blizzard'] }), mon(143, 'thick-fat'), { random: () => 0.99 });
+  const blizzard = moveIndex(c, 0, (m) => m.key === 'blizzard');
+  assert.ok(blizzard >= 0);
+  const ev2 = turn(c, { type: 'move', move: blizzard }, idle(c, 1));
+  assert.ok(ev2.some((e) => e.t === 'damage' && e.side === 1));
+  assert.ok(!ev2.some((e) => e.t === 'miss'));
+});
+
 test('an ability with no battle effect changes nothing', () => {
   const a = duel(mon(52, 'pickup'), mon(25, 'static'), { random: rng(5) });
   const b = duel(mon(52, 'technician'), mon(25, 'static'), { random: rng(5) });
@@ -283,5 +332,5 @@ test('every species with every one of its abilities can fight to the end', () =>
       JSON.stringify(publicState(b));
     }
   }
-  assert.ok(species({ finalID: 1 }).moves.every((m) => m.category));
+  assert.ok(buildFighter(mon(1, 'overgrow')).moves.every((m) => m.category && m.pp > 0));
 });

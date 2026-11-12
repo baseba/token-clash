@@ -15,12 +15,12 @@ export const INERT = {
   'sticky-hold': 'items', gluttony: 'items', unburden: 'items', klutz: 'items', 'honey-gather': 'field',
   frisk: 'items', multitype: 'items', pickpocket: 'items', unnerve: 'items', healer: 'doubles',
   'friend-guard': 'doubles', 'heavy-metal': 'moves', 'light-metal': 'moves', harvest: 'items',
-  telepathy: 'doubles', 'wonder-skin': 'moves', infiltrator: 'moves', 'magic-bounce': 'moves',
+  telepathy: 'doubles', infiltrator: 'moves',
   'cheek-pouch': 'items', magician: 'items', symbiosis: 'items', battery: 'doubles', receiver: 'doubles',
   'power-of-alchemy': 'doubles', 'rks-system': 'items', 'ball-fetch': 'items', 'propeller-tail': 'doubles',
   stalwart: 'doubles', ripen: 'items', 'power-spot': 'doubles', 'screen-cleaner': 'moves',
   'unseen-fist': 'moves', 'curious-medicine': 'doubles', commander: 'doubles',
-  'good-as-gold': 'moves', 'cud-chew': 'items', costar: 'doubles', hospitality: 'doubles',
+  'cud-chew': 'items', costar: 'doubles', hospitality: 'doubles',
   'embody-aspect': 'tera', 'teraform-zero': 'tera', 'piercing-drill': 'moves',
 };
 
@@ -43,6 +43,7 @@ const pinch = (type) => ({ onBasePower: (E, me, move) => (move.type === type && 
 const weatherSpeed = (test) => ({ onSpeed: (E, me, spd) => (test(E.weather()) ? spd * 2 : spd) });
 const isSun = (w) => w === 'sun' || w === 'harshsun';
 const isRain = (w) => w === 'rain' || w === 'heavyrain';
+const isIcy = (w) => w === 'snow' || w === 'hail';
 
 const skin = (type) => ({
   onModifyMove(E, me, move) {
@@ -365,8 +366,8 @@ const EFFECTS = {
   steadfast: { onFlinch: (E, me) => E.boost(me, { spd: 1 }, me, { ability: me }) },
   'snow-cloak': {
     breakable: true,
-    weatherImmune: ['snow'],
-    onEvasion: (E, me, move, attacker, acc) => (E.weather() === 'snow' ? acc * 0.8 : acc),
+    weatherImmune: ['snow', 'hail'],
+    onEvasion: (E, me, move, attacker, acc) => (isIcy(E.weather()) ? acc * 0.8 : acc),
   },
   'anger-point': {
     onDamagingHit(E, me, move, attacker, { crit }) {
@@ -403,6 +404,9 @@ const EFFECTS = {
     },
   },
   'iron-fist': flagPower('punch', 1.2),
+  'magic-bounce': { breakable: true, bouncesStatus: true },
+  'good-as-gold': { breakable: true, blocksStatusMoves: true },
+  'wonder-skin': { breakable: true, wonderSkin: true },
   'poison-heal': {
     onStatusDamage(E, me, status) {
       if (!poison(status)) return undefined;
@@ -490,11 +494,11 @@ const EFFECTS = {
   scrappy: merge(ignoresIntimidate, { hitsGhost: true }),
   'storm-drain': absorb('water', { boost: { satk: 1 } }),
   'ice-body': {
-    weatherImmune: ['snow'],
-    onEndTurn: (E, me) => E.weather() === 'snow' && E.heal(me, fraction(me, 1 / 16), me),
+    weatherImmune: ['snow', 'hail'],
+    onEndTurn: (E, me) => isIcy(E.weather()) && E.heal(me, fraction(me, 1 / 16), me),
   },
   'solid-rock': { breakable: true, onDefenderFinal: (E, me, move, attacker, { eff }) => (eff > 1 ? 0.75 : 1) },
-  'snow-warning': setsWeather('snow'),
+  'snow-warning': setsWeather('hail'),
   reckless: { onBasePower: (E, me, move) => (move.recoil ? 1.2 : 1) },
   'flower-gift': {
     breakable: true,
@@ -546,7 +550,7 @@ const EFFECTS = {
       E.boost(me, lowered ? { [raised]: 2, [lowered]: -1 } : { [raised]: 2 }, me);
     },
   },
-  overcoat: { breakable: true, weatherImmune: ['sand', 'snow'] },
+  overcoat: { breakable: true, weatherImmune: ['sand', 'snow', 'hail'] },
   'poison-touch': {
     onAfterMoveHit(E, me, move, target) {
       if (target.hp > 0 && contact(E, move, me) && E.rand() < 0.3) E.setStatus(target, 'psn', me, { ability: me });
@@ -654,7 +658,7 @@ const EFFECTS = {
     noTrace: true,
     onBeforeMoveForm(E, me, move) {
       if (me.speciesId !== 681) return;
-      const want = isAttack(move) ? 'aegislash-blade' : move.kind === 'boost' && (move.stat === 'def' || move.stat === 'sdef') ? null : me.form ?? null;
+      const want = isAttack(move) ? 'aegislash-blade' : null;
       if ((me.form ?? null) !== want) {
         E.show(me, want ? 'formBlade' : 'formShield');
         E.changeForm(me, want);
@@ -711,7 +715,7 @@ const EFFECTS = {
       if (droppedBelowHalf(me, before)) E.boost(me, { satk: 1 }, me, { ability: me });
     },
   },
-  'slush-rush': weatherSpeed((w) => w === 'snow'),
+  'slush-rush': weatherSpeed(isIcy),
   'long-reach': {},
   'liquid-voice': {
     onModifyMove(E, me, move) {
@@ -776,9 +780,9 @@ const EFFECTS = {
   },
   dancer: {
     onFoeMove(E, me, foe, move) {
-      if (!has(move, 'dance') || me.hp <= 0 || move.kind !== 'boost') return;
+      if (!has(move, 'dance') || me.hp <= 0 || move.kind !== 'status' || move.target !== 'self' || !move.boosts) return;
       E.show(me);
-      E.boost(me, { [move.stat]: 1 }, me);
+      E.boost(me, move.boosts, me);
     },
   },
   fluffy: {
@@ -838,7 +842,7 @@ const EFFECTS = {
     unsuppressable: true,
     noTrace: true,
     onAfterMove(E, me, move) {
-      if (me.speciesId !== 845 || me.vol.gulp || move.type !== 'water' || !isAttack(move)) return;
+      if (me.speciesId !== 845 || me.vol.gulp || (move.key !== 'surf' && move.key !== 'dive')) return;
       me.vol.gulp = me.hp > me.stats.hp / 2 ? 'arrokuda' : 'pikachu';
       E.show(me, me.vol.gulp === 'arrokuda' ? 'gulpArrokuda' : 'gulpPikachu');
       E.changeForm(me, me.vol.gulp === 'arrokuda' ? 'cramorant-gulping' : 'cramorant-gorging');
@@ -886,7 +890,7 @@ const EFFECTS = {
       return 0;
     },
     onWeatherChange(E, me) {
-      if (me.speciesId === 875 && me.form === 'eiscue-noice' && E.weather() === 'snow') {
+      if (me.speciesId === 875 && me.form === 'eiscue-noice' && isIcy(E.weather())) {
         E.show(me, 'iceFaceRestored');
         E.changeForm(me, null, { permanent: true });
       }
@@ -1100,7 +1104,7 @@ const EFFECTS = {
 function forecastType(E, me) {
   if (me.speciesId !== 351) return;
   const w = E.weather();
-  const want = isSun(w) ? 'castform-sunny' : isRain(w) ? 'castform-rainy' : w === 'snow' ? 'castform-snowy' : null;
+  const want = isSun(w) ? 'castform-sunny' : isRain(w) ? 'castform-rainy' : isIcy(w) ? 'castform-snowy' : null;
   if ((me.form ?? null) === want) return;
   E.show(me);
   E.changeForm(me, want);

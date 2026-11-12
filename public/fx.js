@@ -25,26 +25,31 @@ const PARTICLE = {
   dragon: 'flame', dark: 'smoke', steel: 'shard', fairy: 'star',
 };
 
-const BY_NAME = {
-  Lanzallamas: 'stream', Hidrobomba: 'stream', 'Pistola Agua': 'stream', 'Aliento Dragón': 'stream', 'Furia Dragón': 'stream',
-  'Disparo Lodo': 'stream', Lanzamugre: 'stream', Ascuas: 'projectile', Llamarada: 'blast',
-  Rayo: 'bolt', Trueno: 'bolt', Impactrueno: 'bolt',
-  'Rayo Hielo': 'beam', Hiperrayo: 'beam', 'Rayo Solar': 'beam', Psicorrayo: 'beam', 'Foco Resplandor': 'beam',
-  Ventisca: 'storm', 'Nieve Polvo': 'storm', Lluevehojas: 'storm',
-  'Viento Hielo': 'gust', Vendaval: 'gust', 'Viento Feérico': 'gust', 'Tajo Aéreo': 'slash',
-  Psíquico: 'psywave', Confusión: 'psywave', Premonición: 'psywave', Infortunio: 'psywave', 'Onda Tóxica': 'psywave',
-  'Tierra Viva': 'eruption', 'Bofetón Lodo': 'projectile', Burbuja: 'bubbles',
-  Megaagotar: 'drain', 'Beso Drenaje': 'drain', Chupavidas: 'drain',
-  'Cometa Draco': 'meteor', 'Poder Pasado': 'rain', 'Brillo Mágico': 'flash',
-  'Fuerza Lunar': 'orb', 'Bola Sombra': 'orb', 'Bomba Lodo': 'orb',
-  Terremoto: 'quake', Terratemblor: 'quake', 'Fuerza Telúrica': 'rise', 'Roca Afilada': 'rise',
-  Avalancha: 'rain', Lanzarrocas: 'rain', Pedrada: 'projectile', Antiaéreo: 'projectile',
-  'Pin Misil': 'darts', 'Esquirla Helada': 'projectile', 'Bomba Germen': 'rain',
+const SHAPE_IDS = {
+  stream: ['flamethrower', 'hydro-pump', 'water-gun', 'dragon-breath', 'dragon-rage', 'mud-shot', 'gunk-shot', 'scald', 'surf', 'muddy-water', 'sludge-wave', 'fire-spin', 'whirlpool', 'acid-spray', 'octazooka', 'steam-eruption', 'inferno', 'heat-wave', 'mystical-fire'],
+  projectile: ['ember', 'mud-slap', 'rock-throw', 'smack-down', 'ice-shard', 'water-pulse', 'acid', 'sludge', 'poison-sting', 'swift', 'flame-burst', 'shadow-sneak', 'vacuum-wave'],
+  blast: ['fire-blast', 'overheat', 'explosion', 'self-destruct', 'zap-cannon', 'focus-blast'],
+  bolt: ['thunderbolt', 'thunder', 'thunder-shock', 'discharge', 'shock-wave', 'charge-beam'],
+  beam: ['ice-beam', 'hyper-beam', 'solar-beam', 'psybeam', 'flash-cannon', 'aurora-beam', 'signal-beam', 'bubble-beam', 'dragon-pulse', 'tri-attack', 'prismatic-laser', 'origin-pulse', 'mirror-shot'],
+  storm: ['blizzard', 'powder-snow', 'leaf-storm', 'petal-dance', 'magical-leaf', 'razor-leaf', 'sandstorm', 'leaf-tornado', 'petal-blizzard', 'silver-wind'],
+  gust: ['icy-wind', 'hurricane', 'gust', 'fairy-wind', 'twister', 'ominous-wind', 'heat-wave', 'bleakwind-storm', 'air-cutter'],
+  psywave: ['psychic', 'confusion', 'future-sight', 'hex', 'night-shade', 'extrasensory', 'psyshock', 'dream-eater', 'psywave', 'stored-power', 'zen-headbutt', 'toxic', 'poison-gas', 'hypnosis', 'confuse-ray', 'will-o-wisp', 'thunder-wave', 'stun-spore', 'sleep-powder', 'poison-powder', 'spore', 'sweet-kiss', 'attract', 'yawn', 'glare'],
+  eruption: ['earth-power', 'eruption', 'lava-plume', 'magma-storm', 'mud-bomb'],
+  bubbles: ['bubble'],
+  drain: ['mega-drain', 'absorb', 'giga-drain', 'leech-life', 'draining-kiss', 'horn-leech', 'leech-seed', 'parabolic-charge', 'oblivion-wing'],
+  meteor: ['draco-meteor', 'meteor-beam'],
+  rain: ['ancient-power', 'rock-slide', 'rock-tomb', 'avalanche', 'icicle-crash', 'diamond-storm', 'head-smash'],
+  flash: ['dazzling-gleam', 'flash', 'light-of-ruin', 'moonlight', 'morning-sun', 'synthesis'],
+  orb: ['shadow-ball', 'sludge-bomb', 'moonblast', 'energy-ball', 'aura-sphere', 'electro-ball', 'weather-ball', 'seed-bomb', 'gyro-ball', 'mist-ball', 'luster-purge'],
+  quake: ['earthquake', 'bulldoze', 'magnitude', 'fissure', 'stomping-tantrum'],
+  rise: ['stone-edge', 'precipice-blades', 'power-gem', 'spikes'],
+  darts: ['pin-missile', 'bullet-seed', 'icicle-spear', 'rock-blast', 'fury-attack', 'double-kick', 'double-slap', 'comet-punch', 'arm-thrust', 'twineedle', 'tail-slap', 'water-shuriken', 'scale-shot', 'triple-axel'],
 };
+const BY_ID = Object.fromEntries(Object.entries(SHAPE_IDS).flatMap(([shape, ids]) => ids.map((id) => [id, shape])));
 
 export const SHAPE_NAMES = [
   'projectile', 'orb', 'stream', 'beam', 'bolt', 'storm', 'gust', 'psywave', 'eruption', 'bubbles', 'pulse', 'sound', 'drain',
-  'meteor', 'rain', 'flash', 'blast', 'quake', 'rise', 'darts', 'strike', 'punch', 'bite', 'slash', 'boost', 'heal',
+  'meteor', 'rain', 'flash', 'blast', 'quake', 'rise', 'darts', 'strike', 'punch', 'bite', 'slash', 'boost', 'heal', 'weather',
 ];
 
 const STAT_COLOR = { atk: 'fighting', def: 'steel', satk: 'psychic', sdef: 'water', spd: 'electric', acc: 'normal', eva: 'flying' };
@@ -55,10 +60,15 @@ const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function moveShape(ev) {
-  if (ev.kind === 'boost') return 'boost';
-  if (ev.kind === 'heal') return 'heal';
-  if (BY_NAME[ev.move]) return BY_NAME[ev.move];
   const flags = ev.flags || [];
+  if (ev.kind === 'status') {
+    if (ev.effect === 'boost') return 'boost';
+    if (ev.effect === 'heal') return 'heal';
+    if (ev.effect === 'weather') return 'weather';
+    if (flags.includes('sound')) return 'sound';
+    return BY_ID[ev.key] === 'drain' ? 'drain' : 'psywave';
+  }
+  if (BY_ID[ev.key]) return BY_ID[ev.key];
   if (ev.drain) return 'drain';
   if (ev.multihit) return 'darts';
   if (flags.includes('bite')) return 'bite';
@@ -536,6 +546,8 @@ export function createFx(arena) {
       const shape = moveShape(ev);
       if (shape === 'boost') return boost(from, ev.stat);
       if (shape === 'heal') return heal(from);
+      if (shape === 'weather') return storm({ x: arena.clientWidth / 2, y: arena.clientHeight * 0.4 }, type);
+      if (ev.kind === 'status' && shape === 'psywave') return psywave(to, type);
       return (SHAPES[shape] || SHAPES.projectile)(from, to, type);
     },
     status(status, spot) {
