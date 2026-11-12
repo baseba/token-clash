@@ -1,6 +1,7 @@
-import { creatureHTML } from './creature.js?v=dev';
+import { creatureHTML, loadAnimatedSprites } from './creature.js?v=dev';
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
+import { createFx } from './fx.js?v=dev';
 
 const $app = document.getElementById('app');
 const $who = document.getElementById('who');
@@ -46,6 +47,7 @@ function h(tag, attrs, ...kids) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const compact = (n) => new Intl.NumberFormat('es', { notation: 'compact', maximumFractionDigits: 1 }).format(n || 0);
+const SPRITE_CANVAS = 96;
 const RARITY = { common: 'Común', uncommon: 'Poco común', rare: 'Rara', legendary: 'Legendaria' };
 
 let toastTimer;
@@ -300,6 +302,18 @@ document.addEventListener('click', (e) => {
   nav(a.pathname);
 });
 window.addEventListener('popstate', route);
+document.addEventListener(
+  'load',
+  (e) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement) || !img.closest('.creature')) return;
+    const native = img.naturalWidth !== SPRITE_CANVAS || img.naturalHeight !== SPRITE_CANVAS;
+    img.classList.toggle('native', native);
+    img.style.width = native ? `${(img.naturalWidth / SPRITE_CANVAS) * 100}%` : '';
+    img.style.height = native ? `${(img.naturalHeight / SPRITE_CANVAS) * 100}%` : '';
+  },
+  true,
+);
 
 function route() {
   cleanup?.();
@@ -716,7 +730,6 @@ function battleUI(c, sendAction) {
   let mine = 0;
   let sent = null; // label of the action we sent this turn, until the turn resolves
   let queue = Promise.resolve();
-  let lastElement = null; // element of the move being played, for the impact effect
 
   const sideAt = (p) => (p === 'me' ? mine : 1 - mine);
   const hud = (p) => {
@@ -743,6 +756,7 @@ function battleUI(c, sendAction) {
   arena.style.setProperty('--pad-me-rim', scene.me[1]);
   arena.style.setProperty('--pad-foe-fill', scene.foe[0]);
   arena.style.setProperty('--pad-foe-rim', scene.foe[1]);
+  const fx = createFx(arena);
   $app.replaceChildren(
     h('div', { class: 'status-line' }, els.turn, els.vs, els.field, els.timer),
     h('div', { class: 'stage' }, arena, els.say),
@@ -771,6 +785,7 @@ function battleUI(c, sendAction) {
   };
   // Skip the show when the tab is hidden, so coming back doesn't replay a backlog.
   const wait = (ms) => (document.hidden ? Promise.resolve() : sleep(ms));
+  const settle = (r) => (typeof r === 'number' ? wait(r) : r);
 
   function log(parts, cls) {
     els.log.append(h('p', { class: cls || null }, parts));
@@ -799,13 +814,6 @@ function battleUI(c, sendAction) {
     const el = h('span', { class: `float ${cls || ''}` }, text);
     spot.append(el);
     setTimeout(() => el.remove(), 1400);
-  }
-  function burst(side, type) {
-    const spot = els.spot[pos(side)];
-    const el = h('span', { class: 'burst' }, '💥');
-    if (type && TYPES[type]) el.style.color = TYPES[type].color;
-    spot.append(el);
-    setTimeout(() => el.remove(), 700);
   }
   function abilityPop(side, ev) {
     const spot = els.spot[pos(side)];
@@ -1026,18 +1034,16 @@ function battleUI(c, sendAction) {
         log(`Turno ${ev.turn}`, 'turn');
         return 350;
       case 'move': {
-        lastElement = ev.type || null;
         setActing(ev.side);
-        if (ev.kind === 'attack') anim(els.spot[pos(ev.side)], `lunge-${pos(ev.side)}`, 500);
+        if (ev.kind === 'attack' && (ev.flags || []).includes('contact')) anim(els.spot[pos(ev.side)], `lunge-${pos(ev.side)}`, 500);
         else anim(els.spot[pos(ev.side)], 'power', 600);
         tell([...mon(ev.side, ev.name), ' usa ', h('b', { class: 'mvname' }, ev.move), ev.type ? ' ' : '', ev.type ? typeChip(ev.type) : '', ev.why ? h('small', { class: 'why' }, ` · ${WHY[ev.why]}`) : ''], { side: ev.side });
-        return 750;
+        return Promise.all([sleep(450), wait(250).then(() => fx.move(ev, els.spot[pos(ev.side)], els.spot[pos(1 - ev.side)]))]);
       }
       case 'damage': {
         const f = activeOf(ev.side);
         const before = f.hp;
         f.hp = ev.hp;
-        burst(ev.side, lastElement);
         paint(ev.side);
         anim(els.spot[pos(ev.side)], 'hit', 500);
         anim(els.hud[pos(ev.side)].el, 'hurt', 600);
@@ -1092,7 +1098,7 @@ function battleUI(c, sendAction) {
         paint(ev.side);
         float(ev.side, STATUS[ev.status], 'miss');
         tell([...mon(ev.side, f.name), ` ${STATUS_TEXT[ev.status]}.`], { side: ev.side, sub: true, cls: 'weak' });
-        return 900;
+        return Promise.all([sleep(700), fx.status(ev.status, els.spot[pos(ev.side)])]);
       }
       case 'cure': {
         const f = activeOf(ev.side);
@@ -1257,7 +1263,7 @@ function battleUI(c, sendAction) {
         if (msg.state.intro?.length) {
           playing = true;
           renderControls();
-          for (const ev of msg.state.intro) await wait(play(ev));
+          for (const ev of msg.state.intro) await settle(play(ev));
           setActing(null);
           playing = false;
           view = clone(msg.state);
@@ -1274,7 +1280,7 @@ function battleUI(c, sendAction) {
       sent = null;
       renderControls();
       if (msg.timedOut) log('⏱ Se acabó el tiempo: la máquina eligió por quien no alcanzó.', 'weak');
-      for (const ev of msg.events) await wait(play(ev));
+      for (const ev of msg.events) await settle(play(ev));
       setActing(null);
       playing = false;
       view = clone(msg.state);
@@ -1299,4 +1305,4 @@ function battleUI(c, sendAction) {
   };
 }
 
-route();
+loadAnimatedSprites().finally(route);

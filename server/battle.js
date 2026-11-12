@@ -617,7 +617,7 @@ function useMove(b, s, moveIdx, priority, why = null) {
   run(b, me, 'onModifyMove', move);
   run(b, me, 'onPrepareMove', move);
   me.revealedMoves.add(base.key);
-  emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind || 'attack', key: base.key, ...(why ? { why } : {}) });
+  emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind || 'attack', key: base.key, category: move.category, flags: move.flags, ...(move.stat ? { stat: move.stat } : {}), ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}), ...(why ? { why } : {}) });
 
   const foe = foeOf(b, me);
   if (move.uses) me.uses[move.key] = Math.max(0, (me.uses[move.key] ?? 0) - (foe && abilityKey(b, foe) === 'pressure' ? 2 : 1));
