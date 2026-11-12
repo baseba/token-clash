@@ -75,10 +75,13 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: a.data.token })).status, 400);
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST' })).status, 401);
 
+  const battles = async () => (await fetch(`${base}/healthz/battles`)).text();
+  assert.equal(await battles(), '0');
   const host = player(id, a.data.token);
   await new Promise((r) => host.ws.on('open', r));
   await new Promise((r) => setTimeout(r, 100));
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token })).status, 200);
+  assert.equal(await battles(), '1'); // deploy/deploy.sh waits for this to reach 0
   const guest = player(id, b.data.token);
   const spectator = player(id, null);
 
@@ -93,6 +96,7 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   await new Promise((r) => setTimeout(r, 300));
   const done = await call(`/api/challenges/${id}`);
   assert.equal(done.data.challenge.status, 'finished');
+  assert.equal(await battles(), '0');
   assert.ok(done.data.challenge.final);
   const lb = await call('/api/leaderboard');
   const total = lb.data.trainers.reduce((n, t) => n + t.wins + t.losses, 0);

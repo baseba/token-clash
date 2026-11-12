@@ -14,43 +14,24 @@ En vivo: **https://clash.mirrordev.xyz**
    si alguien no elige, su criatura ataca sola). Cualquiera más con el link puede mirar.
 4. Ranking de victorias en la portada. Opción "Todos a nivel 50" para que gane la estrategia.
 
-## Criaturas (PokeAPI + disfraz de Tuxemon)
+## Criaturas (PokeAPI)
 
-El save solo aporta números: especie, cadena evolutiva, rareza, nivel, IVs y si es brillante. Cada criatura sale de
-dos fuentes que no se mezclan:
+El save solo aporta números: especie, cadena evolutiva, rareza, nivel, IVs y si es brillante. Todo lo demás sale de
+[PokeAPI](https://pokeapi.co): nombre, stats base (ataque y ataque especial se promedian, igual defensa y defensa
+especial), tipos reales (uno o dos) y sprites de frente y espalda, también los brillantes. Los ataques son nombres
+reales de movimientos elegidos según los tipos de la especie (`species()` en `server/creatures.js`).
 
-- **Datos de batalla** de [PokeAPI](https://pokeapi.co), al día: stats base reales (ataque y ataque especial se
-  promedian, igual defensa y defensa especial), elemento según su tipo y etapa evolutiva. Viven en
-  `server/pokeapi.json`, que solo guarda números y tipos (ni nombres, ni sprites, ni ataques).
-- **Lo que se ve** es un disfraz de [Tuxemon](https://github.com/Tuxemon/Tuxemon), un juego de criaturas de código
-  abierto (`tuxemonFor()` en `server/creatures.js`). Cada cadena evolutiva se convierte de forma determinista en una
-  línea evolutiva de Tuxemon del mismo largo y, si hay al menos 4 líneas de ese largo, del mismo elemento. Cada etapa
-  pasa a ser la etapa equivalente: nombre, sprites de frente y espalda y nombres de ataques (en español cuando Tuxemon
-  los tiene traducidos y el disfraz comparte el elemento). La misma especie se ve igual para todos.
-
-No se muestran nombres, sprites ni ataques de ninguna franquicia comercial. El servidor nunca llama a la PokeAPI
-(en producción no tiene salida a internet). Para refrescar los datos:
+Los datos viven en `server/pokeapi.json` y `public/sprites/`. El servidor nunca llama a la PokeAPI (en producción no
+tiene salida a internet). Para refrescarlos, con Node 22 o más:
 
 ```sh
-node scripts/import-pokeapi.mjs   # ~35 s, reescribe server/pokeapi.json
+node scripts/import-pokeapi.mjs   # ~2-3 min, reescribe server/pokeapi.json y public/sprites/
 ```
 
-Las especies que la PokeAPI no conoce usan stats según su rareza y el elemento de su disfraz.
+Las especies que la PokeAPI no conoce quedan como tipo Normal, con stats según su rareza.
 
-El arte de Tuxemon es CC BY-SA 4.0 / CC BY 4.0 según cada autor: los créditos están en `public/creditos.txt`
-(enlazado desde el pie de la página). Los sprites recortados (`public/sprites/`) y el catálogo
-(`server/tuxemon.json`) se regeneran con:
-
-```sh
-git clone --depth 1 https://github.com/Tuxemon/Tuxemon /tmp/tuxemon
-python3 scripts/import-tuxemon.py /tmp/tuxemon   # necesita Pillow y PyYAML
-```
-
-Hay ~1000 especies y 363 criaturas, así que dos especies distintas a veces caen en la misma criatura (para eso
-están los apodos).
-
-Elementos: Brasa > Brote > Marea > Brasa, y Chispa > Sombra > Roca > Chispa (×1.5 / ×0.67). Los tipos de la PokeAPI
-(y los de Tuxemon) se agrupan en esos seis; el primer tipo no normal manda, y los solo normales quedan como Neutro.
+Tipos: los 18 reales con la tabla de efectividad real (×2, ×0.5, ×0), en `public/types.js`, que comparten el
+servidor y el navegador.
 
 Del save se guarda solo eso (más el total de tokens para el ranking); el nombre del equipo, los logs y los
 nombres de especies se descartan. Saves importados antes de esta versión: "Actualizar save" para tomar la etapa
@@ -65,9 +46,9 @@ npm test        # parser, motor de batalla y flujo completo con WebSocket
 ```
 
 - `server/save.js`: lee el export (`format: "poketokenbar.save"`) o el estado crudo.
-- `server/creatures.js`: especie → datos de PokeAPI (stats, elemento) + disfraz de Tuxemon (nombre, sprite, golpes).
-- `scripts/import-pokeapi.mjs`: genera `server/pokeapi.json`.
-- `scripts/import-tuxemon.py`: genera `server/tuxemon.json`, `public/sprites/` y `public/creditos.txt`.
+- `server/creatures.js`: especie → datos de PokeAPI (nombre, stats, tipos) y sus ataques.
+- `scripts/import-pokeapi.mjs`: genera `server/pokeapi.json` y `public/sprites/`.
+- `public/types.js`: tipos y tabla de efectividad.
 - `server/battle.js`: motor puro de batalla (aleatoriedad inyectada).
 - `server/index.js`: HTTP + WebSocket, desafíos, ranking. Persistencia en `data/db.json`.
 - `public/`: frontend sin build (JS de módulos, sprites PNG).
@@ -89,13 +70,47 @@ Túnel (ya creado, una sola vez): `cloudflared tunnel create token-clash`,
 `cloudflared tunnel route dns token-clash clash.mirrordev.xyz`, y el token directo al secret
 `cloudflared-token-clash-token` de Podman.
 
-Actualizar (cuando nadie esté peleando):
+### Deploy automático
+
+En el servidor, `token-clash-deploy.timer` corre `deploy/deploy.sh` cada 2 minutos. Desde GitHub nadie entra al
+servidor: es el servidor el que va a buscar los cambios. Cuando `origin/main` tiene un commit nuevo:
+
+1. Espera a que el CI de ese commit (`test` y `container`) esté en verde. Si falla, ese commit no se despliega.
+2. Espera a que no haya peleas en curso (`/healthz/battles`, solo responde desde dentro del contenedor).
+3. Hace fast-forward de `~/code/token-clash`, construye la imagen (la anterior queda como `token-clash:previous`) y
+   reinicia. Si no queda sana, vuelve a la imagen anterior y no reintenta ese commit.
+
+Si cambia algo del host (`deploy/*.container`, `*.network`, `*.service`, `*.timer` o el propio `deploy.sh`), no
+despliega y lo deja anotado en el log: esos cambios se instalan a mano (abajo). Así, un PR mergeado nunca cambia
+lo que corre fuera del contenedor.
+
+```sh
+journalctl --user -u token-clash-deploy -n 50   # qué hizo
+systemctl --user list-timers token-clash-deploy # cuándo vuelve a mirar
+```
+
+Instalar o actualizar el deploy automático:
 
 ```sh
 cd ~/code/token-clash
+install -m 755 deploy/deploy.sh ~/.local/bin/token-clash-deploy
+cp deploy/token-clash-deploy.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now token-clash-deploy.timer
+```
+
+### Deploy a mano
+
+Para cambios del host, o si el automático está apagado (cuando nadie esté peleando):
+
+```sh
+cd ~/code/token-clash
+git pull --ff-only
+cp deploy/*.container deploy/*.network ~/.config/containers/systemd/   # si cambiaron
+systemctl --user daemon-reload
 podman tag token-clash token-clash:previous
 podman build --format docker -t token-clash -f deploy/Containerfile .
 systemctl --user restart token-clash
 ```
 
-Si cambia un `.container`, cópialo de nuevo y `systemctl --user daemon-reload` antes del restart.
+Volver a la versión anterior: `podman tag token-clash:previous token-clash:latest && systemctl --user restart token-clash`.

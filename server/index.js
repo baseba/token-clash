@@ -432,6 +432,11 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname === '/healthz') return send(res, 200, 'ok');
+    // Live battle count for deploy/deploy.sh, which asks from inside the container (podman exec) so
+    // it can wait until nobody is fighting. Loopback only: cloudflared reaches us from another container.
+    if (url.pathname === '/healthz/battles' && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)) {
+      return send(res, 200, String([...rooms.values()].filter((r) => r.battle?.status === 'active').length));
+    }
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed');
     if (url.pathname === '/' || /^\/b\/[A-Za-z0-9_-]{4,20}$/.test(url.pathname)) return await serveStatic(req, res, 'index.html');
