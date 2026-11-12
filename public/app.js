@@ -1,5 +1,6 @@
 import { creatureHTML } from './creature.js?v=dev';
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
+import { sceneFor } from './backgrounds.js?v=dev';
 
 const $app = document.getElementById('app');
 const $who = document.getElementById('who');
@@ -550,7 +551,12 @@ function battleUI(c, sendAction) {
     controls: h('div', { class: 'card' }),
     log: h('div', { class: 'card log' }),
   };
-  const arena = h('div', { class: 'arena' }, els.spot.foe, els.spot.me, els.hud.foe.el, els.hud.me.el);
+  const scene = sceneFor(c.id);
+  const arena = h('div', { class: 'arena', style: { backgroundImage: `url(${scene.image})` } }, els.spot.foe, els.spot.me, els.hud.foe.el, els.hud.me.el);
+  arena.style.setProperty('--pad-me-fill', scene.me[0]);
+  arena.style.setProperty('--pad-me-rim', scene.me[1]);
+  arena.style.setProperty('--pad-foe-fill', scene.foe[0]);
+  arena.style.setProperty('--pad-foe-rim', scene.foe[1]);
   $app.replaceChildren(
     h('div', { class: 'status-line' }, els.turn, els.vs, els.timer),
     h('div', { class: 'stage' }, arena, els.say),
