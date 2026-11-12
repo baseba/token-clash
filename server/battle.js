@@ -1,5 +1,5 @@
 // Turn-based battle engine. Pure: no I/O, randomness injected, so it can be tested and replayed.
-import { buildFighter, effectiveness, formData, statsFor } from './creatures.js';
+import { buildFighter, effectiveness, formData, statsFor, STRUGGLE } from './creatures.js';
 import { ABILITIES, abilityInfo } from './abilities.js';
 
 export const TEAM_SIZE = 3;
@@ -19,6 +19,8 @@ const isSun = (w) => w === 'sun' || w === 'harshsun';
 const isRain = (w) => w === 'rain' || w === 'heavyrain';
 const poisoned = (status) => status === 'psn' || status === 'tox';
 const isAttack = (move) => move.category !== 'status';
+export const STRUGGLE_MOVE = -1;
+const HEALS_WITH_WEATHER = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
 
 function prepare(entry, levelCap) {
   const f = buildFighter(entry, { levelCap });
@@ -41,7 +43,7 @@ function prepare(entry, levelCap) {
     baseAbility: f.ability,
     revealedAbilities: new Set(),
     revealedMoves: new Set(),
-    uses: Object.fromEntries(f.moves.filter((m) => m.uses).map((m) => [m.key, m.uses])),
+    pp: Object.fromEntries(f.moves.map((m) => [m.key, m.pp])),
   };
 }
 
@@ -263,6 +265,7 @@ function addVolatile(b, f, kind, source = null, opts = {}) {
   if (kind === 'attract' && (f.vol.attract || !f.gender || !source?.gender || f.gender === source.gender)) return false;
   if (kind === 'disable' && (f.vol.disabled || !opts.move?.key)) return false;
   if (kind === 'perish' && f.vol.perish) return false;
+  if (kind === 'leechseed' && (f.vol.leechSeed || f.types.includes('grass'))) return false;
   if (run(b, f, 'onSetStatus', kind, source) === false) return false;
   if (opts.ability) showAbility(b, opts.ability);
   const side = sideIndex(b, f);
@@ -272,6 +275,7 @@ function addVolatile(b, f, kind, source = null, opts = {}) {
   else if (kind === 'disable') f.vol.disabled = { key: opts.move.key, name: opts.move.name, turns: 4 };
   else if (kind === 'perish') f.vol.perish = 4;
   else if (kind === 'charge') f.vol.charge = true;
+  else if (kind === 'leechseed') f.vol.leechSeed = true;
   if (kind !== 'flinch') emit(b, { t: 'volatile', side, name: nameOf(f), kind, ...(kind === 'disable' ? { move: opts.move.name } : {}) });
   return true;
 }
@@ -279,7 +283,7 @@ function addVolatile(b, f, kind, source = null, opts = {}) {
 function hurt(b, f, amount, cause) {
   if (f.hp <= 0) return 0;
   if (cause !== 'confusion' && flag(b, f, 'noIndirectDamage')) return 0;
-  const dealt = Math.min(f.hp, Math.max(1, Math.round(amount)));
+  const dealt = Math.min(f.hp, Math.max(1, Math.floor(amount)));
   f.hp -= dealt;
   emit(b, { t: 'hurt', side: sideIndex(b, f), amount: dealt, hp: f.hp, max: f.stats.hp, cause });
   return dealt;
@@ -287,7 +291,7 @@ function hurt(b, f, amount, cause) {
 
 function heal(b, f, amount, opts = {}) {
   if (f.hp <= 0 || f.hp >= f.stats.hp) return 0;
-  const healed = Math.min(f.stats.hp - f.hp, Math.max(1, Math.round(amount)));
+  const healed = Math.min(f.stats.hp - f.hp, Math.max(1, Math.floor(amount)));
   f.hp += healed;
   emit(b, { t: 'heal', side: sideIndex(b, f), amount: healed, hp: f.hp, max: f.stats.hp, ...(opts.silent ? { quiet: true } : {}) });
   return healed;
@@ -353,11 +357,11 @@ function lookOf(f) {
 }
 
 function transform(b, f, into) {
-  f.vol.transformed = { types: f.types, stats: f.stats, moves: f.moves, sprite: f.sprite, floats: f.floats, uses: f.uses };
+  f.vol.transformed = { types: f.types, stats: f.stats, moves: f.moves, sprite: f.sprite, floats: f.floats, pp: f.pp };
   f.types = [...into.types];
   f.stats = { ...into.stats, hp: f.stats.hp };
   f.moves = into.moves.map((m) => ({ ...m, flags: [...m.flags] }));
-  f.uses = Object.fromEntries(f.moves.filter((m) => m.uses).map((m) => [m.key, 1]));
+  f.pp = Object.fromEntries(f.moves.map((m) => [m.key, 5]));
   f.sprite = into.sprite;
   f.floats = into.floats;
   f.boosts = { ...into.boosts };
@@ -514,7 +518,7 @@ function trapped(b, s) {
 }
 
 function usableMoves(b, f) {
-  const ok = f.moves.map((m, i) => ({ m, i })).filter(({ m }) => !(m.uses && (f.uses[m.key] ?? 0) <= 0) && f.vol.disabled?.key !== m.key);
+  const ok = f.moves.map((m, i) => ({ m, i })).filter(({ m }) => (f.pp[m.key] ?? 0) > 0 && f.vol.disabled?.key !== m.key);
   const lock = f.vol.lockedMove;
   if (lock != null && abilityKey(b, f) === 'gorilla-tactics') {
     const locked = ok.filter(({ m }) => m.key === lock);
@@ -529,7 +533,10 @@ export function validActions(b, s) {
   const switches = side.team.map((f, i) => ({ type: 'switch', to: i })).filter((a) => a.to !== side.active && side.team[a.to].hp > 0);
   if (b.phase === 'replace') return switches;
   const f = side.team[side.active];
-  const moves = usableMoves(b, f).map(({ i }) => ({ type: 'move', move: i }));
+  const forced = f.vol.mustRecharge ?? f.vol.charging;
+  if (forced != null) return [{ type: 'move', move: forced }];
+  const usable = usableMoves(b, f).map(({ i }) => ({ type: 'move', move: i }));
+  const moves = usable.length ? usable : [{ type: 'move', move: STRUGGLE_MOVE }];
   return moves.concat(trapped(b, s) ? [] : switches);
 }
 
@@ -554,8 +561,8 @@ export function autoAction(b, s) {
     let best = moves[0];
     let bestScore = -1;
     for (const o of moves) {
-      const m = me.moves[o.move];
-      const score = (m.power || 20) * effectiveness(m.type, foe.types) * (m.accuracy / 100) + b.random() * 10;
+      const m = o.move === STRUGGLE_MOVE ? STRUGGLE : me.moves[o.move];
+      const score = m.kind === 'status' ? 15 + b.random() * 30 : (m.power || 60) * effectiveness(m.type, foe.types) * ((m.accuracy ?? 100) / 100) * (m.type && me.types.includes(m.type) ? 1.5 : 1) + b.random() * 10;
       if (score > bestScore) [best, bestScore] = [o, score];
     }
     return best;
@@ -593,7 +600,7 @@ function canAct(b, me, move) {
       if (b.random() < 1 / 3) {
         const a = me.stats.atk * stageMult(me.boosts.atk);
         const d = me.stats.def * stageMult(me.boosts.def);
-        hurt(b, me, 40 * (a / (a + d)) * (0.5 + me.level / 70), 'confusion');
+        hurt(b, me, (((2 * me.level) / 5 + 2) * 40 * (a / d)) / 50 + 2, 'confusion');
         return false;
       }
     }
@@ -606,29 +613,70 @@ function canAct(b, me, move) {
   return true;
 }
 
+function statusEffectOf(move) {
+  if (move.heal || HEALS_WITH_WEATHER[move.id] || move.id === 'rest') return { effect: 'heal' };
+  if (move.weather || move.terrain) return { effect: 'weather' };
+  if (move.target === 'self' && move.boosts) {
+    const up = Object.entries(move.boosts).find(([, v]) => v > 0);
+    return { effect: up ? 'boost' : 'debuff', stat: (up ?? Object.entries(move.boosts)[0])[0] };
+  }
+  return { effect: 'debuff' };
+}
+
+function spendPP(b, me, move) {
+  if (move.key === STRUGGLE.key) return;
+  const foe = foeOf(b, me);
+  me.pp[move.key] = Math.max(0, (me.pp[move.key] ?? 0) - (foe && abilityKey(b, foe) === 'pressure' ? 2 : 1));
+}
+
 function useMove(b, s, moveIdx, priority, why = null) {
   const me = activeOf(b, s);
   if (me.hp <= 0) return;
-  const base = me.moves[moveIdx];
-  const move = { ...base, flags: [...base.flags], effectivePriority: priority };
   b.moved.add(me);
-  if (!canAct(b, me, move)) return;
+  if (me.vol.mustRecharge != null) {
+    delete me.vol.mustRecharge;
+    emit(b, { t: 'cant', side: s, name: nameOf(me), reason: 'recharge' });
+    return;
+  }
+  const base = moveIdx === STRUGGLE_MOVE ? STRUGGLE : me.moves[moveIdx];
+  const move = { ...base, flags: [...base.flags], effectivePriority: priority };
+  const charged = me.vol.charging === moveIdx;
+  if (!canAct(b, me, move)) {
+    delete me.vol.charging;
+    return;
+  }
   run(b, me, 'onBeforeMoveForm', move);
   run(b, me, 'onModifyMove', move);
   run(b, me, 'onPrepareMove', move);
   me.revealedMoves.add(base.key);
-  emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind || 'attack', key: base.key, category: move.category, flags: move.flags, ...(move.stat ? { stat: move.stat } : {}), ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}), ...(why ? { why } : {}) });
+  me.vol.lastMove = base.key;
+  const status = move.kind === 'status' ? statusEffectOf(move) : {};
+  emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind, key: base.key, category: move.category, flags: move.flags, ...status, ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}), ...(why ? { why } : {}) });
 
   const foe = foeOf(b, me);
-  if (move.uses) me.uses[move.key] = Math.max(0, (me.uses[move.key] ?? 0) - (foe && abilityKey(b, foe) === 'pressure' ? 2 : 1));
+  if (move.flags.includes('charge') && !charged && !(isSun(weather(b)) && (base.id === 'solar-beam' || base.id === 'solar-blade'))) {
+    spendPP(b, me, move);
+    me.vol.charging = moveIdx;
+    emit(b, { t: 'charging', side: s, name: nameOf(me), move: move.name });
+    return;
+  }
+  delete me.vol.charging;
+  if (!charged) spendPP(b, me, move);
 
-  if (move.kind === 'boost') {
-    const applied = boost(b, me, { [move.stat]: 1 }, me, { cap: STAGE_MAX });
-    if (!Object.keys(applied).length) emit(b, { t: 'nothing', side: s });
-  } else if (move.kind === 'heal') {
-    const healed = heal(b, me, me.stats.hp * move.amount);
-    if (!healed) emit(b, { t: 'heal', side: s, amount: 0, hp: me.hp, max: me.stats.hp });
-  } else attack(b, me, foe, move);
+  if (move.selfDestruct && anyActiveHas(b, 'damp')) {
+    emit(b, { t: 'nothing', side: s });
+    return;
+  }
+  if (move.kind === 'status') statusMove(b, me, foe, move);
+  else {
+    const dealt = attack(b, me, foe, move);
+    if (dealt && move.flags.includes('recharge') && me.hp > 0) me.vol.mustRecharge = moveIdx;
+    if (move.recoilMaxHp && me.hp > 0) hurt(b, me, me.stats.hp * move.recoilMaxHp, 'recoil');
+  }
+  if (move.selfDestruct && me.hp > 0) {
+    me.hp = 0;
+    faint(b, me);
+  }
 
   run(b, me, 'onAfterMove', move);
   if (move.flags.includes('dance')) {
@@ -637,17 +685,94 @@ function useMove(b, s, moveIdx, priority, why = null) {
   }
 }
 
+function selfStatus(b, me, move) {
+  let did = false;
+  if (move.weather) did = setWeather(b, move.weather, null) || did;
+  if (move.terrain) did = setTerrain(b, move.terrain, null) || did;
+  if (move.boosts) did = Object.keys(boost(b, me, move.boosts, me)).length > 0 || did;
+  if (move.heal) did = heal(b, me, me.stats.hp * move.heal) > 0 || did;
+  const weatherHeal = HEALS_WITH_WEATHER[move.id];
+  if (weatherHeal) {
+    const w = weather(b);
+    const share = w === weatherHeal || (weatherHeal === 'sun' && isSun(w)) ? 2 / 3 : w && w !== 'winds' ? 1 / 4 : 1 / 2;
+    did = heal(b, me, me.stats.hp * share) > 0 || did;
+  }
+  if (move.id === 'rest' && me.hp < me.stats.hp && me.status !== 'slp' && run(b, me, 'onSetStatus', 'slp', me) !== false && !statusImmune(b, me, 'slp', me)) {
+    me.status = 'slp';
+    me.statusTurns = 3;
+    emit(b, { t: 'status', side: sideIndex(b, me), name: nameOf(me), status: 'slp' });
+    heal(b, me, me.stats.hp);
+    did = true;
+  }
+  if (!did) emit(b, { t: 'nothing', side: sideIndex(b, me) });
+}
+
+function statusMove(b, me, foe, move) {
+  if (move.target !== 'foe') return selfStatus(b, me, move);
+  const s = sideIndex(b, me);
+  if (!foe) {
+    emit(b, { t: 'notarget', side: s });
+    return;
+  }
+  let target = foe;
+  b.mold = flag(b, me, 'moldBreaker') ? { target: foe } : null;
+  try {
+    if (move.effectivePriority > move.priority && foe.types.includes('dark')) {
+      emit(b, { t: 'immune', side: 1 - s });
+      return;
+    }
+    if (move.id === 'thunder-wave' && typeEffectiveness(b, move, me, foe) === 0) {
+      emit(b, { t: 'immune', side: 1 - s });
+      return;
+    }
+    if (run(b, foe, 'onTryHit', move, me)) return;
+    if (flag(b, foe, 'blocksStatusMoves')) {
+      showAbility(b, foe);
+      emit(b, { t: 'immune', side: 1 - s });
+      return;
+    }
+    if (move.accuracy != null && !hits(b, me, foe, move)) {
+      emit(b, { t: 'miss', side: s });
+      return;
+    }
+    if (flag(b, foe, 'bouncesStatus')) {
+      showAbility(b, foe, 'bounce');
+      target = me;
+    }
+  } finally {
+    b.mold = null;
+  }
+  const source = target === me ? foe : me;
+  let did = false;
+  if (move.boosts) did = Object.keys(boost(b, target, move.boosts, source)).length > 0 || did;
+  if (move.status) did = setStatus(b, target, move.status, source) || did;
+  if (move.volatile === 'confusion') did = addVolatile(b, target, 'confusion', source) || did;
+  if (move.volatile === 'attract') did = addVolatile(b, target, 'attract', source) || did;
+  if (move.volatile === 'leechseed') did = addVolatile(b, target, 'leechseed', source) || did;
+  if (move.self) did = Object.keys(boost(b, source, move.self, source)).length > 0 || did;
+  if (!did) emit(b, { t: 'nothing', side: s });
+}
+
 function rollHits(b, me, move) {
   if (move.multihit) {
-    if (flag(b, me, 'maxHits')) return 5;
+    const [lo, hi] = move.multihit;
+    if (lo === hi) return lo;
+    if (flag(b, me, 'maxHits')) return hi;
     const r = b.random();
-    return r < 0.35 ? 2 : r < 0.7 ? 3 : r < 0.85 ? 4 : 5;
+    if (lo === 2 && hi === 5) return r < 0.35 ? 2 : r < 0.7 ? 3 : r < 0.85 ? 4 : 5;
+    return lo + Math.floor(r * (hi - lo + 1));
   }
   return flag(b, me, 'parentalBond') ? 2 : 1;
 }
 
 function hits(b, me, target, move) {
-  if (flag(b, me, 'alwaysHits') || flag(b, target, 'alwaysHits')) return true;
+  if (move.ohko) return b.random() * 100 < 30 + me.level - target.level;
+  if (move.accuracy == null || flag(b, me, 'alwaysHits') || flag(b, target, 'alwaysHits')) return true;
+  const w = weather(b);
+  if (move.id === 'blizzard' && (w === 'hail' || w === 'snow')) return true;
+  if ((move.id === 'thunder' || move.id === 'hurricane') && isRain(w)) return true;
+  if ((move.id === 'thunder' || move.id === 'hurricane') && isSun(w)) return b.random() * 100 < 50;
+  if (move.kind === 'status' && flag(b, target, 'wonderSkin')) return b.random() < 0.5;
   const accStage = flag(b, target, 'unaware') ? 0 : me.boosts.acc;
   const evaStage = flag(b, me, 'unaware') || flag(b, me, 'ignoresEvasion') ? 0 : target.boosts.eva;
   let acc = move.accuracy * accuracyMult(clamp(accStage - evaStage, -STAGE_LIMIT, STAGE_LIMIT));
@@ -694,7 +819,7 @@ function computeDamage(b, me, target, move, eff, hitPower) {
   if (w === 'sand' && !physical && target.types.includes('rock')) d *= 1.5;
   if (w === 'snow' && physical && target.types.includes('ice')) d *= 1.5;
 
-  let dmg = hitPower * powerMods(b, me, target, move) * (a / (a + d)) * (0.5 + me.level / 70);
+  let dmg = (((2 * me.level) / 5 + 2) * hitPower * powerMods(b, me, target, move) * (a / d)) / 50 + 2;
   const mw = weatherFor(b, me);
   if (isSun(mw)) dmg *= move.type === 'fire' ? 1.5 : move.type === 'water' ? 0.5 : 1;
   if (isRain(mw)) dmg *= move.type === 'water' ? 1.5 : move.type === 'fire' ? 0.5 : 1;
@@ -722,11 +847,21 @@ function applySecondaries(b, me, target, move) {
   }
 }
 
+function fixedDamage(me, target, move) {
+  if (move.ohko) return target.hp;
+  if (move.fixedDamage === 'level') return me.level;
+  return Number(move.fixedDamage);
+}
+
 function attack(b, me, target, move) {
   const s = sideIndex(b, me);
   if (!target) {
     emit(b, { t: 'notarget', side: s });
-    return;
+    return 0;
+  }
+  if (move.ohko && target.level > me.level) {
+    emit(b, { t: 'nothing', side: s });
+    return 0;
   }
   const w = weather(b);
   if ((w === 'heavyrain' && move.type === 'fire') || (w === 'harshsun' && move.type === 'water')) {
@@ -755,8 +890,8 @@ function attack(b, me, target, move) {
     let lastHit = 0;
     let landed = 0;
     for (let i = 0; i < count && target.hp > 0 && me.hp > 0; i++) {
-      const hitPower = move.multihit ? Math.round(move.power / 3) : i > 0 ? move.power * 0.25 : move.power;
-      const { dmg, crit } = computeDamage(b, me, target, move, eff, hitPower);
+      const hitPower = i > 0 && !move.multihit ? move.power * 0.25 : move.power;
+      const { dmg, crit } = move.ohko || move.fixedDamage ? { dmg: fixedDamage(me, target, move), crit: false } : computeDamage(b, me, target, move, eff, hitPower);
       const dealt = Math.min(target.hp, chain(b, target, 'onDamage', dmg, move, me));
       const before = target.hp;
       target.hp -= dealt;
@@ -782,6 +917,7 @@ function attack(b, me, target, move) {
     }
     if (me.hp > 0) run(b, me, 'onAfterMoveHit', move, target, total);
     if (target.hp <= 0) faint(b, target, me, move, lastHit);
+    return total;
   } finally {
     b.mold = null;
   }
@@ -829,7 +965,7 @@ function resolveTurn(b) {
     .filter((a) => a.type === 'move')
     .map((a) => {
       const f = activeOf(b, a.s);
-      const move = f.moves[a.move];
+      const move = a.move === STRUGGLE_MOVE ? STRUGGLE : f.moves[a.move];
       const frac = run(b, f, 'onFractionalPriority', move);
       return { ...a, prio: chain(b, f, 'onModifyPriority', move.priority, move), frac: typeof frac === 'number' ? frac : 0, spd: speedOf(b, f), tie: b.random() };
     })
@@ -880,8 +1016,17 @@ function residual(b) {
   const w = weather(b);
   for (const f of order()) {
     if (w === 'sand' && !f.types.some((t) => SAND_PROOF.includes(t)) && !abilityDef(b, f)?.weatherImmune?.includes('sand')) hurt(b, f, f.stats.hp / 16, 'sand');
+    if (w === 'hail' && !f.types.includes('ice') && !abilityDef(b, f)?.weatherImmune?.includes('hail')) hurt(b, f, f.stats.hp / 16, 'hail');
     if (f.hp > 0 && b.field.terrain === 'grassy' && grounded(b, f)) heal(b, f, f.stats.hp / 16);
     if (f.hp > 0) statusDamage(b, f);
+    if (f.hp > 0 && f.vol.leechSeed) {
+      const seeder = foeOf(b, f);
+      const drained = hurt(b, f, f.stats.hp / 8, 'leechseed');
+      if (seeder && drained) {
+        if (flag(b, f, 'oozes')) hurt(b, seeder, drained, 'ooze');
+        else heal(b, seeder, drained);
+      }
+    }
   }
   settle(b);
   for (const f of order()) run(b, f, 'onEndTurn');
@@ -957,13 +1102,22 @@ function publicMove(m) {
     desc: m.desc,
     key: m.key,
     contact: m.flags.includes('contact'),
+    pp: m.pp,
+    target: m.target,
+    ...(m.boosts ? { boosts: m.boosts } : {}),
+    ...(m.status ? { status: m.status } : {}),
+    ...(m.heal ? { heal: m.heal } : {}),
+    ...(m.weather ? { weather: m.weather } : {}),
+    ...(m.fixedDamage ? { fixedDamage: m.fixedDamage } : {}),
+    ...(m.ohko ? { ohko: true } : {}),
+    ...(m.flags.includes('charge') ? { charge: true } : {}),
+    ...(m.flags.includes('recharge') ? { recharge: true } : {}),
     ...(m.secondary ? { secondary: m.secondary } : {}),
     ...(m.self ? { self: m.self } : {}),
     ...(m.recoil ? { recoil: m.recoil } : {}),
     ...(m.drain ? { drain: m.drain } : {}),
     ...(m.crit ? { crit: m.crit } : {}),
     ...(m.multihit ? { multihit: true } : {}),
-    ...(m.uses ? { uses: m.uses } : {}),
   };
 }
 
@@ -1027,7 +1181,7 @@ function fighterView(b, s, i, own) {
     hp: own ? f.hp : percentOf(f.hp, f.stats.hp),
     ...(own ? {} : { hpPercent: true }),
     boosts: f.boosts,
-    uses: own ? f.uses : {},
+    pp: own ? f.pp : {},
     gender: f.gender,
     sprite: f.sprite,
     floats: f.floats,

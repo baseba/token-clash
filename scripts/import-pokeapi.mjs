@@ -3,6 +3,8 @@
 // - server/pokeapi.json: name, base stats, real types, abilities and where each species sits in
 //   its evolution chain.
 // - server/abilities.json: Spanish name and description of every main-series ability.
+// - server/movedex.json: every learnable move, with its Spanish name and description from PokeAPI and
+//   its battle data from Pokémon Showdown's MIT-licensed server data.
 // - public/sprites/: the official sprites of every species and battle form, via scripts/sprites.mjs.
 //
 // The server never calls PokeAPI (production has no egress): run this again to refresh the data.
@@ -15,6 +17,9 @@ import { syncSprites } from './sprites.mjs';
 const API = 'https://pokeapi.co/api/v2';
 const OUT = new URL('../server/pokeapi.json', import.meta.url);
 const ABILITIES_OUT = new URL('../server/abilities.json', import.meta.url);
+const MOVEDEX_OUT = new URL('../server/movedex.json', import.meta.url);
+const SHOWDOWN_MOVES = 'https://play.pokemonshowdown.com/data/moves.json';
+const LEARNSET_GROUPS = ['black-2-white-2', 'scarlet-violet', 'sword-shield', 'ultra-sun-ultra-moon', 'sun-moon', 'omega-ruby-alpha-sapphire', 'x-y'];
 const CONCURRENCY = 8;
 
 async function get(url, tries = 4) {
@@ -47,6 +52,17 @@ async function mapLimit(items, fn) {
   return out;
 }
 
+function levelUpMoves(moves) {
+  for (const group of LEARNSET_GROUPS) {
+    const learned = moves
+      .map((m) => ({ id: m.move.name, details: m.version_group_details.filter((d) => d.version_group.name === group && d.move_learn_method.name === 'level-up') }))
+      .filter((m) => m.details.length)
+      .map((m) => [m.id, Math.min(...m.details.map((d) => d.level_learned_at))]);
+    if (learned.length) return learned.sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
+  }
+  return [];
+}
+
 const idFromUrl = (url) => Number(url.match(/\/(\d+)\/?$/)[1]);
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -72,6 +88,7 @@ await mapLimit(ids, async (id) => {
     stats: [stat.hp, stat.attack, stat.defense, stat['special-attack'], stat['special-defense'], stat.speed],
     abilities: bySlot.filter((a) => !a.is_hidden).map((a) => a.ability.name),
     hiddenAbility: bySlot.find((a) => a.is_hidden)?.ability.name ?? null,
+    learnset: levelUpMoves(mon.moves),
   };
   if (sp.evolution_chain) {
     species[id].chainId = idFromUrl(sp.evolution_chain.url);
@@ -115,6 +132,55 @@ const abilityLines = Object.keys(abilities)
 writeFileSync(ABILITIES_OUT, `{\n${abilityLines.join(',\n')}\n}\n`);
 console.error(`Listo: ${abilityLines.length} habilidades en server/abilities.json`);
 
+const STAT_KEY = { atk: 'atk', def: 'def', spa: 'satk', spd: 'sdef', spe: 'spd', accuracy: 'acc', evasion: 'eva' };
+const statBoosts = (boosts) => (boosts ? Object.fromEntries(Object.entries(boosts).map(([k, v]) => [STAT_KEY[k], v])) : null);
+const SELF_TARGETS = new Set(['self', 'allySide', 'adjacentAllyOrSelf', 'allies']);
+const FIELD_TARGETS = new Set(['all', 'foeSide']);
+const WEATHER = { raindance: 'rain', sunnyday: 'sun', sandstorm: 'sand', hail: 'hail', snowscape: 'snow', snow: 'snow' };
+const FLAGS = ['contact', 'punch', 'bite', 'sound', 'pulse', 'bullet', 'slicing', 'wind', 'dance', 'heal', 'charge', 'recharge'];
+
+function secondaryOf(sec) {
+  const out = { chance: sec.chance ?? 100 };
+  if (sec.status) out.status = sec.status;
+  if (sec.volatileStatus === 'flinch') out.flinch = true;
+  if (sec.volatileStatus === 'confusion') out.confuse = true;
+  if (sec.boosts) out.boosts = statBoosts(sec.boosts);
+  if (sec.self?.boosts) out.self = statBoosts(sec.self.boosts);
+  return Object.keys(out).length > 1 ? out : null;
+}
+
+function battleMove(sd) {
+  const category = sd.category.toLowerCase();
+  const m = {
+    type: sd.type.toLowerCase(),
+    category,
+    power: sd.basePower || 0,
+    accuracy: sd.accuracy === true ? null : sd.accuracy,
+    pp: sd.pp,
+    priority: sd.priority,
+    target: SELF_TARGETS.has(sd.target) ? 'self' : FIELD_TARGETS.has(sd.target) ? 'field' : 'foe',
+    flags: FLAGS.filter((f) => sd.flags?.[f]),
+  };
+  const secondaries = [...(sd.secondaries ?? []), ...(sd.secondary && !sd.secondaries ? [sd.secondary] : [])].map(secondaryOf).filter(Boolean);
+  if (secondaries.length) m.secondary = secondaries;
+  if (sd.self?.boosts) m.self = statBoosts(sd.self.boosts);
+  if (sd.boosts) m.boosts = statBoosts(sd.boosts);
+  if (sd.status) m.status = sd.status;
+  if (sd.volatileStatus) m.volatile = sd.volatileStatus;
+  if (sd.heal) m.heal = sd.heal[0] / sd.heal[1];
+  if (sd.drain) m.drain = sd.drain[0] / sd.drain[1];
+  if (sd.recoil) m.recoil = sd.recoil[0] / sd.recoil[1];
+  if (sd.multihit) m.multihit = Array.isArray(sd.multihit) ? sd.multihit : [sd.multihit, sd.multihit];
+  if (sd.critRatio > 1) m.crit = sd.critRatio - 1;
+  if (sd.weather) m.weather = WEATHER[sd.weather.toLowerCase()] ?? null;
+  if (sd.terrain) m.terrain = sd.terrain.replace('terrain', '');
+  if (sd.ohko) m.ohko = true;
+  if (sd.damage) m.fixedDamage = sd.damage;
+  if (sd.selfdestruct === 'always') m.selfDestruct = true;
+  if (sd.willCrit) m.crit = 3;
+  return m;
+}
+
 const BATTLE_FORMS = [
   'darmanitan-zen', 'aegislash-blade', 'wishiwashi-school', 'zygarde-complete', 'mimikyu-busted', 'eiscue-noice',
   'palafin-hero', 'terapagos-terastal', 'cramorant-gulping', 'cramorant-gorging', 'morpeko-hangry', 'cherrim-sunshine',
@@ -135,6 +201,27 @@ await mapLimit(BATTLE_FORMS, async (name) => {
     sprite: name,
   };
 });
+
+const learnable = [...new Set(Object.values(species).flatMap((s) => s.learnset.map(([moveId]) => moveId)))];
+console.error(`${learnable.length} movimientos (Showdown + PokeAPI)…`);
+const showdown = await get(SHOWDOWN_MOVES);
+const movedex = {};
+await mapLimit(learnable, async (moveId) => {
+  const sd = showdown[moveId.replace(/[^a-z0-9]/g, '')];
+  const api = await get(`${API}/move/${moveId}`);
+  if (!sd || !api) return;
+  const flavor = spanish(api.flavor_text_entries).at(-1)?.flavor_text;
+  movedex[moveId] = {
+    name: spanish(api.names)[0]?.name || sd.name,
+    desc: (flavor || api.effect_entries.find((e) => e.language.name === 'en')?.short_effect || '').replace(/\s+/g, ' ').trim(),
+    ...battleMove(sd),
+  };
+});
+const moveLines = Object.keys(movedex)
+  .sort()
+  .map((k) => `  "${k}": ${JSON.stringify(movedex[k])}`);
+writeFileSync(MOVEDEX_OUT, `{\n${moveLines.join(',\n')}\n}\n`);
+console.error(`Listo: ${moveLines.length} movimientos en server/movedex.json`);
 
 const lines = Object.keys(species)
   .map(Number)

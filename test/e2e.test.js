@@ -13,7 +13,7 @@ let proc;
 
 before(async () => {
   proc = spawn(process.execPath, ['server/index.js'], {
-    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'tc-')), TURN_MS: '1500' },
+    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'tc-')), TURN_MS: '1500', PREVIEW_MS: '1500' },
     stdio: 'inherit',
   });
   for (let i = 0; i < 50; i++) {
@@ -45,7 +45,9 @@ function player(room, token) {
     const m = JSON.parse(raw);
     frames.push(m);
     if (m.state?.status === 'finished') resolveEnd(m);
-    // Play: always pick the first legal action.
+    // Team preview: take the first ones; then always pick the first legal action.
+    const mine = m.preview && m.you != null ? m.preview.sides[m.you] : null;
+    if (mine && !mine.ready) ws.send(JSON.stringify({ t: 'pick', picks: mine.party.slice(0, mine.needed).map((_, i) => i) }));
     if (m.actions?.length) ws.send(JSON.stringify({ t: 'act', action: m.actions[0] }));
   });
   return { ws, frames, ended };
@@ -56,7 +58,7 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   assert.equal(a.status, 200);
   assert.ok(a.data.token);
   assert.equal(a.data.me.roster.length, 4);
-  assert.equal(a.data.me.team.length, 3);
+  assert.equal(a.data.me.team.length, 4);
   const b = await call('/api/import', { method: 'POST', body: { name: 'Beto <b>', save } });
 
   const page = await fetch(`${base}/b/abcdef`);
@@ -83,6 +85,10 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token })).status, 200);
   assert.equal(await battles(), '1'); // deploy/deploy.sh waits for this to reach 0
   const guest = player(id, b.data.token);
+  const preview = await new Promise((r) => guest.ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.preview) r(m.preview); }));
+  const hostParty = preview.sides[0].party;
+  assert.ok(hostParty.length >= 1 && hostParty.every((f) => f.name && f.sprite && !f.moves && !f.abilityInfo && !f.stats));
+  assert.ok(preview.sides[1].party.every((f) => f.moves && f.stats));
   const spectator = player(id, null);
 
   const [endA, endB, endS] = await Promise.all([host.ended, guest.ended, spectator.ended]);

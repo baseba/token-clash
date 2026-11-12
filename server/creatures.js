@@ -2,12 +2,11 @@
 // scripts/import-pokeapi.mjs: server/pokeapi.json holds the name, base stats, real types and
 // evolution placement of every species, and public/sprites/ holds each species' official
 // front/back sprites by dex number. The server never calls PokeAPI (production has no egress). The
-// type chart and labels live in public/types.js, shared with the browser; the move names here are
-// real Pokémon moves, picked by the species' own types so each attack matches its type.
+// type chart and labels live in public/types.js, shared with the browser. server/movedex.json holds
+// every learnable move.
 
 import { readFileSync } from 'node:fs';
 import { effectiveness } from '../public/types.js';
-import { moveInfo } from './moves.js';
 import { abilityInfo, knownAbility } from './abilities.js';
 
 export { effectiveness };
@@ -59,57 +58,89 @@ export function rng(seed) {
   };
 }
 
-const pick = (r, list) => list[Math.floor(r() * list.length)];
 const between = (r, lo, hi) => lo + Math.floor(r() * (hi - lo + 1));
 
-// Real Pokémon move names per type: a weaker "strike" (power 60) and a stronger "burst" (power 95).
-const MOVE_NAMES = {
-  normal: { strike: ['Placaje', 'Golpe Cabeza', 'Doble Filo'], burst: ['Hiperrayo', 'Gigaimpacto', 'Última Baza'] },
-  fire: { strike: ['Ascuas', 'Colmillo Ígneo', 'Rueda Fuego'], burst: ['Lanzallamas', 'Llamarada', 'Envite Ígneo'] },
-  water: { strike: ['Pistola Agua', 'Hidropulso', 'Burbuja'], burst: ['Hidrobomba', 'Cascada', 'Acua Cola'] },
-  grass: { strike: ['Látigo Cepa', 'Hoja Afilada', 'Megaagotar'], burst: ['Rayo Solar', 'Bomba Germen', 'Lluevehojas'] },
-  electric: { strike: ['Impactrueno', 'Chispa', 'Colmillo Rayo'], burst: ['Rayo', 'Trueno', 'Voltio Cruel'] },
-  ice: { strike: ['Viento Hielo', 'Colmillo Hielo', 'Nieve Polvo'], burst: ['Rayo Hielo', 'Ventisca', 'Frío Polar'] },
-  fighting: { strike: ['Golpe Kárate', 'Patada Baja', 'Demolición'], burst: ['A Bocajarro', 'Puño Dinámico', 'Patada Salto Alta'] },
-  poison: { strike: ['Ácido', 'Colmillo Veneno', 'Puya Nociva'], burst: ['Bomba Lodo', 'Lanzamugre', 'Onda Tóxica'] },
-  ground: { strike: ['Bofetón Lodo', 'Disparo Lodo', 'Terratemblor'], burst: ['Terremoto', 'Fuerza Telúrica', 'Tierra Viva'] },
-  flying: { strike: ['Picotazo', 'Ataque Ala', 'Tajo Aéreo'], burst: ['Pájaro Osado', 'Vendaval', 'Vuelo'] },
-  psychic: { strike: ['Confusión', 'Psicorrayo', 'Cabezazo Zen'], burst: ['Psíquico', 'Psicocorte', 'Premonición'] },
-  bug: { strike: ['Picadura', 'Tijera X', 'Pin Misil'], burst: ['Megacuerno', 'Zumbido', 'Chupavidas'] },
-  rock: { strike: ['Lanzarrocas', 'Pedrada', 'Antiaéreo'], burst: ['Roca Afilada', 'Avalancha', 'Poder Pasado'] },
-  ghost: { strike: ['Lengüetazo', 'Garra Umbría', 'Puño Sombra'], burst: ['Bola Sombra', 'Golpe Fantasma', 'Infortunio'] },
-  dragon: { strike: ['Furia Dragón', 'Aliento Dragón', 'Garra Dragón'], burst: ['Enfado', 'Cometa Draco', 'Carga Dragón'] },
-  dark: { strike: ['Mordisco', 'Finta', 'Tajo Umbrío'], burst: ['Triturar', 'Pulso Umbrío', 'Juego Sucio'] },
-  steel: { strike: ['Garra Metal', 'Cola Férrea', 'Puño Bala'], burst: ['Foco Resplandor', 'Cabeza de Hierro', 'Puño Meteoro'] },
-  fairy: { strike: ['Viento Feérico', 'Beso Drenaje', 'Carantoña'], burst: ['Fuerza Lunar', 'Brillo Mágico', 'Voz Cautivadora'] },
+const MOVEDEX = JSON.parse(readFileSync(new URL('./movedex.json', import.meta.url), 'utf8'));
+export const MOVES_PER_FIGHTER = 4;
+const SUPPORTED_VOLATILES = new Set(['confusion', 'attract', 'leechseed']);
+const SPECIAL_STATUS_MOVES = new Set(['rest', 'synthesis', 'morning-sun', 'moonlight', 'shore-up']);
+const GRASSY_HALVED = new Set(['earthquake', 'bulldoze', 'magnitude']);
+
+export const STRUGGLE = {
+  key: 'struggle', id: 'struggle', name: 'Forcejeo', desc: 'Ataque desesperado que solo se usa cuando no quedan PP; daña también al usuario.',
+  type: null, category: 'physical', power: 50, accuracy: null, pp: 1, priority: 0, target: 'foe', flags: ['contact'], kind: 'attack', recoilMaxHp: 1 / 4, supported: true,
 };
 
-// A real priority move for the quick slot, by type; types without one fall back to Ataque Rápido.
-const PRIORITY_MOVE = {
-  water: 'Acua Jet', steel: 'Puño Bala', fighting: 'Ultrapuño', dark: 'Golpe Bajo',
-  ghost: 'Sombra Vil', ice: 'Esquirla Helada', rock: 'Roca Veloz',
-};
+function supportedMove(m) {
+  if (m.category !== 'status') return m.power > 0 || !!m.fixedDamage || !!m.ohko;
+  return !!(m.boosts || m.self || m.status || SUPPORTED_VOLATILES.has(m.volatile) || m.heal || m.weather || m.terrain || SPECIAL_STATUS_MOVES.has(m.id));
+}
 
-export const SUPPORT_MOVES = {
-  guard: { name: 'Defensa Férrea', kind: 'boost', stat: 'def', desc: 'Sube su defensa' },
-  focus: { name: 'Danza Espada', kind: 'boost', stat: 'atk', desc: 'Sube su ataque' },
-  mend: { name: 'Recuperación', kind: 'heal', amount: 0.3, uses: 2, desc: 'Recupera 30% de vida (2 usos)' },
-  plot: { name: 'Maquinación', kind: 'boost', stat: 'satk', desc: 'Sube su ataque especial' },
-  calm: { name: 'Amnesia', kind: 'boost', stat: 'sdef', desc: 'Sube su defensa especial' },
+export function moveData(id) {
+  const d = MOVEDEX[id];
+  if (!d) return null;
+  const m = { key: id, id, ...d, flags: [...(d.flags ?? [])], kind: d.category === 'status' ? 'status' : 'attack' };
+  if (GRASSY_HALVED.has(id)) m.weakenedByGrassyTerrain = true;
+  if (id === 'foul-play') m.usesTargetAttack = true;
+  if (id === 'toxic') m.status = 'tox';
+  m.supported = supportedMove(m);
+  return m;
+}
+
+export function learnedMoves(entry) {
+  const data = speciesData(entry.finalID);
+  const byLevel = new Map((data?.learnset ?? []).filter(([, lvl]) => lvl <= entry.level).map(([id, lvl]) => [id, lvl]));
+  for (const id of entry.learned ?? []) if (!byLevel.has(id)) byLevel.set(id, 0);
+  return [...byLevel.entries()]
+    .filter(([id]) => MOVEDEX[id])
+    .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
+    .map(([id]) => id);
+}
+
+export function movepool(entry) {
+  return learnedMoves(entry).map((id) => moveData(id));
+}
+
+export function defaultMoveset(entry) {
+  const usable = learnedMoves(entry).filter((id) => moveData(id).supported);
+  if (usable.length) return usable.slice(-MOVES_PER_FIGHTER);
+  return MOVEDEX.tackle ? ['tackle'] : [];
+}
+
+export function validMoveset(entry, ids) {
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > MOVES_PER_FIGHTER || new Set(ids).size !== ids.length) return false;
+  const pool = new Set(learnedMoves(entry));
+  return ids.every((id) => typeof id === 'string' && pool.has(id) && moveData(id).supported);
+}
+
+export function movesetFor(entry) {
+  return validMoveset(entry, entry.moveset) ? entry.moveset : defaultMoveset(entry);
+}
+
+export function abilityOptions(entry) {
+  const data = speciesData(entry.finalID);
+  if (!data) return [];
+  return [...data.abilities.map((key) => ({ key, hidden: false })), ...(data.hiddenAbility ? [{ key: data.hiddenAbility, hidden: true }] : [])].filter((a) => knownAbility(a.key));
+}
+
+const NATURES = {
+  lonely: ['atk', 'def'], brave: ['atk', 'spd'], adamant: ['atk', 'satk'], naughty: ['atk', 'sdef'],
+  bold: ['def', 'atk'], relaxed: ['def', 'spd'], impish: ['def', 'satk'], lax: ['def', 'sdef'],
+  timid: ['spd', 'atk'], hasty: ['spd', 'def'], jolly: ['spd', 'satk'], naive: ['spd', 'sdef'],
+  modest: ['satk', 'atk'], mild: ['satk', 'def'], quiet: ['satk', 'spd'], rash: ['satk', 'sdef'],
+  calm: ['sdef', 'atk'], gentle: ['sdef', 'def'], sassy: ['sdef', 'spd'], careful: ['sdef', 'satk'],
 };
+export const NATURE_NAMES = new Set([...Object.keys(NATURES), 'hardy', 'docile', 'serious', 'bashful', 'quirky']);
 
 const RARITY_BASE = { common: 55, uncommon: 65, rare: 75, legendary: 90 };
 
-// Species: name, sprite, types and stats straight from PokeAPI; the move names are real Pokémon
-// moves chosen by the species' types. A species PokeAPI doesn't know (unknown or newer) falls back
-// to its dex number, the Normal type and stats derived from rarity.
+// Species: name, sprite, types and stats straight from PokeAPI. A species PokeAPI doesn't know
+// (unknown or newer) falls back to its dex number, the Normal type and stats derived from rarity.
 export function species(entry) {
   const { finalID, rarity } = entry;
   const data = speciesData(finalID);
   const r = rng(`sp:${finalID}`);
   const types = data ? data.types : ['normal'];
-  const t1 = types[0];
-  const t2 = types[1] || types[0];
 
   let stats;
   if (data) {
@@ -126,30 +157,7 @@ export function species(entry) {
       spd: base + between(r, -18, 18),
     };
   }
-
-  // One move per type (so both types of a dual get represented), a priority move and a support move.
-  const category = stats.atk >= stats.satk ? 'physical' : 'special';
-  const fitting = (names) => {
-    const same = names.filter((n) => moveInfo(n).category === category);
-    return same.length ? same : names;
-  };
-  let supportKey = pick(r, ['guard', 'focus', 'mend']);
-  if (supportKey === 'focus' && category === 'special') supportKey = 'plot';
-  if (supportKey === 'guard' && stats.sdef > stats.def) supportKey = 'calm';
-  const strike = pick(r, fitting(MOVE_NAMES[t1].strike));
-  const burst = pick(r, fitting(MOVE_NAMES[t2].burst));
-  const quick = PRIORITY_MOVE[t2]
-    ? { name: PRIORITY_MOVE[t2], type: t2 }
-    : PRIORITY_MOVE[t1]
-      ? { name: PRIORITY_MOVE[t1], type: t1 }
-      : { name: 'Ataque Rápido', type: 'normal' };
-  const moves = [
-    { key: 'strike', name: strike, type: t1, power: 60, accuracy: 100, priority: 0 },
-    { key: 'burst', name: burst, type: t2, power: 95, accuracy: 85, priority: 0 },
-    { key: 'quick', name: quick.name, type: quick.type, power: 40, accuracy: 100, priority: 1 },
-    { key: supportKey, ...SUPPORT_MOVES[supportKey], type: null, power: 0, accuracy: 100, priority: 0 },
-  ].map((m) => ({ ...moveInfo(m.name), ...m }));
-  return { id: finalID, name: data ? data.name : `#${finalID}`, sprite: String(finalID), types, stats, moves, floats: floats(finalID) };
+  return { id: finalID, name: data ? data.name : `#${finalID}`, sprite: String(finalID), types, stats, floats: floats(finalID) };
 }
 
 export function abilityFor(entry) {
@@ -157,22 +165,25 @@ export function abilityFor(entry) {
   if (!data?.abilities?.length) return null;
   const regular = data.abilities;
   const all = data.hiddenAbility ? [...regular, data.hiddenAbility] : regular;
+  if (entry.abilityChoice && all.includes(entry.abilityChoice) && knownAbility(entry.abilityChoice)) return entry.abilityChoice;
   if (entry.ability && all.includes(entry.ability) && knownAbility(entry.ability)) return entry.ability;
   if (entry.abilitySlot === 3 && data.hiddenAbility) return data.hiddenAbility;
   if (entry.abilitySlot === 1 || entry.abilitySlot === 2) return regular[entry.abilitySlot - 1] ?? regular[0];
   return regular[hash(`ab:${entry.id ?? entry.finalID}`) % regular.length];
 }
 
-const scale = (base, iv, level, flat) => Math.floor(((2 * base + iv) * level) / 100) + flat;
+const scale = (base, iv, level) => Math.floor(((2 * base + iv) * level) / 100);
 
-export function statsFor([hp, attack, defense, spAttack, spDefense, speed], iv, level) {
+export function statsFor([hp, attack, defense, spAttack, spDefense, speed], iv, level, nature = null) {
+  const [up, down] = NATURES[nature] ?? [];
+  const stat = (key, base, value) => Math.floor((scale(base, value, level) + 5) * (key === up ? 1.1 : key === down ? 0.9 : 1));
   return {
-    hp: scale(hp, iv.hp, level, level + 20),
-    atk: scale(attack, iv.atk, level, 10),
-    def: scale(defense, iv.def, level, 10),
-    satk: scale(spAttack, iv.satk ?? iv.atk, level, 10),
-    sdef: scale(spDefense, iv.sdef ?? iv.def, level, 10),
-    spd: scale(speed, iv.spd, level, 10),
+    hp: hp === 1 ? 1 : scale(hp, iv.hp, level) + level + 10,
+    atk: stat('atk', attack, iv.atk),
+    def: stat('def', defense, iv.def),
+    satk: stat('satk', spAttack, iv.satk ?? iv.atk),
+    sdef: stat('sdef', spDefense, iv.sdef ?? iv.def),
+    spd: stat('spd', speed, iv.spd),
   };
 }
 
@@ -183,7 +194,7 @@ export function buildFighter(entry, { levelCap } = {}) {
   const iv = entry.ivs;
   const ability = abilityFor(entry);
   const { hp, atk, def, satk, sdef, spd } = sp.stats;
-  const stats = statsFor([hp, atk, def, satk, sdef, spd], iv, level);
+  const stats = statsFor([hp, atk, def, satk, sdef, spd], iv, level, entry.nature);
   return {
     uid: entry.id,
     name: entry.nickname || sp.name,
@@ -194,12 +205,13 @@ export function buildFighter(entry, { levelCap } = {}) {
     shiny: entry.shiny,
     level,
     stats,
-    moves: sp.moves.map((m) => ({ ...m, flags: [...m.flags] })),
+    moves: movesetFor(entry).map((id) => moveData(id)),
     sprite: sp.sprite,
     floats: sp.floats,
     ability,
     abilityInfo: abilityInfo(ability),
     gender: entry.gender ?? null,
+    nature: entry.nature ?? null,
     ivs: iv,
   };
 }

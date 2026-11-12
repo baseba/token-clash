@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseSave } from '../server/save.js';
 import { createBattle, submit, autoAction, needsAction, validActions } from '../server/battle.js';
-import { rng, species, speciesData, effectiveness } from '../server/creatures.js';
+import { rng, species, speciesData, effectiveness, learnedMoves, defaultMoveset, validMoveset, movesetFor, buildFighter, moveData, statsFor } from '../server/creatures.js';
 
 const { roster } = parseSave(readFileSync(new URL('./fixtures/export.json', import.meta.url), 'utf8'));
 
@@ -34,10 +34,6 @@ test('name, sprite, types and stats come straight from PokeAPI', () => {
   // Dual-type species keep both types, in PokeAPI slot order.
   assert.deepEqual(speciesData(1).types, ['grass', 'poison']);
   assert.deepEqual(speciesData(16).types, ['normal', 'flying']);
-  // Damaging moves carry the species' own types (STAB), and there are four moves.
-  const moves = sp.moves;
-  assert.equal(moves.length, 4);
-  assert.equal(moves[0].type, 'fire');
   // A species PokeAPI doesn't know keeps working with rarity-based stats and the Normal type.
   const unknown = species(e(4999));
   assert.equal(speciesData(4999), null);
@@ -100,4 +96,36 @@ test('events say who acts first and why, and whom a switch replaces', () => {
   assert.equal(sw[0].from, c.sides[0].team[0].name);
   assert.equal(sw[0].forced, false);
   assert.equal(sw[1].name, c.sides[1].team[2].name);
+});
+
+test('moves come from what the Pokémon has learned: the latest four by default, any four the player picks', () => {
+  const charmander = { id: 'c', finalID: 4, level: 30, rarity: 'common', ivs: { hp: 31, atk: 31, def: 31, satk: 31, sdef: 31, spd: 31 } };
+  const pool = learnedMoves(charmander);
+  const learnset = speciesData(4).learnset.filter(([, lvl]) => lvl <= 30).map(([id]) => id);
+  assert.deepEqual(new Set(pool), new Set(learnset));
+  assert.ok(!pool.includes('flamethrower'));
+  const def = defaultMoveset(charmander);
+  assert.equal(def.length, 4);
+  assert.deepEqual(def, pool.filter((id) => moveData(id).supported).slice(-4));
+
+  assert.ok(validMoveset(charmander, ['ember', 'scratch']));
+  assert.ok(!validMoveset(charmander, ['flamethrower']));
+  assert.ok(!validMoveset(charmander, ['ember', 'ember']));
+  assert.ok(!validMoveset(charmander, ['ember', 'scratch', 'growl', 'smokescreen', 'dragon-rage']));
+  assert.deepEqual(movesetFor({ ...charmander, moveset: ['ember', 'scratch'] }), ['ember', 'scratch']);
+  assert.deepEqual(movesetFor({ ...charmander, moveset: ['flamethrower'] }), def);
+  assert.ok(learnedMoves({ ...charmander, learned: ['flamethrower'] }).includes('flamethrower'));
+
+  const f = buildFighter({ ...charmander, moveset: ['ember', 'growl'] });
+  assert.deepEqual(f.moves.map((m) => [m.key, m.name, m.pp]), [['ember', 'Ascuas', 25], ['growl', 'Gruñido', 40]]);
+});
+
+test('stats follow the real formula, with the nature boosting one stat and lowering another', () => {
+  const iv = { hp: 31, atk: 31, def: 31, satk: 31, sdef: 31, spd: 31 };
+  const base = [78, 84, 78, 109, 85, 100];
+  const neutral = statsFor(base, iv, 50);
+  assert.deepEqual(neutral, { hp: 153, atk: 104, def: 98, satk: 129, sdef: 105, spd: 120 });
+  const modest = statsFor(base, iv, 50, 'modest');
+  assert.equal(modest.satk, Math.floor(129 * 1.1));
+  assert.equal(modest.atk, Math.floor(104 * 0.9));
 });
