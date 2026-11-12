@@ -6,8 +6,10 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { parseSave, SaveError } from './save.js';
-import { buildFighter } from './creatures.js';
-import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents, TEAM_SIZE } from './battle.js';
+import { buildFighter, movepool, validMoveset, abilityOptions, movesetFor, speciesData, MOVES_PER_FIGHTER } from './creatures.js';
+import { abilityInfo } from './abilities.js';
+import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents } from './battle.js';
+import { createPreview, pick, fillMissing, previewReady, chosenEntries, previewView, PARTY_SIZE } from './preview.js';
 import { openStore } from './store.js';
 
 const PORT = Number(process.env.PORT || 8080);
@@ -16,6 +18,7 @@ const DATA_DIR = process.env.DATA_DIR || fileURLToPath(new URL('../data', import
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || '';
 const TRUST_CF = process.env.TRUST_CF_CONNECTING_IP === '1';
 const TURN_MS = Number(process.env.TURN_MS || 60_000);
+const PREVIEW_MS = Number(process.env.PREVIEW_MS || 60_000);
 const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 // "?v=dev" in index.html and app.js becomes a hash of the code, so each deploy gets new URLs and
 // no browser keeps old code (Cloudflare stretches the cache of .js/.css to hours).
@@ -120,7 +123,7 @@ function defaultTeam(roster) {
   const rank = { legendary: 3, rare: 2, uncommon: 1, common: 0 };
   return [...roster]
     .sort((a, b) => b.level - a.level || rank[b.rarity] - rank[a.rarity] || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0))
-    .slice(0, TEAM_SIZE)
+    .slice(0, PARTY_SIZE)
     .map((e) => e.id);
 }
 
@@ -128,6 +131,31 @@ function teamEntries(t) {
   const byId = new Map(t.roster.map((e) => [e.id, e]));
   const team = t.team.map((id) => byId.get(id)).filter(Boolean);
   return team.length ? team : defaultTeam(t.roster).map((id) => byId.get(id));
+}
+
+function saveEdit(e) {
+  if (!e.moveset && !e.abilityChoice) return null;
+  const data = speciesData(e.finalID);
+  const level = new Map((data?.learnset ?? []).map(([id, lvl]) => [id, lvl]));
+  const out = { id: e.id };
+  if (e.moveset && validMoveset(e, e.moveset)) out.currentMoves = e.moveset.map((name) => ({ name, level: level.get(name) ?? 1 }));
+  if (e.abilityChoice && data) {
+    const hidden = data.hiddenAbility === e.abilityChoice && !data.abilities.includes(e.abilityChoice);
+    out.ability = { name: e.abilityChoice, slot: hidden ? 3 : data.abilities.indexOf(e.abilityChoice) + 1, hidden };
+  }
+  return out.currentMoves || out.ability ? out : null;
+}
+
+function monDetail(e) {
+  const chosen = new Set(movesetFor(e));
+  const learnedAt = new Map((speciesData(e.finalID)?.learnset ?? []).map(([id, lvl]) => [id, lvl]));
+  return {
+    ...buildFighter(e),
+    nickname: e.nickname || null,
+    movepool: movepool(e).map((m) => ({ level: learnedAt.get(m.key) ?? null, key: m.key, name: m.name, desc: m.desc, type: m.type, category: m.category, power: m.power, accuracy: m.accuracy, pp: m.pp, priority: m.priority, contact: m.flags.includes('contact'), supported: m.supported, chosen: chosen.has(m.key) })),
+    abilityOptions: abilityOptions(e).map((a) => ({ ...abilityInfo(a.key), hidden: a.hidden })),
+    maxMoves: MOVES_PER_FIGHTER,
+  };
 }
 
 function trainerSummary(t) {
@@ -146,7 +174,7 @@ function myView(t) {
   return {
     ...trainerSummary(t),
     team: t.team,
-    roster: t.roster.map((e) => ({ ...buildFighter(e), active: !!e.active, nickname: e.nickname || null })),
+    roster: t.roster.map((e) => ({ ...buildFighter(e), active: !!e.active, nickname: e.nickname || null, saveEdit: saveEdit(e) })),
   };
 }
 
@@ -187,7 +215,42 @@ function sideOf(battle, trainerId) {
   return i === -1 ? null : i;
 }
 
+function sideIn(sides, trainerId) {
+  if (!trainerId) return null;
+  const i = sides.findIndex((s) => s.trainerId === trainerId);
+  return i === -1 ? null : i;
+}
+
+function previewFrame(r, ws, extra) {
+  const you = sideIn(r.preview.sides, ws.trainerId);
+  return { ...extra, t: extra.t === 'presence' || extra.t === 'ready' ? 'preview' : extra.t, preview: previewView(r.preview, you), you, deadline: r.deadline, watchers: r.sockets.size };
+}
+
+function armPreviewTimer(id, r) {
+  clearTimeout(r.timer);
+  r.deadline = Date.now() + PREVIEW_MS;
+  r.timer = setTimeout(() => {
+    if (!r.preview) return;
+    fillMissing(r.preview);
+    startBattle(id, r);
+  }, PREVIEW_MS);
+  r.timer.unref?.();
+}
+
+function startBattle(id, r) {
+  const p = r.preview;
+  r.preview = null;
+  r.battle = createBattle({
+    id,
+    levelCap: p.levelCap,
+    sides: p.sides.map((side, s) => ({ trainerId: side.trainerId, name: side.name, entries: chosenEntries(p, s) })),
+  });
+  armTimer(id, r);
+  broadcast(r, { t: 'start' });
+}
+
 function frameFor(r, ws, extra = {}) {
+  if (r.preview) return previewFrame(r, ws, extra);
   const you = sideOf(r.battle, ws.trainerId);
   return {
     ...extra,
@@ -297,8 +360,12 @@ async function api(req, res, url) {
       db.trainers[t.id] = t;
       byToken.set(t.tokenHash, t);
     } else if (name) t.name = name;
-    const nick = new Map(t.roster.map((e) => [e.id, e.nickname]));
-    t.roster = parsed.roster.map((e) => (nick.get(e.id) ? { ...e, nickname: nick.get(e.id) } : e));
+    const kept = new Map(t.roster.map((e) => [e.id, { nickname: e.nickname, moveset: e.moveset, abilityChoice: e.abilityChoice }]));
+    t.roster = parsed.roster.map((e) => {
+      const k = kept.get(e.id);
+      if (!k) return e;
+      return Object.fromEntries(Object.entries({ ...e, ...k }).filter(([, v]) => v !== undefined));
+    });
     const ids = new Set(t.roster.map((e) => e.id));
     t.team = t.team.filter((id) => ids.has(id));
     if (!t.team.length) t.team = defaultTeam(t.roster);
@@ -324,7 +391,7 @@ async function api(req, res, url) {
     }
     const byId = new Map(t.roster.map((e) => [e.id, e]));
     if (Array.isArray(body.team)) {
-      const team = [...new Set(body.team.filter((id) => typeof id === 'string' && byId.has(id)))].slice(0, TEAM_SIZE);
+      const team = [...new Set(body.team.filter((id) => typeof id === 'string' && byId.has(id)))].slice(0, PARTY_SIZE);
       if (team.length) t.team = team;
     }
     if (body.nickname && typeof body.nickname.id === 'string' && byId.has(body.nickname.id)) {
@@ -336,6 +403,28 @@ async function api(req, res, url) {
     t.updatedAt = Date.now();
     store.save();
     return send(res, 200, { me: myView(t) });
+  }
+
+  let mon = /^\/api\/me\/mons\/([A-Za-z0-9_-]{1,64})$/.exec(p);
+  if (mon) {
+    const t = trainerFrom(req);
+    if (!t) return send(res, 401, { error: 'Sin sesión' });
+    const e = t.roster.find((x) => x.id === mon[1]);
+    if (!e) return send(res, 404, { error: 'Ese Pokémon no está en tu colección.' });
+    if (method === 'PUT') {
+      const body = await readBody(req);
+      if (body.moves !== undefined) {
+        if (!validMoveset(e, body.moves)) return send(res, 400, { error: `Elige entre 1 y ${MOVES_PER_FIGHTER} movimientos distintos que conozca.` });
+        e.moveset = [...body.moves];
+      }
+      if (body.ability !== undefined) {
+        if (!abilityOptions(e).some((a) => a.key === body.ability)) return send(res, 400, { error: 'Esa habilidad no es de su especie.' });
+        e.abilityChoice = body.ability;
+      }
+      t.updatedAt = Date.now();
+      store.save();
+    } else if (method !== 'GET') return send(res, 405, { error: 'Método no permitido' });
+    return send(res, 200, { mon: monDetail(e) });
   }
 
   if (p === '/api/me/challenges' && method === 'GET') {
@@ -415,8 +504,7 @@ async function api(req, res, url) {
     c.guestTeam = teamEntries(t).map((e) => ({ ...e }));
     const host = db.trainers[c.hostId];
     const r = room(c.id);
-    r.battle = createBattle({
-      id: c.id,
+    r.preview = createPreview({
       levelCap: c.levelCap,
       sides: [
         { trainerId: c.hostId, name: host?.name ?? c.hostName, entries: c.hostTeam },
@@ -424,8 +512,8 @@ async function api(req, res, url) {
       ],
     });
     store.save();
-    armTimer(c.id, r);
-    broadcast(r, { t: 'start' });
+    armPreviewTimer(c.id, r);
+    broadcast(r, { t: 'preview' });
     return send(res, 200, { challenge: challengeView(c, t.id) });
   }
 
@@ -439,11 +527,11 @@ const server = createServer(async (req, res) => {
     // Live battle count for deploy/deploy.sh, which asks from inside the container (podman exec) so
     // it can wait until nobody is fighting. Loopback only: cloudflared reaches us from another container.
     if (url.pathname === '/healthz/battles' && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)) {
-      return send(res, 200, String([...rooms.values()].filter((r) => r.battle?.status === 'active').length));
+      return send(res, 200, String([...rooms.values()].filter((r) => r.preview || r.battle?.status === 'active').length));
     }
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed');
-    if (url.pathname === '/' || /^\/b\/[A-Za-z0-9_-]{4,20}$/.test(url.pathname)) return await serveStatic(req, res, 'index.html');
+    if (url.pathname === '/' || url.pathname === '/equipo' || /^\/b\/[A-Za-z0-9_-]{4,20}$/.test(url.pathname)) return await serveStatic(req, res, 'index.html');
     return await serveStatic(req, res, url.pathname);
   } catch (e) {
     if (e instanceof SaveError) return send(res, 400, { error: e.message });
@@ -496,11 +584,25 @@ function onSocket(ws) {
       r.sockets.add(ws);
       ws.on('close', () => {
         r.sockets.delete(ws);
-        if (r.battle) broadcast(r, { t: 'presence' });
-        if (!r.battle && r.sockets.size === 0) rooms.delete(c.id);
+        if (r.battle || r.preview) broadcast(r, { t: 'presence' });
+        if (!r.battle && !r.preview && r.sockets.size === 0) rooms.delete(c.id);
       });
-      if (r.battle) broadcast(r, { t: 'presence' });
+      if (r.battle || r.preview) broadcast(r, { t: 'presence' });
       else ws.send(JSON.stringify({ t: 'waiting', watchers: r.sockets.size }));
+      return;
+    }
+    if (msg.t === 'pick' && ws.roomId) {
+      const r = rooms.get(ws.roomId);
+      if (!r?.preview) return;
+      const s = sideIn(r.preview.sides, ws.trainerId);
+      if (s === null) return;
+      try {
+        pick(r.preview, s, Array.isArray(msg.picks) ? msg.picks.map(Number) : null);
+      } catch (e) {
+        return ws.send(JSON.stringify({ t: 'error', error: e.message }));
+      }
+      if (previewReady(r.preview)) startBattle(ws.roomId, r);
+      else broadcast(r, { t: 'preview' });
       return;
     }
     if (msg.t === 'act' && ws.roomId) {

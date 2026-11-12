@@ -1,15 +1,17 @@
 // Reads a PokeTokenBar save: the app's export / snapshot ({format: "poketokenbar.save", state})
 // or the raw live file (~/Library/Application Support/PokeTokenBar/companion-state.json).
-// We keep only game data: species numbers, rarity, level, IVs, shiny, ability and gender. Names,
-// device name and token logs are dropped on purpose.
+// We keep only game data: species numbers, rarity, level, IVs, nature, shiny, ability, gender and
+// learned moves. Names, device name and token logs are dropped on purpose.
 
-import { hash } from './creatures.js';
+import { hash, NATURE_NAMES } from './creatures.js';
 
 const RARITIES = new Set(['common', 'uncommon', 'rare', 'legendary']);
 const UUID = /^[0-9a-fA-F-]{8,40}$/;
 const MAX_ROSTER = 300;
 const ABILITY_KEY = /^[a-z0-9-]{1,40}$/;
 const GENDERS = new Set(['male', 'female']);
+const MOVE_KEY = /^[a-z0-9-]{1,40}$/;
+const MAX_LEARNED = 120;
 
 export class SaveError extends Error {}
 
@@ -36,6 +38,11 @@ function chainInfo(chain, finalID, stageHint) {
   return { stage, chainLen: chain.length };
 }
 
+function currentMovesOf(profile) {
+  const list = Array.isArray(profile?.currentMoves) ? profile.currentMoves.filter((n) => typeof n === 'string' && MOVE_KEY.test(n)) : [];
+  return [...new Set(list)].slice(0, 4);
+}
+
 function entryFrom(raw, { finalID, baseID, defaultLevel, fallbackId, chain, stageHint }) {
   if (!Number.isInteger(finalID) || finalID < 1 || finalID > 5000) return null;
   if (!Number.isInteger(baseID) || baseID < 1 || baseID > 5000) baseID = finalID;
@@ -53,8 +60,20 @@ function entryFrom(raw, { finalID, baseID, defaultLevel, fallbackId, chain, stag
     ability: typeof profile?.abilityName === 'string' && ABILITY_KEY.test(profile.abilityName) ? profile.abilityName : null,
     abilitySlot: [1, 2, 3].includes(profile?.abilitySlot) ? profile.abilitySlot : null,
     gender: GENDERS.has(profile?.gender) ? profile.gender : null,
+    nature: NATURE_NAMES.has(raw.nature) ? raw.nature : NATURE_NAMES.has(profile?.nature) ? profile.nature : null,
+    learned: [...new Set([...(Array.isArray(profile?.moves) ? profile.moves.map((m) => m?.name) : []), ...currentMovesOf(profile)])].filter((n) => typeof n === 'string' && MOVE_KEY.test(n)).slice(0, MAX_LEARNED),
+    ...(currentMovesOf(profile).length ? { moveset: currentMovesOf(profile) } : {}),
     ...chainInfo(chain, finalID, stageHint),
   };
+}
+
+export function firstOfEachSpecies(candidates) {
+  const first = new Map();
+  for (const c of candidates) {
+    const prev = first.get(c.e.finalID);
+    if (!prev || c.caught < prev.caught || (c.caught === prev.caught && c.order < prev.order)) first.set(c.e.finalID, c);
+  }
+  return [...first.values()].sort((x, y) => x.e.finalID - y.e.finalID).map((c) => c.e);
 }
 
 export function parseSave(text) {
@@ -72,18 +91,19 @@ export function parseSave(text) {
     throw new SaveError('No encontré tu colección. Exporta desde PokeTokenBar → Ajustes → Backup & Transfer.');
   }
 
-  const roster = [];
-  const seen = new Set();
-  const add = (e) => {
-    if (!e || seen.has(e.id) || roster.length >= MAX_ROSTER) return;
-    seen.add(e.id);
-    roster.push(e);
+  const candidates = [];
+  const seenIds = new Set();
+  const add = (e, caughtAt) => {
+    if (!e || seenIds.has(e.id)) return;
+    seenIds.add(e.id);
+    const t = Date.parse(caughtAt);
+    candidates.push({ e, caught: Number.isFinite(t) ? t : Infinity, order: candidates.length });
   };
 
   const dex = Array.isArray(state.dex) ? state.dex : [];
   dex.forEach((d, i) => {
     if (!d || typeof d !== 'object' || d.releasedAt) return; // released ones were let go, not raised
-    add(entryFrom(d, { finalID: d.finalID, baseID: d.baseID, defaultLevel: 100, fallbackId: `dex-${i}-${d.finalID}`, chain: d.chainOrder }));
+    add(entryFrom(d, { finalID: d.finalID, baseID: d.baseID, defaultLevel: 100, fallbackId: `dex-${i}-${d.finalID}`, chain: d.chainOrder }), d.caughtAt);
   });
 
   const a = state.active;
@@ -93,9 +113,11 @@ export function parseSave(text) {
     const e = entryFrom(a, { finalID: current, baseID: a.baseID, defaultLevel: 30, fallbackId: `active-${a.baseID}`, chain: Array.isArray(a.plannedPathIDs) && a.plannedPathIDs.length >= a.pathIDs.length ? a.plannedPathIDs : a.pathIDs, stageHint: stage });
     if (e) {
       e.active = true;
-      add(e);
+      add(e, null);
     }
   }
+
+  const roster = firstOfEachSpecies(candidates).slice(0, MAX_ROSTER);
 
   if (roster.length === 0) throw new SaveError('Tu save no tiene criaturas todavía (¿solo un huevo?). Vuelve cuando nazca la primera.');
 
