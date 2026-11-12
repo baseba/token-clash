@@ -1,0 +1,10 @@
+[Unit]
+Description=Revisa cada 2 minutos si hay que desplegar token-clash
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+RandomizedDelaySec=15s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Despliega token-clash si main tiene un commit nuevo con CI en verde
+After=network-online.target token-clash.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/token-clash-deploy
+# A build plus a health-gated restart; generous so a slow build isn't cut.
+TimeoutStartSec=15min
