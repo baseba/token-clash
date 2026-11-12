@@ -89,8 +89,10 @@ await mapLimit(ids, async (id) => {
   };
   const sprites = mon.sprites || {};
   await download(sprites.front_default, new URL(`${id}-front.png`, SPRITES));
+  await download(sprites.front_shiny || sprites.front_default, new URL(`${id}-front-shiny.png`, SPRITES));
   // Some species (newer gens) have no back sprite: fall back to the front one.
   await download(sprites.back_default || sprites.front_default, new URL(`${id}-back.png`, SPRITES));
+  await download(sprites.back_shiny || sprites.front_shiny || sprites.back_default || sprites.front_default, new URL(`${id}-back-shiny.png`, SPRITES));
   if (sp.evolution_chain) {
     species[id].chainId = idFromUrl(sp.evolution_chain.url);
     chainIds.add(species[id].chainId);
