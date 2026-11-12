@@ -85,6 +85,177 @@ function typeChips(types) {
   return h('span', { class: 'els' }, ...(types || []).map(typeChip));
 }
 
+const STATUS = { brn: 'QUE', par: 'PAR', psn: 'ENV', tox: 'TÓX', slp: 'DOR', frz: 'CON' };
+const STATUS_TEXT = { brn: 'se quema', par: 'queda paralizado', psn: 'queda envenenado', tox: 'queda gravemente envenenado', slp: 'se duerme', frz: 'se congela' };
+const CURE_TEXT = { brn: 'ya no está quemado', par: 'ya no está paralizado', psn: 'ya no está envenenado', tox: 'ya no está envenenado', slp: 'se despierta', frz: 'se descongela' };
+const WEATHER = { sun: '☀️ Sol', rain: '🌧️ Lluvia', sand: '🌪️ Tormenta de arena', snow: '❄️ Nieve', harshsun: '🔆 Sol abrasador', heavyrain: '⛈️ Diluvio', winds: '🌀 Turbulencias' };
+const WEATHER_START = { sun: 'El sol pega fuerte.', rain: 'Empieza a llover.', sand: 'Se desata una tormenta de arena.', snow: 'Empieza a nevar.', harshsun: 'El sol abrasa: los ataques de Agua se evaporan.', heavyrain: 'Cae un diluvio: los ataques de Fuego se apagan.', winds: 'Soplan turbulencias que protegen a los Volador.' };
+const TERRAIN = { electric: '⚡ Campo Eléctrico', grassy: '🌿 Campo de Hierba', misty: '🌫️ Campo de Niebla', psychic: '🔮 Campo Psíquico' };
+const STAT = { atk: ['ATQ', 'ataque'], def: ['DEF', 'defensa'], satk: ['AT.E', 'ataque especial'], sdef: ['DF.E', 'defensa especial'], spd: ['VEL', 'velocidad'], acc: ['PRE', 'precisión'], eva: ['EVA', 'evasión'] };
+const CANT = { slp: 'está dormido.', frz: 'está congelado.', par: 'está paralizado: no puede moverse.', flinch: 'retrocede y no se mueve.', attract: 'está enamorado y no ataca.' };
+const HURT = { brn: ' por la quemadura', psn: ' por el veneno', tox: ' por el veneno', sand: ' por la tormenta de arena', recoil: ' por el retroceso', ooze: ' por el lodo líquido', ability: '' };
+const VOLATILE = {
+  confusion: () => 'queda confuso.',
+  attract: () => 'se enamora.',
+  disable: (ev) => `no puede usar ${ev.move}.`,
+  perish: () => 'oye el canto mortal: caerá en 3 turnos.',
+  charge: () => 'se carga de electricidad.',
+};
+const ABILITY_NOTE = {
+  noDrop: () => 'evita que le bajen las características.',
+  endure: () => 'aguanta el golpe.',
+  weatherOff: () => 'anula los efectos del clima.',
+  pressure: () => 'ejerce presión.',
+  moldBreaker: () => 'rompe moldes.',
+  turboblaze: () => 'desprende un aura llameante.',
+  teravolt: () => 'desprende un aura chisporroteante.',
+  loafing: () => 'está holgazaneando.',
+  shudder: () => 'se estremece: el rival tiene un ataque peligroso.',
+  forewarn: (ev) => `prevé ${ev.move}.`,
+  trace: (ev) => `copia ${ev.copied}.`,
+  slowStart: () => 'no logra ponerse en marcha.',
+  slowStartEnd: () => 'por fin se pone en marcha.',
+  darkAura: () => 'irradia un aura oscura.',
+  fairyAura: () => 'irradia un aura feérica.',
+  auraBreak: () => 'invierte las auras.',
+  neutralizingGas: () => 'llena el campo de gas reactivo.',
+  comatose: () => 'está en coma.',
+  ruin: () => 'debilita a quienes lo rodean.',
+  asOne: () => 'tiene dos habilidades a la vez.',
+  disguise: () => 'su disfraz recibe el golpe.',
+  illusionBroken: () => 'su ilusión se desvanece.',
+  iceFaceBroken: () => 'su cara de hielo se rompe.',
+  iceFaceRestored: () => 'recupera su cara de hielo.',
+  gulpArrokuda: () => 'atrapa una presa.',
+  gulpPikachu: () => 'atrapa una presa.',
+  gulpSpit: () => 'escupe su presa.',
+  formZen: () => 'entra en Modo Daruma.',
+  formStandard: () => 'vuelve a su forma normal.',
+  formBlade: () => 'cambia a forma filo.',
+  formShield: () => 'cambia a forma escudo.',
+  formSchool: () => 'forma un banco.',
+  formSolo: () => 'deshace el banco.',
+  formCore: () => 'pierde su coraza.',
+  formMeteor: () => 'recupera su coraza.',
+  formComplete: () => 'alcanza su forma completa.',
+  formHero: () => 'se transforma en héroe.',
+  formTerastal: () => 'adopta su forma teracristal.',
+  formHangry: () => 'le entra el hambre.',
+  formFullBelly: () => 'queda satisfecho.',
+  paradox: (ev) => `potencia su ${STAT[ev.stat]?.[1] ?? 'fuerza'}.`,
+};
+const signed = (n) => `${n > 0 ? '+' : ''}${n}`;
+const STATUS_NAME = { brn: 'Quemado', par: 'Paralizado', psn: 'Envenenado', tox: 'Gravemente envenenado', slp: 'Dormido', frz: 'Congelado' };
+const CATEGORY = { physical: 'Físico', special: 'Especial', status: 'Estado' };
+const INFLICT = { brn: 'quemar', par: 'paralizar', psn: 'envenenar', tox: 'envenenar gravemente', frz: 'congelar', slp: 'dormir' };
+const STAT_THE = { atk: 'el ataque', def: 'la defensa', satk: 'el ataque especial', sdef: 'la defensa especial', spd: 'la velocidad', acc: 'la precisión', eva: 'la evasión' };
+const stageMult = (k, s) => {
+  const base = k === 'acc' || k === 'eva' ? 3 : 2;
+  return s >= 0 ? (base + s) / base : base / (base - s);
+};
+
+function moveEffects(m) {
+  const out = [];
+  if (m.kind && m.kind !== 'attack') out.push(m.desc);
+  if (m.priority > 0) out.push('Ataca primero.');
+  if (m.contact) out.push('Hace contacto.');
+  if (m.multihit) out.push('Golpea de 2 a 5 veces.');
+  if (m.crit) out.push('Alta probabilidad de golpe crítico.');
+  for (const s of m.secondary || []) {
+    if (s.status) out.push(`${s.chance}% de ${INFLICT[s.status]}.`);
+    if (s.flinch) out.push(`${s.chance}% de hacer retroceder.`);
+    if (s.confuse) out.push(`${s.chance}% de confundir.`);
+    for (const k of Object.keys(s.boosts || {})) out.push(`${s.chance}% de bajar ${STAT_THE[k]} del rival.`);
+    if (s.self) out.push(`${s.chance}% de subir su ${Object.keys(s.self).map((k) => STAT[k][1]).join(', ')}.`);
+  }
+  for (const [k, v] of Object.entries(m.self || {})) out.push(`${v < 0 ? 'Baja' : 'Sube'} su ${STAT[k][1]}${Math.abs(v) > 1 ? ` ${Math.abs(v)} niveles` : ''}.`);
+  if (m.recoil) out.push('El usuario recibe 1/3 del daño como retroceso.');
+  if (m.drain) out.push(`Recupera el ${Math.round(m.drain * 100)}% del daño causado.`);
+  return out;
+}
+
+function infoCard(f, { own, owner, close }) {
+  const pct = Math.max(0, Math.round((f.hp / f.stats.hp) * 100));
+  const gender = f.gender === 'male' ? ' ♂' : f.gender === 'female' ? ' ♀' : '';
+  const vol = f.volatiles || {};
+  const conditions = [
+    f.status ? STATUS_NAME[f.status] : null,
+    vol.confusion ? 'Confuso' : null,
+    vol.attract ? 'Enamorado' : null,
+    vol.perish ? `Canto mortal: ${vol.perish - 1}` : null,
+    vol.charge ? 'Cargado' : null,
+    vol.flashFire ? 'Absorbe Fuego activo' : null,
+    vol.disabled ? `No puede usar ${vol.disabled}` : null,
+    vol.slowStart ? 'Inicio lento' : null,
+  ].filter(Boolean);
+  const boosts = Object.entries(STAT).filter(([k]) => f.boosts?.[k]);
+  const moves = own ? f.moves : [...f.moves, ...Array(Math.max(0, 4 - f.moves.length)).fill(null)];
+  const ab = f.abilityInfo;
+
+  return h(
+    'div',
+    { class: 'info-card' },
+    h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: close }, '×'),
+    h(
+      'header',
+      null,
+      h('div', { class: 'info-sprite', html: creatureHTML(f) }),
+      h(
+        'div',
+        null,
+        h('h2', null, f.shiny ? `✨ ${f.name}` : f.name, h('span', { class: 'muted' }, gender)),
+        h('p', { class: 'muted small' }, f.name !== f.speciesName ? `${f.speciesName} · ` : '', `Nv ${f.level} · de ${owner}`),
+        typeChips(f.types),
+      ),
+    ),
+    h('section', null, h('h3', null, 'PS'), h('p', null, own ? `${f.hp} / ${f.stats.hp} PV (${pct}%)` : `${pct}%`)),
+    h('section', null, h('h3', null, 'Estado'), h('p', null, conditions.length ? conditions.join(' · ') : 'Sin problemas de estado.')),
+    h(
+      'section',
+      null,
+      h('h3', null, 'Cambios de características'),
+      boosts.length
+        ? h('p', null, boosts.map(([k, [label]]) => `${label} ${signed(f.boosts[k])} (×${stageMult(k, f.boosts[k]).toFixed(2).replace(/\.?0+$/, '')})`).join(' · '))
+        : h('p', { class: 'muted' }, 'Sin cambios.'),
+    ),
+    own
+      ? h('section', null, h('h3', null, 'Características'), h('div', { class: 'info-stats' }, [['PS', 'hp'], ['Ataque', 'atk'], ['Defensa', 'def'], ['At. Esp.', 'satk'], ['Def. Esp.', 'sdef'], ['Velocidad', 'spd']].map(([l, k]) => h('span', null, h('b', null, f.stats[k]), l))))
+      : null,
+    h(
+      'section',
+      null,
+      h('h3', null, 'Habilidad'),
+      ab
+        ? [h('p', null, abilityChip(ab)), h('p', null, ab.desc), ab.inert ? h('p', { class: 'muted small' }, ab.inert) : null]
+        : [h('p', null, h('span', { class: 'ability inert' }, 'Desconocida')), h('p', { class: 'muted small' }, 'No sabes su habilidad hasta que se active en combate.')],
+    ),
+    h(
+      'section',
+      null,
+      h('h3', null, own ? 'Movimientos' : 'Movimientos vistos'),
+      h(
+        'ul',
+        { class: 'info-moves' },
+        moves.map((m) =>
+          m
+            ? h(
+                'li',
+                null,
+                h('div', { class: 'mv-head' }, h('b', null, m.name), typeChip(m.type), h('span', { class: 'muted small' }, CATEGORY[m.category] || ''), m.power ? h('span', { class: 'muted small' }, `Poder ${m.power} · ${m.accuracy}%`) : null),
+                h('p', { class: 'muted small' }, moveEffects(m).join(' ') || 'Sin efectos adicionales.'),
+              )
+            : h('li', { class: 'muted' }, '???'),
+        ),
+      ),
+    ),
+  );
+}
+
+function abilityChip(info) {
+  if (!info) return null;
+  return h('span', { class: `ability${info.inert ? ' inert' : ''}`, title: info.inert ? `${info.desc}\n\n${info.inert}` : info.desc }, info.name);
+}
+
 function monCard(f, opts = {}) {
   const clickable = !!opts.onclick;
   return h(
@@ -102,8 +273,9 @@ function monCard(f, opts = {}) {
     h('div', { html: creatureHTML(f) }),
     h('div', { class: 'nm', title: f.name !== f.speciesName ? `${f.name} (${f.speciesName})` : f.name }, f.name),
     h('div', { class: 'meta' }, typeChips(f.types), h('span', null, `Nv ${f.level}`), opts.rarity !== false ? h('span', null, RARITY[f.rarity] || '') : null),
+    f.abilityInfo ? h('div', { class: 'ab-line' }, abilityChip(f.abilityInfo)) : null,
     opts.stats
-      ? h('div', { class: 'stats' }, ...[['PV', 'hp'], ['ATQ', 'atk'], ['DEF', 'def'], ['VEL', 'spd']].map(([l, k]) => h('span', null, h('b', null, f.stats[k]), l)))
+      ? h('div', { class: 'stats' }, ...[['PV', 'hp'], ['ATQ', 'atk'], ['DEF', 'def'], ['AT.E', 'satk'], ['DF.E', 'sdef'], ['VEL', 'spd']].map(([l, k]) => h('span', null, h('b', null, f.stats[k]), l)))
       : null,
     opts.onEdit ? h('button', { class: 'edit', title: 'Ponerle apodo', 'aria-label': `Apodo para ${f.name}`, onclick: (e) => { e.stopPropagation(); opts.onEdit(); } }, '✎') : null,
   );
@@ -520,7 +692,17 @@ function renderLobby(c, { onAccepted }) {
     h(
       'section',
       { class: 'vs' },
-      h('div', { class: 'card' }, h('h2', null, `Equipo de ${c.host.name}`), h('div', { class: 'mini-team' }, c.hostTeam.map((f, i) => monCard(f, { badge: i + 1, stats: true, rarity: false })))),
+      h(
+        'div',
+        { class: 'card' },
+        h('h2', null, `Equipo de ${c.host.name}`),
+        c.hostTeam.length
+          ? h('div', { class: 'mini-team' }, c.hostTeam.map((f, i) => monCard(f, { badge: i + 1, stats: true, rarity: false })))
+          : [
+              h('div', { class: 'mini-team' }, Array.from({ length: c.hostTeamSize ?? 3 }, (_, i) => h('div', { class: 'mon mon-hidden', 'aria-label': 'Pokémon oculto' }, h('span', { class: 'badge' }, i + 1), h('div', { class: 'ball' }), h('div', { class: 'nm' }, '???')))),
+              h('p', { class: 'muted small' }, 'No sabrás qué Pokémon trae hasta que los saque al combate.'),
+            ],
+      ),
       h('div', { class: 'vs-mark' }, 'VS'),
       right,
     ),
@@ -536,17 +718,21 @@ function battleUI(c, sendAction) {
   let queue = Promise.resolve();
   let lastElement = null; // element of the move being played, for the impact effect
 
+  const sideAt = (p) => (p === 'me' ? mine : 1 - mine);
   const hud = (p) => {
     const r = { name: h('span'), lvl: h('span'), sub: h('div', { class: 'sub' }), bar: h('i'), num: h('div', { class: 'hpnum' }) };
-    r.el = h('div', { class: `hud ${p}` }, h('div', { class: 'nm' }, r.name, r.lvl), r.sub, h('div', { class: 'hp' }, r.bar), r.num);
+    const info = h('button', { class: 'info-btn', type: 'button', title: 'Ver info', 'aria-label': 'Ver info del Pokémon', onclick: () => openInfo(sideAt(p)) }, 'i');
+    r.el = h('div', { class: `hud ${p}` }, h('div', { class: 'nm' }, r.name, h('span', { class: 'nm-end' }, r.lvl, info)), r.sub, h('div', { class: 'hp' }, r.bar), r.num);
     return r;
   };
   const els = {
     turn: h('span', null, ''),
     vs: h('span', { class: 'vs-line' }),
     timer: h('span', { class: 'timer' }, ''),
-    spot: { foe: h('div', { class: 'spot foe' }), me: h('div', { class: 'spot me' }) },
+    field: h('span', { class: 'field' }),
+    spot: { foe: h('div', { class: 'spot foe', title: 'Ver info', onclick: () => openInfo(sideAt('foe')) }), me: h('div', { class: 'spot me', title: 'Ver info', onclick: () => openInfo(sideAt('me')) }) },
     hud: { foe: hud('foe'), me: hud('me') },
+    info: h('dialog', { class: 'info-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() }),
     say: h('div', { class: 'say', 'aria-live': 'polite' }),
     controls: h('div', { class: 'card' }),
     log: h('div', { class: 'card log' }),
@@ -558,9 +744,10 @@ function battleUI(c, sendAction) {
   arena.style.setProperty('--pad-foe-fill', scene.foe[0]);
   arena.style.setProperty('--pad-foe-rim', scene.foe[1]);
   $app.replaceChildren(
-    h('div', { class: 'status-line' }, els.turn, els.vs, els.timer),
+    h('div', { class: 'status-line' }, els.turn, els.vs, els.field, els.timer),
     h('div', { class: 'stage' }, arena, els.say),
     h('div', { class: 'battle-layout' }, els.controls, els.log),
+    els.info,
   );
 
   const tick = setInterval(() => {
@@ -620,20 +807,42 @@ function battleUI(c, sendAction) {
     spot.append(el);
     setTimeout(() => el.remove(), 700);
   }
+  function abilityPop(side, ev) {
+    const spot = els.spot[pos(side)];
+    spot.querySelector('.ab-pop')?.remove();
+    const el = h('div', { class: `ab-pop ${pos(side)}`, 'aria-hidden': 'true' }, h('small', null, ev.name), h('b', null, ev.ability));
+    spot.append(el);
+    anim(spot, 'power', 600);
+    setTimeout(() => el.remove(), 1900);
+  }
+
+  function openInfo(side) {
+    if (!view) return;
+    const f = activeOf(side);
+    const own = isYou(side) || view.status === 'finished';
+    els.info.replaceChildren(infoCard(f, { own, owner: view.sides[side].name, close: () => els.info.close() }));
+    if (!els.info.open) els.info.showModal();
+  }
+
   function setActing(side) {
     for (const p of ['me', 'foe']) els.hud[p].el.classList.toggle('acting', side != null && pos(side) === p);
     for (const p of ['me', 'foe']) els.spot[p].classList.toggle('acting', side != null && pos(side) === p);
   }
 
-  function countTo(el, from, to, max) {
+  const amountText = (ev) => (ev.pct ? `${ev.amount}%` : `${ev.amount} PV`);
+  const hpText = (ev, v) => (ev.pct ? `${v}%` : `${v}`);
+  const floatAmount = (ev, sign) => `${sign}${ev.amount}${ev.pct ? '%' : ''}`;
+
+  function countTo(el, from, to, max, percent = false) {
+    const label = (n) => (percent ? `${n}%` : `${n} / ${max} PV`);
     const t0 = performance.now();
     const step = (t) => {
       const k = Math.min(1, (t - t0) / 500);
-      el.textContent = `${Math.round(from + (to - from) * k)} / ${max} PV`;
+      el.textContent = label(Math.round(from + (to - from) * k));
       if (k < 1 && el.dataset.to === String(to)) requestAnimationFrame(step);
     };
     el.dataset.to = String(to);
-    if (document.hidden || from === to) el.textContent = `${to} / ${max} PV`;
+    if (document.hidden || from === to) el.textContent = label(to);
     else requestAnimationFrame(step);
   }
 
@@ -643,7 +852,7 @@ function battleUI(c, sendAction) {
     const f = activeOf(side);
     const spot = els.spot[p];
     const r = els.hud[p];
-    const key = `${side}:${sd.active}:${f.uid}`;
+    const key = `${side}:${sd.active}:${f.uid}:${f.sprite}`;
     const fresh = spot.dataset.key !== key;
     if (fresh) {
       spot.dataset.key = key;
@@ -662,24 +871,38 @@ function battleUI(c, sendAction) {
       r.bar.style.transition = '';
     } else r.bar.style.width = `${pct}%`;
     const shown = Number(r.num.dataset.to);
-    countTo(r.num, fresh || Number.isNaN(shown) ? f.hp : shown, f.hp, f.stats.hp);
+    countTo(r.num, fresh || Number.isNaN(shown) ? f.hp : shown, f.hp, f.stats.hp, !!f.hpPercent);
 
     r.name.textContent = f.shiny ? `✨ ${f.name}` : f.name;
     r.lvl.textContent = `Nv ${f.level}`;
-    const boosts = [f.boosts.atk ? `ATQ ${f.boosts.atk > 0 ? '+' : ''}${f.boosts.atk}` : null, f.boosts.def ? `DEF ${f.boosts.def > 0 ? '+' : ''}${f.boosts.def}` : null].filter(Boolean).join(' · ');
+    const boosts = Object.entries(STAT)
+      .filter(([k]) => f.boosts[k])
+      .map(([k, [label]]) => `${label} ${signed(f.boosts[k])}`)
+      .join(' · ');
+    const vol = f.volatiles || {};
+    const marks = [vol.confusion ? 'confuso' : null, vol.attract ? 'enamorado' : null, vol.perish ? `canto ${vol.perish - 1}` : null, vol.charge ? 'cargado' : null].filter(Boolean).join(' · ');
     r.sub.replaceChildren(
       ...[
         typeChips(f.types),
+        f.status ? h('span', { class: `cond ${f.status}` }, STATUS[f.status]) : null,
         h('span', { class: 'owner' }, isYou(side) ? `${sd.name} (tú)` : sd.name),
         boosts ? h('span', { class: 'boosts' }, boosts) : null,
+        marks ? h('span', { class: 'boosts' }, marks) : null,
         h('span', { class: 'dots', 'aria-label': 'Equipo' }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
       ].filter(Boolean),
     );
   }
 
+  function paintField() {
+    const fl = view.field || {};
+    const parts = [fl.weather ? `${WEATHER[fl.weather] ?? fl.weather}${fl.weatherSuppressed ? ' (sin efecto)' : ''}` : null, fl.terrain ? TERRAIN[fl.terrain] ?? fl.terrain : null].filter(Boolean);
+    els.field.textContent = parts.join(' · ');
+  }
+
   function paintAll() {
     paint(0);
     paint(1);
+    paintField();
     els.turn.textContent = view.status === 'finished' ? 'Fin de la batalla' : `Turno ${view.turn}`;
     const tag = (side) => h('span', { class: `who by-${pos(side)}` }, isYou(side) ? `${view.sides[side].name} (tú)` : view.sides[side].name);
     els.vs.replaceChildren(tag(mine), h('span', { class: 'muted' }, ' vs '), tag(1 - mine));
@@ -818,9 +1041,9 @@ function battleUI(c, sendAction) {
         paint(ev.side);
         anim(els.spot[pos(ev.side)], 'hit', 500);
         anim(els.hud[pos(ev.side)].el, 'hurt', 600);
-        float(ev.side, `−${ev.amount}`, ev.crit || ev.eff > 1 ? 'dmg big' : ev.eff < 1 ? 'dmg small' : 'dmg');
+        float(ev.side, floatAmount(ev, '−'), ev.crit || ev.eff > 1 ? 'dmg big' : ev.eff < 1 ? 'dmg small' : 'dmg');
         const notes = [ev.crit ? '¡Golpe crítico!' : '', ev.eff > 1 ? '¡Es muy eficaz!' : ev.eff < 1 ? 'No es muy eficaz…' : ''].filter(Boolean).join(' ');
-        tell([...mon(ev.side, f.name), ` pierde ${ev.amount} PV (${before} → ${ev.hp})`, notes ? h('span', { class: ev.eff < 1 && !ev.crit ? 'weak' : 'strong' }, ` ${notes}`) : ''], { side: ev.side, sub: true });
+        tell([...mon(ev.side, f.name), ` pierde ${amountText(ev)} (${hpText(ev, before)} → ${hpText(ev, ev.hp)})`, notes ? h('span', { class: ev.eff < 1 && !ev.crit ? 'weak' : 'strong' }, ` ${notes}`) : ''], { side: ev.side, sub: true });
         return 1050;
       }
       case 'miss': {
@@ -836,19 +1059,155 @@ function battleUI(c, sendAction) {
         return 800;
       case 'boost': {
         const f = activeOf(ev.side);
+        const [label, word] = STAT[ev.stat] ?? [ev.stat, ev.stat];
+        const up = (ev.by ?? 1) > 0;
         f.boosts[ev.stat] = ev.stage;
         paint(ev.side);
-        float(ev.side, ev.stat === 'atk' ? 'ATQ ▲' : 'DEF ▲', 'up');
-        tell([...mon(ev.side, f.name), ` sube su ${ev.stat === 'atk' ? 'ataque' : 'defensa'} (${ev.stage > 0 ? '+' : ''}${ev.stage}).`], { side: ev.side, sub: true });
+        float(ev.side, `${label} ${up ? '▲' : '▼'}`, up ? 'up' : 'miss');
+        tell([...mon(ev.side, f.name), ` ${up ? 'sube' : 'baja'} su ${word}${Math.abs(ev.by ?? 1) >= 2 ? ' mucho' : ''} (${signed(ev.stage)}).`], { side: ev.side, sub: true, cls: up ? null : 'weak' });
         return 900;
+      }
+      case 'ability': {
+        const f = activeOf(ev.side);
+        if (ev.look) {
+          Object.assign(f, ev.look);
+          paint(ev.side);
+        }
+        if (ev.info) f.abilityInfo = ev.info;
+        abilityPop(ev.side, ev);
+        const note = ev.note && ABILITY_NOTE[ev.note] ? ` ${ABILITY_NOTE[ev.note](ev)}` : '';
+        tell([h('span', { class: 'ab-tag' }, ev.ability), ' de ', ...mon(ev.side, ev.name), note ? `:${note}` : '.'], { side: ev.side, sub: true });
+        return note ? 1400 : 1200;
+      }
+      case 'abilityChange': {
+        const f = activeOf(ev.side);
+        f.abilityInfo = ev.ability;
+        paint(ev.side);
+        tell([...mon(ev.side, f.name), ` ahora tiene la habilidad ${ev.ability?.name ?? '—'}.`], { side: ev.side, sub: true });
+        return 800;
+      }
+      case 'status': {
+        const f = activeOf(ev.side);
+        f.status = ev.status;
+        paint(ev.side);
+        float(ev.side, STATUS[ev.status], 'miss');
+        tell([...mon(ev.side, f.name), ` ${STATUS_TEXT[ev.status]}.`], { side: ev.side, sub: true, cls: 'weak' });
+        return 900;
+      }
+      case 'cure': {
+        const f = activeOf(ev.side);
+        f.status = null;
+        paint(ev.side);
+        tell([...mon(ev.side, f.name), ` ${CURE_TEXT[ev.status] ?? 'se recupera'}.`], { side: ev.side, sub: true });
+        return 800;
+      }
+      case 'cant':
+        if (ev.reason === 'truant') return 0;
+        float(ev.side, '…', 'miss');
+        tell([...mon(ev.side, ev.name), ` ${CANT[ev.reason] ?? 'no puede moverse.'}`], { side: ev.side, cls: 'weak' });
+        return 900;
+      case 'confused':
+        tell([...mon(ev.side, ev.name), ' está confuso…'], { side: ev.side, sub: true, cls: 'weak' });
+        return 700;
+      case 'volatile': {
+        const f = activeOf(ev.side);
+        f.volatiles = { ...f.volatiles, [ev.kind]: ev.kind === 'perish' ? 4 : true };
+        paint(ev.side);
+        tell([...mon(ev.side, ev.name), ` ${VOLATILE[ev.kind]?.(ev) ?? ''}`], { side: ev.side, sub: true, cls: 'weak' });
+        return 900;
+      }
+      case 'volatileEnd': {
+        const f = activeOf(ev.side);
+        if (f.volatiles) delete f.volatiles[ev.kind];
+        paint(ev.side);
+        tell([...mon(ev.side, ev.name), ev.kind === 'disable' ? ` vuelve a poder usar ${ev.move}.` : ' ya no está confuso.'], { side: ev.side, sub: true });
+        return 700;
+      }
+      case 'perish': {
+        const f = activeOf(ev.side);
+        f.volatiles = { ...f.volatiles, perish: ev.count + 1 };
+        paint(ev.side);
+        tell(['Canto mortal: a ', ...mon(ev.side, ev.name), ` le quedan ${ev.count}.`], { side: ev.side, sub: true, cls: 'weak' });
+        return 700;
+      }
+      case 'hurt': {
+        const f = activeOf(ev.side);
+        const before = f.hp;
+        f.hp = ev.hp;
+        paint(ev.side);
+        anim(els.hud[pos(ev.side)].el, 'hurt', 600);
+        float(ev.side, floatAmount(ev, '−'), 'dmg small');
+        const why = ev.cause === 'confusion' ? ' se hiere a sí mismo' : ` pierde ${amountText(ev)}${HURT[ev.cause] ?? ''}`;
+        tell([...mon(ev.side, f.name), `${why} (${hpText(ev, before)} → ${hpText(ev, ev.hp)}).`], { side: ev.side, sub: true, cls: 'weak' });
+        return 900;
+      }
+      case 'immune':
+        float(ev.side, 'Inmune', 'miss');
+        tell(['no afecta a ', ...mon(ev.side, activeOf(ev.side).name), '.'], { side: 1 - ev.side, sub: true, cls: 'weak' });
+        return 900;
+      case 'hits':
+        tell([`¡${ev.count} golpes!`], { side: 1 - ev.side, sub: true });
+        return 600;
+      case 'fizzle':
+        tell([ev.weather === 'heavyrain' ? 'el ataque se apaga con el diluvio.' : 'el ataque se evapora con el sol abrasador.'], { side: ev.side, sub: true, cls: 'weak' });
+        return 800;
+      case 'notarget':
+        tell(['no hay a quién atacar.'], { side: ev.side, sub: true, cls: 'weak' });
+        return 600;
+      case 'weather':
+        view.field = { ...view.field, weather: ev.weather, weatherSuppressed: false };
+        paintField();
+        tell([WEATHER_START[ev.weather] ?? 'Cambia el clima.']);
+        return 900;
+      case 'weatherEnd':
+        view.field = { ...view.field, weather: null };
+        paintField();
+        tell(['El clima vuelve a la normalidad.'], { cls: 'weak' });
+        return 700;
+      case 'terrain':
+        view.field = { ...view.field, terrain: ev.terrain };
+        paintField();
+        tell([`Aparece un ${TERRAIN[ev.terrain] ?? 'campo'}.`]);
+        return 900;
+      case 'terrainEnd':
+        view.field = { ...view.field, terrain: null };
+        paintField();
+        tell(['El campo vuelve a la normalidad.'], { cls: 'weak' });
+        return 700;
+      case 'hazard':
+        tell([`Púas tóxicas rodean al equipo de ${sd(ev.side).name}.`], { side: ev.side, cls: 'weak' });
+        return 800;
+      case 'hazardEnd':
+        tell([`Desaparecen las púas tóxicas del lado de ${sd(ev.side).name}.`], { side: ev.side });
+        return 700;
+      case 'types': {
+        const f = activeOf(ev.side);
+        f.types = ev.types;
+        paint(ev.side);
+        tell([...mon(ev.side, f.name), ' ahora es de tipo ', typeChips(ev.types), '.'], { side: ev.side, sub: true });
+        return 800;
+      }
+      case 'form': {
+        const f = activeOf(ev.side);
+        Object.assign(f, { stats: ev.stats, types: ev.types, hp: ev.hp, ...(ev.sprite ? { sprite: ev.sprite } : {}) });
+        paint(ev.side);
+        anim(els.spot[pos(ev.side)], 'power', 600);
+        return 700;
+      }
+      case 'transform': {
+        const f = activeOf(ev.side);
+        Object.assign(f, { sprite: ev.sprite, floats: ev.floats, types: ev.types, stats: ev.stats, moves: ev.moves, boosts: ev.boosts });
+        paint(ev.side);
+        tell([...mon(ev.side, f.name), ` se transforma en ${ev.into}.`], { side: ev.side, sub: true });
+        return 1000;
       }
       case 'heal': {
         const f = activeOf(ev.side);
         const before = f.hp;
         f.hp = ev.hp;
         paint(ev.side);
-        float(ev.side, `+${ev.amount}`, 'heal');
-        tell([...mon(ev.side, f.name), ` recupera ${ev.amount} PV (${before} → ${ev.hp}).`], { side: ev.side, sub: true });
+        float(ev.side, floatAmount(ev, '+'), 'heal');
+        tell([...mon(ev.side, f.name), ` recupera ${amountText(ev)} (${hpText(ev, before)} → ${hpText(ev, ev.hp)}).`], { side: ev.side, sub: true });
         return 1000;
       }
       case 'faint': {
@@ -863,6 +1222,8 @@ function battleUI(c, sendAction) {
         const s = ev.side;
         const from = ev.from || activeOf(s).name;
         sd(s).active = ev.to;
+        if (ev.mon) sd(s).team[ev.to] = ev.mon;
+        if (ev.look) Object.assign(activeOf(s), ev.look);
         paint(s);
         const who = isYou(s) ? 'mandas' : `${sd(s).name} manda`;
         if (ev.forced) tell([isYou(s) ? 'Mandas a ' : `${sd(s).name} manda a `, h('b', null, ev.name), '.'], { side: s });
@@ -874,6 +1235,7 @@ function battleUI(c, sendAction) {
         return 500;
       case 'end':
         setActing(null);
+        if (ev.reason === 'limit') log('Se llegó al límite de turnos: gana quien conserva más vida.', 'weak');
         tell([ev.winner === null ? 'Empate.' : isYou(ev.winner) ? '¡Ganaste la batalla! 🏆' : `¡${sd(ev.winner).name} gana la batalla!`], { cls: 'win' });
         return 900;
     }
@@ -892,6 +1254,16 @@ function battleUI(c, sendAction) {
       if (msg.state.status === 'active' && !els.log.childElementCount) {
         log(`${view.sides[0].name} vs ${view.sides[1].name}. ¡A pelear!`, 'turn');
         say(msg.you == null ? `${view.sides[0].name} vs ${view.sides[1].name}` : '¡A pelear! Elige tu jugada.');
+        if (msg.state.intro?.length) {
+          playing = true;
+          renderControls();
+          for (const ev of msg.state.intro) await wait(play(ev));
+          setActing(null);
+          playing = false;
+          view = clone(msg.state);
+          paintAll();
+          say(msg.you == null ? 'Eligiendo…' : '¿Qué haces?');
+        }
       }
       if (msg.state.status === 'finished') {
         const w = msg.state.winner;

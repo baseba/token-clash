@@ -23,11 +23,11 @@ test('species are deterministic and sprited by dex number', () => {
 
 test('name, sprite, types and stats come straight from PokeAPI', () => {
   const e = (finalID, extra = {}) => ({ finalID, baseID: finalID, rarity: 'common', ...extra });
-  // Real types and stats (attack/special and defense/special averaged).
+  // Real types and the six real base stats.
   assert.deepEqual(speciesData(4).types, ['fire']);
   const sp = species(e(4, { stage: 0, chainLen: 3 }));
   assert.deepEqual(sp.types, ['fire']);
-  assert.deepEqual(sp.stats, { hp: 39, atk: 56, def: 47, spd: 65 });
+  assert.deepEqual(sp.stats, { hp: 39, atk: 52, def: 43, satk: 60, sdef: 50, spd: 65 });
   // Real PokeAPI name and dex-number sprite.
   assert.equal(sp.name, speciesData(4).name);
   assert.equal(sp.sprite, '4');

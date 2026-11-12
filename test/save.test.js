@@ -11,7 +11,7 @@ test('reads an export: finished + active, skips released', () => {
   assert.equal(totalTokens, 17100000000);
   const lux = roster[0];
   assert.deepEqual({ finalID: lux.finalID, shiny: lux.shiny, level: lux.level }, { finalID: 405, shiny: true, level: 100 });
-  assert.deepEqual(lux.ivs, { hp: 31, atk: 16, def: 22, spd: 27 });
+  assert.deepEqual(lux.ivs, { hp: 31, atk: 23, def: 31, satk: 9, sdef: 13, spd: 27 });
   assert.deepEqual([lux.stage, lux.chainLen], [2, 3]);
   const active = roster.find((e) => e.active);
   assert.equal(active.finalID, 432);
@@ -30,7 +30,12 @@ test('reads the raw live state file too', () => {
 test('drops personal fields', () => {
   const s = JSON.stringify(parseSave(text));
   assert.ok(!s.includes('Mac de prueba'));
-  assert.ok(!s.includes('rivalry'));
+});
+
+test('keeps the ability and gender from the profile', () => {
+  const { roster } = parseSave(text);
+  assert.deepEqual([roster[0].ability, roster[0].abilitySlot, roster[0].gender], ['rivalry', 1, 'male']);
+  assert.deepEqual([roster[1].ability, roster[1].gender], [null, null]);
 });
 
 test('rejects junk', () => {
