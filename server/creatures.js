@@ -7,10 +7,24 @@
 
 import { readFileSync } from 'node:fs';
 import { effectiveness } from '../public/types.js';
+import { moveInfo } from './moves.js';
+import { abilityInfo, knownAbility } from './abilities.js';
 
 export { effectiveness };
 
-const POKEAPI = JSON.parse(readFileSync(new URL('./pokeapi.json', import.meta.url), 'utf8')).species;
+const POKEAPI_FILE = JSON.parse(readFileSync(new URL('./pokeapi.json', import.meta.url), 'utf8'));
+const POKEAPI = POKEAPI_FILE.species;
+const FORMS = POKEAPI_FILE.forms ?? {};
+const AIRBORNE = JSON.parse(readFileSync(new URL('./airborne.json', import.meta.url), 'utf8'));
+const AIRBORNE_IDS = new Set(AIRBORNE.airborne);
+const FLOATING_ABILITIES = new Set(['levitate', 'eelevate']);
+
+export function floats(id) {
+  if (id <= AIRBORNE.coversUpTo) return AIRBORNE_IDS.has(id);
+  const d = POKEAPI[id];
+  if (!d) return false;
+  return d.types.includes('flying') || [...(d.abilities ?? []), d.hiddenAbility].some((a) => FLOATING_ABILITIES.has(a));
+}
 
 // PokeAPI data of a species number, or null when we don't have it (unknown or newer species).
 export function speciesData(id) {
@@ -18,6 +32,11 @@ export function speciesData(id) {
   if (!d) return null;
   const [hp, attack, defense, spAttack, spDefense, speed] = d.stats;
   return { ...d, base: { hp, attack, defense, spAttack, spDefense, speed } };
+}
+
+export function formData(name) {
+  const f = FORMS[name];
+  return f ? { types: f.types, base: f.stats, sprite: f.sprite } : null;
 }
 
 export function hash(str) {
@@ -75,14 +94,15 @@ export const SUPPORT_MOVES = {
   guard: { name: 'Defensa Férrea', kind: 'boost', stat: 'def', desc: 'Sube su defensa' },
   focus: { name: 'Danza Espada', kind: 'boost', stat: 'atk', desc: 'Sube su ataque' },
   mend: { name: 'Recuperación', kind: 'heal', amount: 0.3, uses: 2, desc: 'Recupera 30% de vida (2 usos)' },
+  plot: { name: 'Maquinación', kind: 'boost', stat: 'satk', desc: 'Sube su ataque especial' },
+  calm: { name: 'Amnesia', kind: 'boost', stat: 'sdef', desc: 'Sube su defensa especial' },
 };
 
 const RARITY_BASE = { common: 55, uncommon: 65, rare: 75, legendary: 90 };
 
 // Species: name, sprite, types and stats straight from PokeAPI; the move names are real Pokémon
-// moves chosen by the species' types. Physical and special stats are averaged, like the IVs in
-// save.js. A species PokeAPI doesn't know (unknown or newer) falls back to its dex number, the
-// Normal type and stats derived from rarity.
+// moves chosen by the species' types. A species PokeAPI doesn't know (unknown or newer) falls back
+// to its dex number, the Normal type and stats derived from rarity.
 export function species(entry) {
   const { finalID, rarity } = entry;
   const data = speciesData(finalID);
@@ -94,21 +114,30 @@ export function species(entry) {
   let stats;
   if (data) {
     const b = data.base;
-    stats = { hp: b.hp, atk: Math.round((b.attack + b.spAttack) / 2), def: Math.round((b.defense + b.spDefense) / 2), spd: b.speed };
+    stats = { hp: b.hp, atk: b.attack, def: b.defense, satk: b.spAttack, sdef: b.spDefense, spd: b.speed };
   } else {
     const base = RARITY_BASE[rarity] ?? RARITY_BASE.common;
     stats = {
       hp: base + between(r, -14, 14),
       atk: base + between(r, -16, 16),
       def: base + between(r, -16, 16),
+      satk: base + between(r, -16, 16),
+      sdef: base + between(r, -16, 16),
       spd: base + between(r, -18, 18),
     };
   }
 
   // One move per type (so both types of a dual get represented), a priority move and a support move.
-  const supportKey = pick(r, Object.keys(SUPPORT_MOVES));
-  const strike = pick(r, MOVE_NAMES[t1].strike);
-  const burst = pick(r, MOVE_NAMES[t2].burst);
+  const category = stats.atk >= stats.satk ? 'physical' : 'special';
+  const fitting = (names) => {
+    const same = names.filter((n) => moveInfo(n).category === category);
+    return same.length ? same : names;
+  };
+  let supportKey = pick(r, ['guard', 'focus', 'mend']);
+  if (supportKey === 'focus' && category === 'special') supportKey = 'plot';
+  if (supportKey === 'guard' && stats.sdef > stats.def) supportKey = 'calm';
+  const strike = pick(r, fitting(MOVE_NAMES[t1].strike));
+  const burst = pick(r, fitting(MOVE_NAMES[t2].burst));
   const quick = PRIORITY_MOVE[t2]
     ? { name: PRIORITY_MOVE[t2], type: t2 }
     : PRIORITY_MOVE[t1]
@@ -119,23 +148,42 @@ export function species(entry) {
     { key: 'burst', name: burst, type: t2, power: 95, accuracy: 85, priority: 0 },
     { key: 'quick', name: quick.name, type: quick.type, power: 40, accuracy: 100, priority: 1 },
     { key: supportKey, ...SUPPORT_MOVES[supportKey], type: null, power: 0, accuracy: 100, priority: 0 },
-  ];
-  return { id: finalID, name: data ? data.name : `#${finalID}`, sprite: String(finalID), types, stats, moves };
+  ].map((m) => ({ ...moveInfo(m.name), ...m }));
+  return { id: finalID, name: data ? data.name : `#${finalID}`, sprite: String(finalID), types, stats, moves, floats: floats(finalID) };
+}
+
+export function abilityFor(entry) {
+  const data = speciesData(entry.finalID);
+  if (!data?.abilities?.length) return null;
+  const regular = data.abilities;
+  const all = data.hiddenAbility ? [...regular, data.hiddenAbility] : regular;
+  if (entry.ability && all.includes(entry.ability) && knownAbility(entry.ability)) return entry.ability;
+  if (entry.abilitySlot === 3 && data.hiddenAbility) return data.hiddenAbility;
+  if (entry.abilitySlot === 1 || entry.abilitySlot === 2) return regular[entry.abilitySlot - 1] ?? regular[0];
+  return regular[hash(`ab:${entry.id ?? entry.finalID}`) % regular.length];
 }
 
 const scale = (base, iv, level, flat) => Math.floor(((2 * base + iv) * level) / 100) + flat;
+
+export function statsFor([hp, attack, defense, spAttack, spDefense, speed], iv, level) {
+  return {
+    hp: scale(hp, iv.hp, level, level + 20),
+    atk: scale(attack, iv.atk, level, 10),
+    def: scale(defense, iv.def, level, 10),
+    satk: scale(spAttack, iv.satk ?? iv.atk, level, 10),
+    sdef: scale(spDefense, iv.sdef ?? iv.def, level, 10),
+    spd: scale(speed, iv.spd, level, 10),
+  };
+}
 
 // A fighter as the battle and the browser see it.
 export function buildFighter(entry, { levelCap } = {}) {
   const sp = species(entry);
   const level = levelCap ? levelCap : entry.level;
   const iv = entry.ivs;
-  const stats = {
-    hp: scale(sp.stats.hp, iv.hp, level, level + 20),
-    atk: scale(sp.stats.atk, iv.atk, level, 10),
-    def: scale(sp.stats.def, iv.def, level, 10),
-    spd: scale(sp.stats.spd, iv.spd, level, 10),
-  };
+  const ability = abilityFor(entry);
+  const { hp, atk, def, satk, sdef, spd } = sp.stats;
+  const stats = statsFor([hp, atk, def, satk, sdef, spd], iv, level);
   return {
     uid: entry.id,
     name: entry.nickname || sp.name,
@@ -146,7 +194,12 @@ export function buildFighter(entry, { levelCap } = {}) {
     shiny: entry.shiny,
     level,
     stats,
-    moves: sp.moves.map((m) => ({ ...m })),
+    moves: sp.moves.map((m) => ({ ...m, flags: [...m.flags] })),
     sprite: sp.sprite,
+    floats: sp.floats,
+    ability,
+    abilityInfo: abilityInfo(ability),
+    gender: entry.gender ?? null,
+    ivs: iv,
   };
 }

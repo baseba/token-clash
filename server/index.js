@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { parseSave, SaveError } from './save.js';
 import { buildFighter } from './creatures.js';
-import { createBattle, submit, autoAction, needsAction, validActions, publicState, TEAM_SIZE } from './battle.js';
+import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents, TEAM_SIZE } from './battle.js';
 import { openStore } from './store.js';
 
 const PORT = Number(process.env.PORT || 8080);
@@ -150,8 +150,10 @@ function myView(t) {
   };
 }
 
-function challengeView(c) {
+
+function challengeView(c, viewerId = null) {
   const host = db.trainers[c.hostId];
+  const hostTeam = c.hostTeam.map((e) => buildFighter(e, { levelCap: c.levelCap }));
   return {
     id: c.id,
     status: c.status,
@@ -159,7 +161,8 @@ function challengeView(c) {
     createdAt: c.createdAt,
     host: { id: c.hostId, name: host?.name ?? c.hostName },
     guest: c.guestId ? { id: c.guestId, name: db.trainers[c.guestId]?.name ?? c.guestName } : null,
-    hostTeam: c.hostTeam.map((e) => buildFighter(e, { levelCap: c.levelCap })),
+    hostTeam: viewerId === c.hostId || c.status === 'finished' ? hostTeam : [],
+    hostTeamSize: hostTeam.length,
     winnerId: c.winnerId ?? null,
     turns: c.turns ?? null,
     final: c.final ?? null,
@@ -188,7 +191,8 @@ function frameFor(r, ws, extra = {}) {
   const you = sideOf(r.battle, ws.trainerId);
   return {
     ...extra,
-    state: publicState(r.battle),
+    ...(extra.events ? { events: viewEvents(extra.events, you) } : {}),
+    state: publicState(r.battle, you),
     you,
     actions: you === null ? [] : validActions(r.battle, you),
     deadline: r.deadline,
@@ -378,14 +382,14 @@ async function api(req, res, url) {
       createdAt: Date.now(),
     };
     store.save();
-    return send(res, 200, { challenge: challengeView(db.challenges[id]) });
+    return send(res, 200, { challenge: challengeView(db.challenges[id], t.id) });
   }
 
   let m = /^\/api\/challenges\/([A-Za-z0-9_-]{4,20})$/.exec(p);
   if (m && method === 'GET') {
     const c = db.challenges[m[1]];
     if (!c) return send(res, 404, { error: 'Ese desafío no existe.' });
-    return send(res, 200, { challenge: challengeView(c) });
+    return send(res, 200, { challenge: challengeView(c, trainerFrom(req)?.id) });
   }
   if (m && method === 'DELETE') {
     const t = trainerFrom(req);
@@ -394,7 +398,7 @@ async function api(req, res, url) {
     if (!t || c.hostId !== t.id || c.status !== 'open') return send(res, 403, { error: 'No puedes cancelar este desafío.' });
     c.status = 'cancelled';
     store.save();
-    return send(res, 200, { challenge: challengeView(c) });
+    return send(res, 200, { challenge: challengeView(c, t.id) });
   }
 
   m = /^\/api\/challenges\/([A-Za-z0-9_-]{4,20})\/accept$/.exec(p);
@@ -422,7 +426,7 @@ async function api(req, res, url) {
     store.save();
     armTimer(c.id, r);
     broadcast(r, { t: 'start' });
-    return send(res, 200, { challenge: challengeView(c) });
+    return send(res, 200, { challenge: challengeView(c, t.id) });
   }
 
   return send(res, 404, { error: 'No encontrado' });

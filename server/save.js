@@ -1,13 +1,15 @@
 // Reads a PokeTokenBar save: the app's export / snapshot ({format: "poketokenbar.save", state})
 // or the raw live file (~/Library/Application Support/PokeTokenBar/companion-state.json).
-// We keep only numbers: species numbers, rarity, level, IVs, shiny. Names, device name and
-// token logs are dropped on purpose.
+// We keep only game data: species numbers, rarity, level, IVs, shiny, ability and gender. Names,
+// device name and token logs are dropped on purpose.
 
 import { hash } from './creatures.js';
 
 const RARITIES = new Set(['common', 'uncommon', 'rare', 'legendary']);
 const UUID = /^[0-9a-fA-F-]{8,40}$/;
 const MAX_ROSTER = 300;
+const ABILITY_KEY = /^[a-z0-9-]{1,40}$/;
+const GENDERS = new Set(['male', 'female']);
 
 export class SaveError extends Error {}
 
@@ -21,14 +23,9 @@ function ivsFrom(profile, seedKey) {
   const iv = profile && typeof profile.ivs === 'object' && profile.ivs ? profile.ivs : null;
   // Old saves have no IVs: give a stable middling value instead of a random one.
   const fb = 8 + (hash(seedKey) % 16);
-  if (!iv) return { hp: fb, atk: fb, def: fb, spd: fb };
+  if (!iv) return { hp: fb, atk: fb, def: fb, satk: fb, sdef: fb, spd: fb };
   const g = (k) => int(iv[k], 0, 31, fb);
-  return {
-    hp: g('hp'),
-    atk: Math.round((g('attack') + g('specialAttack')) / 2),
-    def: Math.round((g('defense') + g('specialDefense')) / 2),
-    spd: g('speed'),
-  };
+  return { hp: g('hp'), atk: g('attack'), def: g('defense'), satk: g('specialAttack'), sdef: g('specialDefense'), spd: g('speed') };
 }
 
 // Where finalID sits in its evolution chain (0 = first form) and how long the chain is.
@@ -53,6 +50,9 @@ function entryFrom(raw, { finalID, baseID, defaultLevel, fallbackId, chain, stag
     shiny: raw.isShiny === true,
     level: int(profile?.level, 1, 100, defaultLevel),
     ivs: ivsFrom(profile, id),
+    ability: typeof profile?.abilityName === 'string' && ABILITY_KEY.test(profile.abilityName) ? profile.abilityName : null,
+    abilitySlot: [1, 2, 3].includes(profile?.abilitySlot) ? profile.abilitySlot : null,
+    gender: GENDERS.has(profile?.gender) ? profile.gender : null,
     ...chainInfo(chain, finalID, stageHint),
   };
 }
