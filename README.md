@@ -74,7 +74,7 @@ npm test        # parser, motor de batalla y flujo completo con WebSocket
 
 Las batallas en curso viven en memoria: reiniciar el servicio corta las peleas activas (quedan como "cortadas").
 
-## Deploy (Podman + Cloudflare Tunnel, mismo patrón que entre-amigos)
+## Deploy (Podman + Cloudflare Tunnel)
 
 La app corre en un contenedor sin puertos publicados, solo lectura, sin capabilities, en una red interna
 sin salida. Solo `cloudflared` (en esa red y en una con salida) la alcanza. Los datos viven en `./data`.
