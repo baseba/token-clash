@@ -138,15 +138,20 @@ input[type=text]:focus, .btn:focus-visible, .mon:focus-visible { outline: 3px so
 .arena {
   position: relative; border-radius: 22px; overflow: hidden; border: 1px solid var(--line);
   background: linear-gradient(180deg, #2a5f8f 0%, #7ab6d6 46%, #9ccf7f 46%, #6aa65a 100%);
-  aspect-ratio: 16 / 9; max-height: 54vh; width: 100%; box-shadow: var(--shadow);
+  background-size: 100% 100%; image-rendering: pixelated;
+  aspect-ratio: 240 / 112; width: 100%; max-width: calc(62vh * 240 / 112); margin-inline: auto; box-shadow: var(--shadow);
 }
-@media (max-width: 600px) { .arena { aspect-ratio: 1 / 1; max-height: none; } .spot.foe { top: 22%; } .hud { width: 58%; } .hud .sub { font-size: .7rem; } }
-.arena::before, .arena::after { content: ""; position: absolute; border-radius: 50%; background: rgb(0 0 0 / .14); }
-.arena::before { width: 34%; height: 9%; right: 9%; top: 47%; }
-.arena::after { width: 40%; height: 11%; left: 6%; bottom: 7%; }
-.spot { position: absolute; width: 30%; max-width: 230px; z-index: 1; }
-.spot.foe { right: 11%; top: 13%; }
-.spot.me { left: 9%; bottom: 8%; width: 34%; max-width: 260px; }
+@media (max-width: 600px) { .hud { width: 58%; } .hud .sub { font-size: .7rem; } }
+.spot::before {
+  content: ""; position: absolute; z-index: -1; border-radius: 50%;
+  background: var(--pad-fill); border: 3px solid var(--pad-rim);
+  box-shadow: inset 0 -.45em 0 color-mix(in srgb, var(--pad-rim) 55%, transparent);
+}
+.spot.foe::before { --pad-fill: var(--pad-foe-fill, #d8e8c8); --pad-rim: var(--pad-foe-rim, #6f8a5e); left: -8%; width: 116%; top: 70%; height: 26%; }
+.spot.me::before { --pad-fill: var(--pad-me-fill, #d8e8c8); --pad-rim: var(--pad-me-rim, #6f8a5e); left: -12%; width: 124%; top: 76%; height: 30%; }
+.spot { position: absolute; width: 24%; z-index: 1; }
+.spot.foe { right: 12%; top: 8%; }
+.spot.me { left: 8%; bottom: 7%; width: 28%; }
 .spot .creature { width: 100%; height: auto; animation: bob 2.4s ease-in-out infinite; }
 .spot.me .creature { animation-delay: -1.1s; }
 .spot.hit .creature { animation: hit .45s ease; }
