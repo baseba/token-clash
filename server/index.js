@@ -78,7 +78,12 @@ function cleanName(s, max = 24) {
 function trainerFrom(req) {
   const h = req.headers.authorization || '';
   const m = /^Bearer ([A-Za-z0-9_-]{20,100})$/.exec(h);
-  return m ? byToken.get(sha(m[1])) || null : null;
+  return seen(m ? byToken.get(sha(m[1])) : null);
+}
+
+function seen(t) {
+  if (t) t.lastSeen = Date.now();
+  return t ?? null;
 }
 
 function originOk(req) {
@@ -476,7 +481,7 @@ async function api(req, res, url) {
     if (!t) {
       if (!name) return send(res, 400, { error: 'Ponte un nombre de entrenador.' });
       token = randomBytes(24).toString('base64url');
-      t = { id: newId(6), name, tokenHash: sha(token), roster: [], team: [], wins: 0, losses: 0, createdAt: Date.now() };
+      t = { id: newId(6), name, tokenHash: sha(token), roster: [], team: [], wins: 0, losses: 0, createdAt: Date.now(), lastSeen: Date.now() };
       db.trainers[t.id] = t;
       byToken.set(t.tokenHash, t);
     } else if (name) t.name = name;
@@ -570,8 +575,8 @@ async function api(req, res, url) {
   }
 
   if (p === '/api/stats' && method === 'GET') {
-    const live = [...rooms.values()].filter((r) => r.preview || r.battle?.status === 'active').length;
-    return send(res, 200, { ...serverStats(db), live: { battles: live, online: wss.clients.size, startedAt: STARTED_AT, version: ASSET_VERSION } });
+    const live = [...rooms.values()].filter((r) => r.sockets.size > 0 && (r.preview || r.battle?.status === 'active')).length;
+    return send(res, 200, { ...serverStats(db), live: { battles: live, startedAt: STARTED_AT, version: ASSET_VERSION } });
   }
 
   if (p === '/api/leaderboard' && method === 'GET') {
@@ -714,7 +719,7 @@ function onSocket(ws) {
       return;
     }
     if (msg.t === 'hello' && !ws.roomId) {
-      if (typeof msg.token === 'string') ws.trainerId = byToken.get(sha(msg.token))?.id ?? null;
+      if (typeof msg.token === 'string') ws.trainerId = seen(byToken.get(sha(msg.token)))?.id ?? null;
       const c = typeof msg.room === 'string' ? db.challenges[msg.room] : null;
       if (!c) return ws.send(JSON.stringify({ t: 'error', error: 'Ese desafío no existe.' }));
       ws.roomId = c.id;

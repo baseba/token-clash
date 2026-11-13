@@ -1,10 +1,15 @@
+import { TURN_LIMIT } from './battle.js';
+
 const RECENT = 12;
 const TOP_MONS = 12;
+const ACTIVE_NOW_MS = 15 * 60_000;
+const ACTIVE_DAY_MS = 24 * 60 * 60_000;
 
 const nameOf = (db, id, fallback) => db.trainers[id]?.name ?? fallback ?? '¿?';
 
 export function rankingOf(trainers) {
   return trainers
+    .filter((t) => t.wins + t.losses > 0)
     .map((t) => {
       const games = t.wins + t.losses;
       return {
@@ -19,8 +24,32 @@ export function rankingOf(trainers) {
         totalTokens: t.totalTokens ?? 0,
       };
     })
-    .sort((a, b) => b.wins - a.wins || a.losses - b.losses || b.totalTokens - a.totalTokens);
+    .sort((a, b) => b.wins - a.wins || b.winRate - a.winRate || a.losses - b.losses || a.name.localeCompare(b.name));
 }
+
+export function playersOf(trainers) {
+  const parent = trainers.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const ownerOf = new Map();
+  trainers.forEach((t, i) => {
+    for (const e of t.roster) {
+      if (!e.id) continue;
+      if (ownerOf.has(e.id)) parent[find(i)] = find(ownerOf.get(e.id));
+      else ownerOf.set(e.id, i);
+    }
+  });
+  const groups = new Map();
+  trainers.forEach((t, i) => groups.set(find(i), [...(groups.get(find(i)) ?? []), t]));
+  return [...groups.values()];
+}
+
+function uniqueEntries(trainers) {
+  const byKey = new Map();
+  for (const t of trainers) t.roster.forEach((e, i) => byKey.set(e.id ?? `${t.id}:${i}`, e));
+  return [...byKey.values()];
+}
+
+const activeSince = (players, since) => players.filter((group) => group.some((t) => (t.lastSeen ?? 0) >= since)).length;
 
 function monUsage(battles) {
   const usage = new Map();
@@ -39,23 +68,30 @@ function monUsage(battles) {
   return [...usage.values()].sort((a, b) => b.uses - a.uses || b.wins - a.wins || a.name.localeCompare(b.name)).slice(0, TOP_MONS);
 }
 
-export function serverStats(db) {
+export function serverStats(db, now = Date.now()) {
   const trainers = Object.values(db.trainers);
+  const players = playersOf(trainers);
+  const entries = uniqueEntries(trainers);
   const challenges = Object.values(db.challenges);
   const pvp = challenges.filter((c) => !c.ai && c.status === 'finished' && c.final);
-  const species = new Set(trainers.flatMap((t) => t.roster.map((e) => e.finalID)));
-  const turns = pvp.reduce((sum, c) => sum + (c.turns ?? 0), 0);
+  const vsAi = challenges.filter((c) => c.ai && c.status === 'finished');
+  const turns = pvp.reduce((sum, c) => sum + Math.min(c.turns ?? 0, TURN_LIMIT), 0);
   return {
     totals: {
-      trainers: trainers.length,
-      pokemon: trainers.reduce((sum, t) => sum + t.roster.length, 0),
-      species: species.size,
-      shinies: trainers.reduce((sum, t) => sum + t.roster.filter((e) => e.shiny).length, 0),
-      tokens: trainers.reduce((sum, t) => sum + (t.totalTokens ?? 0), 0),
+      trainers: players.length,
+      accounts: trainers.length,
+      pokemon: entries.length,
+      species: new Set(entries.map((e) => e.finalID)).size,
+      shinies: entries.filter((e) => e.shiny).length,
+      tokens: players.reduce((sum, group) => sum + Math.max(...group.map((t) => t.totalTokens ?? 0)), 0),
       battles: pvp.length,
-      aiBattles: challenges.filter((c) => c.ai && c.status === 'finished').length,
       randomBattles: pvp.filter((c) => c.mode === 'random').length,
+      draws: pvp.filter((c) => !c.winnerId).length,
       avgTurns: pvp.length ? Math.round((turns / pvp.length) * 10) / 10 : null,
+      aiBattles: vsAi.length,
+      aiWins: vsAi.filter((c) => c.winnerId && c.winnerId === c.hostId).length,
+      activeNow: activeSince(players, now - ACTIVE_NOW_MS),
+      activeToday: activeSince(players, now - ACTIVE_DAY_MS),
     },
     ranking: rankingOf(trainers),
     recent: pvp
