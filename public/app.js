@@ -1,4 +1,4 @@
-import { creatureHTML, loadAnimatedSprites } from './creature.js?v=dev';
+import { creatureHTML, loadAnimatedSprites, preloadSprites } from './creature.js?v=dev';
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
 import { createFx } from './fx.js?v=dev';
@@ -454,6 +454,32 @@ function monCard(f, opts = {}) {
   );
 }
 
+function rosterFilters(onChange) {
+  const by = { query: '', type: '', shiny: '' };
+  const set = (k, v) => { by[k] = v; onChange(); };
+  const el = h(
+    'div',
+    { class: 'coll-filters' },
+    h('input', { type: 'search', placeholder: 'Buscar por nombre…', 'aria-label': 'Buscar Pokémon', oninput: (e) => set('query', e.target.value.trim().toLowerCase()) }),
+    h('select', { 'aria-label': 'Filtrar por tipo', onchange: (e) => set('type', e.target.value) }, h('option', { value: '' }, 'Todos los tipos'), Object.keys(TYPES).map((t) => h('option', { value: t }, typeLabel(t)))),
+    h('select', { 'aria-label': 'Filtrar shiny', onchange: (e) => set('shiny', e.target.value) }, h('option', { value: '' }, 'Shiny y normales'), h('option', { value: 'shiny' }, '✨ Solo shiny'), h('option', { value: 'plain' }, 'Solo normales')),
+  );
+  const match = (f) => (!by.query || f.name.toLowerCase().includes(by.query) || f.speciesName.toLowerCase().includes(by.query)) && (!by.type || f.types.includes(by.type)) && (!by.shiny || (by.shiny === 'shiny') === !!f.shiny);
+  return { el, match };
+}
+
+function collectionBar(filters, countEl) {
+  return h('div', { class: 'coll-bar' }, filters.el, countEl);
+}
+
+const shownCount = (el, shown, total) => {
+  el.textContent = shown === total ? `${total} Pokémon` : `${shown} de ${total}`;
+};
+
+function toolButton({ icon, label, note, tip, ...attrs }) {
+  return h(attrs.href ? 'a' : 'button', { ...(attrs.href ? {} : { type: 'button' }), class: 'tool-btn', 'data-tip': tip ?? null, ...attrs }, h('span', { class: 'tool-icon', 'aria-hidden': 'true' }, icon), h('span', { class: 'tool-text' }, h('b', null, label), note ? h('small', null, note) : null));
+}
+
 function renderWho() {
   $who.replaceChildren();
   if (!me) return;
@@ -461,7 +487,16 @@ function renderWho() {
 }
 
 // ---------- routing ----------
+let routeSeq = 0;
+let shownPath = location.pathname + location.search;
+let unsaved = null;
+const UNSAVED_MSG = 'Tienes cambios sin guardar. ¿Descartarlos?';
+const canLeave = () => !unsaved?.() || window.confirm(UNSAVED_MSG);
+const stale = (seq) => seq !== routeSeq;
+
 function nav(path) {
+  if (!canLeave()) return;
+  unsaved = null;
   history.pushState(null, '', path);
   route();
   window.scrollTo(0, 0);
@@ -470,9 +505,16 @@ document.addEventListener('click', (e) => {
   const a = e.target.closest('a[data-link]');
   if (!a || a.origin !== location.origin || e.metaKey || e.ctrlKey || e.shiftKey) return;
   e.preventDefault();
-  nav(a.pathname);
+  nav(a.pathname + a.search);
 });
-window.addEventListener('popstate', route);
+window.addEventListener('popstate', () => {
+  if (!canLeave()) return history.pushState(null, '', shownPath);
+  unsaved = null;
+  route();
+});
+window.addEventListener('beforeunload', (e) => {
+  if (unsaved?.()) e.preventDefault();
+});
 
 const $tip = h('div', { class: 'tip', role: 'tooltip', hidden: true });
 document.body.append($tip);
@@ -524,7 +566,7 @@ document.addEventListener(
 );
 
 function markNav() {
-  const current = location.pathname === '/stats' ? 'stats' : location.pathname === '/' ? 'home' : null;
+  const current = location.pathname === '/stats' ? 'stats' : location.pathname === '/' || location.pathname === '/equipo' ? 'home' : null;
   for (const a of document.querySelectorAll('[data-nav]')) {
     if (a.dataset.nav === current) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -535,12 +577,15 @@ function route() {
   hideTip();
   cleanup?.();
   cleanup = null;
+  unsaved = null;
+  shownPath = location.pathname + location.search;
+  const seq = ++routeSeq;
   markNav();
   const m = /^\/b\/([A-Za-z0-9_-]{4,20})$/.exec(location.pathname);
-  if (m) return battlePage(m[1]);
-  if (location.pathname === '/equipo') return teamPage();
-  if (location.pathname === '/stats') return statsPage();
-  return homePage();
+  if (m) return battlePage(m[1], seq);
+  if (location.pathname === '/equipo') return teamPage(seq);
+  if (location.pathname === '/stats') return statsPage(seq);
+  return homePage(seq);
 }
 
 async function loadMe() {
@@ -624,9 +669,10 @@ function importCard({ onDone, compact: small = false } = {}) {
 }
 
 // ---------- home ----------
-async function homePage() {
+async function homePage(seq) {
   document.title = 'Token Clash';
   await loadMe();
+  if (stale(seq)) return;
   renderWho();
   if (!me) return renderLanding();
   renderHome();
@@ -754,7 +800,20 @@ function renderHome() {
   );
   paint();
 
-  const reimport = h('div', { hidden: true }, importCard({ onDone: renderHome }));
+  const reimport = h('div', { class: 'reimport', hidden: true }, importCard({ onDone: renderHome }));
+  const reimportBtn = toolButton({ icon: '↻', label: 'Actualizar save', note: 'Sube uno más nuevo', 'aria-expanded': 'false', onclick: () => {
+    reimport.hidden = !reimport.hidden;
+    reimportBtn.setAttribute('aria-expanded', String(!reimport.hidden));
+  } });
+  const grid = h('div', { class: 'mons' });
+  const countEl = h('span', { class: 'coll-count' });
+  const filters = rosterFilters(paintCollection);
+  function paintCollection() {
+    const list = me.roster.filter(filters.match);
+    shownCount(countEl, list.length, me.roster.length);
+    grid.replaceChildren(...(list.length ? list.map((f) => monCard(f, { picked: me.team.includes(f.uid), stats: true, badge: f.active ? 'Criando' : null, onclick: () => nav(`/equipo?p=${f.uid}`), onEdit: () => rename(f) })) : [h('p', { class: 'muted' }, 'Ningún Pokémon coincide con el filtro.')]));
+  }
+  paintCollection();
 
   $app.replaceChildren(
     h(
@@ -781,9 +840,10 @@ function renderHome() {
     h(
       'section',
       null,
-      h('div', { class: 'row between' }, h('h2', null, `Tu colección (${me.rosterSize})`), h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: downloadEditedSave }, '⬇ Descargar save editado'), h('button', { class: 'btn sm', onclick: () => { reimport.hidden = !reimport.hidden; } }, '↻ Actualizar save'))),
+      h('div', { class: 'coll-head' }, h('h2', null, 'Tu colección'), h('div', { class: 'tools' }, toolButton({ icon: '⬇', label: 'Descargar save editado', note: 'Para importarlo en PokeTokenBar', tip: 'Baja tu save con los movimientos y habilidades que cambiaste', onclick: downloadEditedSave }), reimportBtn)),
       reimport,
-      h('div', { class: 'mons', style: null }, me.roster.map((f) => monCard(f, { picked: me.team.includes(f.uid), stats: true, badge: f.active ? 'Criando' : null, onclick: () => nav(`/equipo?p=${f.uid}`), onEdit: () => rename(f) }))),
+      collectionBar(filters, countEl),
+      grid,
     ),
     h('section', null, myChallengesCard()),
     h(
@@ -855,7 +915,7 @@ function podium(top) {
 
 function rankingCard(ranking) {
   const body = !ranking.length
-    ? [h('p', { class: 'muted' }, 'Nadie ha llegado todavía. Sé el primero.')]
+    ? [h('p', { class: 'muted' }, 'Todavía nadie ha peleado contra otro jugador. Crea un link y estrena el ranking.')]
     : [
         podium(ranking.slice(0, 3)),
         ranking.length > 3
@@ -895,16 +955,23 @@ function recentCard(recent) {
   return h('div', { class: 'card' }, h('h2', null, '🕑 Batallas recientes'), list);
 }
 
-function numbersCard(totals, live) {
+function numbersCard(totals) {
   const rows = [
     ['⚔︎', 'Batallas entre jugadores', totals.battles],
     [MODE_ICON.random, 'De ellas, aleatorias', totals.randomBattles],
+    ['🤝', 'De ellas, empates', totals.draws],
     ['⏱', 'Turnos por batalla (promedio)', totals.avgTurns ?? '—'],
-    ['🤖', 'Peleas contra la IA', totals.aiBattles],
+    ['🤖', 'Peleas contra la IA', totals.aiBattles, totals.aiBattles ? `los jugadores ganaron ${percent(totals.aiWins / totals.aiBattles)}` : null],
     ['📚', 'Especies distintas en el servidor', totals.species],
-    ['🟢', 'Conectados ahora', live.online],
+    ['🟢', 'Jugadores activos', totals.activeNow, 'en los últimos 15 min'],
+    ['📅', 'Jugadores activos hoy', totals.activeToday, 'en las últimas 24 h'],
   ];
-  return h('div', { class: 'card' }, h('h2', null, '📈 En números'), h('div', { class: 'list' }, rows.map(([icon, label, value]) => h('div', { class: 'item' }, h('span', null, `${icon} ${label}`), h('strong', { class: 'num-value' }, value)))));
+  return h(
+    'div',
+    { class: 'card' },
+    h('h2', null, '📈 En números'),
+    h('div', { class: 'list' }, rows.map(([icon, label, value, note]) => h('div', { class: 'item' }, h('span', { class: 'num-label' }, `${icon} ${label}`, note ? h('small', { class: 'muted' }, note) : null), h('strong', { class: 'num-value' }, value)))),
+  );
 }
 
 function topMonsSection(mons) {
@@ -920,26 +987,29 @@ function topMonsSection(mons) {
             h('div', { html: creatureHTML({ sprite: m.sprite }) }),
             h('div', { class: 'nm' }, m.name),
             h('div', { class: 'meta' }, typeChips(m.types ?? [])),
-            h('div', { class: 'top-mon-line' }, h('b', null, plural(m.uses, 'uso', 'usos')), h('span', { class: 'muted' }, ` · gana ${percent(m.wins / m.uses)}`)),
+            h('div', { class: 'top-mon-line', tabindex: 0, 'data-tip': `Peleó en ${plural(m.uses, 'batalla', 'batallas')} y su equipo ganó ${plural(m.wins, 'vez', 'veces')}` }, h('b', null, plural(m.uses, 'batalla', 'batallas')), h('span', { class: 'muted' }, ` · ganó ${percent(m.wins / m.uses)}`)),
           ),
         ),
       )
     : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aparecen cuando haya batallas entre jugadores.'));
-  return h('section', null, h('div', { class: 'row between' }, h('h2', null, '🔥 Pokémon más usados'), h('span', { class: 'muted small' }, 'En batallas entre jugadores')), body);
+  return h('section', null, h('div', { class: 'row between' }, h('h2', null, '🔥 Pokémon más usados'), h('span', { class: 'muted small' }, 'Los que salieron a pelear en batallas entre jugadores')), body);
 }
 
-async function statsPage() {
+async function statsPage(seq) {
   document.title = 'Stats · Token Clash';
   await loadMe();
+  if (stale(seq)) return;
   renderWho();
   $app.replaceChildren(h('p', { class: 'muted center pad' }, 'Cargando…'));
   let data;
   try {
     data = await api('/api/stats');
   } catch (e) {
+    if (stale(seq)) return;
     $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No pude cargar las stats'), h('p', { class: 'muted' }, e.message)));
     return;
   }
+  if (stale(seq)) return;
   const { totals, ranking, recent, topMons, live } = data;
   $app.replaceChildren(
     h(
@@ -952,16 +1022,16 @@ async function statsPage() {
         h(
           'div',
           { class: 'row' },
-          h('span', { class: 'chip live-chip' }, h('i', { class: 'live-dot', 'aria-hidden': 'true' }), `${plural(live.battles, 'batalla', 'batallas')} en vivo`),
-          h('span', { class: 'chip' }, `🧢 ${plural(totals.trainers, 'entrenador', 'entrenadores')}`),
-          h('span', { class: 'chip' }, `📚 ${compact(totals.pokemon)} Pokémon`),
+          h('span', { class: 'chip live-chip', tabindex: 0, 'data-tip': 'Preparaciones y batallas con alguien mirando, incluidas las peleas contra la IA' }, h('i', { class: 'live-dot', 'aria-hidden': 'true' }), `${plural(live.battles, 'batalla', 'batallas')} en vivo`),
+          h('span', { class: 'chip', tabindex: 0, 'data-tip': totals.accounts > totals.trainers ? `${totals.accounts} cuentas: quien importó el mismo save en varias cuenta una sola vez` : 'Cada save cuenta una vez' }, `🧢 ${plural(totals.trainers, 'entrenador', 'entrenadores')}`),
+          h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Pokémon distintos de todos los saves, sin contar dos veces los que se repiten entre cuentas' }, `📚 ${compact(totals.pokemon)} Pokémon`),
           h('span', { class: 'chip' }, `✨ ${totals.shinies} shiny`),
-          h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens de todos los entrenadores según PokeTokenBar' }, `🪙 ${compact(totals.tokens)} tokens`),
+          h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens de todos los saves según PokeTokenBar, una vez por save' }, `🪙 ${compact(totals.tokens)} tokens`),
         ),
       ),
     ),
     h('section', null, rankingCard(ranking)),
-    h('section', { class: 'grid2' }, recentCard(recent), numbersCard(totals, live)),
+    h('section', { class: 'grid2' }, recentCard(recent), numbersCard(totals)),
     topMonsSection(topMons),
     h('section', null, h('p', { class: 'muted small center' }, `Versión ${live.version} · servidor encendido ${ago(live.startedAt)}`)),
     feedbackButton(),
@@ -1072,16 +1142,14 @@ function typeTint(type) {
   return { '--type': c };
 }
 
-async function teamPage() {
+async function teamPage(seq) {
   await loadMe();
+  if (stale(seq)) return;
   renderWho();
   if (!me) return nav('/');
   document.title = 'Tu equipo · Token Clash';
   const params = new URLSearchParams(location.search);
   let selected = params.get('p') || me.team[0] || me.roster[0]?.uid;
-  let query = '';
-  let typeFilter = '';
-  let shinyFilter = '';
   let dragFrom = null;
   let editor = null;
 
@@ -1120,9 +1188,10 @@ async function teamPage() {
     return setParty(added.ids, { pop: uid });
   }
   function select(uid) {
-    if (editor?.dirty() && !window.confirm('Tienes cambios sin guardar. ¿Descartarlos?')) return;
+    if (editor?.dirty() && !window.confirm(UNSAVED_MSG)) return;
     selected = uid;
     history.replaceState(null, '', `/equipo?p=${uid}`);
+    shownPath = `/equipo?p=${uid}`;
     paintParty();
     paintCollection();
     openEditor();
@@ -1173,8 +1242,8 @@ async function teamPage() {
   }
 
   function paintCollection() {
-    const q = query.toLowerCase();
-    const list = me.roster.filter((f) => (!q || f.name.toLowerCase().includes(q) || f.speciesName.toLowerCase().includes(q)) && (!typeFilter || f.types.includes(typeFilter)) && (!shinyFilter || (shinyFilter === 'shiny') === !!f.shiny));
+    const list = me.roster.filter(filters.match);
+    shownCount(collCount, list.length, me.roster.length);
     grid.replaceChildren(
       ...(list.length
         ? list.map((f) => {
@@ -1195,7 +1264,10 @@ async function teamPage() {
   async function openEditor() {
     if (!selected) return panel.replaceChildren(h('p', { class: 'muted' }, 'Elige un Pokémon para ver sus movimientos.'));
     panel.replaceChildren(h('div', { class: 'panel-loading pulse' }, 'Cargando…'));
+    const want = selected;
+    editor = null;
     editor = await monPanel(selected, panel, {
+      isCurrent: () => want === selected && !stale(seq),
       inParty: () => me.team.includes(selected),
       toggleParty: () => toggle(selected),
       onSaved: () => {
@@ -1205,27 +1277,29 @@ async function teamPage() {
     });
   }
 
-  const shinySelect = h('select', { 'aria-label': 'Filtrar shiny', onchange: (e) => { shinyFilter = e.target.value; paintCollection(); } }, h('option', { value: '' }, 'Shiny y normales'), h('option', { value: 'shiny' }, '✨ Solo shiny'), h('option', { value: 'plain' }, 'Solo normales'));
-  const typeSelect = h('select', { 'aria-label': 'Filtrar por tipo', onchange: (e) => { typeFilter = e.target.value; paintCollection(); } }, h('option', { value: '' }, 'Todos los tipos'), Object.keys(TYPES).map((t) => h('option', { value: t }, typeLabel(t))));
+  const filters = rosterFilters(() => paintCollection());
+  const collCount = h('span', { class: 'coll-count' });
   $app.replaceChildren(
-    h('div', { class: 'team-head' }, h('h1', null, 'Tu equipo ', countEl), h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: downloadEditedSave, 'data-tip': 'Baja tu save con los movimientos y habilidades que cambiaste, para importarlo en PokeTokenBar' }, '⬇ Descargar save editado'), h('a', { class: 'btn sm', href: '/', 'data-link': true }, '← Inicio'))),
+    h('div', { class: 'team-head' }, h('h1', null, 'Tu equipo ', countEl), h('div', { class: 'tools' }, toolButton({ icon: '⬇', label: 'Descargar save editado', note: 'Para importarlo en PokeTokenBar', tip: 'Baja tu save con los movimientos y habilidades que cambiaste', onclick: downloadEditedSave }), toolButton({ icon: '←', label: 'Volver al inicio', href: '/', 'data-link': true }))),
     h('section', { class: 'party-board' }, partyEl, h('p', { class: 'hint' }, `Arrastra para ordenar · el líder abre la pelea · antes de cada combate eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}`)),
     panel,
-    h('section', { class: 'collection-board' }, h('div', { class: 'row between' }, h('h2', null, `Colección `, h('span', { class: 'muted' }, `(${me.rosterSize})`)), h('div', { class: 'coll-filters' }, h('input', { type: 'search', placeholder: 'Buscar por nombre…', 'aria-label': 'Buscar Pokémon', oninput: (e) => { query = e.target.value.trim(); paintCollection(); } }), typeSelect, shinySelect)), grid),
+    h('section', { class: 'collection-board' }, h('div', { class: 'coll-head' }, h('h2', null, 'Colección')), collectionBar(filters, collCount), grid),
   );
+  unsaved = () => !!editor?.dirty();
   paintParty();
   paintCollection();
   openEditor();
 }
 
-async function monPanel(uid, panel, { inParty, toggleParty, onSaved }) {
+async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }) {
   let mon;
   try {
     mon = (await api(`/api/me/mons/${uid}`)).mon;
   } catch (e) {
-    panel.replaceChildren(h('p', { class: 'error' }, e.message));
+    if (isCurrent()) panel.replaceChildren(h('p', { class: 'error' }, e.message));
     return null;
   }
+  if (!isCurrent()) return null;
   const original = { moves: mon.movepool.filter((m) => m.chosen).map((m) => m.key), ability: mon.ability };
   if (!original.moves.length) original.moves = mon.moves.map((m) => m.key);
   let moves = original.moves.slice();
@@ -1363,16 +1437,19 @@ async function monPanel(uid, panel, { inParty, toggleParty, onSaved }) {
 }
 
 // ---------- battle ----------
-async function battlePage(id) {
+async function battlePage(id, seq) {
   await loadMe();
+  if (stale(seq)) return;
   renderWho();
   let c;
   try {
     c = (await api(`/api/challenges/${id}`)).challenge;
   } catch (e) {
+    if (stale(seq)) return;
     $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No encontré esa batalla'), h('p', { class: 'muted' }, e.message), h('a', { class: 'btn', href: '/', 'data-link': true }, 'Ir al inicio')));
     return;
   }
+  if (stale(seq)) return;
   document.title = `${c.host.name} desafía · Token Clash`;
 
   if (c.status === 'cancelled' || c.status === 'abandoned') {
@@ -1548,6 +1625,10 @@ const ROLL_START_MS = 700;
 const ROLL_STEP_MS = 450;
 const rolledRooms = new Set();
 
+function preloadFor(you, parties) {
+  parties.forEach((party, s) => preloadSprites([...(party ?? []), { sprite: 'substitute' }], { back: s === you }));
+}
+
 function previewUI(c, sendPick) {
   let last = null;
   let total = 0;
@@ -1598,7 +1679,8 @@ function previewUI(c, sendPick) {
 
   const dieCard = (i) => h('div', { class: 'prep-card dice-slot', 'aria-label': 'Lanzando dados' }, h('div', { class: 'die spin', style: { animationDelay: `${-i * 110}ms` } }, DIE_FACES[i % DIE_FACES.length]), h('b', null, '???'));
   const rollingOn = (s) => rolling && rollSides.has(s);
-  const revealClass = (s, i) => (rollingOn(s) && i === justRevealed ? ' reveal' : '');
+  const cardAnim = (s, i) => `${entered || rollingOn(s) ? '' : ' enter'}${rollingOn(s) && i === justRevealed ? ' reveal' : ''}`;
+  let view = null;
 
   function choose(i, needed) {
     if (sent || rollingOn(last?.you)) return;
@@ -1609,57 +1691,96 @@ function previewUI(c, sendPick) {
     render();
   }
 
+  function syncGrid(grid, slots, party, s, make) {
+    party.forEach((f, i) => {
+      const kind = rollingOn(s) && i >= revealed ? 'die' : 'card';
+      if (slots[i]?.kind === kind) return;
+      const slot = kind === 'die' ? { kind, el: dieCard(i) } : { kind, ...make(f, i) };
+      if (slots[i]) slots[i].el.replaceWith(slot.el);
+      else grid.append(slot.el);
+      slots[i] = slot;
+    });
+  }
+
+  const seenCard = (f, s, i) => ({ el: h('div', { class: `prep-card seen${cardAnim(s, i)}`, style: { animationDelay: `${i * 70}ms` } }, h('div', { html: creatureHTML(f) }), h('b', null, f.name, genderMark(f.gender)), typeChips(f.types ?? [])) });
+
+  function ownCard(f, i, own, random) {
+    const badge = h('span', { class: 'badge', hidden: true });
+    const el = h(
+      'button',
+      { type: 'button', class: `prep-card${cardAnim(last.you, i)}`, style: { animationDelay: entered ? '0ms' : `${i * 70}ms` }, onclick: () => choose(i, own.needed) },
+      badge,
+      h('div', { html: creatureHTML(f) }),
+      h('b', null, f.name, genderMark(f.gender)),
+      h('small', { class: 'muted' }, `Nv ${f.level}`),
+      typeChips(f.types),
+      random && f.abilityInfo ? abilityChip(f.abilityInfo) : null,
+      h('small', { class: 'prep-moves muted' }, f.moves.map((m) => m.name).join(' · ')),
+    );
+    return { el, badge };
+  }
+
+  function sideView(s, title) {
+    const v = { s, grid: h('div', { class: 'prep-grid' }), status: h('span'), statusKey: null, slots: [] };
+    v.el = h('div', { class: 'card prep-side' }, h('div', { class: 'row between' }, h('h2', null, title), v.status), v.grid);
+    return v;
+  }
+
+  function paintSide(v, side) {
+    syncGrid(v.grid, v.slots, side.party, v.s, (f, i) => seenCard(f, v.s, i));
+    const key = rollingOn(v.s) ? 'roll' : side.ready ? 'ready' : 'picking';
+    if (key === v.statusKey) return;
+    v.statusKey = key;
+    v.status.replaceChildren(key === 'roll' ? h('span', { class: 'muted small pulse' }, '🎲 Sorteando…') : key === 'ready' ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, 'Eligiendo…'));
+  }
+
+  function build(p, you) {
+    if (you == null) {
+      const sides = [sideView(0, p.sides[0].name), sideView(1, p.sides[1].name)];
+      root.replaceChildren(sides[0].el, h('div', { class: 'vs-mark' }, 'VS'), sides[1].el);
+      return { sides, mine: null };
+    }
+    const foeSide = 1 - you;
+    const foe = sideView(foeSide, `Equipo de ${p.sides[foeSide].name}`);
+    const mine = { title: h('h2'), note: h('p', { class: 'muted small' }), grid: h('div', { class: 'prep-grid' }), foot: h('div', { class: 'prep-foot' }), footMode: null, footNote: h('p', { class: 'pulse' }), slots: [] };
+    mine.pickBtn = h('button', { type: 'button', class: 'btn primary', onclick: () => { sent = true; sendPick(picks.slice()); render(); } });
+    root.replaceChildren(h('div', { class: 'card prep-side mine' }, mine.title, mine.note, mine.grid, mine.foot), h('div', { class: 'vs-mark' }, 'VS'), foe.el);
+    return { sides: [foe], mine };
+  }
+
+  function paintMine(m, own, foe, random) {
+    const you = last.you;
+    const rollingMe = rollingOn(you);
+    const done = own.ready || sent;
+    const chosen = own.picks ?? picks;
+    m.title.textContent = rollingMe ? '🎲 Lanzando los dados…' : done ? 'Tu equipo para esta pelea' : `Elige ${own.needed} de tus ${own.party.length}`;
+    m.note.textContent = rollingMe ? 'Sorteando Pokémon, movimientos y habilidades de tu colección.' : done ? 'El primero sale a pelear.' : 'Tócalos en el orden en que quieres usarlos: el primero sale a pelear. Si se acaba el tiempo, se eligen al azar.';
+    syncGrid(m.grid, m.slots, own.party, you, (f, i) => ownCard(f, i, own, random));
+    m.slots.forEach((slot, i) => {
+      if (slot.kind !== 'card') return;
+      const order = chosen.indexOf(i);
+      slot.el.classList.toggle('chosen', order >= 0);
+      slot.el.classList.toggle('benched', done && order < 0);
+      slot.el.disabled = done || rollingMe;
+      slot.badge.hidden = order < 0;
+      slot.badge.textContent = order >= 0 ? String(order + 1) : '';
+    });
+    const mode = rollingMe || done ? 'note' : 'pick';
+    if (m.footMode !== mode) {
+      m.footMode = mode;
+      m.foot.replaceChildren(mode === 'pick' ? m.pickBtn : m.footNote);
+    }
+    m.footNote.textContent = rollingMe ? '🎲 Los dados están rodando…' : foe.ready ? '¡Comienza la batalla!' : `Esperando a ${foe.name}…`;
+    m.pickBtn.disabled = picks.length !== own.needed || rolling;
+    m.pickBtn.textContent = `Continuar (${picks.length}/${own.needed})`;
+  }
+
   function render() {
     const p = last.preview;
     const you = last.you;
-    const own = you != null ? p.sides[you] : null;
-    const foe = p.sides[you == null ? 1 : 1 - you];
-    const seen = (side, title, s) =>
-      h(
-        'div',
-        { class: 'card prep-side' },
-        h('div', { class: 'row between' }, h('h2', null, title), rollingOn(s) ? h('span', { class: 'muted small pulse' }, '🎲 Sorteando…') : side.ready ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, 'Eligiendo…')),
-        h('div', { class: 'prep-grid' }, side.party.map((f, i) => (rollingOn(s) && i >= revealed ? dieCard(i) : h('div', { class: `prep-card seen${entered || rollingOn(s) ? '' : ' enter'}${revealClass(s, i)}`, style: { animationDelay: `${i * 70}ms` } }, h('div', { html: creatureHTML(f) }), h('b', null, f.name, genderMark(f.gender)), typeChips(f.types ?? []))))),
-      );
-    if (!own) {
-      root.replaceChildren(seen(p.sides[0], p.sides[0].name, 0), h('div', { class: 'vs-mark' }, 'VS'), seen(p.sides[1], p.sides[1].name, 1));
-      entered = true;
-      return;
-    }
-    const done = own.ready || sent;
-    const random = p.mode === 'random';
-    const chosen = own.picks ?? picks;
-    const mine = h(
-      'div',
-      { class: 'card prep-side mine' },
-      h('h2', null, rollingOn(you) ? '🎲 Lanzando los dados…' : done ? 'Tu equipo para esta pelea' : `Elige ${own.needed} de tus ${own.party.length}`),
-      h('p', { class: 'muted small' }, rollingOn(you) ? 'Sorteando Pokémon, movimientos y habilidades de tu colección.' : done ? 'El primero sale a pelear.' : 'Tócalos en el orden en que quieres usarlos: el primero sale a pelear. Si se acaba el tiempo, se eligen al azar.'),
-      h(
-        'div',
-        { class: 'prep-grid' },
-        own.party.map((f, i) => {
-          if (rollingOn(you) && i >= revealed) return dieCard(i);
-          const order = chosen.indexOf(i);
-          return h(
-            'button',
-            { type: 'button', class: `prep-card${entered || rollingOn(you) ? '' : ' enter'}${revealClass(you, i)}${order >= 0 ? ' chosen' : ''}${done && order < 0 ? ' benched' : ''}`, style: { animationDelay: entered ? '0ms' : `${i * 70}ms` }, disabled: done || rollingOn(you), onclick: () => choose(i, own.needed) },
-            order >= 0 ? h('span', { class: 'badge' }, order + 1) : null,
-            h('div', { html: creatureHTML(f) }),
-            h('b', null, f.name, genderMark(f.gender)),
-            h('small', { class: 'muted' }, `Nv ${f.level}`),
-            typeChips(f.types),
-            random && f.abilityInfo ? abilityChip(f.abilityInfo) : null,
-            h('small', { class: 'prep-moves muted' }, f.moves.map((m) => m.name).join(' · ')),
-          );
-        }),
-      ),
-      rollingOn(you)
-        ? h('p', { class: 'pulse' }, '🎲 Los dados están rodando…')
-        : done
-        ? h('p', { class: 'pulse' }, foe.ready ? '¡Comienza la batalla!' : `Esperando a ${foe.name}…`)
-        : h('button', { type: 'button', class: 'btn primary', disabled: picks.length !== own.needed || rolling, onclick: () => { sent = true; sendPick(picks.slice()); render(); } }, `Continuar (${picks.length}/${own.needed})`),
-    );
-    root.replaceChildren(mine, h('div', { class: 'vs-mark' }, 'VS'), seen(foe, `Equipo de ${foe.name}`, p.sides.indexOf(foe)));
+    view ??= build(p, you);
+    for (const v of view.sides) paintSide(v, p.sides[v.s]);
+    if (view.mine) paintMine(view.mine, p.sides[you], p.sides[1 - you], p.mode === 'random');
     entered = true;
   }
 
@@ -1667,6 +1788,7 @@ function previewUI(c, sendPick) {
     update(msg) {
       const first = !last;
       last = msg;
+      preloadFor(msg.you, msg.preview.sides.map((side) => side.party));
       if (!total && msg.deadline) total = Math.max(1, msg.deadline - Date.now());
       if (first && !rolledRooms.has(c.id)) {
         const sides = msg.preview.sides;
@@ -1857,7 +1979,7 @@ function battleUI(c, sendAction) {
     const fresh = spot.dataset.key !== key;
     if (fresh) {
       spot.dataset.key = key;
-      spot.innerHTML = creatureHTML(f, { back: p === 'me' });
+      spot.innerHTML = creatureHTML(f, { back: p === 'me', eager: true });
       enter = true;
     }
     spot.classList.toggle('faint', f.hp <= 0);
@@ -1866,7 +1988,7 @@ function battleUI(c, sendAction) {
     const shownStatus = f.hp > 0 && f.status ? f.status : '';
     if (shownStatus) spot.dataset.status = shownStatus;
     else delete spot.dataset.status;
-    if (!spot.querySelector('.sub-doll')) spot.append(h('div', { class: 'sub-doll', 'aria-hidden': 'true', html: creatureHTML({ sprite: 'substitute' }, { back: p === 'me' }) }));
+    if (!spot.querySelector('.sub-doll')) spot.append(h('div', { class: 'sub-doll', 'aria-hidden': 'true', html: creatureHTML({ sprite: 'substitute' }, { back: p === 'me', eager: true }) }));
     spot.classList.toggle('has-sub', !!f.volatiles?.substitute && f.hp > 0);
     let aura = spot.querySelector('.status-aura');
     if (!aura) {
@@ -2567,6 +2689,7 @@ function battleUI(c, sendAction) {
 
   return {
     push(msg) {
+      if (msg.state) preloadFor(msg.you, msg.state.sides.map((side) => side.team.filter((f) => !f.hidden)));
       queue = queue.then(() => apply(msg)).catch((e) => console.error(e));
     },
     destroy() {
