@@ -1,3 +1,4 @@
+import { humanCount } from './tournament.js';
 import { TURN_LIMIT } from './battle.js';
 
 const RECENT = 12;
@@ -73,8 +74,8 @@ export function serverStats(db, now = Date.now()) {
   const players = playersOf(trainers);
   const entries = uniqueEntries(trainers);
   const challenges = Object.values(db.challenges);
-  const pvp = challenges.filter((c) => !c.ai && c.status === 'finished' && c.final);
-  const vsAi = challenges.filter((c) => c.ai && c.status === 'finished');
+  const pvp = challenges.filter((c) => !c.ai && !c.tournamentId && c.status === 'finished' && c.final);
+  const vsAi = challenges.filter((c) => c.ai && !c.aiOnly && c.status === 'finished');
   const turns = pvp.reduce((sum, c) => sum + Math.min(c.turns ?? 0, TURN_LIMIT), 0);
   return {
     totals: {
@@ -108,5 +109,44 @@ export function serverStats(db, now = Date.now()) {
         finishedAt: c.finishedAt ?? c.createdAt,
       })),
     topMons: monUsage(pvp),
+    tournaments: tournamentStats(db),
+  };
+}
+
+export function tournamentStats(db) {
+  const done = Object.values(db.tournaments ?? {}).filter((t) => t.status === 'finished' && t.bracket && humanCount(t) >= 2);
+  const rows = new Map();
+  const row = (seat) => {
+    const key = seat.id;
+    if (!rows.has(key)) rows.set(key, { id: seat.id, name: nameOf(db, seat.id, seat.name), titles: 0, finals: 0, played: 0, wins: 0, losses: 0 });
+    return rows.get(key);
+  };
+  for (const t of done) {
+    t.seats.forEach((seat, i) => {
+      if (seat.ai) return;
+      const r = row(seat);
+      r.played += 1;
+      if (t.champion === i) r.titles += 1;
+      const final = t.bracket.at(-1)[0];
+      if (final.a === i || final.b === i) r.finals += 1;
+      for (const m of t.bracket.flat()) {
+        if (m.winner === null || (m.a !== i && m.b !== i)) continue;
+        if (m.winner === i) r.wins += 1;
+        else r.losses += 1;
+      }
+    });
+  }
+  const ranking = [...rows.values()].sort((a, b) => b.titles - a.titles || b.finals - a.finals || b.wins - a.wins || a.losses - b.losses || a.name.localeCompare(b.name));
+  const recent = done
+    .sort((a, b) => (b.finishedAt ?? b.createdAt) - (a.finishedAt ?? a.createdAt))
+    .slice(0, RECENT)
+    .map((t) => {
+      const champ = t.seats[t.champion];
+      return { id: t.id, size: t.size, mode: t.mode ?? 'team', levelCap: t.levelCap ?? null, humans: humanCount(t), champion: champ ? nameOf(db, champ.ai ? null : champ.id, champ.name) : '¿?', championAi: !!champ?.ai, finishedAt: t.finishedAt ?? t.createdAt };
+    });
+  return {
+    totals: { tournaments: done.length, matches: done.reduce((n, t) => n + t.size - 1, 0), aiTitles: done.filter((t) => t.seats[t.champion]?.ai).length },
+    ranking,
+    recent,
   };
 }

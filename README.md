@@ -19,8 +19,29 @@ En vivo: **https://clash.mirrordev.xyz**
    - **🎒 Batalla con tu equipo:** los 6 que armaste.
    - **🎲 Batalla aleatoria:** los dados sortean hasta 6 de la colección de cada uno, sin repetir especie, con
      movimientos y habilidad al azar.
-   - **Contra otro jugador:** te damos un link para mandarle. Cuando acepta, pelean en vivo (60 s por turno; si
-     alguien no elige, su Pokémon ataca solo). Cualquiera más con el link puede mirar.
+   - **Contra otro jugador:** se abre una sala de espera, pública por defecto o privada.
+     - **Pública:** si ya hay una sala abierta con el mismo modo y nivel, entras a esa. Si no, se abre la tuya y
+       aparece en **Salas abiertas** del inicio, donde cualquiera puede entrar con un clic. La lista se
+       actualiza en vivo: las salas nuevas aparecen y las que parten o se cierran desaparecen sin recargar.
+     - **Privada:** no aparece en Salas abiertas; solo entra quien tenga el link.
+     - Una sala pública deja de aparecer si el anfitrión cierra la página. Cuando alguien entra, los dos se ven en
+       la sala y cada uno aprieta **¡Estoy listo!**; con los dos listos parte una cuenta regresiva de 5 s antes de
+       elegir sus Pokémon. Después pelean en vivo (60 s por turno; si alguien no elige, su Pokémon ataca solo).
+       Cualquiera más con el link puede mirar.
+   - **Torneo:** con tu equipo o aleatorio, de 4, 8 o 16 jugadores, en sala pública o privada.
+     - El dueño puede rellenar los asientos libres con IAs de cualquier dificultad y quitar a quien quiera.
+     - Parte cuando la sala está llena y todos aprietan ¡Estoy listo! (las IAs siempre están listas).
+     - Se sortean las llaves con una animación y las peleas se juegan de a una, en orden, cada una con su cuenta
+       regresiva. Todos siguen la pelea en curso: si es tuya juegas y si no la miras en modo espectador, con una
+       barra y un marco celestes que no se confunden con los de tu propia pelea (dorados).
+     - Si una pelea termina empatada, avanza uno por sorteo. Si alguien del torneo no está en la sala de su pelea,
+       sus turnos se juegan solos a los 15 s para no frenar al resto.
+     - Al final de cada pelea todos ven quién ganó y quién quedó fuera; luego vuelven a las llaves, donde se anima
+       al que avanza, y pasan a la siguiente pelea.
+     - Las IAs llevan nombres al azar de una lista fija (por ejemplo «nora ai - ai difícil»), sin repetirse dentro
+       de un torneo.
+     - Los torneos terminados con al menos 2 personas entran a **Tus torneos** y a la sección **Torneos** de
+       `/stats` (campeones, finales y últimos torneos). Sus peleas no suman al ranking 1 contra 1.
    - **Contra la IA:** Fácil, Media, Difícil, Muy difícil o Skynet, con Pokémon de la 1.ª a la 5.ª generación.
      Con tu equipo, los dados sortean sus 6 entre Pokémon completamente evolucionados, y cada dificultad acota
      ese grupo a los más fuertes por estadísticas base (100 %, 80 %, 60 %, 50 % y 40 %); en aleatoria sortea
@@ -97,6 +118,8 @@ npm test        # parser, motor de batalla, IA, stats y flujo completo con WebSo
   de las dos no hay Skynet. `JEV_MODEL` fija la versión (por defecto `jev-1.14.0`).
 - `server/jev-proxy.js`: el proxy de salida de Skynet (ver Deploy).
 - `server/random.js`: sorteo de la batalla aleatoria (equipo, movimientos y habilidad; aleatoriedad inyectada).
+- `server/lobby.js`: salas abiertas y emparejamiento (qué salas se listan y a cuál entra una búsqueda pública).
+- `server/tournament.js`: asientos, llaves y avance del torneo.
 - `server/index.js`: HTTP + WebSocket, desafíos, ranking. Persistencia en `data/db.json`.
 - `public/`: frontend sin build (JS de módulos); `public/fx.js` dibuja los efectos de los movimientos y estados.
 

@@ -13,7 +13,7 @@ export const AI_PREFIX = 'ai:';
 export const LAST_AI_SPECIES = 649;
 
 export const aiTrainerId = (level) => `${AI_PREFIX}${level}`;
-export const aiLevelOf = (trainerId) => (typeof trainerId === 'string' && trainerId.startsWith(AI_PREFIX) ? trainerId.slice(AI_PREFIX.length) : null);
+export const aiLevelOf = (trainerId) => (typeof trainerId === 'string' && trainerId.startsWith(AI_PREFIX) ? trainerId.slice(AI_PREFIX.length).split('#')[0] : null);
 export const isAiLevel = (level) => AI_LEVELS.includes(level);
 
 const IMMUNE_BY_ABILITY = {

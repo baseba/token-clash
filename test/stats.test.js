@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serverStats, rankingOf, playersOf } from '../server/stats.js';
+import { serverStats, rankingOf, playersOf, tournamentStats } from '../server/stats.js';
 
 const trainer = (id, name, wins, losses, roster, totalTokens = 0) => ({ id, name, wins, losses, roster, totalTokens });
 const fighter = (speciesName, sprite) => ({ speciesName, sprite, types: ['normal'] });
@@ -61,4 +61,25 @@ test('server stats count only battles between players and the Pokémon they used
   assert.deepEqual(s.recent.map((c) => [c.id, c.winner]), [['x5', null], ['x2', 'guest'], ['x1', 'host']]);
   assert.equal(s.recent[1].host, 'Beto');
   assert.deepEqual(s.topMons.map((m) => [m.name, m.uses, m.wins]), [['Pikachu', 6, 2], ['Eevee', 3, 1]]);
+});
+
+test('tournaments count apart from 1v1 and only when at least two people played', () => {
+  const seats = (humans) => [...humans.map((id) => ({ id, name: id.toUpperCase() })), ...Array.from({ length: 4 - humans.length }, (_, i) => ({ id: `ai:easy#${i + 1}`, name: `bot ${i}`, ai: 'easy' }))];
+  const bracket = (w1, w2, champ) => [[{ a: 0, b: 1, winner: w1 }, { a: 2, b: 3, winner: w2 }], [{ a: w1, b: w2, winner: champ }]];
+  const db = {
+    trainers: { a: trainer('a', 'Ana', 0, 0, []), b: trainer('b', 'Beto', 0, 0, []) },
+    challenges: {
+      m1: { ...battle('m1', 'a', 'b', 0), tournamentId: 't1' },
+    },
+    tournaments: {
+      t1: { id: 't1', size: 4, mode: 'team', status: 'finished', createdAt: 1, finishedAt: 5, seats: seats(['a', 'b']), bracket: bracket(0, 2, 0), champion: 0 },
+      t2: { id: 't2', size: 4, mode: 'random', status: 'finished', createdAt: 2, finishedAt: 6, seats: seats(['a']), bracket: bracket(0, 2, 0), champion: 0 },
+      t3: { id: 't3', size: 4, mode: 'team', status: 'running', createdAt: 3, seats: seats(['a', 'b']), bracket: bracket(null, null, null) },
+    },
+  };
+  const t = tournamentStats(db);
+  assert.deepEqual(t.totals, { tournaments: 1, matches: 3, aiTitles: 0 });
+  assert.deepEqual(t.ranking.map((r) => [r.name, r.titles, r.finals, r.wins, r.losses]), [['Ana', 1, 1, 2, 0], ['Beto', 0, 0, 0, 1]]);
+  assert.deepEqual(t.recent.map((r) => [r.id, r.champion, r.humans]), [['t1', 'Ana', 2]]);
+  assert.equal(serverStats(db).totals.battles, 0);
 });

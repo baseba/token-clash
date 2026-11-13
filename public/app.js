@@ -515,6 +515,14 @@ window.addEventListener('popstate', () => {
 window.addEventListener('beforeunload', (e) => {
   if (unsaved?.()) e.preventDefault();
 });
+window.addEventListener('pagehide', () => {
+  closeRoomsFeed();
+  cleanup?.();
+  cleanup = null;
+});
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) route();
+});
 
 const $tip = h('div', { class: 'tip', role: 'tooltip', hidden: true });
 document.body.append($tip);
@@ -575,6 +583,7 @@ function markNav() {
 
 function route() {
   hideTip();
+  closeRoomsFeed();
   cleanup?.();
   cleanup = null;
   unsaved = null;
@@ -585,6 +594,8 @@ function route() {
   if (m) return battlePage(m[1], seq);
   if (location.pathname === '/equipo') return teamPage(seq);
   if (location.pathname === '/stats') return statsPage(seq);
+  const t = /^\/t\/([A-Za-z0-9_-]{4,20})$/.exec(location.pathname);
+  if (t) return tournamentPage(t[1], seq);
   return homePage(seq);
 }
 
@@ -718,6 +729,8 @@ function renderHome() {
   let levelCap = null;
   let mode = 'team';
   let rival = 'friend';
+  let visibility = 'public';
+  let size = 8;
   let aiLevel = 'mid';
 
   async function saveTeam(next) {
@@ -754,7 +767,13 @@ function renderHome() {
   async function createChallenge(btn) {
     btn.disabled = true;
     try {
-      const { challenge } = await api('/api/challenges', { method: 'POST', body: { levelCap, mode, ...(rival === 'ai' ? { ai: aiLevel } : {}) } });
+      if (rival === 'tournament') {
+        const { tournament, joined } = await api('/api/tournaments', { method: 'POST', body: { levelCap, mode, size, visibility } });
+        if (joined) toast('Te uniste a un torneo abierto');
+        return nav(`/t/${tournament.id}`);
+      }
+      const { challenge, joined } = await api('/api/challenges', { method: 'POST', body: { levelCap, mode, ...(rival === 'ai' ? { ai: aiLevel } : { visibility }) } });
+      if (joined) toast(`Te uniste a la sala de ${challenge.host.name}`);
       nav(`/b/${challenge.id}`);
     } catch (e) {
       toast(e.message);
@@ -778,10 +797,19 @@ function renderHome() {
   const aiNote = h('p', { class: 'nb-note' });
   const startBtn = h('button', { class: 'btn primary nb-start', onclick: (e) => createChallenge(e.currentTarget) });
   const aiField = field('Dificultad', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Dificultad de la IA' }, choice('seg', AI_ORDER.filter((k) => (me.aiLevels ?? AI_ORDER).includes(k)).map((k) => ({ value: k, label: AI_LABEL[k] })), aiLevel, (v) => { aiLevel = v; paint(); })), aiNote);
+  const roomNote = h('p', { class: 'nb-note' });
+  const roomField = field('Sala', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Tipo de sala' }, choice('seg', [{ value: 'public', label: '🌐 Pública' }, { value: 'private', label: '🔒 Privada' }], visibility, (v) => { visibility = v; paint(); })), roomNote);
+  const sizeField = field('Jugadores', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Jugadores del torneo' }, choice('seg', TOURNAMENT_SIZES.map((n) => ({ value: n, label: String(n) })), size, (v) => { size = v; paint(); })), h('p', { class: 'nb-note' }, 'Llaves de eliminación directa. El dueño puede rellenar los asientos libres con IAs.'));
   function paint() {
+    const tour = rival === 'tournament';
     aiField.classList.toggle('is-hidden', rival !== 'ai');
+    roomField.classList.toggle('is-hidden', rival === 'ai');
+    sizeField.classList.toggle('is-hidden', !tour);
     aiNote.textContent = AI_NOTES[aiLevel][mode];
-    startBtn.textContent = rival === 'ai' ? `🤖 Pelear contra la IA · ${AI_LABEL[aiLevel]}` : '⚔︎ Crear link de desafío';
+    roomNote.textContent = visibility === 'public'
+      ? tour ? 'Si ya hay un torneo abierto con este modo, nivel y tamaño, entras a ese. Si no, abrimos el tuyo y aparece en Salas abiertas.' : 'Si ya hay una sala abierta con este modo y nivel, entras a esa. Si no, abrimos la tuya y aparece en Salas abiertas.'
+      : 'No aparece en Salas abiertas: solo entra quien tenga el link que te damos.';
+    startBtn.textContent = rival === 'ai' ? `🤖 Pelear contra la IA · ${AI_LABEL[aiLevel]}` : tour ? (visibility === 'public' ? `🏆 Buscar torneo de ${size}` : `🔒 Crear torneo privado de ${size}`) : visibility === 'public' ? '⚔︎ Buscar rival' : '🔒 Crear sala privada';
   }
   const battleForm = h(
     'div',
@@ -790,10 +818,13 @@ function renderHome() {
       { value: 'team', icon: MODE_ICON.team, label: MODE_LABEL.team, desc: `Los ${PARTY_SIZE} que armaste.` },
       { value: 'random', icon: MODE_ICON.random, label: MODE_LABEL.random, desc: `Los dados sortean ${PARTY_SIZE} de tu colección, con movimientos y habilidad al azar.` },
     ], mode, (v) => { mode = v; paint(); }))),
-    field('Rival', h('div', { class: 'cards2', role: 'group', 'aria-label': 'Rival' }, choice('pick', [
-      { value: 'friend', icon: '👥', label: 'Contra otro jugador', desc: 'Te damos un link para mandarle.' },
+    field('Rival', h('div', { class: 'cards3', role: 'group', 'aria-label': 'Rival' }, choice('pick', [
+      { value: 'friend', icon: '👥', label: 'Contra otro jugador', desc: 'Entras a una sala abierta o abres una nueva.' },
       { value: 'ai', icon: '🤖', label: 'La IA', desc: 'Peleas ahora mismo, con Pokémon de la 1.ª a la 5.ª generación.' },
+      { value: 'tournament', icon: '🏆', label: 'Torneo', desc: 'De 4, 8 o 16 jugadores, con IAs para rellenar.' },
     ], rival, (v) => { rival = v; paint(); }))),
+    sizeField,
+    roomField,
     aiField,
     field('Nivel', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Nivel' }, choice('seg', [{ value: null, label: 'Nivel real' }, { value: 50, label: 'Todos a nivel 50' }], levelCap, (v) => { levelCap = v; })), h('p', { class: 'nb-note' }, 'Nivel 50 empareja la pelea: gana la estrategia, no quién quemó más tokens.')),
     startBtn,
@@ -827,6 +858,7 @@ function renderHome() {
       h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', h('span', { class: 'party-count' }, `${team.length}/${PARTY_SIZE}`)), h('a', { class: 'btn sm primary', href: '/equipo', 'data-link': true }, '✎ Editar equipo')),
       h('div', { class: 'party-board' }, partyRow(team), h('p', { class: 'hint' }, `En cada pelea eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}. Toca uno para editar sus movimientos y su habilidad.`)),
     ),
+    h('section', null, openRoomsCard()),
     h(
       'section',
       null,
@@ -855,25 +887,136 @@ function renderHome() {
   );
 }
 
+const wsURL = () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+let roomsFeed = null;
+function closeRoomsFeed() {
+  roomsFeed?.();
+  roomsFeed = null;
+}
+
+function openRoomsCard() {
+  closeRoomsFeed();
+  const list = h('div', { class: 'list' }, h('p', { class: 'muted' }, 'Buscando salas…'));
+  const count = h('span', { class: 'chip', hidden: true });
+  const live = h('span', { class: 'live-dot', 'data-tip': 'Se actualiza solo' });
+  const card = h('div', { class: 'card rooms-card' }, h('div', { class: 'nb-head' }, h('h2', null, 'Salas abiertas ', count), h('p', { class: 'muted small' }, live, 'Jugadores esperando rival ahora mismo')), list);
+  const rows = new Map();
+  let first = true;
+  let rooms = [];
+  let ws = null;
+  let retry = 0;
+  let closed = false;
+  async function join(r, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Entrando…';
+    try {
+      if (r.kind === 'tournament') {
+        await api(`/api/tournaments/${r.id}/join`, { method: 'POST' });
+        return nav(`/t/${r.id}`);
+      }
+      await api(`/api/challenges/${r.id}/accept`, { method: 'POST' });
+      nav(`/b/${r.id}`);
+    } catch (e) {
+      toast(e.message);
+      rows.get(key(r))?.classList.add('room-gone');
+      btn.textContent = 'No disponible';
+    }
+  }
+  const meta = (r) => `${r.kind === 'tournament' ? `🏆 Torneo de ${r.size} · ${r.filled}/${r.size} · ` : ''}${MODE_ICON[r.mode] ?? MODE_ICON.team} ${MODE_LABEL[r.mode] ?? MODE_LABEL.team} · ${r.levelCap ? 'Nv 50' : 'Nivel real'} · ${ago(r.createdAt)}`;
+  const key = (r) => `${r.kind}:${r.id}:${r.filled ?? ''}:${r.mine}`;
+  function row(r) {
+    const tour = r.kind === 'tournament';
+    const href = tour ? `/t/${r.id}` : `/b/${r.id}`;
+    const title = tour ? (r.mine ? 'Tu torneo' : `Torneo de ${r.host.name}`) : r.mine ? 'Tu sala' : r.host.name;
+    return h(
+      'div',
+      { class: `item room${tour ? ' is-tour' : ''}${r.mine ? ' is-me' : ''}${first ? '' : ' room-new'}` },
+      h('span', { class: 'room-who' }, h('b', null, title), r.mine ? null : [' ', record(r.host)], h('span', { class: 'muted small room-meta' }, meta(r))),
+      r.mine ? h('a', { class: 'btn sm', href, 'data-link': true }, 'Ver') : h('button', { class: 'btn sm primary', onclick: (e) => join(r, e.currentTarget) }, 'Entrar'),
+    );
+  }
+  function paint(next) {
+    rooms = next;
+    count.hidden = !rooms.length;
+    count.textContent = String(rooms.length);
+    const keep = new Set(rooms.map(key));
+    for (const k of rows.keys()) if (!keep.has(k)) rows.delete(k);
+    for (const r of rooms) if (!rows.has(key(r))) rows.set(key(r), row(r));
+    list.replaceChildren(...(rooms.length ? rooms.map((r) => rows.get(key(r))) : [h('p', { class: 'muted' }, 'No hay salas abiertas. Busca rival y la tuya aparecerá aquí para los demás.')]));
+    first = false;
+  }
+  function refreshAges() {
+    for (const r of rooms) rows.get(key(r))?.querySelector('.room-meta')?.replaceChildren(meta(r));
+  }
+  function connect() {
+    if (closed) return;
+    ws = new WebSocket(wsURL());
+    ws.onopen = () => {
+      retry = 0;
+      live.classList.add('on');
+      ws.send(JSON.stringify({ t: 'lobby', token }));
+    };
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.t === 'rooms') paint(msg.rooms);
+    };
+    ws.onclose = () => {
+      live.classList.remove('on');
+      if (closed) return;
+      if (!card.isConnected && !first) return stop();
+      retry += 1;
+      setTimeout(connect, Math.min(8000, 500 * 2 ** retry));
+    };
+  }
+  const ageTimer = setInterval(() => {
+    if (!card.isConnected && !first) return stop();
+    refreshAges();
+  }, 20_000);
+  function stop() {
+    closed = true;
+    clearInterval(ageTimer);
+    if (ws) {
+      ws.onclose = null;
+      ws.close();
+    }
+  }
+  roomsFeed = stop;
+  connect();
+  return card;
+}
+
 function myChallengesCard() {
   const list = h('div', { class: 'list' }, h('p', { class: 'muted' }, 'Cargando…'));
   api('/api/me/challenges')
-    .then(({ challenges }) => {
-      if (!challenges.length) return list.replaceChildren(h('p', { class: 'muted' }, 'Todavía no hay batallas. ¡Crea un link!'));
+    .then(({ challenges, tournaments = [] }) => {
+      if (tournaments.length) tourList.replaceChildren(...tournaments.map(tournamentItem));
+      tourBox.hidden = !tournaments.length;
+      if (!challenges.length) return list.replaceChildren(h('p', { class: 'muted' }, 'Todavía no hay batallas. ¡Busca rival!'));
       list.replaceChildren(
         ...challenges.map((c) => {
-          const label = c.opponent ? `vs ${c.opponent}` : 'Esperando rival';
+          const label = c.opponent ? `vs ${c.opponent}` : c.visibility === 'public' ? 'Sala pública · esperando rival' : 'Sala privada · esperando rival';
           const st =
             c.status === 'finished' ? (c.won ? h('span', { class: 'w' }, 'Ganaste') : h('span', { class: 'l' }, 'Perdiste'))
             : c.status === 'active' ? h('span', { class: 'pulse' }, 'En curso')
-            : c.status === 'open' ? h('span', { class: 'muted' }, 'Abierto')
+            : c.status === 'open' ? h('span', { class: 'muted' }, 'Abierta')
             : h('span', { class: 'muted' }, c.status === 'cancelled' ? 'Cancelado' : 'Cortado');
           return h('a', { class: 'item', href: `/b/${c.id}`, 'data-link': true }, h('span', null, label, h('span', { class: 'muted small' }, ` · ${MODE_ICON[c.mode] ?? MODE_ICON.team}`), c.levelCap ? h('span', { class: 'muted small' }, ' · Nv 50') : null), st);
         }),
       );
     })
     .catch(() => list.replaceChildren(h('p', { class: 'muted' }, 'No pude cargar tus batallas.')));
-  return h('div', { class: 'card' }, h('h2', null, 'Tus batallas'), list);
+  const tourList = h('div', { class: 'list' });
+  const tourBox = h('div', { class: 'my-tours', hidden: true }, h('h3', null, '🏆 Tus torneos'), tourList);
+  return h('div', { class: 'card' }, h('h2', null, 'Tus batallas'), list, tourBox);
+}
+
+function tournamentItem(t) {
+  const st =
+    t.status === 'open' ? h('span', { class: 'muted' }, 'Esperando jugadores')
+    : t.status === 'running' ? h('span', { class: 'pulse' }, 'En juego')
+    : t.champion ? h('span', { class: 'w' }, '🏆 Campeón')
+    : h('span', { class: 'muted' }, t.reached ? `Llegaste a ${t.reached === 'Final' ? 'la Final' : t.reached}` : 'Terminado');
+  return h('a', { class: 'item', href: `/t/${t.id}`, 'data-link': true }, h('span', null, `Torneo de ${t.size}`, h('span', { class: 'muted small' }, ` · ${MODE_ICON[t.mode] ?? MODE_ICON.team} · ${plural(t.humans, 'jugador', 'jugadores')}${t.levelCap ? ' · Nv 50' : ''}`)), st);
 }
 
 const percent = (x) => (x == null ? '—' : `${Math.round(x * 100)}%`);
@@ -934,6 +1077,28 @@ function rankingCard(ranking) {
           : null,
       ];
   return h('div', { class: 'card' }, h('div', { class: 'row between' }, h('h2', null, '🏆 Ranking'), h('span', { class: 'muted small' }, 'Solo batallas entre jugadores')), ...body);
+}
+
+function tournamentStatsSection({ totals, ranking, recent }) {
+  const head = h('div', { class: 'row between' }, h('h2', null, '🏆 Torneos'), h('span', { class: 'muted small', tabindex: 0, 'data-tip': 'Solo cuentan los torneos terminados con al menos 2 personas. No suman al ranking de batallas 1 contra 1.' }, 'Aparte del ranking 1 contra 1'));
+  if (!totals.tournaments) return h('section', null, h('div', { class: 'card' }, head, h('p', { class: 'muted' }, 'Todavía no termina ningún torneo con al menos 2 personas. Arma uno desde el inicio.')));
+  const champs = h(
+    'div',
+    { class: 'list rank-list' },
+    ranking.slice(0, 10).map((t, i) =>
+      h('div', { class: `item${me && t.id === me.id ? ' is-me' : ''}` }, h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 1}`), h('span', { class: 'rank-who' }, h('strong', null, t.name), h('small', { class: 'muted' }, `${plural(t.played, 'torneo', 'torneos')} · ${plural(t.finals, 'final', 'finales')}`))), h('span', { class: 'row rank-right' }, h('span', { class: 'chip' }, `🏆 ${t.titles}`), record(t))),
+    ),
+  );
+  const last = h(
+    'div',
+    { class: 'list' },
+    recent.map((t) => h('a', { class: 'item recent', href: `/t/${t.id}`, 'data-link': true }, h('span', null, h('span', { class: 'winner' }, `🏆 ${t.champion}`), h('span', { class: 'muted small' }, ` · Torneo de ${t.size}`)), h('span', { class: 'muted small recent-meta' }, `${MODE_ICON[t.mode] ?? MODE_ICON.team} · ${plural(t.humans, 'jugador', 'jugadores')}${t.levelCap ? ' · Nv 50' : ''} · ${ago(t.finishedAt)}`))),
+  );
+  return h(
+    'section',
+    null,
+    h('div', { class: 'card' }, head, h('div', { class: 'row tour-totals' }, h('span', { class: 'chip' }, plural(totals.tournaments, 'torneo', 'torneos')), h('span', { class: 'chip' }, `${plural(totals.matches, 'pelea', 'peleas')} de torneo`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Torneos que terminó ganando una IA' }, `🤖 ${plural(totals.aiTitles, 'título', 'títulos')} de la IA`)), h('div', { class: 'grid2 tour-stats' }, h('div', null, h('h3', null, 'Campeones'), champs), h('div', null, h('h3', null, 'Últimos torneos'), last))),
+  );
 }
 
 function recentCard(recent) {
@@ -1010,7 +1175,7 @@ async function statsPage(seq) {
     return;
   }
   if (stale(seq)) return;
-  const { totals, ranking, recent, topMons, live } = data;
+  const { totals, ranking, recent, topMons, live, tournaments } = data;
   $app.replaceChildren(
     h(
       'section',
@@ -1032,6 +1197,7 @@ async function statsPage(seq) {
     ),
     h('section', null, rankingCard(ranking)),
     h('section', { class: 'grid2' }, recentCard(recent), numbersCard(totals)),
+    tournaments ? tournamentStatsSection(tournaments) : null,
     topMonsSection(topMons),
     h('section', null, h('p', { class: 'muted small center' }, `Versión ${live.version} · servidor encendido ${ago(live.startedAt)}`)),
     feedbackButton(),
@@ -1043,6 +1209,7 @@ const PARTY_SIZE = 6;
 const MODE_ICON = { team: '🎒', random: '🎲' };
 const MODE_LABEL = { team: 'Batalla con tu equipo', random: 'Batalla aleatoria' };
 const AI_ORDER = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
+const TOURNAMENT_SIZES = [4, 8, 16];
 const AI_LABEL = { easy: 'Fácil', mid: 'Media', hard: 'Difícil', veryhard: 'Muy difícil', skynet: 'Skynet' };
 const AI_NOTES = {
   easy: {
@@ -1452,8 +1619,9 @@ async function battlePage(id, seq) {
   if (stale(seq)) return;
   document.title = `${c.host.name} desafía · Token Clash`;
 
-  if (c.status === 'cancelled' || c.status === 'abandoned') {
-    $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, c.status === 'cancelled' ? 'Desafío cancelado' : 'Esta batalla se cortó'), h('p', { class: 'muted' }, c.status === 'cancelled' ? `${c.host.name} lo canceló.` : 'El servidor se reinició a mitad de la pelea. Pide un link nuevo.'), h('a', { class: 'btn primary', href: '/', 'data-link': true }, 'Ir al inicio')));
+  if (c.status === 'cancelled') return roomClosedBanner(c, me && c.host.id === me.id);
+  if (c.status === 'abandoned') {
+    $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'Esta batalla se cortó'), h('p', { class: 'muted' }, 'El servidor se reinició a mitad de la pelea. Busca rival de nuevo desde el inicio.'), h('a', { class: 'btn primary', href: '/', 'data-link': true }, 'Ir al inicio')));
     return;
   }
 
@@ -1462,16 +1630,24 @@ async function battlePage(id, seq) {
   let retry = 0;
   let battle = null; // battle UI controller, once a battle exists
   let prep = null;
+  let match = null;
+  let duel = null;
+  const bar = roomBar(c);
+  const stopFollow = c.tournament ? followTournament(c, seq, () => battle) : null;
   cleanup = () => {
     closed = true;
     ws?.close();
     battle?.destroy();
     prep?.destroy();
+    match?.destroy();
+    bar.destroy();
+    stopFollow?.();
   };
+  const send = (msg) => ws?.readyState === 1 && ws.send(JSON.stringify(msg));
 
   function connect() {
     if (closed) return;
-    ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+    ws = new WebSocket(wsURL());
     ws.onopen = () => {
       retry = 0;
       ws.send(JSON.stringify({ t: 'hello', room: id, token }));
@@ -1479,6 +1655,30 @@ async function battlePage(id, seq) {
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.t === 'error') return toast(msg.error);
+      if (msg.t === 'closed') {
+        cleanup?.();
+        cleanup = null;
+        return roomClosedBanner(c, me && c.host.id === me.id);
+      }
+      if (msg.t === 'reopened') {
+        if (!msg.host) return void nav('/');
+        toast('Tu rival salió de la sala. Sigue abierta para que entre otro.');
+        return void route();
+      }
+      if ('you' in msg) bar.update(msg.you, msg.players?.map((p) => p.name) ?? msg.state?.sides.map((side) => side.name) ?? msg.preview?.sides.map((side) => side.name));
+      if (msg.t === 'lobby') {
+        duel ??= duelLobbyUI(c, send);
+        duel.update(msg);
+        return;
+      }
+      duel = null;
+      if (msg.t === 'countdown') {
+        match ??= countdownUI(c);
+        match.update(msg);
+        return;
+      }
+      match?.destroy();
+      match = null;
       if (msg.preview) {
         prep ??= previewUI(c, (picks) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'pick', picks })));
         prep.update(msg);
@@ -1512,6 +1712,7 @@ async function battlePage(id, seq) {
 
   if (c.status === 'finished') {
     const you = me ? c.final.sides.findIndex((s) => s.trainerId === me.id) : -1;
+    bar.update(you === -1 ? null : you, c.final.sides.map((side) => side.name));
     battle = battleUI(c, () => {});
     battle.push({ state: c.final, you: you === -1 ? null : you, actions: [], deadline: null });
     return;
@@ -1521,8 +1722,21 @@ async function battlePage(id, seq) {
   connect();
 }
 
+function roomClosedBanner(c, mine) {
+  $app.replaceChildren(
+    h(
+      'div',
+      { class: 'card banner' },
+      h('h2', null, 'Sala cerrada'),
+      h('p', { class: 'muted' }, mine ? 'Cerraste esta sala o entraste a otra pelea.' : `${c.host.name} cerró la sala antes de que alguien entrara.`),
+      h('a', { class: 'btn primary', href: '/', 'data-link': true }, mine ? 'Ir al inicio' : 'Buscar otra sala'),
+    ),
+  );
+}
+
 function renderLobby(c, { onAccepted }) {
   const mine = me && c.host.id === me.id;
+  const open = c.visibility === 'public';
   const link = `${location.origin}/b/${c.id}`;
   const random = c.mode === 'random';
   const capNote = [
@@ -1533,13 +1747,13 @@ function renderLobby(c, { onAccepted }) {
   const randomHint = h('p', { class: 'muted small' }, `Cuando los dos estén listos, los dados sortean ${PARTY_SIZE} Pokémon de la colección de cada uno, sin repetir, con movimientos y habilidad al azar.`);
 
   if (mine) {
-    const input = h('input', { type: 'text', readonly: true, value: link, 'aria-label': 'Link del desafío', onfocus: (e) => e.target.select() });
+    const input = h('input', { type: 'text', readonly: true, value: link, 'aria-label': 'Link de la sala', onfocus: (e) => e.target.select() });
     $app.replaceChildren(
       h(
         'section',
         { class: 'card' },
-        h('h1', null, 'Tu desafío está listo'),
-        h('p', { class: 'muted' }, 'Mándale este link a otro jugador. La pelea parte apenas lo acepte; deja esta página abierta para jugar en vivo.'),
+        h('h1', null, open ? '🌐 Tu sala está abierta' : '🔒 Tu sala privada está lista'),
+        h('p', { class: 'muted' }, open ? 'Aparece en Salas abiertas del inicio y el primero que entre pelea contigo. También puedes mandar el link. Deja esta página abierta: si la cierras, la sala deja de aparecer.' : 'No aparece en Salas abiertas: mándale este link a quien quieras desafiar. La pelea parte apenas entre; deja esta página abierta para jugar en vivo.'),
         h('div', { class: 'share' }, input, h('button', { class: 'btn primary', onclick: () => copy(link, 'Link copiado, ¡a provocar!') }, 'Copiar')),
         h('div', { class: 'row', style: null }, capNote, h('span', { class: 'muted pulse' }, '⏳ Esperando rival…')),
       ),
@@ -1556,7 +1770,7 @@ function renderLobby(c, { onAccepted }) {
             toast(e.message);
           }
         },
-      }, 'Cancelar desafío')),
+      }, 'Cerrar sala')),
     );
     return;
   }
@@ -1592,12 +1806,12 @@ function renderLobby(c, { onAccepted }) {
         h('h2', null, 'Tu equipo'),
         h('div', { class: 'mini-team' }, myTeam().map((f, i) => monCard(f, { badge: i + 1, stats: true, rarity: false }))),
         h('p', { class: 'muted small' }, '¿Otro equipo? ', h('a', { href: '/', target: '_blank', rel: 'noopener' }, 'Cámbialo en otra pestaña'), ' y recarga esta.'),
-        h('button', { class: 'btn primary', onclick: (e) => accept(e.currentTarget) }, '⚔︎ Aceptar desafío'),
+        h('button', { class: 'btn primary', onclick: (e) => accept(e.currentTarget) }, open ? '⚔︎ Entrar a la sala' : '⚔︎ Aceptar desafío'),
       )
     : importCard({ onDone: () => renderLobby(c, { onAccepted }) });
 
   $app.replaceChildren(
-    h('section', null, h('h1', null, `${c.host.name} te desafía`), h('div', { class: 'row' }, capNote, h('span', { class: 'muted' }, 'Pelea en vivo por turnos. Si alguien no elige en 60 s, su Pokémon ataca solo.'))),
+    h('section', null, h('h1', null, open ? `Sala de ${c.host.name}` : `${c.host.name} te desafía`), h('div', { class: 'row' }, capNote, h('span', { class: 'muted' }, 'Pelea en vivo por turnos. Si alguien no elige en 60 s, su Pokémon ataca solo.'))),
     h(
       'section',
       { class: 'vs' },
@@ -1618,6 +1832,497 @@ function renderLobby(c, { onAccepted }) {
       right,
     ),
   );
+}
+
+function confettiOn(host) {
+  const colors = ['#ffcf4a', '#ff7a9c', '#5ec8ff', '#4fd18b', '#b45ae0', '#ffffff'];
+  host.classList.add('has-confetti');
+  for (let i = 0; i < 60; i++) {
+    const bit = h('i', { class: 'confetti', style: { left: `${Math.random() * 100}%`, background: colors[i % colors.length] } });
+    host.append(bit);
+    bit.animate([{ transform: 'translateY(-10%) rotate(0deg)', opacity: 1 }, { transform: `translateY(${host.clientHeight * 1.2 + 40}px) rotate(${360 + Math.random() * 540}deg)`, opacity: 0 }], { duration: 1800 + Math.random() * 1400, delay: Math.random() * 600, easing: 'cubic-bezier(.2,.6,.4,1)', fill: 'forwards' });
+  }
+}
+
+const avatar = (p) => h('div', { class: `match-avatar${p.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true' }, p.ai ? '🤖' : (p.name.trim()[0] ?? '?').toUpperCase());
+
+function seatCard(p, { you = false, host = false, onRemove = null } = {}) {
+  const status = p.ready ? h('span', { class: 'seat-state ok' }, '✅ Listo') : h('span', { class: 'seat-state' }, '⏳ Esperando');
+  return h(
+    'div',
+    { class: `seat${you ? ' is-you' : ''}${p.ready ? ' is-ready' : ''}${p.online === false ? ' is-away' : ''}` },
+    avatar(p),
+    h('div', { class: 'seat-body' }, h('span', { class: 'seat-name' }, h('b', null, p.name), host ? h('span', { 'data-tip': 'Dueño de la sala' }, '👑') : null, you ? h('span', { class: 'chip match-you' }, 'Tú') : null), h('span', { class: 'seat-meta' }, p.ai ? h('span', { class: 'muted small' }, `Dificultad ${(AI_LABEL[p.ai] ?? '').toLowerCase()}`) : record(p), status), p.online === false ? h('span', { class: 'muted small' }, 'Desconectado') : null),
+    onRemove ? h('button', { class: 'btn sm ghost seat-x', type: 'button', 'aria-label': `Quitar a ${p.name}`, 'data-tip': 'Quitar', onclick: (e) => { e.currentTarget.disabled = true; onRemove(); } }, '✕') : null,
+  );
+}
+
+function readyButton(ready, onToggle) {
+  return h('button', { class: `btn ${ready ? '' : 'primary'} ready-btn`, 'aria-pressed': String(ready), onclick: (e) => { e.currentTarget.disabled = true; onToggle(!ready); } }, ready ? 'Ya no estoy listo' : '✋ ¡Estoy listo!');
+}
+
+function duelLobbyUI(c, send) {
+  const root = h('section', { class: 'card match duel-lobby' });
+  return {
+    update(msg) {
+      const you = msg.you;
+      const mine = you !== null;
+      const others = msg.players.filter((_, i) => i !== you);
+      const pending = msg.players.filter((p) => !p.ready);
+      const youPending = mine && !msg.players[you].ready;
+      const otherPending = pending.filter((p) => msg.players.indexOf(p) !== you).map((p) => p.name);
+      const waitingText = !pending.length ? null : youPending && otherPending.length ? 'Faltan los dos.' : youPending ? 'Falta que tú aprietes «¡Estoy listo!».' : `Esperando a ${otherPending.join(' y ')}…`;
+      root.replaceChildren(...[
+        h('h1', null, mine ? '¡Sala completa!' : 'Sala llena'),
+        h('p', { class: 'muted' }, mine ? 'Cuando los dos aprieten «¡Estoy listo!» parte la cuenta regresiva.' : `${msg.players[0].name} y ${msg.players[1].name} se están preparando. Puedes quedarte mirando.`),
+        h('div', { class: 'seats seats-2' }, msg.players.map((p, i) => seatCard(p, { you: i === you, host: i === 0 }))),
+        waitingText ? h('p', { class: 'match-caption' }, waitingText) : null,
+        mine
+          ? h('div', { class: 'row center' }, readyButton(msg.players[you].ready, (ready) => send({ t: 'set-ready', ready })), you === 0
+            ? h('button', { class: 'btn danger', onclick: async () => { try { await api(`/api/challenges/${c.id}`, { method: 'DELETE' }); nav('/'); } catch (e) { toast(e.message); } } }, 'Cerrar sala')
+            : h('button', { class: 'btn', onclick: () => { send({ t: 'leave' }); nav('/'); } }, 'Salir de la sala'))
+          : null,
+        others.some((p) => p.online === false) && mine ? h('p', { class: 'muted small' }, 'Tu rival se desconectó. Si no vuelve en 30 s, la sala se libera.') : null,
+      ].filter(Boolean));
+      if (!root.isConnected) $app.replaceChildren(root);
+    },
+  };
+}
+
+function roomBar(c) {
+  const el = h('div', { class: 'room-bar', hidden: true });
+  $app.before(el);
+  return {
+    update(you, names = null) {
+      const watching = you === null;
+      document.body.dataset.watching = String(watching);
+      const vs = names?.length === 2 ? `${names[0]} vs ${names[1]}` : '';
+      const tour = c.tournament;
+      el.hidden = false;
+      el.className = `room-bar ${watching ? 'is-watching' : 'is-playing'}`;
+      el.replaceChildren(
+        h('span', { class: 'room-bar-tag' }, watching ? '👁 Estás mirando' : '⚔︎ Tu pelea'),
+        h('span', { class: 'room-bar-text' }, [tour ? `🏆 ${tour.round} · Pelea ${tour.number} de ${tour.total}` : null, vs].filter(Boolean).join(' · ')),
+        ...(tour ? [h('a', { class: 'btn sm', href: `/t/${tour.id}`, 'data-link': true }, 'Ver llaves')] : []),
+      );
+    },
+    destroy() {
+      el.remove();
+      delete document.body.dataset.watching;
+    },
+  };
+}
+
+function tournamentFeed(id, onFrame) {
+  let ws = null;
+  let closed = false;
+  let retry = 0;
+  function connect() {
+    if (closed) return;
+    ws = new WebSocket(wsURL());
+    ws.onopen = () => {
+      retry = 0;
+      ws.send(JSON.stringify({ t: 'tour', id, token }));
+    };
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.t === 'tour') onFrame(msg.tournament);
+      else if (msg.t === 'error') toast(msg.error);
+    };
+    ws.onclose = () => {
+      if (closed) return;
+      retry += 1;
+      setTimeout(connect, Math.min(8000, 500 * 2 ** retry));
+    };
+  }
+  connect();
+  return () => {
+    closed = true;
+    if (ws) {
+      ws.onclose = null;
+      ws.close();
+    }
+  };
+}
+
+const RESULT_HOLD_MS = 4500;
+let cameFromMatch = null;
+
+function followTournament(c, seq, getBattle) {
+  let prev = null;
+  let leaving = false;
+  const leave = async (T) => {
+    if (leaving) return;
+    leaving = true;
+    const b = getBattle();
+    if (b) await Promise.race([b.resultShown(), sleep(120_000)]);
+    await sleep(RESULT_HOLD_MS);
+    if (stale(seq)) return;
+    cameFromMatch = { tournamentId: T.id, challengeId: c.id };
+    nav(`/t/${T.id}`);
+  };
+  return tournamentFeed(c.tournament.id, (T) => {
+    const cur = T.current?.challengeId ?? null;
+    const was = prev;
+    prev = { cur, status: T.status };
+    if (!was || stale(seq)) return;
+    if (was.cur === c.id && cur !== c.id) return void leave(T);
+    if (cur && cur !== c.id && cur !== was.cur && !leaving) nav(`/b/${cur}`);
+  });
+}
+
+async function tournamentPage(id, seq) {
+  await loadMe();
+  if (stale(seq)) return;
+  renderWho();
+  let T;
+  try {
+    T = (await api(`/api/tournaments/${id}`)).tournament;
+  } catch (e) {
+    if (stale(seq)) return;
+    $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No encontré ese torneo'), h('p', { class: 'muted' }, e.message), h('a', { class: 'btn', href: '/', 'data-link': true }, 'Ir al inicio')));
+    return;
+  }
+  if (stale(seq)) return;
+  document.title = `Torneo de ${T.size} · Token Clash`;
+  const arrived = cameFromMatch?.tournamentId === id ? cameFromMatch : null;
+  cameFromMatch = null;
+  const ui = tournamentUI(id, arrived?.challengeId ?? null);
+  let lastCurrent = arrived ? null : T.current?.challengeId ?? null;
+  const shownAt = Date.now();
+  let timer = null;
+  const follow = (cur) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => !stale(seq) && nav(`/b/${cur}`), Math.max(0, shownAt + BRACKET_HOLD_MS - Date.now()));
+  };
+  ui.update(T);
+  const stop = tournamentFeed(id, (next) => {
+    if (stale(seq)) return;
+    const cur = next.current?.challengeId ?? null;
+    ui.update(next);
+    if (cur && cur !== lastCurrent) follow(cur);
+    lastCurrent = cur;
+  });
+  cleanup = () => {
+    clearTimeout(timer);
+    stop();
+    ui.destroy();
+  };
+}
+
+const BRACKET_HOLD_MS = 4000;
+
+function tournamentUI(id, justPlayed = null) {
+  let T = null;
+  let celebrated = false;
+  let partied = false;
+  let painted = '';
+  const celebrateUntil = Date.now() + BRACKET_HOLD_MS;
+  let offset = 0;
+  let drew = false;
+  let tick = null;
+  let aiChoice = 'mid';
+  const act = async (path, opts = {}, after = null) => {
+    try {
+      await api(`/api/tournaments/${id}${path}`, { method: 'POST', ...opts });
+      after?.();
+    } catch (e) {
+      toast(e.message);
+      paint();
+    }
+  };
+  const nowServer = () => Date.now() + offset;
+  const seatName = (i) => (i === null || i === undefined ? null : T.seats[i]?.name);
+
+  function header() {
+    const status = { open: 'Esperando jugadores', running: 'En juego', finished: 'Terminado', cancelled: 'Cerrado', abandoned: 'Cortado' }[T.status];
+    return h(
+      'section',
+      { class: 'tour-head' },
+      h('h1', null, `🏆 Torneo de ${T.size}`),
+      h('div', { class: 'row' }, h('span', { class: 'chip' }, `${MODE_ICON[T.mode]} ${MODE_LABEL[T.mode]}`), h('span', { class: 'chip' }, T.levelCap ? 'Todos a nivel 50' : 'Nivel real'), h('span', { class: 'chip' }, T.visibility === 'public' ? '🌐 Público' : '🔒 Privado'), h('span', { class: `chip${T.status === 'running' ? ' pulse' : ''}` }, status)),
+    );
+  }
+
+  function lobby() {
+    const link = `${location.origin}/t/${T.id}`;
+    const seated = T.you !== null;
+    const free = T.size - T.seats.length;
+    const readyCount = T.seats.filter((s) => s.ready).length;
+    const levelSel = h('select', { class: 'ai-level', 'aria-label': 'Dificultad de la IA', onchange: (e) => (aiChoice = e.target.value) }, T.aiLevels.map((k) => h('option', { value: k, selected: k === aiChoice ? true : null }, AI_LABEL[k])));
+    const addAi = (count) => act('/ai', { body: { level: levelSel.value, count } });
+    const slots = Array.from({ length: T.size }, (_, i) => {
+      const p = T.seats[i];
+      if (p) return seatCard(p, { you: i === T.you, host: i === 0, onRemove: T.host && i > 0 ? () => act(`/seats/${i}`, { method: 'DELETE' }) : null });
+      return h('div', { class: 'seat is-free' }, h('div', { class: 'match-avatar is-free', 'aria-hidden': 'true' }, '?'), h('div', { class: 'seat-body' }, h('b', null, 'Asiento libre'), h('span', { class: 'muted small' }, 'Esperando jugador')), T.host ? h('button', { class: 'btn sm', type: 'button', onclick: () => addAi(1) }, '+ IA') : null);
+    });
+    const missing = free ? `Faltan ${free} ${free === 1 ? 'jugador' : 'jugadores'}` : `${readyCount} de ${T.size} listos`;
+    return [
+      h(
+        'section',
+        { class: 'card' },
+        h('div', { class: 'nb-head' }, h('h2', null, 'Sala del torneo'), h('p', { class: 'muted small' }, `${T.seats.length}/${T.size} jugadores · ${missing}`)),
+        h('p', { class: 'muted' }, 'El torneo parte cuando la sala está llena y todos aprietan «¡Estoy listo!». Las IAs siempre están listas.'),
+        h('div', { class: 'share' }, h('input', { type: 'text', readonly: true, value: link, 'aria-label': 'Link del torneo', onfocus: (e) => e.target.select() }), h('button', { class: 'btn primary', onclick: () => copy(link, 'Link del torneo copiado') }, 'Copiar')),
+        T.host
+          ? h('div', { class: 'host-tools' }, h('span', { class: 'nb-label' }, 'Rellenar con IA'), levelSel, h('button', { class: 'btn sm', disabled: !free, onclick: () => addAi(1) }, '+ 1 IA'), h('button', { class: 'btn sm', disabled: !free, onclick: () => addAi(free) }, `Llenar ${free || ''} asientos`.trim()))
+          : null,
+        h('div', { class: `seats seats-${T.size}` }, slots),
+        h(
+          'div',
+          { class: 'row center tour-actions' },
+          seated ? readyButton(T.seats[T.you].ready, (ready) => act('/ready', { body: { ready } })) : me ? h('button', { class: 'btn primary', disabled: !free, onclick: () => act('/join') }, free ? '⚔︎ Entrar al torneo' : 'Torneo lleno') : null,
+          T.host ? h('button', { class: 'btn danger', onclick: () => act('', { method: 'DELETE' }, () => nav('/')) }, 'Cerrar torneo') : seated ? h('button', { class: 'btn', onclick: () => act('/leave', {}, () => nav('/')) }, 'Salir del torneo') : null,
+        ),
+      ),
+      me ? null : h('section', null, importCard({ onDone: () => route() })),
+    ];
+  }
+
+  function seedOf(i) {
+    const pos = T.rounds[0]?.matches.flatMap((m) => [m.a, m.b]).indexOf(i);
+    return pos === undefined || pos === -1 ? null : pos + 1;
+  }
+
+  function slot(i, m, side, round) {
+    const seat = i === null ? null : T.seats[i];
+    const done = m.winner !== null;
+    const won = done && m.winner === i;
+    const cls = ['bk-slot', seat ? '' : 'is-tbd', seat && i === T.you ? 'is-you' : '', won ? 'won' : '', done && !won ? 'lost' : ''].filter(Boolean).join(' ');
+    const sub = !seat ? 'Espera ganador' : seat.ai ? `IA ${(AI_LABEL[seat.ai] ?? '').toLowerCase()}` : i === T.you ? 'Tú' : `${seat.wins}V ${seat.losses}D`;
+    return h(
+      'div',
+      { class: cls, 'data-round': round, 'data-side': side },
+      h('span', { class: 'bk-seed' }, seat ? seedOf(i) : ''),
+      h('span', { class: `bk-av${seat?.ai ? ' is-ai' : ''}${!seat ? ' is-empty' : ''}`, 'aria-hidden': 'true' }, !seat ? '?' : seat.ai ? '🤖' : (seat.name.trim()[0] ?? '?').toUpperCase()),
+      h('span', { class: 'bk-who', title: seat?.name ?? null }, h('span', { class: 'bk-name' }, seat ? (seat.ai ? seat.name.replace(/ - ai .*$/, '') : seat.name) : 'Por definir'), h('small', { class: 'bk-sub' }, sub)),
+      h('span', { class: 'bk-mark', 'aria-label': won ? 'Ganó' : done && seat ? 'Perdió' : null }, won ? (m.coinFlip ? h('span', { 'data-tip': 'Empate: avanzó por sorteo' }, '🪙') : '✔') : done && seat ? '✕' : ''),
+    );
+  }
+
+  function bracket() {
+    const champion = T.champion !== null ? T.seats[T.champion] : null;
+    const final = T.rounds.at(-1)?.matches[0];
+    const runnerUp = final && final.winner !== null ? T.seats[final.winner === final.a ? final.b : final.a] : null;
+    const upcoming = T.current ? null : T.rounds.flatMap((round, r) => round.matches.map((m, i) => ({ m, r, i }))).find(({ m }) => m.winner === null && m.a !== null && m.b !== null);
+    const last = T.rounds.length - 1;
+    const cols = T.rounds.map((round, r) => {
+      const played = round.matches.filter((m) => m.winner !== null).length;
+      const state = played === round.matches.length ? 'done' : T.current?.round === r || upcoming?.r === r ? 'now' : 'later';
+      return h(
+        'div',
+        { class: `bk-col is-${state}` },
+        h('div', { class: 'bk-round' }, h('b', null, round.name), h('small', null, `${played}/${round.matches.length} jugadas`)),
+        h('div', { class: 'bk-matches' }, round.matches.map((m, i) => {
+          const live = T.current && T.current.round === r && T.current.index === i;
+          const next = upcoming && upcoming.r === r && upcoming.i === i;
+          const mineMatch = T.you !== null && (m.a === T.you || m.b === T.you);
+          const yourPath = m.winner !== null && m.winner === T.you;
+          const number = T.rounds.slice(0, r).reduce((n, x) => n + x.matches.length, 0) + i + 1;
+          const status = live
+            ? h('a', { class: 'bk-status is-live', href: `/b/${m.challengeId}`, 'data-link': true }, h('i', { class: 'bk-dot' }), mineMatch ? 'Entrar' : 'Mirar')
+            : m.winner !== null
+            ? h('a', { class: 'bk-status is-done', href: `/b/${m.challengeId}`, 'data-link': true }, 'Ver pelea')
+            : next
+            ? h('span', { class: 'bk-status is-next' }, 'Próxima')
+            : h('span', { class: 'bk-status' }, m.a !== null && m.b !== null ? 'En espera' : '—');
+          return h(
+            'div',
+            { class: ['bk-cell', r === last ? 'is-solo' : i % 2 ? 'is-bottom' : 'is-top', m.winner !== null ? 'is-decided' : '', yourPath ? 'is-your-path' : ''].filter(Boolean).join(' ') },
+            h(
+              'div',
+              { class: ['bk-match', live ? 'is-live' : '', next ? 'is-next' : '', mineMatch ? 'is-mine' : '', m.winner !== null ? 'is-done' : ''].filter(Boolean).join(' ') },
+              h('div', { class: 'bk-head' }, h('span', null, `Pelea ${number}`), status),
+              slot(m.a, m, 'a', r),
+              slot(m.b, m, 'b', r),
+            ),
+          );
+        })),
+      );
+    });
+    cols.push(
+      h(
+        'div',
+        { class: 'bk-col bk-champ' },
+        h('div', { class: 'bk-round' }, h('b', null, 'Campeón'), h('small', null, champion ? '¡Terminado!' : 'Por decidir')),
+        h(
+          'div',
+          { class: 'bk-matches' },
+          h(
+            'div',
+            { class: `bk-cell is-solo${champion ? ' is-decided' : ''}` },
+            h(
+              'div',
+              { class: `bk-trophy${champion ? ' has-champ' : ''}${T.champion !== null && T.champion === T.you ? ' is-you' : ''}` },
+              h('span', { class: 'bk-cup', 'aria-hidden': 'true' }, '🏆'),
+              champion ? h('span', { class: `bk-av big${champion.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true' }, champion.ai ? '🤖' : (champion.name.trim()[0] ?? '?').toUpperCase()) : null,
+              h('b', { class: 'bk-champ-name' }, champion?.name ?? '¿Quién será?'),
+              runnerUp ? h('small', { class: 'muted' }, `🥈 ${runnerUp.name}`) : h('small', { class: 'muted' }, `${T.size} jugadores · ${T.total} peleas`),
+            ),
+          ),
+        ),
+      ),
+    );
+    const progress = h(
+      'div',
+      { class: 'bk-top' },
+      h('div', { class: 'bk-progress', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': T.total, 'aria-valuenow': T.played }, h('i', { style: { width: `${(T.played / T.total) * 100}%` } })),
+      h('span', { class: 'muted small' }, `${T.played} de ${T.total} peleas`),
+      h('span', { class: 'bk-legend' }, h('span', null, h('i', { class: 'bk-dot' }), 'En vivo'), h('span', { class: 'lg-win' }, '✔ Avanza'), T.you !== null ? h('span', { class: 'lg-you' }, '★ Tu camino') : null, h('span', null, '🤖 IA')),
+    );
+    return h('div', { class: 'bracket-box' }, progress, h('div', { class: 'bracket-wrap' }, h('div', { class: `bracket rounds-${T.rounds.length} size-${T.size}` }, cols)));
+  }
+
+  function liveCard() {
+    const left = T.nextAt ? Math.max(0, Math.ceil((T.nextAt - nowServer()) / 1000)) : null;
+    if (T.status === 'finished') {
+      const champ = T.seats[T.champion];
+      return h('section', { class: 'card tour-live is-champ' }, h('h2', null, T.champion === T.you ? '🏆 ¡Ganaste el torneo!' : `🏆 ¡${champ.name} gana el torneo!`), h('p', { class: 'muted' }, `${T.total} peleas jugadas.`), h('a', { class: 'btn primary', href: '/', 'data-link': true }, 'Volver al inicio'));
+    }
+    if (T.current) {
+      const m = T.rounds[T.current.round].matches[T.current.index];
+      const mine = T.you !== null && (m.a === T.you || m.b === T.you);
+      return h('section', { class: `card tour-live${mine ? ' is-mine' : ''}` }, h('div', null, h('span', { class: 'chip pulse' }, '● EN VIVO'), ' ', h('b', null, `${seatName(m.a)} vs ${seatName(m.b)}`), h('span', { class: 'muted small' }, ` · ${T.rounds[T.current.round].name} · Pelea ${T.played + 1} de ${T.total}`)), h('a', { class: 'btn primary', href: `/b/${m.challengeId}`, 'data-link': true }, mine ? '⚔︎ ¡Ir a tu pelea!' : '👁 Mirar la pelea'));
+    }
+    const drawing = T.drawAt && nowServer() - T.drawAt < 5000;
+    if (left !== null) return h('section', { class: 'card tour-live' }, h('b', { class: 'tour-next' }, drawing ? '🎲 Sorteando las llaves…' : `Siguiente pelea en ${left}s`), h('span', { class: 'muted small' }, `${T.played} de ${T.total} peleas jugadas`));
+    return null;
+  }
+
+  function animateAdvance(root, challengeId, scroll) {
+    const r = T.rounds.findIndex((round) => round.matches.some((m) => m.challengeId === challengeId));
+    if (r === -1) return;
+    const i = T.rounds[r].matches.findIndex((m) => m.challengeId === challengeId);
+    const match = root.querySelectorAll('.bk-col')[r]?.querySelectorAll('.bk-match')[i];
+    match?.classList.add('just-played');
+    const next = r + 1 < T.rounds.length ? root.querySelectorAll('.bk-col')[r + 1]?.querySelectorAll('.bk-match')[Math.floor(i / 2)]?.querySelectorAll('.bk-slot')[i % 2] : root.querySelector('.bk-trophy');
+    next?.classList.add('just-advanced');
+    if (scroll) match?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }
+
+  function animateDraw(root) {
+    const names = T.seats.map((s) => s.name);
+    const slots = [...root.querySelectorAll('.bk-slot[data-round="0"] .bk-name')];
+    slots.forEach((el, i) => {
+      const final = el.textContent;
+      el.parentElement.classList.add('is-drawing');
+      el.parentElement.style.setProperty('--d', `${i * 140}ms`);
+      const spin = setInterval(() => (el.textContent = names[Math.floor(Math.random() * names.length)]), 70);
+      setTimeout(() => {
+        clearInterval(spin);
+        el.textContent = final;
+        el.parentElement.classList.remove('is-drawing');
+        playClass(el.parentElement, 'is-landed', 700);
+      }, 1200 + i * 220);
+    });
+  }
+
+  function paint() {
+    if (!T) return;
+    if (T.status === 'cancelled' || T.status === 'abandoned') {
+      $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, T.status === 'cancelled' ? 'Torneo cerrado' : 'Este torneo se cortó'), h('p', { class: 'muted' }, T.status === 'cancelled' ? 'El dueño cerró el torneo antes de partir.' : 'El servidor se reinició a mitad del torneo.'), h('a', { class: 'btn primary', href: '/', 'data-link': true }, 'Ir al inicio')));
+      return;
+    }
+    if (T.status === 'open') {
+      $app.replaceChildren(header(), ...lobby().filter(Boolean));
+      return;
+    }
+    const board = bracket();
+    const live = liveCard();
+    $app.replaceChildren(...[header(), live, h('section', { class: 'card' }, h('h2', null, 'Llaves'), board)].filter(Boolean));
+    if (!drew && T.drawAt && nowServer() - T.drawAt < 4000) animateDraw(board);
+    drew = true;
+    if (justPlayed && Date.now() < celebrateUntil) animateAdvance(board, justPlayed, !celebrated);
+    celebrated = true;
+    if (T.status === 'finished' && live && !partied) {
+      partied = true;
+      confettiOn(live);
+    }
+  }
+
+  return {
+    update(next) {
+      offset = next.serverNow - Date.now();
+      const key = JSON.stringify({ ...next, serverNow: 0 });
+      if (key === painted) return;
+      painted = key;
+      T = next;
+      document.body.dataset.watching = String(T.you === null && T.status === 'running');
+      paint();
+      clearInterval(tick);
+      if (T.nextAt) tick = setInterval(() => {
+        const el = $app.querySelector('.tour-next');
+        if (!el) return;
+        const drawing = T.drawAt && nowServer() - T.drawAt < 5000;
+        el.textContent = drawing ? '🎲 Sorteando las llaves…' : `Siguiente pelea en ${Math.max(0, Math.ceil((T.nextAt - nowServer()) / 1000))}s`;
+      }, 250);
+    },
+    destroy() {
+      clearInterval(tick);
+      delete document.body.dataset.watching;
+    },
+  };
+}
+
+function countdownUI(c) {
+  const number = h('div', { class: 'match-count', 'aria-live': 'assertive' });
+  const caption = h('p', { class: 'match-caption' }, 'La preparación parte en…');
+  const cards = h('div', { class: 'match-vs' });
+  const heading = h('h1', null, '¡Rival encontrado!');
+  const late = h('div', { class: 'match-late', hidden: true }, h('p', null, 'Llegaste tarde: otro jugador entró primero a esta sala. Puedes quedarte mirando la pelea o buscar otra.'), h('a', { class: 'btn primary sm', href: '/', 'data-link': true }, 'Buscar otra sala'));
+  const root = h(
+    'section',
+    { class: 'card match' },
+    heading,
+    late,
+    h('div', { class: 'row match-chips' }, h('span', { class: 'chip' }, `${MODE_ICON[c.mode] ?? MODE_ICON.team} ${MODE_LABEL[c.mode] ?? MODE_LABEL.team}`), h('span', { class: 'chip' }, c.levelCap ? 'Todos a nivel 50' : 'Nivel real')),
+    cards,
+    caption,
+  );
+  const previousTitle = document.title;
+  let endsAt = 0;
+  let shown = null;
+  let timer = null;
+  const player = (p, side, you) =>
+    h(
+      'div',
+      { class: `match-player side-${side}${you ? ' is-you' : ''}` },
+      avatar(p),
+      h('b', { class: 'match-name' }, p.name),
+      you ? h('span', { class: 'chip match-you' }, 'Tú') : null,
+      p.ai ? h('span', { class: 'chip' }, `🤖 IA ${AI_LABEL[p.ai] ?? ''}`) : record(p),
+      p.ai ? null : h('span', { class: 'muted small' }, `📚 ${p.rosterSize} Pokémon · ✨ ${p.shinies} shiny`),
+    );
+  function tick() {
+    const left = Math.max(0, endsAt - Date.now());
+    const sec = Math.ceil(left / 1000);
+    if (sec === shown) return;
+    shown = sec;
+    number.textContent = sec > 0 ? String(sec) : '¡Ya!';
+    document.title = sec > 0 ? `⚔︎ ${sec}… ¡Rival encontrado!` : '⚔︎ ¡A pelear!';
+    if (sec === 0) caption.textContent = '¡A pelear!';
+    playClass(number, 'tick', 700);
+  }
+  return {
+    update(msg) {
+      endsAt = Date.now() + msg.ms;
+      const watching = msg.you === null;
+      const tour = msg.tournament;
+      heading.textContent = tour ? (watching ? `👁 Próxima pelea · ${tour.round}` : `⚔︎ ¡Te toca! · ${tour.round}`) : watching ? 'Sala llena' : '¡Rival encontrado!';
+      caption.textContent = tour ? `Pelea ${tour.number} de ${tour.total} · parte en…` : 'La preparación parte en…';
+      late.hidden = !watching || !me || !!tour;
+      cards.replaceChildren(player(msg.players[0], 0, msg.you === 0), h('div', { class: 'match-center' }, h('div', { class: 'vs-mark' }, 'VS'), number), player(msg.players[1], 1, msg.you === 1));
+      if (!root.isConnected) $app.replaceChildren(root);
+      shown = null;
+      tick();
+      clearInterval(timer);
+      timer = setInterval(tick, 100);
+    },
+    destroy() {
+      clearInterval(timer);
+      document.title = previousTitle;
+    },
+  };
 }
 
 const DIE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
@@ -1815,6 +2520,8 @@ function battleUI(c, sendAction) {
   let mine = 0;
   let sent = null; // label of the action we sent this turn, until the turn resolves
   let queue = Promise.resolve();
+  let resultShown;
+  const shown = new Promise((r) => (resultShown = r));
 
   const sideAt = (p) => (p === 'me' ? mine : 1 - mine);
   const hud = (p) => {
@@ -1871,7 +2578,8 @@ function battleUI(c, sendAction) {
     return typeof first === 'string' ? [first.replace(/\p{L}/u, (ch) => ch.toUpperCase()), ...rest] : [first, ...rest];
   };
   // Skip the show when the tab is hidden, so coming back doesn't replay a backlog.
-  const wait = (ms) => (document.hidden ? Promise.resolve() : sleep(ms));
+  let backlog = 0;
+  const wait = (ms) => (document.hidden ? Promise.resolve() : sleep(backlog > 1 ? ms / Math.min(4, backlog) : ms));
   const settle = (r) => (typeof r === 'number' ? wait(r) : r);
 
   function log(parts, cls) {
@@ -1931,12 +2639,24 @@ function battleUI(c, sendAction) {
     arena.querySelector('.result')?.remove();
     const watching = frame?.you == null;
     const kind = winner === null ? 'draw' : watching ? 'watch' : isYou(winner) ? 'win' : 'lose';
-    const title = { win: '¡VICTORIA!', lose: 'DERROTA', draw: 'EMPATE', watch: `¡Gana ${view.sides[winner]?.name ?? ''}!` }[kind];
-    const sub = { win: `Venciste a ${view.sides[1 - mine].name}.`, lose: `${view.sides[1 - mine].name} ganó esta vez.`, draw: 'Nadie quedó en pie.', watch: `${view.sides[0].name} vs ${view.sides[1].name}` }[kind];
-    const icon = { win: '🏆', lose: '💀', draw: '🤝', watch: '🏁' }[kind];
-    const el = h('div', { class: `result ${kind}`, onclick: () => el.remove() }, h('div', { class: 'result-card' }, h('span', { class: 'result-icon' }, icon), h('h2', null, title), h('p', null, sub), h('small', null, 'Toca para cerrar')));
+    const tour = c.tournament;
+    const loser = winner === null ? null : view.sides[1 - winner]?.name;
+    const champ = tour?.final && winner !== null;
+    const title = { win: champ ? '¡CAMPEÓN!' : '¡VICTORIA!', lose: 'DERROTA', draw: 'EMPATE', watch: `¡Gana ${view.sides[winner]?.name ?? ''}!` }[kind];
+    const sub = tour
+      ? {
+          win: champ ? '¡Ganaste el torneo!' : `Avanzas a ${tour.next === 'Final' ? 'la Final' : tour.next}.`,
+          lose: `${view.sides[1 - mine].name} sigue en el torneo. Quedaste fuera en ${tour.round}.`,
+          draw: 'Empate: el que avanza se decide por sorteo.',
+          watch: champ ? `${view.sides[winner]?.name} es campeón del torneo · ${loser} queda segundo.` : `${view.sides[winner]?.name} avanza a ${tour.next === 'Final' ? 'la Final' : tour.next} · ${loser} queda fuera.`,
+        }[kind]
+      : { win: `Venciste a ${view.sides[1 - mine].name}.`, lose: `${view.sides[1 - mine].name} ganó esta vez.`, draw: 'Nadie quedó en pie.', watch: `${view.sides[0].name} vs ${view.sides[1].name}` }[kind];
+    const icon = { win: '🏆', lose: '💀', draw: '🤝', watch: champ ? '🏆' : '🏁' }[kind];
+    const duel = winner === null ? null : h('div', { class: 'result-duel' }, [0, 1].map((side) => h('span', { class: `result-side ${side === winner ? 'won' : 'lost'}` }, side === winner ? '👑 ' : '', view.sides[side].name)));
+    const el = h('div', { class: `result ${kind}`, onclick: () => el.remove() }, h('div', { class: 'result-card' }, h('span', { class: 'result-icon' }, icon), h('h2', null, title), duel, h('p', null, sub), h('small', null, tour ? 'Siguen las llaves del torneo' : 'Toca para cerrar')));
     arena.append(el);
     if (kind === 'win' || kind === 'watch') confetti(el);
+    resultShown();
   }
 
   function openInfo(side) {
@@ -2076,23 +2796,26 @@ function battleUI(c, sendAction) {
       const title = st.winner === null ? 'Empate' : you === null ? `¡Gana ${st.sides[st.winner].name}!` : won ? '¡Ganaste! 🏆' : 'Perdiste… 😵';
       box.append(
         h('div', { class: 'banner' }, h('h2', null, title), h('p', { class: 'muted' }, `${st.sides[0].name} vs ${st.sides[1].name} · ${st.turn} turnos`)),
+        c.tournament ? h('p', { class: 'muted pulse' }, 'Volviendo a las llaves del torneo…') : null,
         h(
           'div',
           { class: 'row', style: null },
-          me
+          me && !c.tournament
             ? h('button', {
                 class: 'btn primary',
                 onclick: async (e) => {
                   e.currentTarget.disabled = true;
                   try {
-                    const { challenge } = await api('/api/challenges', { method: 'POST', body: { levelCap: c.levelCap, mode: c.mode, ...(c.ai ? { ai: c.ai } : {}) } });
+                    const { challenge, joined } = await api('/api/challenges', { method: 'POST', body: { levelCap: c.levelCap, mode: c.mode, ...(c.ai ? { ai: c.ai } : { visibility: c.visibility }) } });
+                    if (joined) toast(`Te uniste a la sala de ${challenge.host.name}`);
                     nav(`/b/${challenge.id}`);
                   } catch (err) {
                     toast(err.message);
                   }
                 },
-              }, c.ai ? '⚔︎ Revancha' : '⚔︎ Revancha (nuevo link)')
+              }, c.ai ? '⚔︎ Revancha' : c.visibility === 'public' ? '⚔︎ Buscar otra pelea' : '⚔︎ Revancha (sala privada)')
             : null,
+          c.tournament ? h('a', { class: 'btn primary', href: `/t/${c.tournament.id}`, 'data-link': true }, 'Ver llaves') : null,
           h('a', { class: 'btn', href: '/', 'data-link': true }, 'Inicio'),
         ),
       );
@@ -2100,7 +2823,8 @@ function battleUI(c, sendAction) {
     }
 
     if (you === null) {
-      box.append(h('h2', null, 'Estás mirando'), h('p', { class: 'muted' }, `${st.sides[0].name} vs ${st.sides[1].name}. Para pelear tú, crea tu propio desafío.`), h('a', { class: 'btn', href: '/', 'data-link': true }, 'Ir al inicio'));
+      if (c.tournament) box.append(h('h2', null, '👁 Estás mirando'), h('p', { class: 'muted' }, `${st.sides[0].name} vs ${st.sides[1].name} · ${c.tournament.round}. Cuando termine te llevamos a las llaves y a la siguiente pelea.`), h('a', { class: 'btn', href: `/t/${c.tournament.id}`, 'data-link': true }, 'Ver llaves'));
+      else box.append(h('h2', null, 'Estás mirando'), h('p', { class: 'muted' }, `${st.sides[0].name} vs ${st.sides[1].name}. Para pelear tú, busca rival desde el inicio.`), h('a', { class: 'btn', href: '/', 'data-link': true }, 'Ir al inicio'));
       return;
     }
 
@@ -2690,8 +3414,13 @@ function battleUI(c, sendAction) {
   return {
     push(msg) {
       if (msg.state) preloadFor(msg.you, msg.state.sides.map((side) => side.team.filter((f) => !f.hidden)));
-      queue = queue.then(() => apply(msg)).catch((e) => console.error(e));
+      backlog += 1;
+      queue = queue
+        .then(() => apply(msg))
+        .catch((e) => console.error(e))
+        .finally(() => (backlog -= 1));
     },
+    resultShown: () => shown,
     destroy() {
       clearInterval(tick);
     },

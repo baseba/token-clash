@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const MAX_CHALLENGES = 1000;
+const MAX_TOURNAMENTS = 200;
 
 export function openStore(dir) {
   mkdirSync(dir, { recursive: true });
@@ -15,9 +16,11 @@ export function openStore(dir) {
   }
   db.trainers ??= {};
   db.challenges ??= {};
+  db.tournaments ??= {};
 
   // Battles live in memory; anything left mid-fight by a restart is closed.
   for (const c of Object.values(db.challenges)) if (c.status === 'active') c.status = 'abandoned';
+  for (const t of Object.values(db.tournaments)) if (t.status === 'running') t.status = 'abandoned';
 
   let timer = null;
   const flush = () => {
@@ -28,6 +31,13 @@ export function openStore(dir) {
         .sort((a, b) => db.challenges[a].createdAt - db.challenges[b].createdAt)
         .slice(0, ids.length - MAX_CHALLENGES)
         .forEach((id) => delete db.challenges[id]);
+    }
+    const tids = Object.keys(db.tournaments);
+    if (tids.length > MAX_TOURNAMENTS) {
+      tids
+        .sort((a, b) => db.tournaments[a].createdAt - db.tournaments[b].createdAt)
+        .slice(0, tids.length - MAX_TOURNAMENTS)
+        .forEach((id) => delete db.tournaments[id]);
     }
     const tmp = `${file}.tmp`;
     writeFileSync(tmp, JSON.stringify(db));
