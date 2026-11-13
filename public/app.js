@@ -101,7 +101,31 @@ function typeChips(types) {
   return h('span', { class: 'els' }, ...(types || []).map(typeChip));
 }
 
-const STATUS = { brn: 'QUE', par: 'PAR', psn: 'ENV', tox: 'TÓX', slp: 'DOR', frz: 'CON' };
+const STATUS_INFO = {
+  brn: { icon: '🔥', name: 'Quemado', desc: 'Pierde 1/16 de sus PS al final de cada turno y sus ataques físicos hacen la mitad de daño.' },
+  par: { icon: '⚡', name: 'Paralizado', desc: 'Su velocidad baja a la mitad y cada turno tiene 25% de probabilidad de no poder moverse.' },
+  psn: { icon: '☠️', name: 'Envenenado', desc: 'Pierde 1/8 de sus PS al final de cada turno.' },
+  tox: { icon: '☠️', name: 'Gravemente envenenado', short: 'Tóxico', desc: 'Pierde cada vez más PS al final de cada turno: 1/16, luego 2/16, 3/16…' },
+  slp: { icon: '💤', name: 'Dormido', desc: 'No puede moverse durante 1 a 3 turnos.' },
+  frz: { icon: '🧊', name: 'Congelado', desc: 'No puede moverse. Cada turno tiene 20% de probabilidad de descongelarse, y un ataque de Fuego lo descongela.' },
+};
+const VOLATILE_INFO = {
+  confusion: () => ({ icon: '😵', name: 'Confuso', desc: 'Durante unos turnos puede golpearse a sí mismo en vez de atacar (1 de cada 3 veces).' }),
+  attract: () => ({ icon: '💘', name: 'Enamorado', desc: 'Cada turno tiene 50% de probabilidad de no atacar.' }),
+  perish: (v) => ({ icon: '🎵', name: `Canto mortal: ${v - 1}`, desc: `Se debilitará en ${v - 1} ${v - 1 === 1 ? 'turno' : 'turnos'} si no sale del combate.` }),
+  charge: () => ({ icon: '🔋', name: 'Cargado', desc: 'Su próximo ataque Eléctrico tiene el doble de poder.' }),
+  flashFire: () => ({ icon: '🔥', name: 'Absorbe Fuego', desc: 'Sus ataques de Fuego son 50% más fuertes.' }),
+  disabled: (v) => ({ icon: '🚫', name: 'Anulación', desc: `No puede usar ${v} por unos turnos.` }),
+  slowStart: () => ({ icon: '🐢', name: 'Inicio lento', desc: 'Su Ataque y su Velocidad están a la mitad durante unos turnos.' }),
+};
+const NOTHING_WHY = { sameGender: 'los dos son del mismo género', genderless: 'uno de los dos no tiene género' };
+const GENDER = { male: { sym: '♂', name: 'Macho' }, female: { sym: '♀', name: 'Hembra' } };
+const genderMark = (g) => (GENDER[g] ? h('span', { class: `gender ${g}`, 'data-tip': GENDER[g].name, 'aria-label': GENDER[g].name }, GENDER[g].sym) : null);
+const statusLabel = (status) => `${STATUS_INFO[status].icon} ${STATUS_INFO[status].short ?? STATUS_INFO[status].name}`;
+const conditionsOf = (f) => [
+  ...(f.status ? [{ key: f.status, ...STATUS_INFO[f.status] }] : []),
+  ...Object.entries(f.volatiles || {}).filter(([k, v]) => v && VOLATILE_INFO[k]).map(([k, v]) => ({ key: k, ...VOLATILE_INFO[k](v) })),
+];
 const STATUS_TEXT = { brn: 'se quema', par: 'queda paralizado', psn: 'queda envenenado', tox: 'queda gravemente envenenado', slp: 'se duerme', frz: 'se congela' };
 const CURE_TEXT = { brn: 'ya no está quemado', par: 'ya no está paralizado', psn: 'ya no está envenenado', tox: 'ya no está envenenado', slp: 'se despierta', frz: 'se descongela' };
 const WEATHER = { sun: '☀️ Sol', rain: '🌧️ Lluvia', sand: '🌪️ Tormenta de arena', snow: '❄️ Nieve', hail: '🧊 Granizo', harshsun: '🔆 Sol abrasador', heavyrain: '⛈️ Diluvio', winds: '🌀 Turbulencias' };
@@ -171,7 +195,6 @@ const ABILITY_NOTE = {
   paradox: (ev) => `potencia su ${STAT[ev.stat]?.[1] ?? 'fuerza'}.`,
 };
 const signed = (n) => `${n > 0 ? '+' : ''}${n}`;
-const STATUS_NAME = { brn: 'Quemado', par: 'Paralizado', psn: 'Envenenado', tox: 'Gravemente envenenado', slp: 'Dormido', frz: 'Congelado' };
 const CATEGORY = { physical: 'Físico', special: 'Especial', status: 'Estado' };
 const INFLICT = { brn: 'quemar', par: 'paralizar', psn: 'envenenar', tox: 'envenenar gravemente', frz: 'congelar', slp: 'dormir' };
 const STAT_THE = { atk: 'el ataque', def: 'la defensa', satk: 'el ataque especial', sdef: 'la defensa especial', spd: 'la velocidad', acc: 'la precisión', eva: 'la evasión' };
@@ -197,24 +220,14 @@ function moveEffects(m) {
   for (const [k, v] of Object.entries(m.self || {})) out.push(`${v < 0 ? 'Baja' : 'Sube'} su ${STAT[k][1]}${Math.abs(v) > 1 ? ` ${Math.abs(v)} niveles` : ''}.`);
   if (m.recoil) out.push('El usuario recibe 1/3 del daño como retroceso.');
   if (m.drain) out.push(`Recupera el ${Math.round(m.drain * 100)}% del daño causado.`);
+  if (m.key === 'attract') out.push('Solo funciona entre un macho y una hembra.');
   if (m.breaksScreens) out.push('Rompe Reflejo, Pantalla de Luz y Velo Aurora antes de golpear.');
   return out;
 }
 
 function infoCard(f, { own, owner, close }) {
   const pct = Math.max(0, Math.round((f.hp / f.stats.hp) * 100));
-  const gender = f.gender === 'male' ? ' ♂' : f.gender === 'female' ? ' ♀' : '';
-  const vol = f.volatiles || {};
-  const conditions = [
-    f.status ? STATUS_NAME[f.status] : null,
-    vol.confusion ? 'Confuso' : null,
-    vol.attract ? 'Enamorado' : null,
-    vol.perish ? `Canto mortal: ${vol.perish - 1}` : null,
-    vol.charge ? 'Cargado' : null,
-    vol.flashFire ? 'Absorbe Fuego activo' : null,
-    vol.disabled ? `No puede usar ${vol.disabled}` : null,
-    vol.slowStart ? 'Inicio lento' : null,
-  ].filter(Boolean);
+  const conditions = conditionsOf(f);
   const boosts = Object.entries(STAT).filter(([k]) => f.boosts?.[k]);
   const moves = own ? f.moves : [...f.moves, ...Array(Math.max(0, 4 - f.moves.length)).fill(null)];
   const ab = f.abilityInfo;
@@ -230,13 +243,20 @@ function infoCard(f, { own, owner, close }) {
       h(
         'div',
         null,
-        h('h2', null, f.shiny ? `✨ ${f.name}` : f.name, h('span', { class: 'muted' }, gender)),
+        h('h2', null, f.shiny ? `✨ ${f.name}` : f.name, ' ', genderMark(f.gender) ?? h('span', { class: 'gender none', 'data-tip': 'Sin género: Atracción no le afecta ni la puede usar.' }, '∅')),
         h('p', { class: 'muted small' }, f.name !== f.speciesName ? `${f.speciesName} · ` : '', `Nv ${f.level} · de ${owner}`),
         typeChips(f.types),
       ),
     ),
     h('section', null, h('h3', null, 'PS'), h('p', null, own ? `${f.hp} / ${f.stats.hp} PV (${pct}%)` : `${pct}%`)),
-    h('section', null, h('h3', null, 'Estado'), h('p', null, conditions.length ? conditions.join(' · ') : 'Sin problemas de estado.')),
+    h(
+      'section',
+      null,
+      h('h3', null, 'Estado'),
+      conditions.length
+        ? h('div', { class: 'cond-list' }, conditions.map((c) => h('div', { class: `cond-row ${c.key}` }, h('span', { class: 'cond-icon', 'aria-hidden': 'true' }, c.icon), h('div', null, h('b', null, c.name), h('small', null, c.desc)))))
+        : h('p', { class: 'muted' }, 'Sin problemas de estado.'),
+    ),
     h(
       'section',
       null,
@@ -299,7 +319,7 @@ function monCard(f, opts = {}) {
     opts.badge ? h('span', { class: 'badge' }, opts.badge) : null,
     f.shiny ? h('span', { class: 'shiny', 'data-tip': 'Shiny' }, '✨') : null,
     h('div', { html: creatureHTML(f) }),
-    h('div', { class: 'nm', title: f.name !== f.speciesName ? `${f.name} (${f.speciesName})` : f.name }, f.name),
+    h('div', { class: 'nm', title: f.name !== f.speciesName ? `${f.name} (${f.speciesName})` : f.name }, f.name, genderMark(f.gender)),
     h('div', { class: 'meta' }, typeChips(f.types), h('span', null, `Nv ${f.level}`), opts.rarity !== false ? h('span', null, RARITY[f.rarity] || '') : null),
     f.abilityInfo ? h('div', { class: 'ab-line' }, abilityChip(f.abilityInfo)) : null,
     opts.stats
@@ -832,24 +852,24 @@ const AI_ORDER = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
 const AI_LABEL = { easy: 'Fácil', mid: 'Media', hard: 'Difícil', veryhard: 'Muy difícil', skynet: 'Skynet' };
 const AI_NOTES = {
   easy: {
-    team: 'Arma su equipo al azar con Pokémon de la 1.ª a la 5.ª generación y ataca sin pensar, como un Pokémon salvaje.',
-    random: 'Sus 6 también salen de los dados. Ataca sin pensar, como un Pokémon salvaje.',
+    team: 'Los dados sortean sus 6 entre todos los Pokémon evolucionados de la 1.ª a la 5.ª generación. Ataca sin pensar, como un Pokémon salvaje.',
+    random: 'Sus 6 también salen de los dados, solo entre Pokémon evolucionados. Ataca sin pensar, como un Pokémon salvaje.',
   },
   mid: {
-    team: 'Usa Pokémon evolucionados con sus mejores golpes. Evita movimientos inútiles, pero no cambia de Pokémon.',
-    random: 'Sus 6 salen de los dados. Evita movimientos inútiles, pero no cambia de Pokémon.',
+    team: 'Los dados sortean sus 6 entre el 80 % más fuerte de los evolucionados. Evita movimientos inútiles, pero no cambia de Pokémon.',
+    random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados. Evita movimientos inútiles, pero no cambia de Pokémon.',
   },
   hard: {
-    team: 'Equipo fuerte y variado, con naturalezas y movimientos de cobertura. Busca el KO y a veces cambia si va perdiendo.',
-    random: 'Sus 6 salen de los dados. Elige bien a quién sacar, busca el KO y a veces cambia si va perdiendo.',
+    team: 'Los dados sortean sus 6 entre el 60 % más fuerte de los evolucionados. Busca el KO y a veces cambia si va perdiendo.',
+    random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados. Elige bien a quién sacar, busca el KO y a veces cambia si va perdiendo.',
   },
   veryhard: {
-    team: 'Arma su equipo para contrarrestar el tuyo, con lo mejor de la 1.ª a la 5.ª generación. Calcula velocidad y daño, y cambia cuando le conviene.',
-    random: 'Sus 6 salen de los dados, pero calcula velocidad y daño, elige el mejor enfrentamiento y cambia cuando le conviene.',
+    team: 'Los dados sortean sus 6 entre el 50 % más fuerte de los evolucionados. Calcula velocidad y daño, y cambia cuando le conviene.',
+    random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados, pero calcula velocidad y daño, elige el mejor enfrentamiento y cambia cuando le conviene.',
   },
   skynet: {
-    team: 'Arma su equipo como Muy difícil, pero en cada turno Jev, un modelo de decisiones, elige qué ataque usar o a quién sacar.',
-    random: 'Sus 6 salen de los dados. En cada turno Jev, un modelo de decisiones, elige qué ataque usar o a quién sacar.',
+    team: 'Los dados sortean sus 6 entre el 40 % más fuerte de los evolucionados. En cada turno Jev, un modelo de decisiones, elige qué ataque usar o a quién sacar.',
+    random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados. En cada turno Jev, un modelo de decisiones, elige qué ataque usar o a quién sacar.',
   },
 };
 
@@ -913,7 +933,7 @@ function partyRow(team) {
         h('span', { class: 'slot-num' }, i + 1),
         i === 0 ? h('span', { class: 'lead-tag' }, 'Líder') : null,
         ballFrame(f),
-        h('div', { class: 'name-plate' }, h('b', null, f.shiny ? `✨ ${f.name}` : f.name), h('small', null, `Nv ${f.level}`), typeChips(f.types)),
+        h('div', { class: 'name-plate' }, h('b', null, f.shiny ? `✨ ${f.name}` : f.name, genderMark(f.gender)), h('small', null, `Nv ${f.level}`), typeChips(f.types)),
       );
     }),
   );
@@ -1014,7 +1034,7 @@ async function teamPage() {
           h('span', { class: 'slot-num' }, i + 1),
           i === 0 ? h('span', { class: 'lead-tag' }, 'Líder') : null,
           ballFrame(f),
-          h('div', { class: 'name-plate' }, h('b', null, f.shiny ? `✨ ${f.name}` : f.name), h('small', null, `Nv ${f.level}`), typeChips(f.types)),
+          h('div', { class: 'name-plate' }, h('b', null, f.shiny ? `✨ ${f.name}` : f.name, genderMark(f.gender)), h('small', null, `Nv ${f.level}`), typeChips(f.types)),
           h('button', { class: 'cell-remove', type: 'button', 'data-tip': 'Quitar del equipo', 'aria-label': `Quitar a ${f.name}`, onclick: (e) => { e.stopPropagation(); toggle(f.uid); } }, '✕'),
         );
         return cell;
@@ -1191,7 +1211,7 @@ async function monPanel(uid, panel, { inParty, toggleParty, onSaved }) {
         'aside',
         { class: 'panel-side' },
         ballFrame(mon, { size: 'lg' }),
-        h('h2', null, mon.shiny ? `✨ ${mon.name}` : mon.name),
+        h('h2', null, mon.shiny ? `✨ ${mon.name}` : mon.name, ' ', genderMark(mon.gender)),
         h('p', { class: 'muted small' }, mon.name !== mon.speciesName ? `${mon.speciesName} · ` : '', `#${mon.speciesId} · Nv ${mon.level}`, mon.nature ? ` · ${mon.nature}` : ''),
         typeChips(mon.types),
         h('div', { class: 'stat-bars' }, STAT_ROWS.map(([label, k]) => h('div', { class: 'stat-row' }, h('span', null, label), h('b', null, mon.stats[k]), h('i', { style: { width: `${Math.min(100, (mon.stats[k] / (k === 'hp' ? 400 : 300)) * 100)}%` } })))),
@@ -1473,7 +1493,7 @@ function previewUI(c, sendPick) {
         'div',
         { class: 'card prep-side' },
         h('div', { class: 'row between' }, h('h2', null, title), side.ready ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, 'Eligiendo…')),
-        h('div', { class: 'prep-grid' }, side.party.map((f, i) => (rolling && i >= revealed ? dieCard(i) : h('div', { class: `prep-card seen${entered || rolling ? '' : ' enter'}${revealClass(i)}`, style: { animationDelay: `${i * 70}ms` } }, h('div', { html: creatureHTML(f) }), h('b', null, f.name), typeChips(f.types ?? []))))),
+        h('div', { class: 'prep-grid' }, side.party.map((f, i) => (rolling && i >= revealed ? dieCard(i) : h('div', { class: `prep-card seen${entered || rolling ? '' : ' enter'}${revealClass(i)}`, style: { animationDelay: `${i * 70}ms` } }, h('div', { html: creatureHTML(f) }), h('b', null, f.name, genderMark(f.gender)), typeChips(f.types ?? []))))),
       );
     if (!own) {
       root.replaceChildren(seen(p.sides[0], p.sides[0].name), h('div', { class: 'vs-mark' }, 'VS'), seen(p.sides[1], p.sides[1].name));
@@ -1499,7 +1519,7 @@ function previewUI(c, sendPick) {
             { type: 'button', class: `prep-card${entered || rolling ? '' : ' enter'}${revealClass(i)}${order >= 0 ? ' chosen' : ''}${done && order < 0 ? ' benched' : ''}`, style: { animationDelay: entered ? '0ms' : `${i * 70}ms` }, disabled: done || rolling, onclick: () => choose(i, own.needed) },
             order >= 0 ? h('span', { class: 'badge' }, order + 1) : null,
             h('div', { html: creatureHTML(f) }),
-            h('b', null, f.name),
+            h('b', null, f.name, genderMark(f.gender)),
             h('small', { class: 'muted' }, `Nv ${f.level}`),
             typeChips(f.types),
             random && f.abilityInfo ? abilityChip(f.abilityInfo) : null,
@@ -1710,6 +1730,14 @@ function battleUI(c, sendAction) {
     spot.classList.toggle('faint', f.hp <= 0);
     const screens = sd.screens || {};
     for (const kind of Object.keys(SCREEN)) spot.classList.toggle(`screen-${kind}`, !!screens[kind] && f.hp > 0);
+    const shownStatus = f.hp > 0 && f.status ? f.status : '';
+    if (shownStatus) spot.dataset.status = shownStatus;
+    else delete spot.dataset.status;
+    let aura = spot.querySelector('.status-aura');
+    if (!aura) {
+      aura = h('div', { class: 'status-aura', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'));
+      spot.append(aura);
+    }
     if (enter) anim(spot, 'enter', 500);
 
     const pct = Math.max(0, (f.hp / f.stats.hp) * 100);
@@ -1723,21 +1751,20 @@ function battleUI(c, sendAction) {
     const shown = Number(r.num.dataset.to);
     countTo(r.num, fresh || Number.isNaN(shown) ? f.hp : shown, f.hp, f.stats.hp, !!f.hpPercent);
 
-    r.name.textContent = f.shiny ? `✨ ${f.name}` : f.name;
+    r.name.replaceChildren(f.shiny ? `✨ ${f.name}` : f.name, genderMark(f.gender) ?? '');
     r.lvl.textContent = `Nv ${f.level}`;
     const boosts = Object.entries(STAT)
       .filter(([k]) => f.boosts[k])
       .map(([k, [label]]) => `${label} ${signed(f.boosts[k])}`)
       .join(' · ');
-    const vol = f.volatiles || {};
-    const marks = [vol.confusion ? 'confuso' : null, vol.attract ? 'enamorado' : null, vol.perish ? `canto ${vol.perish - 1}` : null, vol.charge ? 'cargado' : null].filter(Boolean).join(' · ');
+    const volatiles = conditionsOf({ volatiles: f.volatiles }).filter((c) => ['confusion', 'attract', 'perish', 'charge'].includes(c.key));
     r.sub.replaceChildren(
       ...[
         typeChips(f.types),
-        f.status ? h('span', { class: `cond ${f.status}` }, STATUS[f.status]) : null,
+        f.status ? h('span', { class: `cond ${f.status}`, tabindex: 0, 'data-tip': STATUS_INFO[f.status].name, 'data-tip-note': STATUS_INFO[f.status].desc }, statusLabel(f.status)) : null,
         h('span', { class: 'owner' }, isYou(side) ? `${sd.name} (tú)` : sd.name),
         boosts ? h('span', { class: 'boosts' }, boosts) : null,
-        marks ? h('span', { class: 'boosts' }, marks) : null,
+        ...volatiles.map((c) => h('span', { class: 'vol-chip', tabindex: 0, 'data-tip': c.name, 'data-tip-note': c.desc }, `${c.icon} ${c.name}`)),
         ...Object.entries(sd.screens || {}).map(([kind, turns]) => h('span', { class: `screen-chip ${kind}`, tabindex: 0, 'data-tip': `Reduce a la mitad el daño de ${SCREEN_GUARDS[kind]} contra este equipo. Quedan ${turns} turnos.` }, `🛡️ ${SCREEN[kind]} ${turns}`)),
         h('span', { class: 'dots', 'aria-label': 'Equipo' }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
       ].filter(Boolean),
@@ -1877,32 +1904,54 @@ function battleUI(c, sendAction) {
   };
 
   // Plays one event on screen and in the log; returns how long to linger on it.
+  let currentMove = null;
+
+  function showDamage(ev, linger) {
+    const f = activeOf(ev.side);
+    const before = f.hp;
+    f.hp = ev.hp;
+    paint(ev.side);
+    anim(els.spot[pos(ev.side)], 'hit', 500);
+    anim(els.hud[pos(ev.side)].el, 'hurt', 600);
+    float(ev.side, floatAmount(ev, '−'), ev.crit || ev.eff > 1 ? 'dmg big' : ev.eff < 1 ? 'dmg small' : 'dmg');
+    const notes = [ev.crit ? '¡Golpe crítico!' : '', ev.eff > 1 ? '¡Es muy eficaz!' : ev.eff < 1 ? 'No es muy eficaz…' : ''].filter(Boolean).join(' ');
+    tell([...mon(ev.side, f.name), ` pierde ${amountText(ev)} (${hpText(ev, before)} → ${hpText(ev, ev.hp)})`, notes ? h('span', { class: ev.eff < 1 && !ev.crit ? 'weak' : 'strong' }, ` ${notes}`) : ''], { side: ev.side, sub: true });
+    return linger;
+  }
+
+  async function playHit(ev, hit) {
+    const move = currentMove.ev;
+    const from = els.spot[pos(move.side)];
+    if ((move.flags || []).includes('contact')) anim(from, `lunge-${pos(move.side)}`, 400);
+    await fx.move({ ...move, multihit: false }, from, els.spot[pos(ev.side)]);
+    showDamage(ev, 0);
+    float(ev.side, `${hit}×`, 'hit-count');
+    await wait(hit > 1 ? 380 : 450);
+  }
+
   function play(ev) {
     const sd = (s) => view.sides[s];
     switch (ev.t) {
       case 'turn':
+        currentMove = null;
         setActing(null);
         els.turn.textContent = `Turno ${ev.turn}`;
         log(`Turno ${ev.turn}`, 'turn');
         return 350;
       case 'move': {
         setActing(ev.side);
+        currentMove = ev.kind === 'attack' ? { ev, hits: 0 } : null;
         if (ev.kind === 'attack' && (ev.flags || []).includes('contact')) anim(els.spot[pos(ev.side)], `lunge-${pos(ev.side)}`, 500);
         else anim(els.spot[pos(ev.side)], 'power', 600);
         tell([...mon(ev.side, ev.name), ' usa ', h('b', { class: 'mvname' }, ev.move), ev.type ? ' ' : '', ev.type ? typeChip(ev.type) : '', ev.why ? h('small', { class: 'why' }, ` · ${WHY[ev.why]}`) : ''], { side: ev.side });
+        if (ev.multihit) return sleep(350);
         return Promise.all([sleep(450), wait(250).then(() => fx.move(ev, els.spot[pos(ev.side)], els.spot[pos(1 - ev.side)]))]);
       }
       case 'damage': {
-        const f = activeOf(ev.side);
-        const before = f.hp;
-        f.hp = ev.hp;
-        paint(ev.side);
-        anim(els.spot[pos(ev.side)], 'hit', 500);
-        anim(els.hud[pos(ev.side)].el, 'hurt', 600);
-        float(ev.side, floatAmount(ev, '−'), ev.crit || ev.eff > 1 ? 'dmg big' : ev.eff < 1 ? 'dmg small' : 'dmg');
-        const notes = [ev.crit ? '¡Golpe crítico!' : '', ev.eff > 1 ? '¡Es muy eficaz!' : ev.eff < 1 ? 'No es muy eficaz…' : ''].filter(Boolean).join(' ');
-        tell([...mon(ev.side, f.name), ` pierde ${amountText(ev)} (${hpText(ev, before)} → ${hpText(ev, ev.hp)})`, notes ? h('span', { class: ev.eff < 1 && !ev.crit ? 'weak' : 'strong' }, ` ${notes}`) : ''], { side: ev.side, sub: true });
-        return 1050;
+        const hit = currentMove && currentMove.ev.side === 1 - ev.side ? ++currentMove.hits : 0;
+        const repeated = hit > 0 && (currentMove.ev.multihit || hit > 1);
+        if (repeated) return playHit(ev, hit);
+        return showDamage(ev, 1050);
       }
       case 'miss': {
         const t = 1 - ev.side;
@@ -1913,8 +1962,8 @@ function battleUI(c, sendAction) {
       }
       case 'nothing':
         float(ev.side, '¡Falló!', 'miss');
-        tell(['¡pero falló!'], { side: ev.side, sub: true, cls: 'weak' });
-        return 800;
+        tell(['¡pero falló!', ev.reason ? h('small', { class: 'why' }, ` · ${NOTHING_WHY[ev.reason]}`) : ''], { side: ev.side, sub: true, cls: 'weak' });
+        return ev.reason ? 1100 : 800;
       case 'charging':
         anim(els.spot[pos(ev.side)], 'power', 600);
         tell([...mon(ev.side, ev.name), ` se prepara para usar ${ev.move}…`], { side: ev.side, sub: true });
@@ -1952,7 +2001,7 @@ function battleUI(c, sendAction) {
         const f = activeOf(ev.side);
         f.status = ev.status;
         paint(ev.side);
-        float(ev.side, STATUS[ev.status], 'miss');
+        float(ev.side, statusLabel(ev.status), `status-float ${ev.status}`);
         tell([...mon(ev.side, f.name), ` ${STATUS_TEXT[ev.status]}.`], { side: ev.side, sub: true, cls: 'weak' });
         return Promise.all([sleep(700), fx.status(ev.status, els.spot[pos(ev.side)])]);
       }
@@ -1960,14 +2009,23 @@ function battleUI(c, sendAction) {
         const f = activeOf(ev.side);
         f.status = null;
         paint(ev.side);
+        float(ev.side, '✓ Curado', 'up');
+        anim(els.spot[pos(ev.side)], 'cured', 700);
         tell([...mon(ev.side, f.name), ` ${CURE_TEXT[ev.status] ?? 'se recupera'}.`], { side: ev.side, sub: true });
-        return 800;
+        return Promise.all([sleep(800), fx.impact('fairy', els.spot[pos(ev.side)])]);
       }
-      case 'cant':
+      case 'cant': {
         if (ev.reason === 'truant') return 0;
-        float(ev.side, '…', 'miss');
+        const spot = els.spot[pos(ev.side)];
         tell([...mon(ev.side, ev.name), ` ${CANT[ev.reason] ?? 'no puede moverse.'}`], { side: ev.side, cls: 'weak' });
+        if (STATUS_INFO[ev.reason]) {
+          float(ev.side, statusLabel(ev.reason), `status-float ${ev.reason}`);
+          anim(spot, `afflicted-${ev.reason}`, 900);
+          return Promise.all([sleep(900), fx.status(ev.reason, spot)]);
+        }
+        float(ev.side, '…', 'miss');
         return 900;
+      }
       case 'confused':
         tell([...mon(ev.side, ev.name), ' está confuso…'], { side: ev.side, sub: true, cls: 'weak' });
         return 700;
@@ -1999,6 +2057,10 @@ function battleUI(c, sendAction) {
         paint(ev.side);
         anim(els.hud[pos(ev.side)].el, 'hurt', 600);
         float(ev.side, floatAmount(ev, '−'), 'dmg small');
+        if (STATUS_INFO[ev.cause]) {
+          anim(els.spot[pos(ev.side)], `afflicted-${ev.cause}`, 900);
+          fx.status(ev.cause, els.spot[pos(ev.side)]);
+        }
         const why = ev.cause === 'confusion' ? ' se hiere a sí mismo' : ` pierde ${amountText(ev)}${HURT[ev.cause] ?? ''}`;
         tell([...mon(ev.side, f.name), `${why} (${hpText(ev, before)} → ${hpText(ev, ev.hp)}).`], { side: ev.side, sub: true, cls: 'weak' });
         return 900;
