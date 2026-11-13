@@ -1866,11 +1866,7 @@ function battleUI(c, sendAction) {
     const shownStatus = f.hp > 0 && f.status ? f.status : '';
     if (shownStatus) spot.dataset.status = shownStatus;
     else delete spot.dataset.status;
-    let doll = spot.querySelector('.sub-doll');
-    if (!doll) {
-      doll = h('div', { class: 'sub-doll', 'aria-hidden': 'true' }, '🧸');
-      spot.append(doll);
-    }
+    if (!spot.querySelector('.sub-doll')) spot.append(h('div', { class: 'sub-doll', 'aria-hidden': 'true', html: creatureHTML({ sprite: 'substitute' }, { back: p === 'me' }) }));
     spot.classList.toggle('has-sub', !!f.volatiles?.substitute && f.hp > 0);
     let aura = spot.querySelector('.status-aura');
     if (!aura) {

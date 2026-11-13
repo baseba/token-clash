@@ -826,7 +826,9 @@ a.party-cell, a.party-cell.empty { cursor: pointer; }
 .spot.dizzy .creature { animation: dizzy 1.1s ease-in-out; }
 @keyframes dizzy { 0%, 100% { transform: none; } 20% { transform: rotate(-7deg) translateX(-3%); } 45% { transform: rotate(6deg) translateX(3%); } 70% { transform: rotate(-4deg); } }
 
-.sub-doll { position: absolute; left: 50%; bottom: 8%; z-index: 2; transform: translateX(-50%); font-size: clamp(2rem, 6vw, 3.6rem); line-height: 1; pointer-events: none; opacity: 0; transition: opacity .35s ease; filter: drop-shadow(0 4px 6px rgb(0 0 0 / .45)); }
-.spot.has-sub .sub-doll { opacity: 1; }
-.spot.has-sub .creature { opacity: .25; transition: opacity .35s ease; }
+.sub-doll { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; transform: scale(.6); transform-origin: 50% 100%; transition: opacity .3s ease, transform .3s ease; }
+.sub-doll .creature { width: 100%; height: auto; animation: none; }
+.spot.has-sub .sub-doll { opacity: 1; transform: none; }
+.spot > .creature { transition: opacity .3s ease; }
+.spot.has-sub > .creature { opacity: 0; }
 .hud .side-chip { display: inline-flex; align-items: center; gap: .2rem; padding: .05rem .45rem; border-radius: 999px; font-weight: 700; font-size: .7rem; color: #f3ead2; background: rgb(150 120 60 / .3); border: 1px solid rgb(200 170 100 / .45); cursor: help; }

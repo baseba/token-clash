@@ -111,10 +111,16 @@ function formTarget(name) {
   };
 }
 
+const substituteTarget = {
+  slug: 'substitute',
+  animated: true,
+  sources: async () => ({ png: fromStems(RAW, 'png', ['substitute']), gif: fromStems(BW, 'gif', ['substitute']) }),
+};
+
 export async function syncSprites({ log = (msg) => process.stderr.write(`${msg}\n`) } = {}) {
   mkdirSync(SPRITES, { recursive: true });
   const data = JSON.parse(readFileSync(DATA, 'utf8'));
-  const targets = [...Object.keys(data.species).map(speciesTarget), ...Object.values(data.forms ?? {}).map((f) => formTarget(f.sprite))];
+  const targets = [...Object.keys(data.species).map(speciesTarget), ...Object.values(data.forms ?? {}).map((f) => formTarget(f.sprite)), substituteTarget];
   const missing = targets.filter((t) => !complete(t.slug, 'png') || (t.animated && !complete(t.slug, 'gif')));
   log(`Sprites: ${targets.length - missing.length}/${targets.length} listos; revisando ${missing.length}.`);
 
