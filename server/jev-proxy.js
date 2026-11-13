@@ -34,7 +34,9 @@ function readBody(req) {
   });
 }
 
-export function createJevProxy({ apiKey, upstream = JEV_UPSTREAM, fetchImpl = fetch, log = console } = {}) {
+export function createJevProxy({ apiKey: rawKey, upstream = JEV_UPSTREAM, fetchImpl = fetch, log = console } = {}) {
+  // A secret made from a file keeps its trailing newline, which would make the header invalid.
+  const apiKey = rawKey?.trim();
   if (!apiKey) throw new Error('Falta JEV_API_KEY');
   let inflight = 0;
   return createServer(async (req, res) => {

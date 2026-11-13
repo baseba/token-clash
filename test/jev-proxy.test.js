@@ -62,6 +62,12 @@ test('rejects huge bodies and reports TypeSafe errors and outages', async () => 
   dead.close();
 });
 
-test('refuses to start without a key', () => {
+test('refuses to start without a key, and trims the newline a secret file leaves', async () => {
   assert.throws(() => createJevProxy({}), /JEV_API_KEY/);
+  assert.throws(() => createJevProxy({ apiKey: '\n' }), /JEV_API_KEY/);
+  const p = createJevProxy({ apiKey: `${KEY}\n`, upstream: `http://127.0.0.1:${upstream.address().port}/v1/systemone`, log: quiet });
+  await new Promise((r) => p.listen(0, '127.0.0.1', r));
+  assert.equal((await fetch(`http://127.0.0.1:${p.address().port}/v1/systemone`, { method: 'POST', body: '{}' })).status, 200);
+  assert.equal(seen.at(-1).headers.authorization, `Bearer ${KEY}`);
+  p.close();
 });
