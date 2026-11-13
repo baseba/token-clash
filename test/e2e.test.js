@@ -190,7 +190,7 @@ test('a battle against the AI starts at once and stays out of the ranking and th
     assert.equal(ch.status, 200);
     assert.equal(ch.data.challenge.status, 'active');
     assert.equal(ch.data.challenge.ai, 'veryhard');
-    assert.match(ch.data.challenge.guest.name, / ai - ai muy difícil$/);
+    assert.match(ch.data.challenge.guest.name, / ai - muy difícil$/);
     const host = player(ch.data.challenge.id, a.data.token);
     const preview = await new Promise((r) => host.ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.preview) r(m.preview); }));
     assert.equal(preview.sides[1].ready, true);
@@ -210,7 +210,7 @@ test('against Skynet, Jev picks the AI\'s actions and the battle ends', async ()
   assert.ok(a.data.me.aiLevels.includes('skynet'));
   const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode: 'team', ai: 'skynet', levelCap: 50 } });
   assert.equal(ch.status, 200);
-  assert.match(ch.data.challenge.guest.name, / ai - ai skynet$/);
+  assert.match(ch.data.challenge.guest.name, / ai - skynet$/);
   const first = jevCalls.length;
   const host = player(ch.data.challenge.id, a.data.token);
   const end = await host.ended;
@@ -277,7 +277,7 @@ test('a 4-player tournament filled with AIs plays every match in order until a c
   assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: b.data.token, body: { level: 'easy' } })).status, 403);
   const filled = (await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: a.data.token, body: { level: 'easy', count: 5 } })).data.tournament;
   assert.deepEqual(filled.seats.map((s) => s.ready), [false, false, true, true]);
-  assert.ok(filled.seats.slice(2).every((s) => / ai - ai fácil$/.test(s.name)));
+  assert.ok(filled.seats.slice(2).every((s) => / ai - fácil$/.test(s.name)));
   assert.notEqual(filled.seats[2].name, filled.seats[3].name);
   const kicked = (await call(`/api/tournaments/${T.id}/seats/1`, { method: 'DELETE', token: a.data.token })).data.tournament;
   assert.equal(kicked.seats.length, 3);
@@ -347,6 +347,12 @@ test('public rooms are listed and a matching search joins them; private ones sta
   assert.equal(late.status, 409);
   assert.match(late.data.error, /Llegaste tarde/);
   await call(`/api/challenges/${priv.id}`, { method: 'DELETE', token: a.data.token });
+  const page1 = (await call('/api/me/challenges?offset=0&limit=1', { token: a.data.token })).data;
+  const page2 = (await call('/api/me/challenges?offset=1&limit=1', { token: a.data.token })).data;
+  assert.equal(page1.challenges.length, 1);
+  assert.equal(page1.hasMore, true);
+  assert.equal(page2.hasMore, false);
+  assert.notEqual(page1.challenges[0].id, page2.challenges[0].id);
 });
 
 test('bad uploads get a clear error', async () => {

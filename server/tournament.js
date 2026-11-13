@@ -8,7 +8,7 @@ export function aiName(level, taken = [], random = Math.random) {
   const free = AI_NAMES.filter((n) => !used.has(n));
   const pool = free.length ? free : AI_NAMES;
   const base = pool[Math.floor(random() * pool.length)];
-  return { base, name: `${base} - ai ${DIFFICULTY_NAMES[level] ?? level}` };
+  return { base, name: `${base} - ${DIFFICULTY_NAMES[level] ?? level}` };
 }
 
 export const humanCount = (t) => t.seats.filter((s) => !s.ai).length;

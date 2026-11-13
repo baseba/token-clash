@@ -6,12 +6,13 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { parseSave, SaveError, uniqueSpecies, uniqueVariants, carryTeam } from './save.js';
-import { buildFighter, movepool, validMoveset, abilityOptions, usableAbility, movesetFor, speciesData, MOVES_PER_FIGHTER } from './creatures.js';
+import { buildFighter, movepool, validMoveset, abilityOptions, usableAbility, movesetFor, speciesData, lineageLearnset, MOVES_PER_FIGHTER } from './creatures.js';
 import { abilityInfo } from './abilities.js';
 import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents } from './battle.js';
 import { createPreview, pick, fillMissing, previewReady, chosenEntries, previewView, PARTY_SIZE } from './preview.js';
 import { openStore } from './store.js';
 import { serverStats } from './stats.js';
+import { pokedexOf } from './pokedex.js';
 import { openRooms, matchFor, visibilityOf, joinBlocker, HOST_GRACE_MS } from './lobby.js';
 import { TOURNAMENT_SIZES, aiName, humanCount, reachedRound, addSeat, removeSeat, setReady, allReady, isFull, seatOf, nextAiId, shuffledOrder, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor } from './tournament.js';
 import { randomParty } from './random.js';
@@ -161,7 +162,7 @@ function teamEntries(t) {
 function saveEdit(e) {
   if (!e.moveset && !e.abilityChoice) return null;
   const data = speciesData(e.finalID);
-  const level = new Map((data?.learnset ?? []).map(([id, lvl]) => [id, lvl]));
+  const level = new Map([...lineageLearnset(e.finalID)].map(([id, m]) => [id, m.level]));
   const out = { id: e.id };
   if (e.moveset && validMoveset(e, e.moveset)) out.currentMoves = e.moveset.map((name) => ({ name, level: level.get(name) ?? 1 }));
   if (e.abilityChoice && data) {
@@ -173,11 +174,11 @@ function saveEdit(e) {
 
 function monDetail(e) {
   const chosen = new Set(movesetFor(e));
-  const learnedAt = new Map((speciesData(e.finalID)?.learnset ?? []).map(([id, lvl]) => [id, lvl]));
+  const learnedAt = lineageLearnset(e.finalID);
   return {
     ...buildFighter(e),
     nickname: e.nickname || null,
-    movepool: movepool(e).map((m) => ({ level: learnedAt.get(m.key) ?? null, key: m.key, name: m.name, desc: m.desc, type: m.type, category: m.category, power: m.power, accuracy: m.accuracy, pp: m.pp, priority: m.priority, contact: m.flags.includes('contact'), supported: m.supported, chosen: chosen.has(m.key) })),
+    movepool: movepool(e).map((m) => ({ level: learnedAt.get(m.key)?.level ?? null, key: m.key, name: m.name, desc: m.desc, type: m.type, category: m.category, power: m.power, accuracy: m.accuracy, pp: m.pp, priority: m.priority, contact: m.flags.includes('contact'), supported: m.supported, chosen: chosen.has(m.key) })),
     abilityOptions: abilityOptions(e).map((a) => ({ ...abilityInfo(a.key), hidden: a.hidden })),
     maxMoves: MOVES_PER_FIGHTER,
   };
@@ -911,13 +912,22 @@ async function api(req, res, url) {
     return send(res, 200, { mon: monDetail(e) });
   }
 
+  if (p === '/api/pokedex' && method === 'GET') {
+    const t = trainerFrom(req);
+    if (!t) return send(res, 401, { error: 'Sin sesión' });
+    return send(res, 200, { pokedex: pokedexOf(t.roster) });
+  }
+
   if (p === '/api/me/challenges' && method === 'GET') {
     const t = trainerFrom(req);
     if (!t) return send(res, 401, { error: 'Sin sesión' });
-    const list = Object.values(db.challenges)
+    const offset = Math.max(0, Math.floor(Number(url.searchParams.get('offset')) || 0));
+    const limit = Math.min(50, Math.max(1, Math.floor(Number(url.searchParams.get('limit')) || 30)));
+    const mine = Object.values(db.challenges)
       .filter((c) => !c.ai && !c.tournamentId && (c.hostId === t.id || c.guestId === t.id))
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 30)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    const list = mine
+      .slice(offset, offset + limit)
       .map((c) => ({
         id: c.id,
         status: c.status,
@@ -939,7 +949,7 @@ async function api(req, res, url) {
         const reached = T.bracket ? reachedRound(T.bracket, seat) : -1;
         return { id: T.id, size: T.size, mode: T.mode, levelCap: T.levelCap ?? null, status: T.status, humans: humanCount(T), createdAt: T.createdAt, champion: T.champion === seat, reached: reached === -1 ? null : roundName(T.size, reached) };
       });
-    return send(res, 200, { challenges: list, tournaments });
+    return send(res, 200, { challenges: list, hasMore: offset + limit < mine.length, tournaments });
   }
 
   if (p === '/api/stats' && method === 'GET') {
@@ -1119,7 +1129,7 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed');
-    if (url.pathname === '/' || url.pathname === '/equipo' || url.pathname === '/stats' || /^\/[bt]\/[A-Za-z0-9_-]{4,20}$/.test(url.pathname)) return await serveStatic(req, res, 'index.html');
+    if (url.pathname === '/' || ['/equipo', '/coleccion', '/pokedex', '/stats'].includes(url.pathname) || /^\/[bt]\/[A-Za-z0-9_-]{4,20}$/.test(url.pathname)) return await serveStatic(req, res, 'index.html');
     return await serveStatic(req, res, url.pathname);
   } catch (e) {
     if (e instanceof SaveError) return send(res, 400, { error: e.message });

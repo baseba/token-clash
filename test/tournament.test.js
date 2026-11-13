@@ -66,11 +66,11 @@ test('AI names come from the list, carry the difficulty and never repeat inside 
     const { base, name } = aiName('veryhard', taken);
     assert.ok(AI_NAMES.includes(base));
     assert.ok(!taken.includes(base));
-    assert.equal(name, `${base} - ai muy difícil`);
+    assert.equal(name, `${base} - muy difícil`);
     taken.push(base);
   }
   assert.equal(new Set(taken).size, AI_NAMES.length);
-  assert.equal(aiName('easy', [], () => 0).name, 'crubio ai - ai fácil');
+  assert.equal(aiName('easy', [], () => 0).name, 'crubio ai - fácil');
 });
 
 test('how far each seat got in the bracket', () => {

@@ -141,9 +141,42 @@ export function moveData(id) {
   return m;
 }
 
+export function lineage(id) {
+  const chain = [];
+  for (let cur = id; cur && POKEAPI[cur] && !chain.includes(cur); cur = POKEAPI[cur].evolvesFrom) chain.push(cur);
+  return chain;
+}
+
+const CHILDREN = new Map();
+for (const [id, d] of Object.entries(POKEAPI)) if (d.evolvesFrom) CHILDREN.set(d.evolvesFrom, [...(CHILDREN.get(d.evolvesFrom) ?? []), Number(id)]);
+
+export const speciesCount = () => Object.keys(POKEAPI).length;
+
+export function family(id) {
+  const root = lineage(id).at(-1) ?? id;
+  const out = [];
+  const visit = (cur, stage) => {
+    out.push({ id: cur, stage });
+    for (const next of CHILDREN.get(cur) ?? []) visit(next, stage + 1);
+  };
+  visit(root, 0);
+  return out;
+}
+
+export function lineageLearnset(id) {
+  const best = new Map();
+  for (const speciesId of lineage(id)) {
+    for (const [move, level] of POKEAPI[speciesId].learnset ?? []) {
+      const known = best.get(move);
+      if (!known) best.set(move, { level, from: speciesId });
+      else if (level < known.level) known.level = level;
+    }
+  }
+  return best;
+}
+
 export function learnedMoves(entry) {
-  const data = speciesData(entry.finalID);
-  const byLevel = new Map((data?.learnset ?? []).filter(([, lvl]) => lvl <= entry.level).map(([id, lvl]) => [id, lvl]));
+  const byLevel = new Map([...lineageLearnset(entry.finalID)].filter(([, m]) => m.level <= entry.level).map(([id, m]) => [id, m.level]));
   for (const id of entry.learned ?? []) if (!byLevel.has(id)) byLevel.set(id, 0);
   return [...byLevel.entries()]
     .filter(([id]) => MOVEDEX[id])
