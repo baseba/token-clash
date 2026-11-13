@@ -113,7 +113,9 @@ test('moves come from what the Pokémon has learned: the latest four by default,
   assert.ok(!validMoveset(charmander, ['ember', 'ember']));
   assert.ok(!validMoveset(charmander, ['ember', 'scratch', 'growl', 'smokescreen', 'dragon-rage']));
   assert.deepEqual(movesetFor({ ...charmander, moveset: ['ember', 'scratch'] }), ['ember', 'scratch']);
-  assert.deepEqual(movesetFor({ ...charmander, moveset: ['flamethrower'] }), def);
+  const swapped = movesetFor({ ...charmander, moveset: ['flamethrower'] });
+  assert.equal(swapped.length, 1);
+  assert.ok(validMoveset(charmander, swapped));
   assert.ok(learnedMoves({ ...charmander, learned: ['flamethrower'] }).includes('flamethrower'));
 
   const f = buildFighter({ ...charmander, moveset: ['ember', 'growl'] });
@@ -128,4 +130,17 @@ test('stats follow the real formula, with the nature boosting one stat and lower
   const modest = statsFor(base, iv, 50, 'modest');
   assert.equal(modest.satk, Math.floor(129 * 1.1));
   assert.equal(modest.atk, Math.floor(104 * 0.9));
+});
+
+test('Barrera sube dos niveles la Defensa y su descripción no dice que no se puede usar', () => {
+  const iv = { hp: 15, atk: 15, def: 15, spd: 15 };
+  const mime = { id: 'm', finalID: 122, baseID: 122, rarity: 'rare', level: 50, ivs: iv, moveset: ['barrier'] };
+  const foe = { id: 'f', finalID: 68, baseID: 66, rarity: 'rare', level: 50, ivs: iv, moveset: ['body-slam'] };
+  const b = createBattle({ id: 'x', random: rng(1), sides: [{ trainerId: 'a', name: 'A', entries: [mime] }, { trainerId: 'b', name: 'B', entries: [foe] }] });
+  submit(b, 0, { type: 'move', move: 0 });
+  const events = submit(b, 1, { type: 'move', move: 0 });
+  assert.ok(events.some((e) => e.t === 'boost' && e.side === 0 && e.stat === 'def' && e.by === 2));
+  assert.ok(moveData('barrier').supported);
+  const movedex = JSON.parse(readFileSync(new URL('../server/movedex.json', import.meta.url), 'utf8'));
+  assert.deepEqual(Object.keys(movedex).filter((id) => /no se puede usar/i.test(movedex[id].desc)), []);
 });
