@@ -76,6 +76,19 @@ const SPECIAL_STATUS_MOVES = new Set(['rest', 'synthesis', 'morning-sun', 'moonl
 const GRASSY_HALVED = new Set(['earthquake', 'bulldoze', 'magnitude']);
 const SCREEN_MOVES = { reflect: 'reflect', 'light-screen': 'lightscreen', 'aurora-veil': 'auroraveil' };
 const SCREEN_BREAKERS = new Set(['brick-break', 'psychic-fangs', 'raging-bull']);
+const UNSUPPORTED_MOVES = new Set(['future-sight', 'doom-desire', 'rollout', 'ice-ball', 'uproar', 'rage', 'belch']);
+const FIRST_TURN_ONLY = new Set(['fake-out', 'first-impression', 'mat-block']);
+const RAMPAGE = new Set(['outrage', 'thrash', 'petal-dance', 'raging-fury']);
+const BINDING = new Set(['bind', 'wrap', 'fire-spin', 'whirlpool', 'sand-tomb', 'clamp', 'infestation', 'magma-storm', 'thunder-cage', 'snap-trap']);
+const TRAPPING = new Set(['jaw-lock', 'anchor-shot', 'spirit-shackle', 'thousand-waves']);
+const SELF_SWITCH = new Set(['u-turn', 'volt-switch', 'flip-turn']);
+const FORCE_SWITCH = new Set(['dragon-tail', 'circle-throw']);
+const LEAVES_ONE = new Set(['false-swipe', 'hold-back']);
+const CRASHES = new Set(['high-jump-kick', 'jump-kick', 'axe-kick', 'supercell-slam']);
+const IGNORES_DEF_BOOSTS = new Set(['sacred-sword', 'darkest-lariat', 'chip-away']);
+const HITS_PHYSICAL_DEF = new Set(['psyshock', 'psystrike', 'secret-sword']);
+const LOSES_TYPE = { 'burn-up': 'fire', 'double-shock': 'electric' };
+const SELF_COST = { 'fillet-away': 1 / 2, 'clangorous-soul': 1 / 3 };
 
 export const STRUGGLE = {
   key: 'struggle', id: 'struggle', name: 'Forcejeo', desc: 'Ataque desesperado que solo se usa cuando no quedan PP; daña también al usuario.',
@@ -100,7 +113,28 @@ export function moveData(id) {
     m.boosts = { eva: -1 };
     m.clearsScreens = true;
   }
-  m.supported = supportedMove(m);
+  if (FIRST_TURN_ONLY.has(id)) m.firstTurnOnly = true;
+  if (RAMPAGE.has(id)) m.rampage = true;
+  if (BINDING.has(id)) m.binds = true;
+  if (TRAPPING.has(id)) m.traps = true;
+  if (SELF_SWITCH.has(id)) m.selfSwitch = true;
+  if (FORCE_SWITCH.has(id)) m.forceSwitch = true;
+  if (LEAVES_ONE.has(id)) m.leavesOne = true;
+  if (CRASHES.has(id)) m.crashes = true;
+  if (IGNORES_DEF_BOOSTS.has(id)) m.ignoresDefBoosts = true;
+  if (HITS_PHYSICAL_DEF.has(id)) m.hitsPhysicalDef = true;
+  if (LOSES_TYPE[id]) m.losesType = LOSES_TYPE[id];
+  if (SELF_COST[id]) m.selfCost = SELF_COST[id];
+  if (id === 'body-press') m.usesDefense = true;
+  if (id === 'flying-press') m.extraType = 'flying';
+  if (id === 'clanging-scales') m.self = { def: -1 };
+  if (id === 'scale-shot') m.self = { def: -1, spd: 1 };
+  if (id === 'mind-blown' || id === 'steel-beam') m.recoilMaxHp = 1 / 2;
+  if (id === 'memento') m.selfDestruct = true;
+  if (id === 'snore') m.usableAsleep = true;
+  if (id === 'smack-down' || id === 'thousand-arrows') m.grounds = true;
+  if (id === 'thousand-arrows') m.hitsAirborne = true;
+  m.supported = supportedMove(m) && !UNSUPPORTED_MOVES.has(id);
   return m;
 }
 
