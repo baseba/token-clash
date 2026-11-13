@@ -1,4 +1,4 @@
-import { buildFighter, speciesData, formData, statsFor, effectiveness, usableMovepool, abilityOptions, usableAbility, moveData, shuffled, rng, STRUGGLE, MOVES_PER_FIGHTER } from './creatures.js';
+import { buildFighter, speciesData, formData, statsFor, effectiveness, usableMovepool, moveData, shuffled, rng, STRUGGLE, MOVES_PER_FIGHTER } from './creatures.js';
 import { validActions, submit, needsAction, STRUGGLE_MOVE } from './battle.js';
 import { randomize } from './random.js';
 import { PARTY_SIZE, BATTLE_SIZE } from './preview.js';
@@ -16,14 +16,6 @@ export const aiTrainerId = (level) => `${AI_PREFIX}${level}`;
 export const aiLevelOf = (trainerId) => (typeof trainerId === 'string' && trainerId.startsWith(AI_PREFIX) ? trainerId.slice(AI_PREFIX.length) : null);
 export const isAiLevel = (level) => AI_LEVELS.includes(level);
 
-const IVS = { easy: 8, mid: 18, hard: 28, veryhard: 31 };
-const PLAIN_NATURES = ['hardy', 'docile', 'serious', 'bashful', 'quirky'];
-const STRONG_ABILITIES = new Set([
-  'huge-power', 'pure-power', 'speed-boost', 'intimidate', 'levitate', 'drizzle', 'drought', 'sand-stream', 'snow-warning',
-  'multiscale', 'technician', 'adaptability', 'regenerator', 'magic-guard', 'sheer-force', 'guts', 'thick-fat', 'swift-swim',
-  'chlorophyll', 'sturdy', 'serene-grace', 'moxie', 'prankster', 'tinted-lens', 'skill-link', 'iron-fist', 'filter',
-  'solid-rock', 'flash-fire', 'water-absorb', 'volt-absorb', 'natural-cure', 'poison-heal', 'unaware', 'wonder-guard',
-]);
 const IMMUNE_BY_ABILITY = {
   levitate: 'ground', 'volt-absorb': 'electric', 'lightning-rod': 'electric', 'motor-drive': 'electric', 'water-absorb': 'water',
   'storm-drain': 'water', 'dry-skin': 'water', 'flash-fire': 'fire', 'sap-sipper': 'grass',
@@ -47,14 +39,6 @@ export function aiPool() {
   const ids = [];
   for (let id = 1; id <= LAST_AI_SPECIES; id++) if (speciesData(id)) ids.push(id);
   return ids;
-}
-
-function natureFor(data, difficulty, random) {
-  if (difficulty === 'easy' || difficulty === 'mid') return pickOne(PLAIN_NATURES, random);
-  const [, atk, , satk, , spd] = data.stats;
-  const physical = atk >= satk;
-  if (spd >= 90) return physical ? 'jolly' : 'timid';
-  return physical ? 'adamant' : 'modest';
 }
 
 function moveValue(m, mon) {
@@ -112,35 +96,6 @@ export function pickMoveset(entry, difficulty, random) {
   return chosen.map((x) => x.id);
 }
 
-function pickAbility(entry, difficulty, random) {
-  const options = abilityOptions(entry).map((a) => a.key).filter(usableAbility);
-  if (!options.length) return null;
-  if (difficulty === 'hard' || difficulty === 'veryhard') {
-    const strong = options.filter((k) => STRONG_ABILITIES.has(k));
-    if (strong.length) return pickOne(strong, random);
-  }
-  return pickOne(options, random);
-}
-
-export function aiEntry(finalID, { level, difficulty, random, index }) {
-  const data = speciesData(finalID);
-  const iv = IVS[difficulty];
-  const base = {
-    id: `ai-${index}-${finalID}`,
-    finalID,
-    baseID: finalID,
-    rarity: rarityOf(data),
-    shiny: false,
-    level,
-    ivs: { hp: iv, atk: iv, def: iv, satk: iv, sdef: iv, spd: iv },
-    nature: natureFor(data, difficulty, random),
-    learned: [],
-  };
-  const moveset = pickMoveset(base, difficulty, random);
-  const ability = pickAbility(base, difficulty, random);
-  return { ...base, ...(moveset.length ? { moveset } : {}), ...(ability ? { abilityChoice: ability } : {}) };
-}
-
 function typeMatchup(attackTypes, defendTypes) {
   let best = 0;
   for (const t of attackTypes) best = Math.max(best, effectiveness(t, defendTypes));
@@ -158,50 +113,30 @@ function usableAtLevel(id, level) {
   return usableMovepool({ id: 'probe', finalID: id, level, learned: [] }).some((k) => moveData(k).kind === 'attack');
 }
 
-function candidates(difficulty, level) {
-  return aiPool().filter((id) => {
-    const data = speciesData(id);
-    if (!usableAtLevel(id, level)) return false;
-    if (difficulty === 'easy') return true;
-    if (!fullyEvolved(data)) return false;
-    if (difficulty === 'mid') return true;
-    const total = bst(data);
-    if (difficulty === 'hard') return total >= 470 && total < 580;
-    return total >= 500;
-  });
+export const AI_POOL_SHARE = { easy: 1, mid: 0.8, hard: 0.6, veryhard: 0.5, skynet: 0.4 };
+
+const DICE_IVS = { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 };
+
+function diceEntry(id, { level, random, index }) {
+  return randomize({ id: `ai-${index}-${id}`, finalID: id, baseID: id, rarity: rarityOf(speciesData(id)), shiny: false, level, ivs: DICE_IVS, learned: [] }, random);
 }
 
-function diversePick(ranked, count) {
-  const picked = [];
-  const types = new Set();
-  for (const id of ranked) {
-    if (picked.length >= count) break;
-    const t = speciesData(id).types;
-    if (t.some((x) => types.has(x))) continue;
-    picked.push(id);
-    t.forEach((x) => types.add(x));
-  }
-  for (const id of ranked) if (picked.length < count && !picked.includes(id)) picked.push(id);
-  return picked;
+export function aiTeamPool(difficulty, level) {
+  const ranked = aiPool()
+    .filter((id) => fullyEvolved(speciesData(id)) && usableAtLevel(id, level))
+    .sort((a, b) => bst(speciesData(b)) - bst(speciesData(a)) || a - b);
+  const size = Math.max(PARTY_SIZE, Math.ceil(ranked.length * (AI_POOL_SHARE[difficulty] ?? 1)));
+  return ranked.slice(0, size);
 }
 
-// The team never looks at the rival's: harder AIs just draw from a stronger pool, with luck.
-export function buildAiTeam({ difficulty: requested, level, random = Math.random }) {
-  const difficulty = tactics(requested);
-  const pool = candidates(difficulty, level);
-  let ids;
-  if (difficulty === 'easy' || difficulty === 'mid') ids = shuffled(pool, random).slice(0, PARTY_SIZE);
-  else {
-    const luck = difficulty === 'hard' ? 0.4 : 0.6;
-    const ranked = pool.map((id) => ({ id, s: bst(speciesData(id)) * (1 - luck / 2 + random() * luck) })).sort((a, b) => b.s - a.s).map((x) => x.id);
-    ids = diversePick(ranked, PARTY_SIZE);
-  }
-  return ids.map((id, index) => aiEntry(id, { level, difficulty, random, index }));
+export function buildAiTeam({ difficulty, level, random = Math.random }) {
+  const ids = shuffled(aiTeamPool(difficulty, level), random).slice(0, PARTY_SIZE);
+  return ids.map((id, index) => diceEntry(id, { level, random, index }));
 }
 
 export function buildAiRandomParty({ level, random = Math.random }) {
-  const ids = shuffled(aiPool().filter((id) => usableAtLevel(id, level)), random).slice(0, PARTY_SIZE);
-  return ids.map((id, index) => randomize({ id: `ai-${index}-${id}`, finalID: id, baseID: id, rarity: rarityOf(speciesData(id)), shiny: false, level, ivs: { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 }, learned: [] }, random));
+  const ids = shuffled(aiTeamPool('easy', level), random).slice(0, PARTY_SIZE);
+  return ids.map((id, index) => diceEntry(id, { level, random, index }));
 }
 
 // The three for the battle are picked on a hunch, without looking at the rival's party: easier

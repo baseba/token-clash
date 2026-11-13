@@ -89,6 +89,7 @@ await mapLimit(ids, async (id) => {
     abilities: bySlot.filter((a) => !a.is_hidden).map((a) => a.ability.name),
     hiddenAbility: bySlot.find((a) => a.is_hidden)?.ability.name ?? null,
     learnset: levelUpMoves(mon.moves),
+    genderRate: sp.gender_rate,
   };
   if (sp.evolution_chain) {
     species[id].chainId = idFromUrl(sp.evolution_chain.url);

@@ -44,7 +44,7 @@ export const previewReady = (p) => p.sides.every((s) => s.picks);
 export const chosenEntries = (p, s) => p.sides[s].picks.map((i) => p.sides[s].entries[i]);
 
 function seenCard(f) {
-  return { name: f.name, speciesName: f.speciesName, sprite: f.sprite, shiny: f.shiny, floats: f.floats, rarity: f.rarity, types: f.types };
+  return { name: f.name, speciesName: f.speciesName, sprite: f.sprite, shiny: f.shiny, floats: f.floats, rarity: f.rarity, types: f.types, gender: f.gender };
 }
 
 export function previewView(p, viewer = null) {

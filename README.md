@@ -15,9 +15,10 @@ En vivo: **https://clash.mirrordev.xyz**
    Modos: "🎒 Batalla con tu equipo" (los 6 que armaste) y "🎲 Batalla aleatoria" (los dados sortean hasta 6 de la
    colección de cada uno, sin repetir especie, con movimientos y habilidad al azar). En ambos, cada uno elige 3.
    También se puede pelear contra la IA (Fácil, Media, Difícil o Muy difícil), que usa Pokémon de la 1.ª a la
-   5.ª generación. Con tu equipo, la dificultad cambia cómo arma su equipo y cómo pelea; en aleatoria, solo cómo
-   pelea. Las peleas contra la IA no cuentan para el ranking ni quedan en tu historial.
-   **Skynet** arma su equipo como Muy difícil, pero en cada turno le pregunta a
+   5.ª generación. Con tu equipo, los dados sortean sus 6 entre Pokémon completamente evolucionados, y cada
+   dificultad acota ese grupo a los más fuertes por estadísticas base (100 %, 80 %, 60 %, 50 % y 40 % para Skynet);
+   en aleatoria, sortea entre todos los completamente evolucionados y la dificultad solo cambia cómo pelea. Las peleas contra la IA no cuentan para el ranking ni quedan en tu historial.
+   **Skynet** sortea su equipo del 40 % más fuerte, y en cada turno le pregunta a
    [Jev](https://docs.typesafe.ai) (el modelo de decisiones de TypeSafe) qué ataque usar o a quién sacar. Solo
    aparece si el servidor tiene cómo llegar a Jev (ver Deploy).
 4. Ranking de victorias en la portada. Opción "Todos a nivel 50" para que gane la estrategia.
