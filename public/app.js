@@ -1431,6 +1431,7 @@ function previewUI(c, sendPick) {
   let sent = false;
   let entered = false;
   let rolling = false;
+  let rollSides = new Set();
   let revealed = 0;
   let justRevealed = -1;
   const rollTimers = [];
@@ -1472,10 +1473,11 @@ function previewUI(c, sendPick) {
   }
 
   const dieCard = (i) => h('div', { class: 'prep-card dice-slot', 'aria-label': 'Lanzando dados' }, h('div', { class: 'die spin', style: { animationDelay: `${-i * 110}ms` } }, DIE_FACES[i % DIE_FACES.length]), h('b', null, '???'));
-  const revealClass = (i) => (rolling && i === justRevealed ? ' reveal' : '');
+  const rollingOn = (s) => rolling && rollSides.has(s);
+  const revealClass = (s, i) => (rollingOn(s) && i === justRevealed ? ' reveal' : '');
 
   function choose(i, needed) {
-    if (sent || rolling) return;
+    if (sent || rollingOn(last?.you)) return;
     const at = picks.indexOf(i);
     if (at >= 0) picks.splice(at, 1);
     else if (picks.length < needed) picks.push(i);
@@ -1488,15 +1490,15 @@ function previewUI(c, sendPick) {
     const you = last.you;
     const own = you != null ? p.sides[you] : null;
     const foe = p.sides[you == null ? 1 : 1 - you];
-    const seen = (side, title) =>
+    const seen = (side, title, s) =>
       h(
         'div',
         { class: 'card prep-side' },
-        h('div', { class: 'row between' }, h('h2', null, title), side.ready ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, 'Eligiendo…')),
-        h('div', { class: 'prep-grid' }, side.party.map((f, i) => (rolling && i >= revealed ? dieCard(i) : h('div', { class: `prep-card seen${entered || rolling ? '' : ' enter'}${revealClass(i)}`, style: { animationDelay: `${i * 70}ms` } }, h('div', { html: creatureHTML(f) }), h('b', null, f.name, genderMark(f.gender)), typeChips(f.types ?? []))))),
+        h('div', { class: 'row between' }, h('h2', null, title), rollingOn(s) ? h('span', { class: 'muted small pulse' }, '🎲 Sorteando…') : side.ready ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, 'Eligiendo…')),
+        h('div', { class: 'prep-grid' }, side.party.map((f, i) => (rollingOn(s) && i >= revealed ? dieCard(i) : h('div', { class: `prep-card seen${entered || rollingOn(s) ? '' : ' enter'}${revealClass(s, i)}`, style: { animationDelay: `${i * 70}ms` } }, h('div', { html: creatureHTML(f) }), h('b', null, f.name, genderMark(f.gender)), typeChips(f.types ?? []))))),
       );
     if (!own) {
-      root.replaceChildren(seen(p.sides[0], p.sides[0].name), h('div', { class: 'vs-mark' }, 'VS'), seen(p.sides[1], p.sides[1].name));
+      root.replaceChildren(seen(p.sides[0], p.sides[0].name, 0), h('div', { class: 'vs-mark' }, 'VS'), seen(p.sides[1], p.sides[1].name, 1));
       entered = true;
       return;
     }
@@ -1506,17 +1508,17 @@ function previewUI(c, sendPick) {
     const mine = h(
       'div',
       { class: 'card prep-side mine' },
-      h('h2', null, rolling ? '🎲 Lanzando los dados…' : done ? 'Tu equipo para esta pelea' : `Elige ${own.needed} de tus ${own.party.length}`),
-      h('p', { class: 'muted small' }, rolling ? 'Sorteando Pokémon, movimientos y habilidades de tu colección.' : done ? 'El primero sale a pelear.' : 'Tócalos en el orden en que quieres usarlos: el primero sale a pelear. Si se acaba el tiempo, se eligen al azar.'),
+      h('h2', null, rollingOn(you) ? '🎲 Lanzando los dados…' : done ? 'Tu equipo para esta pelea' : `Elige ${own.needed} de tus ${own.party.length}`),
+      h('p', { class: 'muted small' }, rollingOn(you) ? 'Sorteando Pokémon, movimientos y habilidades de tu colección.' : done ? 'El primero sale a pelear.' : 'Tócalos en el orden en que quieres usarlos: el primero sale a pelear. Si se acaba el tiempo, se eligen al azar.'),
       h(
         'div',
         { class: 'prep-grid' },
         own.party.map((f, i) => {
-          if (rolling && i >= revealed) return dieCard(i);
+          if (rollingOn(you) && i >= revealed) return dieCard(i);
           const order = chosen.indexOf(i);
           return h(
             'button',
-            { type: 'button', class: `prep-card${entered || rolling ? '' : ' enter'}${revealClass(i)}${order >= 0 ? ' chosen' : ''}${done && order < 0 ? ' benched' : ''}`, style: { animationDelay: entered ? '0ms' : `${i * 70}ms` }, disabled: done || rolling, onclick: () => choose(i, own.needed) },
+            { type: 'button', class: `prep-card${entered || rollingOn(you) ? '' : ' enter'}${revealClass(you, i)}${order >= 0 ? ' chosen' : ''}${done && order < 0 ? ' benched' : ''}`, style: { animationDelay: entered ? '0ms' : `${i * 70}ms` }, disabled: done || rollingOn(you), onclick: () => choose(i, own.needed) },
             order >= 0 ? h('span', { class: 'badge' }, order + 1) : null,
             h('div', { html: creatureHTML(f) }),
             h('b', null, f.name, genderMark(f.gender)),
@@ -1527,13 +1529,13 @@ function previewUI(c, sendPick) {
           );
         }),
       ),
-      rolling
+      rollingOn(you)
         ? h('p', { class: 'pulse' }, '🎲 Los dados están rodando…')
         : done
         ? h('p', { class: 'pulse' }, foe.ready ? '¡Comienza la batalla!' : `Esperando a ${foe.name}…`)
-        : h('button', { type: 'button', class: 'btn primary', disabled: picks.length !== own.needed, onclick: () => { sent = true; sendPick(picks.slice()); render(); } }, `Continuar (${picks.length}/${own.needed})`),
+        : h('button', { type: 'button', class: 'btn primary', disabled: picks.length !== own.needed || rolling, onclick: () => { sent = true; sendPick(picks.slice()); render(); } }, `Continuar (${picks.length}/${own.needed})`),
     );
-    root.replaceChildren(mine, h('div', { class: 'vs-mark' }, 'VS'), seen(foe, `Equipo de ${foe.name}`));
+    root.replaceChildren(mine, h('div', { class: 'vs-mark' }, 'VS'), seen(foe, `Equipo de ${foe.name}`, p.sides.indexOf(foe)));
     entered = true;
   }
 
@@ -1542,7 +1544,14 @@ function previewUI(c, sendPick) {
       const first = !last;
       last = msg;
       if (!total && msg.deadline) total = Math.max(1, msg.deadline - Date.now());
-      if (first && msg.preview.mode === 'random' && !rolledRooms.has(c.id)) startRoll(Math.max(...msg.preview.sides.map((s) => s.party.length)));
+      if (first && !rolledRooms.has(c.id)) {
+        const sides = msg.preview.sides;
+        const rolled = sides.map((side, i) => (msg.preview.mode === 'random' || side.trainerId?.startsWith('ai:') ? i : null)).filter((i) => i !== null);
+        if (rolled.length) {
+          rollSides = new Set(rolled);
+          startRoll(Math.max(...rolled.map((i) => sides[i].party.length)));
+        }
+      }
       render();
     },
     destroy() {
