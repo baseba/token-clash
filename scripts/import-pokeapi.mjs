@@ -65,6 +65,12 @@ function levelUpMoves(moves) {
 
 const idFromUrl = (url) => Number(url.match(/\/(\d+)\/?$/)[1]);
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const DEX_VERSIONS = ['x', 'y', 'omega-ruby', 'alpha-sapphire', 'sun', 'moon', 'ultra-sun', 'ultra-moon', 'lets-go-pikachu', 'lets-go-eevee', 'sword', 'shield', 'scarlet', 'violet'];
+function dexEntryOf(sp) {
+  const es = sp.flavor_text_entries.filter((e) => e.language.name === 'es');
+  const pick = DEX_VERSIONS.map((v) => es.find((e) => e.version.name === v)).find(Boolean) ?? es[0];
+  return pick ? pick.flavor_text.replace(/[\s\u00ad]+/g, ' ').replace(/(\p{Ll})- (\p{Ll})/gu, '$1$2').trim() : null;
+}
 
 const { count } = await get(`${API}/pokemon-species?limit=1`);
 const ids = Array.from({ length: count }, (_, i) => i + 1);
@@ -91,6 +97,10 @@ await mapLimit(ids, async (id) => {
     learnset: levelUpMoves(mon.moves),
     genderRate: sp.gender_rate,
     weight: mon.weight / 10,
+    height: mon.height / 10,
+    genus: sp.genera.find((g) => g.language.name === 'es')?.genus ?? null,
+    dexEntry: dexEntryOf(sp),
+    ...(sp.evolves_from_species ? { evolvesFrom: idFromUrl(sp.evolves_from_species.url) } : {}),
   };
   if (sp.evolution_chain) {
     species[id].chainId = idFromUrl(sp.evolution_chain.url);
