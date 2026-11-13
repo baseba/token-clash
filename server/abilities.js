@@ -11,7 +11,7 @@ export const INERT_REASONS = {
 };
 
 export const INERT = {
-  'suction-cups': 'moves', 'run-away': 'field', pickup: 'items', plus: 'doubles', minus: 'doubles',
+  'run-away': 'field', pickup: 'items', plus: 'doubles', minus: 'doubles',
   'sticky-hold': 'items', gluttony: 'items', unburden: 'items', klutz: 'items', 'honey-gather': 'field',
   frisk: 'items', multitype: 'items', pickpocket: 'items', unnerve: 'items', healer: 'doubles',
   'friend-guard': 'doubles', 'heavy-metal': 'moves', 'light-metal': 'moves', harvest: 'items',
@@ -717,6 +717,7 @@ const EFFECTS = {
   },
   'slush-rush': weatherSpeed(isIcy),
   'long-reach': {},
+  'suction-cups': { suctionCups: true },
   infiltrator: { infiltrates: true },
   'screen-cleaner': {
     onStart(E, me) {
