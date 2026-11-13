@@ -7,7 +7,7 @@
 
 import { readFileSync } from 'node:fs';
 import { effectiveness } from '../public/types.js';
-import { abilityInfo, knownAbility } from './abilities.js';
+import { abilityInfo, knownAbility, INERT } from './abilities.js';
 
 export { effectiveness };
 
@@ -60,11 +60,22 @@ export function rng(seed) {
 
 const between = (r, lo, hi) => lo + Math.floor(r() * (hi - lo + 1));
 
+export function shuffled(items, random = Math.random) {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 const MOVEDEX = JSON.parse(readFileSync(new URL('./movedex.json', import.meta.url), 'utf8'));
 export const MOVES_PER_FIGHTER = 4;
 const SUPPORTED_VOLATILES = new Set(['confusion', 'attract', 'leechseed']);
 const SPECIAL_STATUS_MOVES = new Set(['rest', 'synthesis', 'morning-sun', 'moonlight', 'shore-up']);
 const GRASSY_HALVED = new Set(['earthquake', 'bulldoze', 'magnitude']);
+const SCREEN_MOVES = { reflect: 'reflect', 'light-screen': 'lightscreen', 'aurora-veil': 'auroraveil' };
+const SCREEN_BREAKERS = new Set(['brick-break', 'psychic-fangs', 'raging-bull']);
 
 export const STRUGGLE = {
   key: 'struggle', id: 'struggle', name: 'Forcejeo', desc: 'Ataque desesperado que solo se usa cuando no quedan PP; daña también al usuario.',
@@ -73,7 +84,7 @@ export const STRUGGLE = {
 
 function supportedMove(m) {
   if (m.category !== 'status') return m.power > 0 || !!m.fixedDamage || !!m.ohko;
-  return !!(m.boosts || m.self || m.status || SUPPORTED_VOLATILES.has(m.volatile) || m.heal || m.weather || m.terrain || SPECIAL_STATUS_MOVES.has(m.id));
+  return !!(m.boosts || m.self || m.status || m.screen || SUPPORTED_VOLATILES.has(m.volatile) || m.heal || m.weather || m.terrain || SPECIAL_STATUS_MOVES.has(m.id));
 }
 
 export function moveData(id) {
@@ -83,6 +94,12 @@ export function moveData(id) {
   if (GRASSY_HALVED.has(id)) m.weakenedByGrassyTerrain = true;
   if (id === 'foul-play') m.usesTargetAttack = true;
   if (id === 'toxic') m.status = 'tox';
+  if (SCREEN_MOVES[id]) m.screen = SCREEN_MOVES[id];
+  if (SCREEN_BREAKERS.has(id)) m.breaksScreens = true;
+  if (id === 'defog') {
+    m.boosts = { eva: -1 };
+    m.clearsScreens = true;
+  }
   m.supported = supportedMove(m);
   return m;
 }
@@ -101,8 +118,12 @@ export function movepool(entry) {
   return learnedMoves(entry).map((id) => moveData(id));
 }
 
+export function usableMovepool(entry) {
+  return learnedMoves(entry).filter((id) => moveData(id).supported);
+}
+
 export function defaultMoveset(entry) {
-  const usable = learnedMoves(entry).filter((id) => moveData(id).supported);
+  const usable = usableMovepool(entry);
   if (usable.length) return usable.slice(-MOVES_PER_FIGHTER);
   return MOVEDEX.tackle ? ['tackle'] : [];
 }
@@ -114,8 +135,15 @@ export function validMoveset(entry, ids) {
 }
 
 export function movesetFor(entry) {
-  return validMoveset(entry, entry.moveset) ? entry.moveset : defaultMoveset(entry);
+  if (!Array.isArray(entry.moveset) || !entry.moveset.length) return defaultMoveset(entry);
+  const saved = [...new Set(entry.moveset)].slice(0, MOVES_PER_FIGHTER);
+  const pool = new Set(usableMovepool(entry));
+  const spares = shuffled([...pool].filter((id) => !saved.includes(id)), rng(`mv:${entry.id ?? entry.finalID}:${saved.join(',')}`));
+  const moves = saved.map((id) => (pool.has(id) ? id : spares.shift())).filter(Boolean);
+  return moves.length ? moves : defaultMoveset(entry);
 }
+
+export const usableAbility = (key) => !!key && knownAbility(key) && !INERT[key];
 
 export function abilityOptions(entry) {
   const data = speciesData(entry.finalID);
@@ -160,9 +188,7 @@ export function species(entry) {
   return { id: finalID, name: data ? data.name : `#${finalID}`, sprite: String(finalID), types, stats, floats: floats(finalID) };
 }
 
-export function abilityFor(entry) {
-  const data = speciesData(entry.finalID);
-  if (!data?.abilities?.length) return null;
+function savedAbility(entry, data) {
   const regular = data.abilities;
   const all = data.hiddenAbility ? [...regular, data.hiddenAbility] : regular;
   if (entry.abilityChoice && all.includes(entry.abilityChoice) && knownAbility(entry.abilityChoice)) return entry.abilityChoice;
@@ -170,6 +196,16 @@ export function abilityFor(entry) {
   if (entry.abilitySlot === 3 && data.hiddenAbility) return data.hiddenAbility;
   if (entry.abilitySlot === 1 || entry.abilitySlot === 2) return regular[entry.abilitySlot - 1] ?? regular[0];
   return regular[hash(`ab:${entry.id ?? entry.finalID}`) % regular.length];
+}
+
+export function abilityFor(entry) {
+  const data = speciesData(entry.finalID);
+  if (!data?.abilities?.length) return null;
+  const saved = savedAbility(entry, data);
+  if (usableAbility(saved)) return saved;
+  const others = abilityOptions(entry).map((a) => a.key).filter((key) => key !== saved && usableAbility(key));
+  if (!others.length) return null;
+  return others[Math.floor(rng(`ab:${entry.id ?? entry.finalID}:${saved}`)() * others.length)];
 }
 
 const scale = (base, iv, level) => Math.floor(((2 * base + iv) * level) / 100);

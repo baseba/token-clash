@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseSave, SaveError, firstOfEachSpecies } from '../server/save.js';
+import { parseSave, SaveError, firstOfEachSpecies, uniqueSpecies, uniqueVariants, carryTeam } from '../server/save.js';
 
 const text = readFileSync(new URL('./fixtures/export.json', import.meta.url), 'utf8');
 
@@ -58,4 +58,29 @@ test('keeps only the first caught of each species, ordered by Pokédex number', 
   const { roster } = parseSave(JSON.stringify(twice));
   assert.equal(roster.filter((e) => e.finalID === 405).length, 1);
   assert.equal(roster.find((e) => e.finalID === 405).id, '0b51abcf-fbf7-4712-b832-2a93dd76cc7b');
+});
+
+test('a stored roster keeps only the first of each species', () => {
+  const roster = [{ id: 'pika-1', finalID: 25 }, { id: 'bulba', finalID: 1 }, { id: 'pika-2', finalID: 25 }, { id: 'pika-3', finalID: 25 }];
+  assert.deepEqual(uniqueSpecies(roster).map((e) => e.id), ['pika-1', 'bulba']);
+});
+
+test('a team slot held by a dropped repeat goes to the one that stays', () => {
+  const before = [{ id: 'pika-1', finalID: 25 }, { id: 'bulba', finalID: 1 }, { id: 'pika-2', finalID: 25 }, { id: 'gone', finalID: 7 }];
+  const after = uniqueSpecies(before).filter((e) => e.id !== 'gone');
+  assert.deepEqual(carryTeam(['pika-2', 'bulba', 'gone'], before, after), ['pika-1', 'bulba']);
+  assert.deepEqual(carryTeam(['pika-1', 'pika-2'], before, after), ['pika-1']);
+});
+
+test('a shiny and a plain one of the same species both stay in the collection', () => {
+  const c = (id, finalID, shiny, caught, order) => ({ e: { id, finalID, shiny }, caught, order });
+  const kept = firstOfEachSpecies([c('plain-late', 25, false, 5, 0), c('shiny-late', 25, true, 6, 1), c('plain-early', 25, false, 1, 2), c('shiny-early', 25, true, 2, 3)]);
+  assert.deepEqual(kept.map((e) => e.id), ['plain-early', 'shiny-early']);
+  const stored = [{ id: 'p1', finalID: 25 }, { id: 's1', finalID: 25, shiny: true }, { id: 'p2', finalID: 25 }, { id: 's2', finalID: 25, shiny: true }];
+  assert.deepEqual(uniqueVariants(stored).map((e) => e.id), ['p1', 's1']);
+});
+
+test('a team never carries the shiny and the plain one of a species together', () => {
+  const roster = [{ id: 'p1', finalID: 25 }, { id: 's1', finalID: 25, shiny: true }, { id: 'b', finalID: 1 }];
+  assert.deepEqual(carryTeam(['s1', 'b', 'p1'], roster, roster), ['s1', 'b']);
 });
