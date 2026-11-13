@@ -59,11 +59,11 @@ function play(seed, levelCap = null) {
   return b;
 }
 
-test('battles always finish with a winner', () => {
+test('battles always finish, with a winner or a double knock out', () => {
   for (let seed = 1; seed <= 200; seed++) {
     const b = play(seed, seed % 2 ? 50 : null);
     assert.equal(b.status, 'finished', `seed ${seed}`);
-    assert.ok(b.winner === 0 || b.winner === 1);
+    assert.ok([0, 1, null].includes(b.winner));
     assert.ok(b.turn < 60, `seed ${seed} took ${b.turn} turns`);
   }
 });

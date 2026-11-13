@@ -208,6 +208,16 @@ export function abilityFor(entry) {
   return others[Math.floor(rng(`ab:${entry.id ?? entry.finalID}:${saved}`)() * others.length)];
 }
 
+export function genderFor(entry) {
+  const rate = speciesData(entry.finalID)?.genderRate;
+  if (rate == null) return entry.gender ?? null;
+  if (rate === -1) return null;
+  if (rate === 0) return 'male';
+  if (rate === 8) return 'female';
+  if (entry.gender === 'male' || entry.gender === 'female') return entry.gender;
+  return hash(`gender:${entry.id ?? entry.finalID}`) % 8 < rate ? 'female' : 'male';
+}
+
 const scale = (base, iv, level) => Math.floor(((2 * base + iv) * level) / 100);
 
 export function statsFor([hp, attack, defense, spAttack, spDefense, speed], iv, level, nature = null) {
@@ -246,7 +256,7 @@ export function buildFighter(entry, { levelCap } = {}) {
     floats: sp.floats,
     ability,
     abilityInfo: abilityInfo(ability),
-    gender: entry.gender ?? null,
+    gender: genderFor(entry),
     nature: entry.nature ?? null,
     ivs: iv,
   };

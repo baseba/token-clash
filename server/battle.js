@@ -789,6 +789,10 @@ function statusMove(b, me, foe, move) {
   if (move.volatile === 'attract') did = addVolatile(b, target, 'attract', source) || did;
   if (move.volatile === 'leechseed') did = addVolatile(b, target, 'leechseed', source) || did;
   if (move.self) did = Object.keys(boost(b, source, move.self, source)).length > 0 || did;
+  if (!did && move.volatile === 'attract' && (!target.gender || !source.gender || target.gender === source.gender)) {
+    emit(b, { t: 'nothing', side: s, reason: !target.gender || !source.gender ? 'genderless' : 'sameGender' });
+    return;
+  }
   if (move.clearsScreens) {
     did = clearScreens(b, sideIndex(b, target), 'defog') || did;
     for (const side of [0, 1]) did = clearToxicSpikes(b, side) || did;
