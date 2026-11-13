@@ -13,7 +13,8 @@ import { createPreview, pick, fillMissing, previewReady, chosenEntries, previewV
 import { openStore } from './store.js';
 import { serverStats } from './stats.js';
 import { randomParty } from './random.js';
-import { AI_LABELS, aiTrainerId, aiLevelOf, isAiLevel, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
+import { AI_LEVELS, AI_LABELS, JEV_LEVEL, aiTrainerId, aiLevelOf, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
+import { chooseJevAction, jevConfigured } from './jev.js';
 
 const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -23,6 +24,11 @@ const TRUST_CF = process.env.TRUST_CF_CONNECTING_IP === '1';
 const TURN_MS = Number(process.env.TURN_MS || 60_000);
 const PREVIEW_MS = Number(process.env.PREVIEW_MS || 60_000);
 const ROLL_MS = Number(process.env.ROLL_MS ?? 6_000);
+// Skynet needs a way to reach Jev: JEV_API_URL (the egress proxy, which holds the key) or a key to
+// call TypeSafe directly. Without either, the level is neither offered nor accepted.
+const JEV_API_KEY = process.env.JEV_API_KEY || '';
+const JEV_ON = jevConfigured();
+const AI_AVAILABLE = AI_LEVELS.filter((level) => level !== JEV_LEVEL || JEV_ON);
 const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 // "?v=dev" in index.html and app.js becomes a hash of the code, so each deploy gets new URLs and
 // no browser keeps old code (Cloudflare stretches the cache of .js/.css to hours).
@@ -201,6 +207,7 @@ function myView(t) {
   return {
     ...trainerSummary(t),
     team: t.team,
+    aiLevels: AI_AVAILABLE,
     roster: t.roster.map((e) => ({ ...buildFighter(e), active: !!e.active, nickname: e.nickname || null, saveEdit: saveEdit(e) })).sort((a, b) => a.speciesId - b.speciesId),
   };
 }
@@ -287,6 +294,8 @@ function aiTurn(id, r) {
   b.sides.forEach((side, s) => {
     const level = aiLevelOf(side.trainerId);
     if (!level || !needsAction(b, s)) return;
+    // Never let a Skynet bug become an unhandled rejection: the turn timer still plays for it.
+    if (level === JEV_LEVEL) return void jevTurn(id, r, s).catch((e) => console.error('Skynet:', e));
     const action = chooseAction(b, s, level) ?? autoAction(b, s);
     if (!action) return;
     acted = true;
@@ -294,6 +303,29 @@ function aiTurn(id, r) {
   });
   if (events) afterResolve(id, r, events);
   else if (acted) broadcast(r, { t: 'ready' });
+}
+
+// Jev answers over the network, so this side acts later. Meanwhile the rival may act, the turn
+// timer may play for Skynet, or the room may close: the answer only counts if nothing moved.
+async function jevTurn(id, r, s) {
+  const b = r.battle;
+  const at = `${b.turn}:${b.phase}`;
+  r.jevAsked ??= new Set();
+  if (r.jevAsked.has(at)) return;
+  r.jevAsked.add(at);
+  const picked = await chooseJevAction(b, s, { apiKey: JEV_API_KEY });
+  r.jevAsked.delete(at);
+  if (r.battle !== b || b.status !== 'active' || `${b.turn}:${b.phase}` !== at || !needsAction(b, s)) return;
+  const action = picked ?? chooseAction(b, s, JEV_LEVEL) ?? autoAction(b, s);
+  if (!action) return;
+  let events;
+  try {
+    events = submit(b, s, action);
+  } catch {
+    return;
+  }
+  if (events) afterResolve(id, r, events);
+  else broadcast(r, { t: 'ready' });
 }
 
 function frameFor(r, ws, extra = {}) {
@@ -557,7 +589,8 @@ async function api(req, res, url) {
     const body = await readBody(req);
     const levelCap = body.levelCap === 50 ? 50 : null;
     const mode = body.mode === 'random' ? 'random' : 'team';
-    if (isAiLevel(body.ai)) return send(res, 200, { challenge: challengeView(startAiChallenge(t, { mode, levelCap, level: body.ai }), t.id) });
+    if (body.ai === JEV_LEVEL && !JEV_ON) return send(res, 503, { error: 'Skynet no está disponible en este servidor.' });
+    if (AI_AVAILABLE.includes(body.ai)) return send(res, 200, { challenge: challengeView(startAiChallenge(t, { mode, levelCap, level: body.ai }), t.id) });
     const id = newId(6);
     db.challenges[id] = {
       id,

@@ -17,6 +17,9 @@ En vivo: **https://clash.mirrordev.xyz**
    También se puede pelear contra la IA (Fácil, Media, Difícil o Muy difícil), que usa Pokémon de la 1.ª a la
    5.ª generación. Con tu equipo, la dificultad cambia cómo arma su equipo y cómo pelea; en aleatoria, solo cómo
    pelea. Las peleas contra la IA no cuentan para el ranking ni quedan en tu historial.
+   **Skynet** arma su equipo como Muy difícil, pero en cada turno le pregunta a
+   [Jev](https://docs.typesafe.ai) (el modelo de decisiones de TypeSafe) qué ataque usar o a quién sacar. Solo
+   aparece si el servidor tiene cómo llegar a Jev (ver Deploy).
 4. Ranking de victorias en la portada. Opción "Todos a nivel 50" para que gane la estrategia.
 
 ## Pokémon (PokeAPI)
@@ -56,6 +59,11 @@ npm test        # parser, motor de batalla y flujo completo con WebSocket
 - `public/types.js`: tipos y tabla de efectividad.
 - `server/battle.js`: motor puro de batalla (aleatoriedad inyectada).
 - `server/ai.js`: la IA: arma su equipo y elige qué hacer cada turno (aleatoriedad inyectada).
+- `server/jev.js`: Skynet. Le pasa a Jev solo lo que vería un jugador de ese lado (sin nombres de entrenador ni
+  apodos) y las acciones válidas como una pregunta Choice. Si Jev no responde en 4 s o falla, decide la IA Muy difícil.
+  Variables: `JEV_API_URL` (en producción, el proxy) o `JEV_API_KEY` para llamar directo a TypeSafe; sin ninguna
+  de las dos no hay Skynet. `JEV_MODEL` fija la versión (por defecto `jev-1.14.0`).
+- `server/jev-proxy.js`: el proxy de salida de Skynet (ver Deploy).
 - `server/random.js`: sorteo de la batalla aleatoria (equipo, movimientos y habilidad; aleatoriedad inyectada).
 - `server/index.js`: HTTP + WebSocket, desafíos, ranking. Persistencia en `data/db.json`.
 - `public/`: frontend sin build (JS de módulos, sprites PNG).
@@ -66,16 +74,21 @@ Las batallas en curso viven en memoria: reiniciar el servicio corta las peleas a
 
 La app corre en un contenedor sin puertos publicados, solo lectura, sin capabilities, en una red interna
 sin salida. Solo `cloudflared` (en esa red y en una con salida) la alcanza. Los datos viven en `./data`.
+Para Skynet, la app le pregunta a Jev a través de `token-clash-jev`, un proxy en las mismas dos redes que solo
+reenvía `POST /v1/systemone` a TypeSafe y le agrega la clave: la app sigue sin salida y sin la clave.
 
 | Archivo | Se instala como |
 | --- | --- |
 | `deploy/Containerfile` | imagen `localhost/token-clash:latest` |
 | `deploy/token-clash.network`, `deploy/token-clash-egress.network` | `~/.config/containers/systemd/` |
-| `deploy/token-clash.container`, `deploy/cloudflared-token-clash.container` | `~/.config/containers/systemd/` |
+| `deploy/token-clash.container`, `deploy/cloudflared-token-clash.container`, `deploy/token-clash-jev.container` | `~/.config/containers/systemd/` |
 
 Túnel (ya creado, una sola vez): `cloudflared tunnel create token-clash`,
 `cloudflared tunnel route dns token-clash clash.mirrordev.xyz`, y el token directo al secret
 `cloudflared-token-clash-token` de Podman.
+
+Clave de Jev (una sola vez): `podman secret create token-clash-jev-key archivo-con-la-clave`. Sin el proxy
+corriendo, Skynet sigue apareciendo pero juega como Muy difícil (`journalctl --user -u token-clash` lo avisa).
 
 ### Deploy automático
 
@@ -118,6 +131,7 @@ systemctl --user daemon-reload
 podman tag token-clash token-clash:previous
 podman build --format docker -t token-clash -f deploy/Containerfile .
 systemctl --user restart token-clash
+systemctl --user restart token-clash-jev   # usa la misma imagen
 ```
 
 Volver a la versión anterior: `podman tag token-clash:previous token-clash:latest && systemctl --user restart token-clash`.

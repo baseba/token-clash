@@ -96,6 +96,10 @@ if ! systemctl --user restart token-clash; then
   exit 1
 fi
 
+# The Jev proxy runs from the same image: move it to the new one too. It's optional (Skynet falls back
+# to the very hard AI without it), so a failure here is logged, not rolled back.
+systemctl --user try-restart token-clash-jev || log "$short: el proxy de Jev no levantó; Skynet juega como Muy difícil. Revisa: systemctl --user status token-clash-jev"
+
 rm -f "$STATE_DIR/failed"
 # The image that was "previous" before this deploy is now untagged: drop it (fails harmlessly if in use).
 [[ -n $old_previous ]] && podman rmi "$old_previous" >/dev/null 2>&1 || true
