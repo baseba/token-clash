@@ -9,12 +9,18 @@ En vivo: **https://clash.mirrordev.xyz**
 
 1. En PokeTokenBar: Ajustes → Backup & Transfer → Exportar (`PokeTokenBar-Save-YYYY-MM-DD.json`).
    También sirve el archivo vivo `~/Library/Application Support/PokeTokenBar/companion-state.json`.
-2. Arrástralo en la web con tu nombre de entrenador. Tu colección queda en el inicio, ordenada por número de
-   Pokédex, con filtros por nombre, tipo y shiny. Si tienes repetidos de una especie, queda el primero que
-   capturaste (el shiny y el normal se muestran los dos, pero en un equipo solo puede ir uno).
-3. En **Tu equipo** (`/equipo`) armas tus 6, los ordenas arrastrando (el primero es el líder) y eliges los
+2. Arrástralo en la web con tu nombre de entrenador. El sitio tiene cuatro pestañas:
+   - **Inicio:** tu equipo, las salas abiertas y la nueva batalla.
+   - **Colección** (`/coleccion`): tus Pokémon ordenados por número de Pokédex, con filtros por nombre, tipo y
+     shiny. Si tienes repetidos de una especie, queda el primero que capturaste (el shiny y el normal se muestran
+     los dos, pero en un equipo solo puede ir uno).
+   - **Pokédex** (`/pokedex`): las 649 especies de la 1.ª a la 5.ª generación. Las que no tienes salen sin información y las
+     que tienes muestran sprite, stats base y línea evolutiva; una preevolución de algo que tienes también queda
+     registrada. Cada una tiene un switch para verla shiny si la tienes shiny.
+   - **Stats:** tus batallas y torneos, el ranking y las stats del servidor.
+3. En **Colección** armas tus 6, los ordenas arrastrando (el primero es el líder) y eliges los
    movimientos y la habilidad de cada uno. "Descargar save editado" baja tu save con esos cambios para
-   importarlo de vuelta en PokeTokenBar.
+   importarlo de vuelta en PokeTokenBar, y "Actualizar save" sube uno más nuevo.
 4. En **Nueva batalla** eliges el modo y el rival:
    - **🎒 Batalla con tu equipo:** los 6 que armaste.
    - **🎲 Batalla aleatoria:** los dados sortean hasta 6 de la colección de cada uno, sin repetir especie, con
@@ -38,7 +44,7 @@ En vivo: **https://clash.mirrordev.xyz**
        sus turnos se juegan solos a los 15 s para no frenar al resto.
      - Al final de cada pelea todos ven quién ganó y quién quedó fuera; luego vuelven a las llaves, donde se anima
        al que avanza, y pasan a la siguiente pelea.
-     - Las IAs llevan nombres al azar de una lista fija (por ejemplo «nora ai - ai difícil»), sin repetirse dentro
+     - Las IAs llevan nombres al azar de una lista fija (por ejemplo «nora ai - difícil»), sin repetirse dentro
        de un torneo.
      - Los torneos terminados con al menos 2 personas entran a **Tus torneos** y a la sección **Torneos** de
        `/stats` (campeones, finales y últimos torneos). Sus peleas no suman al ranking 1 contra 1.
@@ -73,10 +79,12 @@ proporción de la especie, y se muestra porque afecta a movimientos como Atracci
 
 El save solo aporta números: especie, cadena evolutiva, rareza, nivel, IVs y si es shiny. Todo lo demás sale de
 [PokeAPI](https://pokeapi.co): nombre, las seis stats base, tipos reales, habilidades, peso, proporción de
-género, los movimientos que aprende cada especie por nivel y los sprites (los animados de Negro/Blanco cuando
+género, de qué especie evoluciona, los movimientos que aprende cada especie por nivel y los sprites (los animados de Negro/Blanco cuando
 existen, de frente, de espalda y shiny). Los datos de combate de cada movimiento (prioridad, banderas, efectos)
 salen de los datos con licencia MIT de [Pokémon Showdown](https://github.com/smogon/pokemon-showdown). Por
-defecto, cada Pokémon usa los últimos movimientos que aprendió hasta su nivel; en `/equipo` se cambian.
+defecto, cada Pokémon usa los últimos movimientos que aprendió hasta su nivel; en `/coleccion` se cambian. Un
+Pokémon evolucionado también puede usar lo que aprendían sus preevoluciones hasta ese nivel (Raichu tiene los de
+Pichu, Pikachu y Raichu).
 
 Los datos viven en `server/pokeapi.json`, `server/movedex.json` y `server/abilities.json`. Los sprites no se
 versionan: `npm install` los descarga en `public/sprites/` (o `npm run sprites`). El servidor nunca llama a la
@@ -120,6 +128,7 @@ npm test        # parser, motor de batalla, IA, stats y flujo completo con WebSo
 - `server/random.js`: sorteo de la batalla aleatoria (equipo, movimientos y habilidad; aleatoriedad inyectada).
 - `server/lobby.js`: salas abiertas y emparejamiento (qué salas se listan y a cuál entra una búsqueda pública).
 - `server/tournament.js`: asientos, llaves y avance del torneo.
+- `server/pokedex.js`: qué especies tiene registradas cada jugador.
 - `server/index.js`: HTTP + WebSocket, desafíos, ranking. Persistencia en `data/db.json`.
 - `public/`: frontend sin build (JS de módulos); `public/fx.js` dibuja los efectos de los movimientos y estados.
 
