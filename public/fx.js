@@ -591,6 +591,12 @@ export function createFx(arena) {
     await Promise.all(jobs);
   }
 
+  async function shield(on) {
+    const u = unit();
+    const bubble = node({ width: `${u * 34}px`, height: `${u * 34}px`, marginLeft: `${-u * 17}px`, marginTop: `${-u * 17}px`, borderRadius: '50%', border: `${u * 0.9}px solid rgba(150, 230, 140, .9)`, background: 'radial-gradient(circle, rgba(170, 255, 160, .05) 55%, rgba(150, 240, 140, .35))', boxShadow: '0 0 14px rgba(140, 240, 130, .7)' });
+    await play(bubble, [{ transform: at(on, 'scale(0.4)'), opacity: 0 }, { transform: at(on, 'scale(1)'), opacity: 1, offset: 0.3 }, { transform: at(on, 'scale(1.03)'), opacity: 1, offset: 0.75 }, { transform: at(on, 'scale(1.15)'), opacity: 0 }], { duration: 760 });
+  }
+
   const SHAPES = {
     hearts: (f, t) => hearts(t),
     powder: (f, t, ty) => powder(t, ty),
@@ -644,6 +650,8 @@ export function createFx(arena) {
       if (reduced()) return Promise.resolve();
       const on = center(spot);
       switch (kind) {
+        case 'protect':
+          return shield(on);
         case 'confusion':
           return orbit(on, 'electric');
         case 'attract':
