@@ -3,9 +3,10 @@ import { buildFighter } from './creatures.js';
 export const PARTY_SIZE = 6;
 export const BATTLE_SIZE = 3;
 
-export function createPreview({ sides, levelCap = null }) {
+export function createPreview({ sides, levelCap = null, mode = 'team' }) {
   return {
     levelCap,
+    mode,
     sides: sides.map((s) => ({ trainerId: s.trainerId, name: s.name, entries: s.entries.slice(0, PARTY_SIZE), picks: null })),
   };
 }
@@ -43,12 +44,13 @@ export const previewReady = (p) => p.sides.every((s) => s.picks);
 export const chosenEntries = (p, s) => p.sides[s].picks.map((i) => p.sides[s].entries[i]);
 
 function seenCard(f) {
-  return { name: f.name, speciesName: f.speciesName, sprite: f.sprite, shiny: f.shiny, floats: f.floats, rarity: f.rarity };
+  return { name: f.name, speciesName: f.speciesName, sprite: f.sprite, shiny: f.shiny, floats: f.floats, rarity: f.rarity, types: f.types };
 }
 
 export function previewView(p, viewer = null) {
   return {
     levelCap: p.levelCap,
+    mode: p.mode ?? 'team',
     sides: p.sides.map((side, s) => {
       const fighters = side.entries.map((e) => buildFighter(e, { levelCap: p.levelCap }));
       const own = viewer === s;
