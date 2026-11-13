@@ -1,4 +1,4 @@
-import { buildFighter, speciesData, effectiveness, usableMovepool, abilityOptions, usableAbility, moveData, shuffled, rng, STRUGGLE, MOVES_PER_FIGHTER } from './creatures.js';
+import { buildFighter, speciesData, formData, statsFor, effectiveness, usableMovepool, abilityOptions, usableAbility, moveData, shuffled, rng, STRUGGLE, MOVES_PER_FIGHTER } from './creatures.js';
 import { validActions, submit, needsAction, STRUGGLE_MOVE } from './battle.js';
 import { randomize } from './random.js';
 import { PARTY_SIZE, BATTLE_SIZE } from './preview.js';
@@ -185,20 +185,15 @@ function diversePick(ranked, count) {
   return picked;
 }
 
-function counterScore(id, foes) {
-  const data = speciesData(id);
-  const me = { types: data.types };
-  return foes.reduce((sum, f) => sum + speciesMatchup(me, { types: speciesData(f.finalID)?.types ?? ['normal'] }), 0) + bst(data) / 120;
-}
-
-export function buildAiTeam({ difficulty: requested, level, foes = [], random = Math.random }) {
+// The team never looks at the rival's: harder AIs just draw from a stronger pool, with luck.
+export function buildAiTeam({ difficulty: requested, level, random = Math.random }) {
   const difficulty = tactics(requested);
   const pool = candidates(difficulty, level);
   let ids;
   if (difficulty === 'easy' || difficulty === 'mid') ids = shuffled(pool, random).slice(0, PARTY_SIZE);
-  else if (difficulty === 'hard') ids = diversePick(shuffled(pool, random).sort((a, b) => bst(speciesData(b)) * (0.8 + random() * 0.4) - bst(speciesData(a)) * (0.8 + random() * 0.4)), PARTY_SIZE);
   else {
-    const ranked = pool.map((id) => ({ id, s: counterScore(id, foes) + random() * 1.5 })).sort((a, b) => b.s - a.s).map((x) => x.id);
+    const luck = difficulty === 'hard' ? 0.4 : 0.6;
+    const ranked = pool.map((id) => ({ id, s: bst(speciesData(id)) * (1 - luck / 2 + random() * luck) })).sort((a, b) => b.s - a.s).map((x) => x.id);
     ids = diversePick(ranked, PARTY_SIZE);
   }
   return ids.map((id, index) => aiEntry(id, { level, difficulty, random, index }));
@@ -209,13 +204,82 @@ export function buildAiRandomParty({ level, random = Math.random }) {
   return ids.map((id, index) => randomize({ id: `ai-${index}-${id}`, finalID: id, baseID: id, rarity: rarityOf(speciesData(id)), shiny: false, level, ivs: { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 }, learned: [] }, random));
 }
 
-export function aiPicks({ difficulty: level, own, foes, random = Math.random }) {
+// The three for the battle are picked on a hunch, without looking at the rival's party: easier
+// AIs at random, harder ones leaning towards their strongest.
+export function aiPicks({ difficulty: level, own, random = Math.random }) {
   const difficulty = tactics(level);
   const order = own.map((_, i) => i);
-  if (difficulty === 'easy' || difficulty === 'mid') return shuffled(order, random).slice(0, Math.min(BATTLE_SIZE, own.length));
-  const typesOf = (e) => ({ types: speciesData(e.finalID)?.types ?? ['normal'] });
-  const score = (i) => foes.reduce((sum, f) => sum + speciesMatchup(typesOf(own[i]), typesOf(f)), 0) + bst(speciesData(own[i].finalID) ?? { stats: [0] }) / 150 + (difficulty === 'hard' ? random() * 2 : 0);
-  return order.map((i) => ({ i, s: score(i) })).sort((a, b) => b.s - a.s).slice(0, Math.min(BATTLE_SIZE, own.length)).map((x) => x.i);
+  const count = Math.min(BATTLE_SIZE, own.length);
+  if (difficulty === 'easy' || difficulty === 'mid') return shuffled(order, random).slice(0, count);
+  const strength = (i) => bst(speciesData(own[i].finalID) ?? { stats: [0] }) / 150;
+  return order.map((i) => ({ i, s: strength(i) + random() * 2 })).sort((a, b) => b.s - a.s).slice(0, count).map((x) => x.i);
+}
+
+// ---------- what the AI may know ----------
+// The AI decides on its belief of the battle, built only from what a human on its side sees:
+// the rival's revealed moves and ability, its HP as a percentage, and its Pokémon once they've
+// been out. The rest is a guess from the species, never the real thing. Its pending choice is
+// never there.
+
+const GUESS_IV = 15;
+const GUESS_IVS = { hp: GUESS_IV, atk: GUESS_IV, def: GUESS_IV, satk: GUESS_IV, sdef: GUESS_IV, spd: GUESS_IV };
+const guesses = new Map();
+
+// The moves a seasoned player would expect from that species at that level.
+function expectedMoves(speciesId, level) {
+  const key = `${speciesId}:${level}`;
+  if (!guesses.has(key)) {
+    let moves = [];
+    try {
+      const probe = { id: `guess-${speciesId}`, finalID: speciesId, baseID: speciesId, level, ivs: GUESS_IVS, learned: [] };
+      moves = pickMoveset(probe, 'hard', () => 0.5).map(moveData);
+    } catch {
+      moves = [];
+    }
+    guesses.set(key, moves);
+  }
+  return guesses.get(key);
+}
+
+function believedFoe(f) {
+  if (!f.seen) return f;
+  const look = f.vol.illusion ?? f.seenAs;
+  let moves = f.moves;
+  let vol = f.vol;
+  if (!f.vol.transformed) {
+    // Revealed moves keep their slot; the unknown ones become guesses (or go, if there are none).
+    const known = (m) => f.revealedMoves.has(m.key);
+    const extra = expectedMoves(f.speciesId, f.level).filter((g) => !f.moves.some((m) => known(m) && m.key === g.key));
+    const slots = f.moves.map((m) => (known(m) ? m : extra.shift()));
+    moves = slots.filter(Boolean);
+    const slotOf = (i) => (i == null || !slots[i] ? undefined : moves.indexOf(slots[i]));
+    vol = { ...f.vol, charging: slotOf(f.vol.charging), mustRecharge: slotOf(f.vol.mustRecharge) };
+    for (const k of ['charging', 'mustRecharge']) if (vol[k] === undefined) delete vol[k];
+  }
+  const base = f.form ? formData(f.form)?.base : speciesData(f.speciesId)?.stats;
+  const stats = f.vol.transformed || !base ? { ...f.stats } : statsFor(base, GUESS_IVS, f.level);
+  const share = f.hp / f.stats.hp;
+  const ability = f.revealedAbilities.has(f.ability) ? f.ability : null;
+  return {
+    ...f,
+    types: look?.types ?? f.types,
+    stats,
+    hp: f.hp > 0 ? Math.max(1, Math.round(stats.hp * share)) : 0,
+    moves,
+    vol,
+    pp: Object.fromEntries(moves.map((m) => [m.key, m.pp])),
+    ability,
+    baseAbility: ability,
+  };
+}
+
+export function beliefOf(b, s) {
+  const { random, ...state } = b;
+  const copy = structuredClone(state);
+  const theirs = copy.sides[1 - s];
+  theirs.action = null;
+  theirs.team = theirs.team.map(believedFoe);
+  return copy;
 }
 
 function moveOf(f, idx) {
@@ -363,7 +427,8 @@ function simulate(b, s, mine, theirs, seed) {
 const SEARCH_SEEDS = 2;
 
 function lookahead(b, s, options) {
-  const theirs = validActions(b, 1 - s);
+  const rival = b.sides[1 - s].team;
+  const theirs = validActions(b, 1 - s).filter((a) => a.type !== 'switch' || rival[a.to].seen);
   const replies = theirs.length ? theirs : [null];
   let best = null;
   let bestValue = -Infinity;
@@ -373,7 +438,9 @@ function lookahead(b, s, options) {
       for (let k = 0; k < SEARCH_SEEDS; k++) total += simulate(b, s, mine, reply, `${b.turn}:${k}:${JSON.stringify(mine)}:${JSON.stringify(reply)}`);
       return total / SEARCH_SEEDS;
     });
-    const value = 0.6 * Math.min(...outcomes) + 0.4 * (outcomes.reduce((a, x) => a + x, 0) / outcomes.length);
+    // When every line looks the same (say, lost either way), the plain move score breaks the tie.
+    const tiebreak = mine.type === 'move' ? scoreMove(b, s, mine.move) / 1e4 : 0;
+    const value = 0.6 * Math.min(...outcomes) + 0.4 * (outcomes.reduce((a, x) => a + x, 0) / outcomes.length) + tiebreak;
     if (value > bestValue) [best, bestValue] = [mine, value];
   }
   return best;
@@ -387,12 +454,14 @@ function safeLookahead(b, s, options) {
   }
 }
 
-export function chooseAction(b, s, level, random = Math.random) {
+export function chooseAction(battle, s, level, random = Math.random) {
   const difficulty = tactics(level);
-  const options = validActions(b, s);
+  const options = validActions(battle, s);
   if (!options.length) return null;
   if (options.length === 1) return options[0];
+  const b = beliefOf(battle, s);
   const side = b.sides[s];
+  const memory = battle.sides[s];
   const me = side.team[side.active];
   const foe = b.sides[1 - s].team[b.sides[1 - s].active];
   const smart = difficulty === 'hard' || difficulty === 'veryhard';
@@ -422,13 +491,13 @@ export function chooseAction(b, s, level, random = Math.random) {
     const canKo = foe && foe.hp > 0 && scored.some((x) => moveOf(me, x.a.move).kind !== 'status' && estimateDamage(b, me, foe, moveOf(me, x.a.move)) >= foe.hp);
     const doomed = foe && foe.hp > 0 && bestDamage(b, foe, me, true) >= me.hp && speedOf(foe) > speedOf(me);
     const stuck = best.s < 15;
-    const lastSwitched = lastSwitchTurn.get(side) === b.turn - 1;
+    const lastSwitched = lastSwitchTurn.get(memory) === b.turn - 1;
     const willing = veryhard ? true : random() < 0.35;
     if (!canKo && (veryhard ? doomed || stuck : stuck) && !lastSwitched && willing) {
       const here = matchupScore(b, me, foe, true);
       const alt = switches.map((a) => ({ a, s: matchupScore(b, side.team[a.to], foe, true) })).sort((x, y) => y.s - x.s)[0];
       if (alt.s > here + 0.35) {
-        lastSwitchTurn.set(side, b.turn);
+        lastSwitchTurn.set(memory, b.turn);
         return alt.a;
       }
     }

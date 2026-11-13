@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBattle, submit, validActions, needsAction } from '../server/battle.js';
-import { rng, buildFighter, speciesData, effectiveness } from '../server/creatures.js';
-import { AI_LEVELS, LAST_AI_SPECIES, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction, speciesMatchup } from '../server/ai.js';
+import { rng, buildFighter, speciesData } from '../server/creatures.js';
+import { AI_LEVELS, LAST_AI_SPECIES, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from '../server/ai.js';
 
 const fullyEvolved = (id) => {
   const d = speciesData(id);
@@ -35,12 +35,21 @@ test('harder AIs give their Pokémon better IVs and attacks of more than one typ
   }
 });
 
-test('the very hard AI builds a team against yours', () => {
-  const foes = [6, 59, 38, 136, 146, 157].map((finalID) => ({ finalID }));
-  const team = buildAiTeam({ difficulty: 'veryhard', level: 50, foes, random: rng(4) });
-  const score = team.reduce((sum, e) => sum + foes.reduce((s, f) => s + speciesMatchup(speciesData(e.finalID), speciesData(f.finalID)), 0), 0);
-  assert.ok(score > 0, `matchup ${score}`);
-  assert.ok(team.filter((e) => speciesData(e.finalID).types.some((t) => effectiveness(t, ['fire']) > 1)).length >= 2);
+test('the AI builds its team and picks its three without looking at yours', () => {
+  const water = [7, 8, 9, 54, 55, 60].map((finalID) => ({ finalID }));
+  const fire = [4, 5, 6, 37, 38, 58].map((finalID) => ({ finalID }));
+  for (const difficulty of AI_LEVELS) {
+    const a = buildAiTeam({ difficulty, level: 50, foes: water, random: rng(`t:${difficulty}`) });
+    const b = buildAiTeam({ difficulty, level: 50, foes: fire, random: rng(`t:${difficulty}`) });
+    assert.deepEqual(a, b, difficulty);
+    assert.deepEqual(aiPicks({ difficulty, own: a, foes: water, random: rng(9) }), aiPicks({ difficulty, own: a, foes: fire, random: rng(9) }), difficulty);
+  }
+});
+
+test('the hard AIs still bring strong Pokémon, but not always the same ones', () => {
+  const teams = [0, 1, 2, 3].map((seed) => buildAiTeam({ difficulty: 'veryhard', level: 50, random: rng(`v:${seed}`) }).map((e) => e.finalID).sort().join());
+  assert.ok(new Set(teams).size > 1);
+  for (const t of teams) for (const id of t.split(',')) assert.ok(speciesData(Number(id)).stats.reduce((a, x) => a + x, 0) >= 500);
 });
 
 test('the random party of the AI comes from generations 1 to 5 too', () => {
@@ -119,4 +128,33 @@ test('the very hard AI beats the easy one most of the time', () => {
   const games = 20;
   for (let i = 0; i < games; i++) if (aiVsAi('veryhard', 'easy', i) === 0) wins++;
   assert.ok(wins >= games * 0.7, `${wins}/${games}`);
+});
+
+test("the AI decides on what it has seen, never on the rival's hidden moves, bench or choice", () => {
+  const gengar = mon('g', 94, ['shadow-ball', 'sludge-bomb', 'hypnosis', 'thunderbolt']);
+  const rivals = [
+    [mon('a', 143, ['body-slam']), mon('b', 65, ['psychic'])],
+    [mon('a', 143, ['earthquake', 'crunch', 'rest']), mon('b', 6, ['flamethrower'])],
+  ];
+  for (const difficulty of ['easy', 'mid', 'hard', 'veryhard']) {
+    for (let seed = 0; seed < 5; seed++) {
+      const picks = rivals.map((rival) => {
+        const b = duel([gengar], rival, seed);
+        return JSON.stringify(chooseAction(b, 0, difficulty, rng(seed)));
+      });
+      assert.equal(picks[0], picks[1], `${difficulty}:${seed}`);
+      const b = duel([gengar], rivals[1], seed);
+      const before = JSON.stringify(chooseAction(b, 0, difficulty, rng(seed)));
+      submit(b, 1, validActions(b, 1)[0]);
+      assert.equal(JSON.stringify(chooseAction(b, 0, difficulty, rng(seed))), before, `${difficulty}:${seed} con elección pendiente`);
+    }
+  }
+});
+
+test('a move the rival has used is known, and the AI plays around it', () => {
+  const b = duel([mon('p', 25, ['thunderbolt', 'quick-attack'])], [mon('g', 130, ['bite', 'surf'])]);
+  const gyarados = b.sides[1].team[0];
+  gyarados.revealedMoves.add('surf');
+  assert.ok(gyarados.moves.some((m) => m.key === 'surf'));
+  assert.equal(moveKey(b, 0, chooseAction(b, 0, 'veryhard', rng(1))), 'thunderbolt');
 });

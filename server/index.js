@@ -407,7 +407,7 @@ function startAiChallenge(t, { mode, levelCap, level }) {
   const id = newId(6);
   const hostTeam = mode === 'random' ? randomParty(t.roster) : teamEntries(t).map((e) => ({ ...e }));
   const aiLevel = levelCap ?? averageLevel(hostTeam);
-  const aiTeam = mode === 'random' ? buildAiRandomParty({ level: aiLevel }) : buildAiTeam({ difficulty: level, level: aiLevel, foes: hostTeam });
+  const aiTeam = mode === 'random' ? buildAiRandomParty({ level: aiLevel }) : buildAiTeam({ difficulty: level, level: aiLevel });
   const c = {
     id,
     hostId: t.id,
@@ -432,7 +432,7 @@ function startAiChallenge(t, { mode, levelCap, level }) {
       { trainerId: c.guestId, name: c.guestName, entries: aiTeam },
     ],
   });
-  pick(r.preview, 1, aiPicks({ difficulty: level, own: r.preview.sides[1].entries, foes: r.preview.sides[0].entries }));
+  pick(r.preview, 1, aiPicks({ difficulty: level, own: r.preview.sides[1].entries }));
   store.save();
   armPreviewTimer(id, r, mode === 'random' ? ROLL_MS : 0);
   return c;
