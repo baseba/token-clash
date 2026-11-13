@@ -13,7 +13,7 @@ let proc;
 
 before(async () => {
   proc = spawn(process.execPath, ['server/index.js'], {
-    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'tc-')), TURN_MS: '1500', PREVIEW_MS: '1500' },
+    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'tc-')), TURN_MS: '1500', PREVIEW_MS: '1500', ROLL_MS: '0' },
     stdio: 'inherit',
   });
   for (let i = 0; i < 50; i++) {
@@ -87,7 +87,7 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   const guest = player(id, b.data.token);
   const preview = await new Promise((r) => guest.ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.preview) r(m.preview); }));
   const hostParty = preview.sides[0].party;
-  assert.ok(hostParty.length >= 1 && hostParty.every((f) => f.name && f.sprite && !f.moves && !f.abilityInfo && !f.stats));
+  assert.ok(hostParty.length >= 1 && hostParty.every((f) => f.name && f.sprite && f.types?.length && !f.moves && !f.abilityInfo && !f.stats));
   assert.ok(preview.sides[1].party.every((f) => f.moves && f.stats));
   const spectator = player(id, null);
 
@@ -109,6 +109,65 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   assert.equal(total, 2);
   assert.equal(lb.data.trainers.find((t) => t.name.startsWith('Beto')).name, 'Beto <b>'); // stored as text, escaped by the client
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token })).status, 409);
+
+  assert.equal((await fetch(`${base}/stats`)).status, 200);
+  const stats = await call('/api/stats');
+  assert.equal(stats.data.totals.battles, 1);
+  assert.equal(stats.data.recent[0].id, id);
+  assert.ok(stats.data.topMons.length >= 1);
+  assert.equal(typeof stats.data.live.online, 'number');
+});
+
+test('random battle rolls a party from each collection', async () => {
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Dados', save } });
+  const b = await call('/api/import', { method: 'POST', body: { name: 'Suerte', save } });
+  await call('/api/me', { method: 'PUT', token: a.data.token, body: { team: [a.data.me.roster[0].uid] } });
+  const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode: 'random' } });
+  const id = ch.data.challenge.id;
+  assert.equal(ch.data.challenge.mode, 'random');
+  assert.deepEqual(ch.data.challenge.hostTeam, []);
+  assert.equal(ch.data.challenge.hostTeamSize, 4);
+
+  const host = player(id, a.data.token);
+  await new Promise((r) => host.ws.on('open', r));
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token })).status, 200);
+  const preview = await new Promise((r) => {
+    const seen = host.frames.find((f) => f.preview);
+    if (seen) return r(seen.preview);
+    host.ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.preview) r(m.preview); });
+  });
+  assert.equal(preview.mode, 'random');
+  assert.equal(preview.sides[0].party.length, 4);
+  assert.equal(new Set(preview.sides[0].party.map((f) => f.uid)).size, 4);
+
+  const end = await host.ended;
+  assert.ok(end.state.winner === 0 || end.state.winner === 1 || end.state.winner === null);
+  host.ws.close();
+  const mine = await call('/api/me/challenges', { token: a.data.token });
+  assert.equal(mine.data.challenges.find((c) => c.id === id).mode, 'random');
+});
+
+test('a battle against the AI starts at once and stays out of the ranking and the history', async () => {
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Solo', save } });
+  for (const mode of ['team', 'random']) {
+    const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode, ai: 'veryhard', levelCap: 50 } });
+    assert.equal(ch.status, 200);
+    assert.equal(ch.data.challenge.status, 'active');
+    assert.equal(ch.data.challenge.ai, 'veryhard');
+    assert.equal(ch.data.challenge.guest.name, 'IA Muy difícil');
+    const host = player(ch.data.challenge.id, a.data.token);
+    const preview = await new Promise((r) => host.ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.preview) r(m.preview); }));
+    assert.equal(preview.sides[1].ready, true);
+    assert.ok(preview.sides[1].party.length === 6);
+    const end = await host.ended;
+    assert.ok(end.state.winner === 0 || end.state.winner === 1 || end.state.winner === null);
+    host.ws.close();
+  }
+  const me = await call('/api/me', { token: a.data.token });
+  assert.equal(me.data.me.wins + me.data.me.losses, 0);
+  const list = await call('/api/me/challenges', { token: a.data.token });
+  assert.deepEqual(list.data.challenges, []);
 });
 
 test('timeouts auto-play so a battle always ends', async () => {

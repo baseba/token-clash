@@ -67,13 +67,38 @@ function entryFrom(raw, { finalID, baseID, defaultLevel, fallbackId, chain, stag
   };
 }
 
+const variantKey = (e) => `${e.finalID}:${e.shiny ? 'shiny' : 'plain'}`;
+
 export function firstOfEachSpecies(candidates) {
   const first = new Map();
   for (const c of candidates) {
-    const prev = first.get(c.e.finalID);
-    if (!prev || c.caught < prev.caught || (c.caught === prev.caught && c.order < prev.order)) first.set(c.e.finalID, c);
+    const key = variantKey(c.e);
+    const prev = first.get(key);
+    if (!prev || c.caught < prev.caught || (c.caught === prev.caught && c.order < prev.order)) first.set(key, c);
   }
-  return [...first.values()].sort((x, y) => x.e.finalID - y.e.finalID).map((c) => c.e);
+  return [...first.values()].sort((x, y) => x.e.finalID - y.e.finalID || Number(!!x.e.shiny) - Number(!!y.e.shiny)).map((c) => c.e);
+}
+
+function firstBy(list, key) {
+  const seen = new Set();
+  return list.filter((e) => {
+    const k = key(e);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+export const uniqueVariants = (roster) => firstBy(roster, variantKey);
+
+export const uniqueSpecies = (roster) => firstBy(roster, (e) => e.finalID);
+
+export function carryTeam(team, before, after) {
+  const kept = new Map(after.map((e) => [e.id, e]));
+  const keptByVariant = new Map(after.map((e) => [variantKey(e), e]));
+  const variantOf = new Map(before.map((e) => [e.id, variantKey(e)]));
+  const carried = team.map((id) => kept.get(id) ?? keptByVariant.get(variantOf.get(id))).filter(Boolean);
+  return uniqueSpecies(carried).map((e) => e.id);
 }
 
 export function parseSave(text) {
@@ -119,7 +144,7 @@ export function parseSave(text) {
 
   const roster = firstOfEachSpecies(candidates).slice(0, MAX_ROSTER);
 
-  if (roster.length === 0) throw new SaveError('Tu save no tiene criaturas todavía (¿solo un huevo?). Vuelve cuando nazca la primera.');
+  if (roster.length === 0) throw new SaveError('Tu save no tiene Pokémon todavía (¿solo un huevo?). Vuelve cuando nazca el primero.');
 
   const used = Number(state.usedSinceInstall);
   return {

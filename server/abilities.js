@@ -15,10 +15,10 @@ export const INERT = {
   'sticky-hold': 'items', gluttony: 'items', unburden: 'items', klutz: 'items', 'honey-gather': 'field',
   frisk: 'items', multitype: 'items', pickpocket: 'items', unnerve: 'items', healer: 'doubles',
   'friend-guard': 'doubles', 'heavy-metal': 'moves', 'light-metal': 'moves', harvest: 'items',
-  telepathy: 'doubles', infiltrator: 'moves',
+  telepathy: 'doubles',
   'cheek-pouch': 'items', magician: 'items', symbiosis: 'items', battery: 'doubles', receiver: 'doubles',
   'power-of-alchemy': 'doubles', 'rks-system': 'items', 'ball-fetch': 'items', 'propeller-tail': 'doubles',
-  stalwart: 'doubles', ripen: 'items', 'power-spot': 'doubles', 'screen-cleaner': 'moves',
+  stalwart: 'doubles', ripen: 'items', 'power-spot': 'doubles',
   'unseen-fist': 'moves', 'curious-medicine': 'doubles', commander: 'doubles',
   'cud-chew': 'items', costar: 'doubles', hospitality: 'doubles',
   'embody-aspect': 'tera', 'teraform-zero': 'tera', 'piercing-drill': 'moves',
@@ -717,6 +717,15 @@ const EFFECTS = {
   },
   'slush-rush': weatherSpeed(isIcy),
   'long-reach': {},
+  infiltrator: { infiltrates: true },
+  'screen-cleaner': {
+    onStart(E, me) {
+      const sides = [0, 1].filter((s) => Object.keys(E.b.sides[s].screens).length);
+      if (!sides.length) return;
+      E.show(me);
+      for (const s of sides) E.clearScreens(s, 'cleaner');
+    },
+  },
   'liquid-voice': {
     onModifyMove(E, me, move) {
       if (has(move, 'sound')) move.type = 'water';

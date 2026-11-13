@@ -5,12 +5,15 @@ import { createHash, randomBytes } from 'node:crypto';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { parseSave, SaveError } from './save.js';
-import { buildFighter, movepool, validMoveset, abilityOptions, movesetFor, speciesData, MOVES_PER_FIGHTER } from './creatures.js';
+import { parseSave, SaveError, uniqueSpecies, uniqueVariants, carryTeam } from './save.js';
+import { buildFighter, movepool, validMoveset, abilityOptions, usableAbility, movesetFor, speciesData, MOVES_PER_FIGHTER } from './creatures.js';
 import { abilityInfo } from './abilities.js';
 import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents } from './battle.js';
 import { createPreview, pick, fillMissing, previewReady, chosenEntries, previewView, PARTY_SIZE } from './preview.js';
 import { openStore } from './store.js';
+import { serverStats } from './stats.js';
+import { randomParty } from './random.js';
+import { AI_LABELS, aiTrainerId, aiLevelOf, isAiLevel, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
 
 const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -19,6 +22,7 @@ const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || '';
 const TRUST_CF = process.env.TRUST_CF_CONNECTING_IP === '1';
 const TURN_MS = Number(process.env.TURN_MS || 60_000);
 const PREVIEW_MS = Number(process.env.PREVIEW_MS || 60_000);
+const ROLL_MS = Number(process.env.ROLL_MS ?? 6_000);
 const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 // "?v=dev" in index.html and app.js becomes a hash of the code, so each deploy gets new URLs and
 // no browser keeps old code (Cloudflare stretches the cache of .js/.css to hours).
@@ -28,9 +32,11 @@ const ASSET_VERSION = (() => {
   return h.digest('hex').slice(0, 10);
 })();
 const MAX_BODY = 9 * 1024 * 1024;
+const STARTED_AT = Date.now();
 
 const store = openStore(DATA_DIR);
 const { db } = store;
+dropRepeatedSpecies();
 
 // ---------- helpers ----------
 const sha = (s) => createHash('sha256').update(s).digest('hex');
@@ -121,15 +127,15 @@ function readBody(req) {
 // ---------- trainer views ----------
 function defaultTeam(roster) {
   const rank = { legendary: 3, rare: 2, uncommon: 1, common: 0 };
-  return [...roster]
-    .sort((a, b) => b.level - a.level || rank[b.rarity] - rank[a.rarity] || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0))
+  const best = [...roster].sort((a, b) => b.level - a.level || rank[b.rarity] - rank[a.rarity] || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0));
+  return uniqueSpecies(best)
     .slice(0, PARTY_SIZE)
     .map((e) => e.id);
 }
 
 function teamEntries(t) {
   const byId = new Map(t.roster.map((e) => [e.id, e]));
-  const team = t.team.map((id) => byId.get(id)).filter(Boolean);
+  const team = uniqueSpecies(t.team.map((id) => byId.get(id)).filter(Boolean));
   return team.length ? team : defaultTeam(t.roster).map((id) => byId.get(id));
 }
 
@@ -158,6 +164,27 @@ function monDetail(e) {
   };
 }
 
+function dropRepeatedSpecies() {
+  let changed = false;
+  for (const t of Object.values(db.trainers)) {
+    const roster = uniqueVariants(t.roster ?? []);
+    const team = carryTeam(t.team ?? [], t.roster, roster);
+    if (roster.length === t.roster.length && team.join() === (t.team ?? []).join()) continue;
+    t.team = team;
+    t.roster = roster;
+    if (!t.team.length) t.team = defaultTeam(roster);
+    changed = true;
+  }
+  for (const c of Object.values(db.challenges)) {
+    if (c.status !== 'open' || !Array.isArray(c.hostTeam)) continue;
+    const team = uniqueSpecies(c.hostTeam);
+    if (team.length === c.hostTeam.length) continue;
+    c.hostTeam = team;
+    changed = true;
+  }
+  if (changed) store.save();
+}
+
 function trainerSummary(t) {
   return {
     id: t.id,
@@ -174,23 +201,25 @@ function myView(t) {
   return {
     ...trainerSummary(t),
     team: t.team,
-    roster: t.roster.map((e) => ({ ...buildFighter(e), active: !!e.active, nickname: e.nickname || null, saveEdit: saveEdit(e) })),
+    roster: t.roster.map((e) => ({ ...buildFighter(e), active: !!e.active, nickname: e.nickname || null, saveEdit: saveEdit(e) })).sort((a, b) => a.speciesId - b.speciesId),
   };
 }
 
 
 function challengeView(c, viewerId = null) {
   const host = db.trainers[c.hostId];
-  const hostTeam = c.hostTeam.map((e) => buildFighter(e, { levelCap: c.levelCap }));
+  const hostTeam = (c.status === 'finished' || c.mode !== 'random' ? c.hostTeam : []).map((e) => buildFighter(e, { levelCap: c.levelCap }));
   return {
     id: c.id,
     status: c.status,
     levelCap: c.levelCap,
+    mode: c.mode ?? 'team',
+    ai: c.ai ?? null,
     createdAt: c.createdAt,
     host: { id: c.hostId, name: host?.name ?? c.hostName },
     guest: c.guestId ? { id: c.guestId, name: db.trainers[c.guestId]?.name ?? c.guestName } : null,
     hostTeam: viewerId === c.hostId || c.status === 'finished' ? hostTeam : [],
-    hostTeamSize: hostTeam.length,
+    hostTeamSize: c.mode === 'random' ? Math.min(PARTY_SIZE, host?.roster.length ?? 0) : hostTeam.length,
     winnerId: c.winnerId ?? null,
     turns: c.turns ?? null,
     final: c.final ?? null,
@@ -226,14 +255,14 @@ function previewFrame(r, ws, extra) {
   return { ...extra, t: extra.t === 'presence' || extra.t === 'ready' ? 'preview' : extra.t, preview: previewView(r.preview, you), you, deadline: r.deadline, watchers: r.sockets.size };
 }
 
-function armPreviewTimer(id, r) {
+function armPreviewTimer(id, r, extraMs = 0) {
   clearTimeout(r.timer);
-  r.deadline = Date.now() + PREVIEW_MS;
+  r.deadline = Date.now() + PREVIEW_MS + extraMs;
   r.timer = setTimeout(() => {
     if (!r.preview) return;
     fillMissing(r.preview);
     startBattle(id, r);
-  }, PREVIEW_MS);
+  }, PREVIEW_MS + extraMs);
   r.timer.unref?.();
 }
 
@@ -247,6 +276,24 @@ function startBattle(id, r) {
   });
   armTimer(id, r);
   broadcast(r, { t: 'start' });
+  aiTurn(id, r);
+}
+
+function aiTurn(id, r) {
+  const b = r.battle;
+  if (!b || b.status !== 'active') return;
+  let events = null;
+  let acted = false;
+  b.sides.forEach((side, s) => {
+    const level = aiLevelOf(side.trainerId);
+    if (!level || !needsAction(b, s)) return;
+    const action = chooseAction(b, s, level) ?? autoAction(b, s);
+    if (!action) return;
+    acted = true;
+    events = submit(b, s, action) || events;
+  });
+  if (events) afterResolve(id, r, events);
+  else if (acted) broadcast(r, { t: 'ready' });
 }
 
 function frameFor(r, ws, extra = {}) {
@@ -291,6 +338,7 @@ function afterResolve(id, r, events, timedOut = false) {
   if (r.battle.status === 'finished') finishBattle(id, r);
   else armTimer(id, r);
   broadcast(r, { t: 'events', events, timedOut });
+  aiTurn(id, r);
 }
 
 function finishBattle(id, r) {
@@ -304,11 +352,11 @@ function finishBattle(id, r) {
   c.turns = b.turn;
   c.final = publicState(b);
   if (b.winner !== null) {
+    c.winnerId = b.sides[b.winner].trainerId;
     const w = db.trainers[b.sides[b.winner].trainerId];
     const l = db.trainers[b.sides[1 - b.winner].trainerId];
-    c.winnerId = w?.id ?? null;
-    if (w) w.wins += 1;
-    if (l) l.losses += 1;
+    if (w && !c.ai) w.wins += 1;
+    if (l && !c.ai) l.losses += 1;
   }
   store.save();
   // Keep the finished room a while for late viewers, then drop it.
@@ -316,6 +364,46 @@ function finishBattle(id, r) {
     const cur = rooms.get(id);
     if (cur === r && r.sockets.size === 0) rooms.delete(id);
   }, 10 * 60_000).unref();
+}
+
+function averageLevel(entries) {
+  if (!entries.length) return 50;
+  return Math.max(1, Math.min(100, Math.round(entries.reduce((sum, e) => sum + e.level, 0) / entries.length)));
+}
+
+function startAiChallenge(t, { mode, levelCap, level }) {
+  const id = newId(6);
+  const hostTeam = mode === 'random' ? randomParty(t.roster) : teamEntries(t).map((e) => ({ ...e }));
+  const aiLevel = levelCap ?? averageLevel(hostTeam);
+  const aiTeam = mode === 'random' ? buildAiRandomParty({ level: aiLevel }) : buildAiTeam({ difficulty: level, level: aiLevel, foes: hostTeam });
+  const c = {
+    id,
+    hostId: t.id,
+    hostName: t.name,
+    hostTeam,
+    guestId: aiTrainerId(level),
+    guestName: `IA ${AI_LABELS[level]}`,
+    guestTeam: aiTeam,
+    levelCap,
+    mode,
+    ai: level,
+    status: 'active',
+    createdAt: Date.now(),
+  };
+  db.challenges[id] = c;
+  const r = room(id);
+  r.preview = createPreview({
+    levelCap,
+    mode,
+    sides: [
+      { trainerId: t.id, name: t.name, entries: hostTeam },
+      { trainerId: c.guestId, name: c.guestName, entries: aiTeam },
+    ],
+  });
+  pick(r.preview, 1, aiPicks({ difficulty: level, own: r.preview.sides[1].entries, foes: r.preview.sides[0].entries }));
+  store.save();
+  armPreviewTimer(id, r, mode === 'random' ? ROLL_MS : 0);
+  return c;
 }
 
 // ---------- HTTP ----------
@@ -360,14 +448,14 @@ async function api(req, res, url) {
       db.trainers[t.id] = t;
       byToken.set(t.tokenHash, t);
     } else if (name) t.name = name;
+    const previous = t.roster;
     const kept = new Map(t.roster.map((e) => [e.id, { nickname: e.nickname, moveset: e.moveset, abilityChoice: e.abilityChoice }]));
     t.roster = parsed.roster.map((e) => {
       const k = kept.get(e.id);
       if (!k) return e;
       return Object.fromEntries(Object.entries({ ...e, ...k }).filter(([, v]) => v !== undefined));
     });
-    const ids = new Set(t.roster.map((e) => e.id));
-    t.team = t.team.filter((id) => ids.has(id));
+    t.team = carryTeam(t.team, previous, t.roster);
     if (!t.team.length) t.team = defaultTeam(t.roster);
     t.totalTokens = parsed.totalTokens;
     t.updatedAt = Date.now();
@@ -391,7 +479,7 @@ async function api(req, res, url) {
     }
     const byId = new Map(t.roster.map((e) => [e.id, e]));
     if (Array.isArray(body.team)) {
-      const team = [...new Set(body.team.filter((id) => typeof id === 'string' && byId.has(id)))].slice(0, PARTY_SIZE);
+      const team = uniqueSpecies([...new Set(body.team.filter((id) => typeof id === 'string' && byId.has(id)))].map((id) => byId.get(id))).map((e) => e.id).slice(0, PARTY_SIZE);
       if (team.length) t.team = team;
     }
     if (body.nickname && typeof body.nickname.id === 'string' && byId.has(body.nickname.id)) {
@@ -419,6 +507,7 @@ async function api(req, res, url) {
       }
       if (body.ability !== undefined) {
         if (!abilityOptions(e).some((a) => a.key === body.ability)) return send(res, 400, { error: 'Esa habilidad no es de su especie.' });
+        if (!usableAbility(body.ability)) return send(res, 400, { error: 'Esa habilidad no tiene efecto en Token Clash.' });
         e.abilityChoice = body.ability;
       }
       t.updatedAt = Date.now();
@@ -431,19 +520,26 @@ async function api(req, res, url) {
     const t = trainerFrom(req);
     if (!t) return send(res, 401, { error: 'Sin sesión' });
     const list = Object.values(db.challenges)
-      .filter((c) => c.hostId === t.id || c.guestId === t.id)
+      .filter((c) => !c.ai && (c.hostId === t.id || c.guestId === t.id))
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 30)
       .map((c) => ({
         id: c.id,
         status: c.status,
         levelCap: c.levelCap,
+        mode: c.mode ?? 'team',
+        ai: c.ai ?? null,
         createdAt: c.createdAt,
         opponent: c.hostId === t.id ? (c.guestId ? db.trainers[c.guestId]?.name ?? c.guestName : null) : db.trainers[c.hostId]?.name ?? c.hostName,
         won: c.status === 'finished' ? c.winnerId === t.id : null,
         mine: c.hostId === t.id,
       }));
     return send(res, 200, { challenges: list });
+  }
+
+  if (p === '/api/stats' && method === 'GET') {
+    const live = [...rooms.values()].filter((r) => r.preview || r.battle?.status === 'active').length;
+    return send(res, 200, { ...serverStats(db), live: { battles: live, online: wss.clients.size, startedAt: STARTED_AT, version: ASSET_VERSION } });
   }
 
   if (p === '/api/leaderboard' && method === 'GET') {
@@ -460,13 +556,16 @@ async function api(req, res, url) {
     if (limited(`challenge:${t.id}`, 30, 10 * 60_000)) return send(res, 429, { error: 'Demasiados desafíos, espera unos minutos.' });
     const body = await readBody(req);
     const levelCap = body.levelCap === 50 ? 50 : null;
+    const mode = body.mode === 'random' ? 'random' : 'team';
+    if (isAiLevel(body.ai)) return send(res, 200, { challenge: challengeView(startAiChallenge(t, { mode, levelCap, level: body.ai }), t.id) });
     const id = newId(6);
     db.challenges[id] = {
       id,
       hostId: t.id,
       hostName: t.name,
-      hostTeam: teamEntries(t).map((e) => ({ ...e })),
+      hostTeam: mode === 'random' ? [] : teamEntries(t).map((e) => ({ ...e })),
       levelCap,
+      mode,
       status: 'open',
       createdAt: Date.now(),
     };
@@ -496,23 +595,29 @@ async function api(req, res, url) {
     if (!t) return send(res, 401, { error: 'Primero importa tu equipo.' });
     const c = db.challenges[m[1]];
     if (!c) return send(res, 404, { error: 'Ese desafío no existe.' });
-    if (c.hostId === t.id) return send(res, 400, { error: 'No puedes aceptar tu propio desafío. Mándale el link a un colega.' });
+    if (c.hostId === t.id) return send(res, 400, { error: 'No puedes aceptar tu propio desafío. Mándale el link a otro jugador.' });
     if (c.status !== 'open') return send(res, 409, { error: 'Este desafío ya no está abierto.' });
+    const host = db.trainers[c.hostId];
+    const random = c.mode === 'random';
+    if (random) {
+      if (!host?.roster.length) return send(res, 409, { error: 'El anfitrión ya no tiene Pokémon.' });
+      c.hostTeam = randomParty(host.roster);
+      c.guestTeam = randomParty(t.roster);
+    } else c.guestTeam = teamEntries(t).map((e) => ({ ...e }));
     c.status = 'active';
     c.guestId = t.id;
     c.guestName = t.name;
-    c.guestTeam = teamEntries(t).map((e) => ({ ...e }));
-    const host = db.trainers[c.hostId];
     const r = room(c.id);
     r.preview = createPreview({
       levelCap: c.levelCap,
+      mode: c.mode ?? 'team',
       sides: [
         { trainerId: c.hostId, name: host?.name ?? c.hostName, entries: c.hostTeam },
         { trainerId: t.id, name: t.name, entries: c.guestTeam },
       ],
     });
     store.save();
-    armPreviewTimer(c.id, r);
+    armPreviewTimer(c.id, r, random ? ROLL_MS : 0);
     broadcast(r, { t: 'preview' });
     return send(res, 200, { challenge: challengeView(c, t.id) });
   }
@@ -531,7 +636,7 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed');
-    if (url.pathname === '/' || url.pathname === '/equipo' || /^\/b\/[A-Za-z0-9_-]{4,20}$/.test(url.pathname)) return await serveStatic(req, res, 'index.html');
+    if (url.pathname === '/' || url.pathname === '/equipo' || url.pathname === '/stats' || /^\/b\/[A-Za-z0-9_-]{4,20}$/.test(url.pathname)) return await serveStatic(req, res, 'index.html');
     return await serveStatic(req, res, url.pathname);
   } catch (e) {
     if (e instanceof SaveError) return send(res, 400, { error: e.message });

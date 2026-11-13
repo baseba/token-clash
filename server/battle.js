@@ -10,6 +10,8 @@ const FIELD_TURNS = 5;
 const PRIMAL = new Set(['heavyrain', 'harshsun', 'winds']);
 const MAJOR = new Set(['brn', 'par', 'psn', 'tox', 'slp', 'frz']);
 const SAND_PROOF = ['rock', 'ground', 'steel'];
+const SCREEN_KINDS = ['reflect', 'lightscreen', 'auroraveil'];
+const VEIL_WEATHER = new Set(['hail', 'snow']);
 
 const stageMult = (s) => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s));
 const accuracyMult = (s) => (s >= 0 ? (3 + s) / 3 : 3 / (3 - s));
@@ -65,6 +67,7 @@ export function createBattle({ id, sides, levelCap = null, random = Math.random 
       action: null,
       mustSwitch: false,
       toxicSpikes: 0,
+      screens: {},
     })),
     ev: [],
     moved: new Set(),
@@ -157,6 +160,7 @@ function engine(b) {
     hasBench: (f) => b.sides[sideIndex(b, f)].team.some((o) => o !== f && o.hp > 0),
     faintedAllies: (f) => b.sides[sideIndex(b, f)].team.filter((o) => o !== f && o.hp <= 0).length,
     addToxicSpikes: (f) => addToxicSpikes(b, f),
+    clearScreens: (s, cause) => clearScreens(b, s, cause),
     transform: (f, into) => transform(b, f, into),
     changeForm: (f, form, opts) => changeForm(b, f, form, opts),
     breakIllusion: (f) => breakIllusion(b, f),
@@ -342,6 +346,39 @@ function clearTerrain(b) {
   b.field.terrainTurns = 0;
   emit(b, { t: 'terrainEnd', terrain: t });
   for (const f of activeFighters(b)) run(b, f, 'onTerrainChange');
+}
+
+function setScreen(b, s, kind) {
+  const side = b.sides[s];
+  if (side.screens[kind]) return false;
+  if (kind === 'auroraveil' && !VEIL_WEATHER.has(weather(b))) return false;
+  side.screens[kind] = FIELD_TURNS;
+  emit(b, { t: 'screen', side: s, screen: kind, turns: FIELD_TURNS });
+  return true;
+}
+
+function clearScreens(b, s, cause) {
+  const side = b.sides[s];
+  const kinds = SCREEN_KINDS.filter((k) => side.screens[k]);
+  for (const kind of kinds) {
+    delete side.screens[kind];
+    emit(b, { t: 'screenEnd', side: s, screen: kind, cause });
+  }
+  return kinds.length > 0;
+}
+
+function clearToxicSpikes(b, s) {
+  if (!b.sides[s].toxicSpikes) return false;
+  b.sides[s].toxicSpikes = 0;
+  emit(b, { t: 'hazardEnd', side: s });
+  return true;
+}
+
+function screened(b, me, target, move) {
+  if (flag(b, me, 'infiltrates')) return false;
+  const screens = b.sides[sideIndex(b, target)].screens;
+  if (screens.auroraveil) return true;
+  return move.category === 'physical' ? !!screens.reflect : !!screens.lightscreen;
 }
 
 function addToxicSpikes(b, f) {
@@ -616,6 +653,7 @@ function canAct(b, me, move) {
 function statusEffectOf(move) {
   if (move.heal || HEALS_WITH_WEATHER[move.id] || move.id === 'rest') return { effect: 'heal' };
   if (move.weather || move.terrain) return { effect: 'weather' };
+  if (move.screen) return { effect: 'boost', stat: move.screen === 'lightscreen' ? 'sdef' : 'def' };
   if (move.target === 'self' && move.boosts) {
     const up = Object.entries(move.boosts).find(([, v]) => v > 0);
     return { effect: up ? 'boost' : 'debuff', stat: (up ?? Object.entries(move.boosts)[0])[0] };
@@ -689,6 +727,7 @@ function selfStatus(b, me, move) {
   let did = false;
   if (move.weather) did = setWeather(b, move.weather, null) || did;
   if (move.terrain) did = setTerrain(b, move.terrain, null) || did;
+  if (move.screen) did = setScreen(b, sideIndex(b, me), move.screen) || did;
   if (move.boosts) did = Object.keys(boost(b, me, move.boosts, me)).length > 0 || did;
   if (move.heal) did = heal(b, me, me.stats.hp * move.heal) > 0 || did;
   const weatherHeal = HEALS_WITH_WEATHER[move.id];
@@ -750,6 +789,10 @@ function statusMove(b, me, foe, move) {
   if (move.volatile === 'attract') did = addVolatile(b, target, 'attract', source) || did;
   if (move.volatile === 'leechseed') did = addVolatile(b, target, 'leechseed', source) || did;
   if (move.self) did = Object.keys(boost(b, source, move.self, source)).length > 0 || did;
+  if (move.clearsScreens) {
+    did = clearScreens(b, sideIndex(b, target), 'defog') || did;
+    for (const side of [0, 1]) did = clearToxicSpikes(b, side) || did;
+  }
   if (!did) emit(b, { t: 'nothing', side: s });
 }
 
@@ -826,6 +869,7 @@ function computeDamage(b, me, target, move, eff, hitPower) {
   if (move.type && me.types.includes(move.type)) dmg *= flag(b, me, 'stab') ? abilityDef(b, me).stab : 1.5;
   dmg *= eff * (0.85 + b.random() * 0.15) * (crit ? 1.5 : 1);
   if (me.status === 'brn' && physical && !flag(b, me, 'ignoresBurn')) dmg *= 0.5;
+  if (!crit && screened(b, me, target, move)) dmg *= 0.5;
   dmg *= mul(b, me, 'onAttackerFinal', move, target, { eff, crit }) * mul(b, target, 'onDefenderFinal', move, me, { eff, crit });
   return { dmg: Math.max(1, Math.round(dmg)), crit };
 }
@@ -884,6 +928,7 @@ function attack(b, me, target, move) {
       emit(b, { t: 'miss', side: s });
       return;
     }
+    if (move.breaksScreens) clearScreens(b, sideIndex(b, target), 'broken');
     const eff = chain(b, target, 'onEffectiveness', typeEff, move, me);
     const count = rollHits(b, me, move);
     let total = 0;
@@ -1048,6 +1093,13 @@ function residual(b) {
     delete f.vol.flinch;
     f.activeTurns += 1;
   }
+  b.sides.forEach((side, s) => {
+    for (const kind of SCREEN_KINDS) {
+      if (!side.screens[kind] || --side.screens[kind] > 0) continue;
+      delete side.screens[kind];
+      emit(b, { t: 'screenEnd', side: s, screen: kind, cause: 'time' });
+    }
+  });
   if (b.field.weather && --b.field.weatherTurns <= 0) clearWeather(b);
   if (b.field.terrain && --b.field.terrainTurns <= 0) clearTerrain(b);
 }
@@ -1108,6 +1160,8 @@ function publicMove(m) {
     ...(m.status ? { status: m.status } : {}),
     ...(m.heal ? { heal: m.heal } : {}),
     ...(m.weather ? { weather: m.weather } : {}),
+    ...(m.screen ? { screen: m.screen } : {}),
+    ...(m.breaksScreens ? { breaksScreens: true } : {}),
     ...(m.fixedDamage ? { fixedDamage: m.fixedDamage } : {}),
     ...(m.ohko ? { ohko: true } : {}),
     ...(m.flags.includes('charge') ? { charge: true } : {}),
@@ -1210,6 +1264,7 @@ export function publicState(b, viewer = null) {
       ready: !needsAction(b, s),
       mustSwitch: side.mustSwitch,
       toxicSpikes: side.toxicSpikes,
+      screens: { ...side.screens },
       team: side.team.map((f, i) => fighterView(b, s, i, viewer === s || b.status === 'finished')),
     })),
   };

@@ -113,6 +113,7 @@ const { results: abilityList } = await get(`${API}/ability?limit=1000`);
 console.error(`${abilityList.length} habilidades…`);
 const abilities = {};
 const spanish = (entries) => entries.filter((e) => e.language.name === 'es');
+const RETIRED_MOVE_TEXT = /no se puede usar/i;
 await mapLimit(abilityList, async ({ url }) => {
   const ab = await get(url);
   if (!ab || !ab.is_main_series) return;
@@ -210,7 +211,7 @@ await mapLimit(learnable, async (moveId) => {
   const sd = showdown[moveId.replace(/[^a-z0-9]/g, '')];
   const api = await get(`${API}/move/${moveId}`);
   if (!sd || !api) return;
-  const flavor = spanish(api.flavor_text_entries).at(-1)?.flavor_text;
+  const flavor = spanish(api.flavor_text_entries).map((e) => e.flavor_text).filter((t) => !RETIRED_MOVE_TEXT.test(t)).at(-1);
   movedex[moveId] = {
     name: spanish(api.names)[0]?.name || sd.name,
     desc: (flavor || api.effect_entries.find((e) => e.language.name === 'en')?.short_effect || '').replace(/\s+/g, ' ').trim(),

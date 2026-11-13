@@ -154,7 +154,7 @@ test('Inmunidad evita el envenenamiento', () => {
 test('Sombratrampa impide cambiar', () => {
   const b = duel(mon(202, 'shadow-tag'), mon(25, 'static'), { benchB: [mon(26, 'static')] });
   assert.ok(!validActions(b, 1).some((a) => a.type === 'switch'));
-  const free = duel(mon(202, 'telepathy'), mon(25, 'static'), { benchB: [mon(26, 'static')] });
+  const free = duel(mon(25, 'static'), mon(25, 'static'), { benchB: [mon(26, 'static')] });
   assert.ok(validActions(free, 1).some((a) => a.type === 'switch'));
 });
 
