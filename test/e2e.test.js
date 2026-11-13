@@ -4,16 +4,39 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createServer } from 'node:http';
 import WebSocket from 'ws';
+import { createJevProxy } from '../server/jev-proxy.js';
 
 const save = readFileSync(new URL('./fixtures/export.json', import.meta.url), 'utf8');
 const PORT = 18000 + Math.floor(Math.random() * 1000);
 const base = `http://127.0.0.1:${PORT}`;
 let proc;
 
+// Same topology as production: the app has no key and talks to the egress proxy, which adds it
+// and forwards to a stand-in for Jev that always picks the last option it is offered.
+const FAKE_JEV_KEY = 'fake-jev-key';
+const jevCalls = [];
+const fakeJev = createServer((req, res) => {
+  let raw = '';
+  req.on('data', (c) => (raw += c));
+  req.on('end', () => {
+    const body = JSON.parse(raw);
+    jevCalls.push({ auth: req.headers.authorization, body });
+    const keys = Object.keys(body.questions.action.criteria);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ model: body.model, answers: { action: { type: 'choice', choice: keys[keys.length - 1], confidence: 0.9, probabilities: {} } }, usage: { input_tokens: 1, output_tokens: 1 } }));
+  });
+});
+
+let jevProxy;
+
 before(async () => {
+  await new Promise((r) => fakeJev.listen(0, '127.0.0.1', r));
+  jevProxy = createJevProxy({ apiKey: FAKE_JEV_KEY, upstream: `http://127.0.0.1:${fakeJev.address().port}/v1/systemone` });
+  await new Promise((r) => jevProxy.listen(0, '127.0.0.1', r));
   proc = spawn(process.execPath, ['server/index.js'], {
-    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'tc-')), TURN_MS: '1500', PREVIEW_MS: '1500', ROLL_MS: '0' },
+    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'tc-')), TURN_MS: '1500', PREVIEW_MS: '1500', ROLL_MS: '0', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${jevProxy.address().port}/v1/systemone` },
     stdio: 'inherit',
   });
   for (let i = 0; i < 50; i++) {
@@ -24,7 +47,11 @@ before(async () => {
   }
   throw new Error('server did not start');
 });
-after(() => proc.kill());
+after(() => {
+  proc.kill();
+  jevProxy.close();
+  fakeJev.close();
+});
 
 async function call(path, { method = 'GET', body, token } = {}) {
   const res = await fetch(base + path, {
@@ -168,6 +195,23 @@ test('a battle against the AI starts at once and stays out of the ranking and th
   assert.equal(me.data.me.wins + me.data.me.losses, 0);
   const list = await call('/api/me/challenges', { token: a.data.token });
   assert.deepEqual(list.data.challenges, []);
+});
+
+test('against Skynet, Jev picks the AI\'s actions and the battle ends', async () => {
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Sarah', save } });
+  assert.ok(a.data.me.aiLevels.includes('skynet'));
+  const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode: 'team', ai: 'skynet', levelCap: 50 } });
+  assert.equal(ch.status, 200);
+  assert.equal(ch.data.challenge.guest.name, 'IA Skynet');
+  const first = jevCalls.length;
+  const host = player(ch.data.challenge.id, a.data.token);
+  const end = await host.ended;
+  host.ws.close();
+  assert.ok(end.state.winner === 0 || end.state.winner === 1 || end.state.winner === null);
+  const mine = jevCalls.slice(first);
+  assert.ok(mine.length > 0, 'Jev was never asked');
+  assert.ok(mine.every((c) => c.auth === `Bearer ${FAKE_JEV_KEY}`));
+  assert.ok(!JSON.stringify(mine.map((c) => c.body)).includes('Sarah'), 'trainer name sent to Jev');
 });
 
 test('timeouts auto-play so a battle always ends', async () => {

@@ -1,0 +1,34 @@
+[Unit]
+Description=Egress proxy for token-clash: forwards Skynet's questions to Jev (TypeSafe), nothing else
+
+[Container]
+# Same image as the app; it runs only server/jev-proxy.js.
+Image=localhost/token-clash:latest
+ContainerName=token-clash-jev
+# The app reaches it by name on the internal network; it reaches TypeSafe through the egress one.
+Network=token-clash.network
+Network=token-clash-egress.network
+Exec=node server/jev-proxy.js
+Environment=PORT=8081
+# Created once: podman secret create token-clash-jev-key - < archivo-con-la-clave
+# Only this container has the key; the app doesn't.
+Secret=token-clash-jev-key,type=env,target=JEV_API_KEY
+
+ReadOnly=true
+DropCapability=ALL
+NoNewPrivileges=true
+Memory=96m
+PidsLimit=32
+
+HealthCmd=wget -qO- http://127.0.0.1:8081/healthz
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=5s
+
+[Service]
+Restart=always
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

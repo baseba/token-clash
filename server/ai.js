@@ -3,8 +3,12 @@ import { validActions, submit, needsAction, STRUGGLE_MOVE } from './battle.js';
 import { randomize } from './random.js';
 import { PARTY_SIZE, BATTLE_SIZE } from './preview.js';
 
-export const AI_LEVELS = ['easy', 'mid', 'hard', 'veryhard'];
-export const AI_LABELS = { easy: 'Fácil', mid: 'Media', hard: 'Difícil', veryhard: 'Muy difícil' };
+export const AI_LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
+export const AI_LABELS = { easy: 'Fácil', mid: 'Media', hard: 'Difícil', veryhard: 'Muy difícil', skynet: 'Skynet' };
+// Skynet's turns are decided by Jev (server/jev.js). Everything else, and its fallback when Jev
+// can't answer, is the very hard AI.
+export const JEV_LEVEL = 'skynet';
+const tactics = (difficulty) => (difficulty === JEV_LEVEL ? 'veryhard' : difficulty);
 export const AI_PREFIX = 'ai:';
 export const LAST_AI_SPECIES = 649;
 
@@ -187,7 +191,8 @@ function counterScore(id, foes) {
   return foes.reduce((sum, f) => sum + speciesMatchup(me, { types: speciesData(f.finalID)?.types ?? ['normal'] }), 0) + bst(data) / 120;
 }
 
-export function buildAiTeam({ difficulty, level, foes = [], random = Math.random }) {
+export function buildAiTeam({ difficulty: requested, level, foes = [], random = Math.random }) {
+  const difficulty = tactics(requested);
   const pool = candidates(difficulty, level);
   let ids;
   if (difficulty === 'easy' || difficulty === 'mid') ids = shuffled(pool, random).slice(0, PARTY_SIZE);
@@ -204,7 +209,8 @@ export function buildAiRandomParty({ level, random = Math.random }) {
   return ids.map((id, index) => randomize({ id: `ai-${index}-${id}`, finalID: id, baseID: id, rarity: rarityOf(speciesData(id)), shiny: false, level, ivs: { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 }, learned: [] }, random));
 }
 
-export function aiPicks({ difficulty, own, foes, random = Math.random }) {
+export function aiPicks({ difficulty: level, own, foes, random = Math.random }) {
+  const difficulty = tactics(level);
   const order = own.map((_, i) => i);
   if (difficulty === 'easy' || difficulty === 'mid') return shuffled(order, random).slice(0, Math.min(BATTLE_SIZE, own.length));
   const typesOf = (e) => ({ types: speciesData(e.finalID)?.types ?? ['normal'] });
@@ -381,7 +387,8 @@ function safeLookahead(b, s, options) {
   }
 }
 
-export function chooseAction(b, s, difficulty, random = Math.random) {
+export function chooseAction(b, s, level, random = Math.random) {
+  const difficulty = tactics(level);
   const options = validActions(b, s);
   if (!options.length) return null;
   if (options.length === 1) return options[0];

@@ -10,6 +10,9 @@ Environment=PORT=8080
 # Safe only because nothing but cloudflared can reach this container.
 Environment=TRUST_CF_CONNECTING_IP=1
 Environment=PUBLIC_ORIGIN=https://clash.mirrordev.xyz
+# Skynet asks Jev through the egress proxy (token-clash-jev.container), which holds the key. If the
+# proxy is down, Skynet plays like the very hard AI.
+Environment=JEV_API_URL=http://token-clash-jev:8081/v1/systemone
 Volume=%h/code/token-clash/data:/data:Z,U
 
 ReadOnly=true

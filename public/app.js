@@ -587,7 +587,7 @@ function renderHome() {
 
   const aiNote = h('p', { class: 'nb-note' });
   const startBtn = h('button', { class: 'btn primary nb-start', onclick: (e) => createChallenge(e.currentTarget) });
-  const aiField = field('Dificultad', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Dificultad de la IA' }, choice('seg', AI_ORDER.map((k) => ({ value: k, label: AI_LABEL[k] })), aiLevel, (v) => { aiLevel = v; paint(); })), aiNote);
+  const aiField = field('Dificultad', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Dificultad de la IA' }, choice('seg', AI_ORDER.filter((k) => (me.aiLevels ?? AI_ORDER).includes(k)).map((k) => ({ value: k, label: AI_LABEL[k] })), aiLevel, (v) => { aiLevel = v; paint(); })), aiNote);
   function paint() {
     aiField.classList.toggle('is-hidden', rival !== 'ai');
     aiNote.textContent = AI_NOTES[aiLevel][mode];
@@ -828,8 +828,8 @@ async function statsPage() {
 const PARTY_SIZE = 6;
 const MODE_ICON = { team: '🎒', random: '🎲' };
 const MODE_LABEL = { team: 'Batalla con tu equipo', random: 'Batalla aleatoria' };
-const AI_ORDER = ['easy', 'mid', 'hard', 'veryhard'];
-const AI_LABEL = { easy: 'Fácil', mid: 'Media', hard: 'Difícil', veryhard: 'Muy difícil' };
+const AI_ORDER = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
+const AI_LABEL = { easy: 'Fácil', mid: 'Media', hard: 'Difícil', veryhard: 'Muy difícil', skynet: 'Skynet' };
 const AI_NOTES = {
   easy: {
     team: 'Arma su equipo al azar con Pokémon de la 1.ª a la 5.ª generación y ataca sin pensar, como un Pokémon salvaje.',
@@ -846,6 +846,10 @@ const AI_NOTES = {
   veryhard: {
     team: 'Arma su equipo para contrarrestar el tuyo, con lo mejor de la 1.ª a la 5.ª generación. Calcula velocidad y daño, y cambia cuando le conviene.',
     random: 'Sus 6 salen de los dados, pero calcula velocidad y daño, elige el mejor enfrentamiento y cambia cuando le conviene.',
+  },
+  skynet: {
+    team: 'Arma su equipo como Muy difícil, pero en cada turno Jev, un modelo de decisiones, elige qué ataque usar o a quién sacar.',
+    random: 'Sus 6 salen de los dados. En cada turno Jev, un modelo de decisiones, elige qué ataque usar o a quién sacar.',
   },
 };
 

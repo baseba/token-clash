@@ -1,5 +1,5 @@
 [Unit]
-Description=Outbound network for the token-clash tunnel only
+Description=Outbound network for the token-clash tunnel and the Jev egress proxy only (never the app)
 
 [Network]
 NetworkName=token-clash-egress
