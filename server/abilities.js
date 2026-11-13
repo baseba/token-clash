@@ -1166,7 +1166,7 @@ function escapesBelowHalf() {
     onDamagingHit(E, me, move, attacker, { before }) {
       if (droppedBelowHalf(me, before) && E.hasBench(me)) {
         E.show(me);
-        me.vol.exitPending = true;
+        me.vol.switchNow = true;
       }
     },
   };

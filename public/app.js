@@ -122,6 +122,25 @@ const VOLATILE_INFO = {
   saltcure: () => ({ icon: '🧂', name: 'Salazón', desc: 'Pierde 1/8 de sus PS cada turno (1/4 si es de tipo Agua o Acero).' }),
   smackdown: () => ({ icon: '⬇️', name: 'En el suelo', desc: 'Lo derribaron: los ataques de Tierra le afectan.' }),
   noRetreat: () => ({ icon: '🚩', name: 'Bastión Final', desc: 'No puede cambiar de Pokémon.' }),
+  substitute: () => ({ icon: '🧸', name: 'Sustituto', desc: 'Un muñeco recibe los ataques en su lugar y bloquea los movimientos de estado del rival.' }),
+  taunt: (v) => ({ icon: '😤', name: 'Provocado', desc: `Solo puede usar ataques (${v} turnos).` }),
+  encore: () => ({ icon: '🔁', name: 'Otra Vez', desc: 'Tiene que repetir su último movimiento.' }),
+  torment: () => ({ icon: '😣', name: 'Tormento', desc: 'No puede usar el mismo movimiento dos veces seguidas.' }),
+  healblock: (v) => ({ icon: '🚫', name: 'Anticura', desc: `No puede curarse (${v} turnos).` }),
+  yawn: () => ({ icon: '🥱', name: 'Bostezo', desc: 'Se dormirá al final del próximo turno.' }),
+  nightmare: () => ({ icon: '👻', name: 'Pesadilla', desc: 'Pierde 1/4 de sus PS cada turno mientras duerme.' }),
+  curse: () => ({ icon: '🕯️', name: 'Maldición', desc: 'Pierde 1/4 de sus PS cada turno.' }),
+  focusenergy: () => ({ icon: '🎯', name: 'Foco Energía', desc: 'Más probabilidad de golpe crítico.' }),
+  ingrain: () => ({ icon: '🌱', name: 'Arraigo', desc: 'Recupera 1/16 de sus PS cada turno, pero no puede cambiar.' }),
+  aquaring: () => ({ icon: '💧', name: 'Acua Aro', desc: 'Recupera 1/16 de sus PS cada turno.' }),
+  magnetrise: (v) => ({ icon: '🧲', name: 'Levitón', desc: `Inmune a los ataques de Tierra (${v} turnos).` }),
+  telekinesis: (v) => ({ icon: '🪄', name: 'Telequinesis', desc: `Flota: los ataques no le fallan (${v} turnos).` }),
+  foresight: () => ({ icon: '👁️', name: 'Identificado', desc: 'Pierde sus inmunidades de tipo Fantasma y su evasión no cuenta.' }),
+  miracleeye: () => ({ icon: '👁️', name: 'Gran Ojo', desc: 'Los ataques Psíquicos le afectan aunque sea Siniestro.' }),
+  stockpile: (v) => ({ icon: '📦', name: `Reserva ${v}`, desc: 'Energía acumulada para Escupir o Tragar.' }),
+  gastroacid: () => ({ icon: '🧪', name: 'Bilis', desc: 'Su habilidad no tiene efecto.' }),
+  uproar: () => ({ icon: '📢', name: 'Alboroto', desc: 'Nadie puede dormirse mientras dure.' }),
+  imprison: () => ({ icon: '🔐', name: 'Sellado', desc: 'El rival no puede usar los movimientos que comparten.' }),
 };
 const NOTHING_WHY = {
   sameGender: 'los dos son del mismo género',
@@ -137,6 +156,10 @@ const NOTHING_WHY = {
   noType: 'ya no tiene el tipo que necesita',
   noSharedType: 'no comparten ningún tipo',
   lowHp: 'no le quedan suficientes PS',
+  substitute: 'el sustituto lo bloquea',
+  noBench: 'no hay a quién cambiar',
+  noFainted: 'no hay ningún Pokémon debilitado',
+  noStockpile: 'no tiene energía reservada',
 };
 const GENDER = { male: { sym: '♂', name: 'Macho' }, female: { sym: '♀', name: 'Hembra' } };
 const genderMark = (g) => (GENDER[g] ? h('span', { class: `gender ${g}`, 'data-tip': GENDER[g].name, 'aria-label': GENDER[g].name }, GENDER[g].sym) : null);
@@ -159,8 +182,42 @@ const SCREEN_END = {
 };
 const TERRAIN = { electric: '⚡ Campo Eléctrico', grassy: '🌿 Campo de Hierba', misty: '🌫️ Campo de Niebla', psychic: '🔮 Campo Psíquico' };
 const STAT = { atk: ['ATQ', 'ataque'], def: ['DEF', 'defensa'], satk: ['AT.E', 'ataque especial'], sdef: ['DF.E', 'defensa especial'], spd: ['VEL', 'velocidad'], acc: ['PRE', 'precisión'], eva: ['EVA', 'evasión'] };
-const CANT = { recharge: 'necesita recargarse.', slp: 'está dormido.', frz: 'está congelado.', par: 'está paralizado: no puede moverse.', flinch: 'retrocede y no se mueve.', attract: 'está enamorado y no ataca.' };
-const HURT = { leechseed: ' por las drenadoras', brn: ' por la quemadura', psn: ' por el veneno', tox: ' por el veneno', sand: ' por la tormenta de arena', hail: ' por el granizo', recoil: ' por el retroceso', ooze: ' por el lodo líquido', bound: ' por estar apresado', saltcure: ' por la salazón', crash: ' al estrellarse', cost: ' para potenciarse', ability: '' };
+const CANT = {
+  recharge: 'necesita recargarse.', slp: 'está dormido.', frz: 'está congelado.', par: 'está paralizado: no puede moverse.', flinch: 'retrocede y no se mueve.', attract: 'está enamorado y no ataca.',
+  taunt: (ev) => `está provocado: no puede usar ${ev.move}.`,
+  torment: (ev) => `no puede usar ${ev.move} dos veces seguidas.`,
+  twice: (ev) => `no puede usar ${ev.move} dos veces seguidas.`,
+  healBlock: (ev) => `no puede curarse: no usa ${ev.move}.`,
+  gravity: (ev) => `no puede usar ${ev.move} con la gravedad.`,
+  imprison: (ev) => `no puede usar ${ev.move}: está sellado.`,
+};
+const cantText = (ev) => {
+  const c = CANT[ev.reason];
+  return typeof c === 'function' ? c(ev) : c ?? 'no puede moverse.';
+};
+const SIDE_COND = {
+  spikes: { icon: '📌', name: 'Púas', start: (t) => `Hay púas esparcidas alrededor del equipo de ${t}.`, end: (t) => `Desaparecen las púas del lado de ${t}.`, desc: 'Dañan al que entra y toca el suelo (1/8, 1/6 o 1/4 de los PS según las capas).' },
+  stealthrock: { icon: '🪨', name: 'Trampa Rocas', start: (t) => `Rocas puntiagudas flotan alrededor del equipo de ${t}.`, end: (t) => `Desaparecen las rocas del lado de ${t}.`, desc: 'Dañan al que entra según su debilidad a Roca.' },
+  stickyweb: { icon: '🕸️', name: 'Red Viscosa', start: (t) => `Una red viscosa se extiende bajo el equipo de ${t}.`, end: (t) => `Desaparece la red viscosa del lado de ${t}.`, desc: 'Baja la Velocidad del que entra y toca el suelo.' },
+  tailwind: { icon: '🌬️', name: 'Viento Afín', start: (t) => `Sopla un viento afín a favor del equipo de ${t}.`, end: (t) => `Amaina el viento afín del equipo de ${t}.`, desc: 'Duplica la Velocidad del equipo.' },
+  safeguard: { icon: '💠', name: 'Velo Sagrado', start: (t) => `Un velo sagrado protege al equipo de ${t}.`, end: (t) => `Se desvanece el velo sagrado del equipo de ${t}.`, desc: 'Protege al equipo de problemas de estado.' },
+  mist: { icon: '🌫️', name: 'Neblina', start: (t) => `Una neblina cubre al equipo de ${t}.`, end: (t) => `Se disipa la neblina del equipo de ${t}.`, desc: 'Impide que el rival baje las características del equipo.' },
+  luckychant: { icon: '🍀', name: 'Conjuro', start: (t) => `Un conjuro protege al equipo de ${t} de los golpes críticos.`, end: (t) => `Termina el conjuro del equipo de ${t}.`, desc: 'El rival no puede asestar golpes críticos al equipo.' },
+  quickguard: { icon: '⚡', name: 'Anticipo', start: (t) => `El equipo de ${t} se protege de los ataques con prioridad.` },
+  wideguard: { icon: '🧱', name: 'Vasta Guardia', start: (t) => `El equipo de ${t} se protege de los ataques en área.` },
+  craftyshield: { icon: '🃏', name: 'Truco Defensa', start: (t) => `El equipo de ${t} se protege de los movimientos de estado.` },
+  matblock: { icon: '🥋', name: 'Escudo Tatami', start: (t) => `El equipo de ${t} levanta un tatami.` },
+  wish: { icon: '🌠', name: 'Deseo', start: (t, ev) => `${ev.name} pide un deseo.` },
+};
+const ROOM = {
+  gravity: { label: '🌌 Gravedad', start: 'La gravedad se intensifica.', end: 'La gravedad vuelve a la normalidad.' },
+  trickroom: { label: '🔄 Espacio Raro', start: 'El espacio se retuerce: los más lentos atacan primero.', end: 'El espacio vuelve a la normalidad.' },
+  wonderroom: { label: '❓ Zona Extraña', start: 'Se intercambian la Defensa y la Defensa Especial de todos.', end: 'La Zona Extraña desaparece.' },
+  mudsport: { label: '🟤 Chapoteo Lodo', start: 'Los ataques Eléctricos se debilitan.', end: 'El efecto de Chapoteo Lodo termina.' },
+  watersport: { label: '💧 Hidrochorro', start: 'Los ataques de Fuego se debilitan.', end: 'El efecto de Hidrochorro termina.' },
+  fairylock: { label: '🔒 Cerrojo Feérico', start: 'Nadie podrá huir durante el próximo turno.', end: 'El cerrojo feérico se abre.' },
+};
+const HURT = { leechseed: ' por las drenadoras', brn: ' por la quemadura', psn: ' por el veneno', tox: ' por el veneno', sand: ' por la tormenta de arena', hail: ' por el granizo', recoil: ' por el retroceso', ooze: ' por el lodo líquido', bound: ' por estar apresado', saltcure: ' por la salazón', crash: ' al estrellarse', cost: ' para potenciarse', stealthrock: ' por las rocas puntiagudas', spikes: ' por las púas', curse: ' por la maldición', nightmare: ' por la pesadilla', future: ' por el ataque anticipado', painsplit: ' al compartir el dolor', spikyshield: ' al chocar con el escudo de púas', ability: '' };
 const VOLATILE = {
   confusion: () => 'queda confuso.',
   attract: () => 'se enamora.',
@@ -172,11 +229,49 @@ const VOLATILE = {
   trapped: () => 'ya no puede huir.',
   saltcure: () => 'queda en salazón.',
   smackdown: () => 'cae al suelo.',
+  substitute: () => 'crea un sustituto.',
+  taunt: () => 'cae en la provocación.',
+  encore: (ev) => `tendrá que repetir ${ev.move}.`,
+  torment: () => 'queda atormentado.',
+  healblock: () => 'ya no puede curarse.',
+  yawn: () => 'empieza a tener sueño.',
+  nightmare: () => 'tiene pesadillas.',
+  curse: () => 'queda maldito.',
+  focusenergy: () => 'se concentra al máximo.',
+  laserfocus: () => 'afina la concentración.',
+  lockon: () => 'fija al rival en la mira.',
+  magnetrise: () => 'levita gracias al magnetismo.',
+  telekinesis: () => 'flota por telequinesis.',
+  ingrain: () => 'echa raíces.',
+  aquaring: () => 'se rodea de un velo de agua.',
+  foresight: () => 'queda identificado.',
+  miracleeye: () => 'queda identificado.',
+  stockpile: (ev) => `reserva energía (${ev.count}).`,
+  octolock: () => 'queda atrapado por el pulpo.',
+  electrify: () => 'queda electrificado.',
+  gastroacid: () => 'pierde el efecto de su habilidad.',
+  destinybond: () => 'intenta llevarse al rival consigo.',
+  grudge: () => 'guarda rencor.',
+  snatch: () => 'espera para robar un movimiento.',
+  magiccoat: () => 'se cubre con una capa mágica.',
+  quash: () => 'tendrá que actuar último.',
+  uproar: () => 'arma un alboroto.',
+  bide: () => 'empieza a aguantar.',
+  imprison: () => 'sella los movimientos que comparte con el rival.',
 };
 const VOLATILE_END = {
   disable: (ev) => `vuelve a poder usar ${ev.move}.`,
   bound: (ev) => `se libera de ${ev.move}.`,
   confusion: () => 'ya no está confuso.',
+  substitute: () => 'pierde su sustituto.',
+  taunt: () => 'ya no está provocado.',
+  encore: () => 'ya no tiene que repetir el movimiento.',
+  healblock: () => 'puede volver a curarse.',
+  telekinesis: () => 'deja de flotar.',
+  magnetrise: () => 'deja de levitar.',
+  airborne: () => 'cae al suelo por la gravedad.',
+  uproar: () => 'se calma.',
+  stockpile: () => 'gasta su energía reservada.',
 };
 const FOCUS_TEXT = { 'focus-punch': 'se concentra…', 'shell-trap': 'prepara una trampa de caparazón…', 'beak-blast': 'calienta su pico…' };
 const ABILITY_NOTE = {
@@ -1771,6 +1866,8 @@ function battleUI(c, sendAction) {
     const shownStatus = f.hp > 0 && f.status ? f.status : '';
     if (shownStatus) spot.dataset.status = shownStatus;
     else delete spot.dataset.status;
+    if (!spot.querySelector('.sub-doll')) spot.append(h('div', { class: 'sub-doll', 'aria-hidden': 'true', html: creatureHTML({ sprite: 'substitute' }, { back: p === 'me' }) }));
+    spot.classList.toggle('has-sub', !!f.volatiles?.substitute && f.hp > 0);
     let aura = spot.querySelector('.status-aura');
     if (!aura) {
       aura = h('div', { class: 'status-aura', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'));
@@ -1795,7 +1892,7 @@ function battleUI(c, sendAction) {
       .filter(([k]) => f.boosts[k])
       .map(([k, [label]]) => `${label} ${signed(f.boosts[k])}`)
       .join(' · ');
-    const volatiles = conditionsOf({ volatiles: f.volatiles }).filter((c) => ['confusion', 'attract', 'perish', 'charge', 'bound', 'trapped', 'saltcure'].includes(c.key));
+    const volatiles = conditionsOf({ volatiles: f.volatiles }).filter((c) => !['flashFire', 'disabled', 'slowStart', 'smackdown', 'noRetreat', 'foresight', 'miracleeye', 'focusenergy', 'gastroacid', 'imprison'].includes(c.key));
     r.sub.replaceChildren(
       ...[
         typeChips(f.types),
@@ -1804,14 +1901,29 @@ function battleUI(c, sendAction) {
         boosts ? h('span', { class: 'boosts' }, boosts) : null,
         ...volatiles.map((c) => h('span', { class: 'vol-chip', tabindex: 0, 'data-tip': c.name, 'data-tip-note': c.desc }, `${c.icon} ${c.name}`)),
         ...Object.entries(sd.screens || {}).map(([kind, turns]) => h('span', { class: `screen-chip ${kind}`, tabindex: 0, 'data-tip': `Reduce a la mitad el daño de ${SCREEN_GUARDS[kind]} contra este equipo. Quedan ${turns} turnos.` }, `🛡️ ${SCREEN[kind]} ${turns}`)),
+        ...sideChips(sd),
         h('span', { class: 'dots', 'aria-label': 'Equipo' }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
       ].filter(Boolean),
     );
   }
 
+  function sideChips(sd) {
+    const out = [];
+    const hz = sd.hazards || {};
+    if (hz.spikes) out.push(['spikes', `×${hz.spikes}`]);
+    if (hz.stealthrock) out.push(['stealthrock', '']);
+    if (hz.stickyweb) out.push(['stickyweb', '']);
+    for (const [k, turns] of Object.entries(sd.conds || {})) out.push([k, turns]);
+    if (sd.wish) out.push(['wish', '']);
+    const chips = out.filter(([k]) => SIDE_COND[k]).map(([k, extra]) => h('span', { class: 'side-chip', tabindex: 0, 'data-tip': SIDE_COND[k].name, 'data-tip-note': SIDE_COND[k].desc ?? null }, `${SIDE_COND[k].icon} ${SIDE_COND[k].name}${extra ? ` ${extra}` : ''}`));
+    if (sd.toxicSpikes) chips.push(h('span', { class: 'side-chip', tabindex: 0, 'data-tip': 'Púas Tóxicas', 'data-tip-note': 'Envenenan al que entra y toca el suelo.' }, `☠️ Púas Tóxicas ×${sd.toxicSpikes}`));
+    if (sd.future) chips.push(h('span', { class: 'side-chip', tabindex: 0, 'data-tip': `${sd.future} viene en camino` }, `🔮 ${sd.future}`));
+    return chips;
+  }
+
   function paintField() {
     const fl = view.field || {};
-    const parts = [fl.weather ? `${WEATHER[fl.weather] ?? fl.weather}${fl.weatherSuppressed ? ' (sin efecto)' : ''}` : null, fl.terrain ? TERRAIN[fl.terrain] ?? fl.terrain : null].filter(Boolean);
+    const parts = [fl.weather ? `${WEATHER[fl.weather] ?? fl.weather}${fl.weatherSuppressed ? ' (sin efecto)' : ''}` : null, fl.terrain ? TERRAIN[fl.terrain] ?? fl.terrain : null, ...Object.keys(fl.rooms || {}).map((k) => ROOM[k]?.label)].filter(Boolean);
     els.field.textContent = parts.join(' · ');
     els.sky.className = `sky${fl.weather ? ` ${fl.weather}` : ''}${fl.weatherSuppressed ? ' suppressed' : ''}`;
     els.ground.className = `terrain-glow${fl.terrain ? ` ${fl.terrain}` : ''}`;
@@ -1877,7 +1989,7 @@ function battleUI(c, sendAction) {
     const acts = frame.actions;
     const foeReady = st.sides[1 - you].ready;
     if (!acts.length || sent) {
-      const waitingFor = st.phase === 'replace' && st.sides[1 - you].mustSwitch ? `Esperando a que ${foeName} elija quién entra…` : `Esperando a ${foeName}…`;
+      const waitingFor = st.phase !== 'choose' && st.sides[1 - you].mustSwitch ? `Esperando a que ${foeName} elija quién entra…` : `Esperando a ${foeName}…`;
       if (sent) box.append(h('p', null, 'Elegiste: ', h('b', null, sent), '.'));
       box.append(h('p', { class: 'pulse' }, waitingFor));
       return;
@@ -1891,7 +2003,8 @@ function battleUI(c, sendAction) {
       renderControls();
     };
 
-    if (st.phase === 'replace') box.append(h('h2', null, `${f.name} no puede seguir. ¿Quién entra?`));
+    if (st.phase === 'replace') box.append(h('h2', null, f.hp > 0 ? `${f.name} se retira. ¿Quién entra?` : `${f.name} no puede seguir. ¿Quién entra?`));
+    else if (st.phase === 'switchout') box.append(h('h2', null, `${f.name} vuelve. ¿Quién entra en su lugar?`));
     else {
       box.append(h('h2', null, `¿Qué hace ${f.name}?`));
       const moveSet = new Set(acts.filter((a) => a.type === 'move').map((a) => a.move));
@@ -1925,7 +2038,7 @@ function battleUI(c, sendAction) {
     const sw = acts.filter((a) => a.type === 'switch');
     if (sw.length) {
       box.append(
-        h('p', { class: 'muted small' }, st.phase === 'replace' ? '' : 'Cambiar (gasta el turno):'),
+        h('p', { class: 'muted small' }, st.phase !== 'choose' ? '' : 'Cambiar (gasta el turno):'),
         h('div', { class: 'bench' }, sw.map((a) => {
           const t = meSide.team[a.to];
           return h('button', { class: 'btn', onclick: () => act(a, `cambiar a ${t.name}`) }, h('span', { html: creatureHTML(t) }), `${t.name} · ${t.hp}/${t.stats.hp}`);
@@ -2000,6 +2113,10 @@ function battleUI(c, sendAction) {
         return 900;
       }
       case 'nothing':
+        if (ev.reason === 'splash') {
+          tell(['¡Pero no pasa nada!'], { side: ev.side, sub: true, cls: 'weak' });
+          return 800;
+        }
         float(ev.side, '¡Falló!', 'miss');
         tell(['¡pero falló!', ev.reason ? h('small', { class: 'why' }, ` · ${NOTHING_WHY[ev.reason]}`) : ''], { side: ev.side, sub: true, cls: 'weak' });
         return ev.reason ? 1100 : 800;
@@ -2072,7 +2189,7 @@ function battleUI(c, sendAction) {
       case 'cant': {
         if (ev.reason === 'truant') return 0;
         const spot = els.spot[pos(ev.side)];
-        tell([...mon(ev.side, ev.name), ` ${CANT[ev.reason] ?? 'no puede moverse.'}`], { side: ev.side, cls: 'weak' });
+        tell([...mon(ev.side, ev.name), ` ${cantText(ev)}`], { side: ev.side, cls: 'weak' });
         if (STATUS_INFO[ev.reason]) {
           float(ev.side, statusLabel(ev.reason), `status-float ${ev.reason}`);
           anim(spot, `afflicted-${ev.reason}`, 900);
@@ -2253,9 +2370,137 @@ function battleUI(c, sendAction) {
         else tell([isYou(s) ? 'Retiras a ' : `${sd(s).name} retira a `, h('b', null, from), ` y ${who} a `, h('b', null, ev.name), '.'], { side: s });
         return 1000;
       }
+      case 'switchOut':
+        anim(els.spot[pos(ev.side)], 'dodge', 500);
+        tell([...mon(ev.side, ev.name), ' vuelve con su entrenador.'], { side: ev.side, sub: true });
+        return 700;
       case 'replace':
         tell([isYou(ev.side) ? 'Elige quién entra.' : `${sd(ev.side).name} elige quién entra…`], { side: ev.side, cls: 'weak' });
         return 500;
+      case 'protect':
+        anim(els.spot[pos(ev.side)], 'power', 600);
+        tell([...mon(ev.side, ev.name), ev.kind === 'endure' ? ' se prepara para aguantar.' : ' se protege.'], { side: ev.side, sub: true });
+        return Promise.all([sleep(700), fx.condition('protect', els.spot[pos(ev.side)])]);
+      case 'protected':
+        float(ev.side, '🛡️', 'status-float');
+        tell(['¡', ...mon(ev.side, ev.name), ' se protegió!'], { side: ev.side, sub: true, cls: 'weak' });
+        return Promise.all([sleep(800), fx.condition('protect', els.spot[pos(ev.side)])]);
+      case 'protectBroken':
+        tell(['¡Rompe la protección de ', ...mon(ev.side, ev.name), '!'], { side: ev.side, sub: true });
+        return 700;
+      case 'endured':
+        float(ev.side, '¡Aguanta!', 'up');
+        tell(['¡', ...mon(ev.side, ev.name), ' aguantó el golpe!'], { side: ev.side, sub: true });
+        return 800;
+      case 'subDamage':
+        anim(els.spot[pos(ev.side)], 'hit', 500);
+        tell(['El sustituto de ', ...mon(ev.side, ev.name), ' recibe el golpe.'], { side: ev.side, sub: true });
+        return 800;
+      case 'sideStart': {
+        const side = sd(ev.side);
+        if (['spikes', 'stealthrock', 'stickyweb'].includes(ev.kind)) side.hazards = { ...(side.hazards || {}), [ev.kind]: ev.kind === 'spikes' ? ev.layers : true };
+        else if (ev.kind === 'wish') side.wish = true;
+        else if (!['quickguard', 'wideguard', 'craftyshield', 'matblock'].includes(ev.kind)) side.conds = { ...(side.conds || {}), [ev.kind]: true };
+        paint(ev.side);
+        tell([SIDE_COND[ev.kind]?.start(side.name, ev) ?? ''], { side: ev.side });
+        return 900;
+      }
+      case 'sideEnd': {
+        const side = sd(ev.side);
+        if (side.hazards && ev.kind in side.hazards) side.hazards = { ...side.hazards, [ev.kind]: ev.kind === 'spikes' ? 0 : false };
+        if (side.conds) delete side.conds[ev.kind];
+        paint(ev.side);
+        tell([SIDE_COND[ev.kind]?.end?.(side.name) ?? ''], { side: ev.side, cls: 'weak' });
+        return 700;
+      }
+      case 'fieldStart':
+        view.field = { ...view.field, rooms: { ...(view.field.rooms || {}), [ev.kind]: true } };
+        paintField();
+        tell([ROOM[ev.kind]?.start ?? '']);
+        return 900;
+      case 'fieldEnd': {
+        const rooms = { ...(view.field.rooms || {}) };
+        delete rooms[ev.kind];
+        view.field = { ...view.field, rooms };
+        paintField();
+        tell([ROOM[ev.kind]?.end ?? ''], { cls: 'weak' });
+        return 700;
+      }
+      case 'boosts': {
+        const f = activeOf(ev.side);
+        f.boosts = { ...ev.boosts };
+        paint(ev.side);
+        tell(['Cambian las características de ', ...mon(ev.side, ev.name), '.'], { side: ev.side, sub: true });
+        return 800;
+      }
+      case 'stats': {
+        const f = activeOf(ev.side);
+        if (!f.hpPercent) f.stats = { ...ev.stats };
+        paint(ev.side);
+        tell(['Cambian las stats de ', ...mon(ev.side, ev.name), '.'], { side: ev.side, sub: true });
+        return 800;
+      }
+      case 'courtChange':
+        [view.sides[0].hazards, view.sides[1].hazards] = [view.sides[1].hazards, view.sides[0].hazards];
+        [view.sides[0].conds, view.sides[1].conds] = [view.sides[1].conds, view.sides[0].conds];
+        [view.sides[0].screens, view.sides[1].screens] = [view.sides[1].screens, view.sides[0].screens];
+        [view.sides[0].toxicSpikes, view.sides[1].toxicSpikes] = [view.sides[1].toxicSpikes, view.sides[0].toxicSpikes];
+        paint(0);
+        paint(1);
+        tell(['Los dos equipos intercambian sus efectos de campo.']);
+        return 900;
+      case 'teamCured':
+        for (const t of sd(ev.side).team) if (t.hp > 0) t.status = null;
+        paint(ev.side);
+        tell([`El equipo de ${sd(ev.side).name} se cura de sus problemas de estado.`], { side: ev.side });
+        return 900;
+      case 'revive': {
+        const t = sd(ev.side).team[ev.index];
+        if (t) Object.assign(t, { hp: t.hpPercent ? Math.round((ev.hp / ev.max) * 100) : ev.hp, status: null });
+        paint(ev.side);
+        tell(['¡', h('b', null, ev.name), ' vuelve a la vida!'], { side: ev.side });
+        return 1000;
+      }
+      case 'futureStart':
+        tell([...mon(ev.side, ev.name), ` prevé un ataque: ${ev.move}.`], { side: ev.side, sub: true });
+        return 800;
+      case 'futureHit':
+        anim(els.spot[pos(ev.side)], 'hit', 500);
+        tell(['¡', h('b', null, ev.move), ' golpea a ', ...mon(ev.side, ev.name), '!'], { side: ev.side });
+        return Promise.all([sleep(700), fx.move({ kind: 'attack', type: 'psychic', key: 'psychic', flags: [] }, els.spot[pos(ev.side)], els.spot[pos(ev.side)])]);
+      case 'wish':
+        tell([`¡Se cumple el deseo de ${ev.name}!`], { side: ev.side });
+        return 700;
+      case 'healingWish':
+        tell([...mon(ev.side, ev.name), ev.kind === 'lunardance' ? ' recibe el baile lunar.' : ' recibe el deseo de cura.'], { side: ev.side });
+        return 800;
+      case 'stickyWeb':
+        tell([...mon(ev.side, ev.name), ' queda atrapado en la red viscosa.'], { side: ev.side, sub: true, cls: 'weak' });
+        return 700;
+      case 'destinyBond':
+        tell([`${ev.from} se lleva consigo a `, ...mon(ev.side, ev.name), '.'], { side: ev.side, cls: 'weak' });
+        return 900;
+      case 'grudge':
+        tell(['Por el rencor, ', ...mon(ev.side, ev.name), ` pierde todos los PP de ${ev.move}.`], { side: ev.side, cls: 'weak' });
+        return 800;
+      case 'pp':
+        tell([...mon(ev.side, ev.name), ` pierde ${ev.lost} PP de ${ev.move}.`], { side: ev.side, sub: true, cls: 'weak' });
+        return 700;
+      case 'learned':
+        tell([...mon(ev.side, ev.name), ` aprende ${ev.move}.`], { side: ev.side, sub: true });
+        return 800;
+      case 'snatched':
+        tell(['¡', ...mon(ev.side, ev.name), ` roba ${ev.move}!`], { side: ev.side });
+        return 800;
+      case 'bounced':
+        tell(['¡', ...mon(ev.side, ev.name), ` devuelve ${ev.move}!`], { side: ev.side });
+        return 800;
+      case 'bide':
+        tell([...mon(ev.side, ev.name), ' está aguantando.'], { side: ev.side, sub: true });
+        return 700;
+      case 'magnitude':
+        tell([`¡Magnitud ${ev.n}!`], { side: ev.side, sub: true });
+        return 600;
       case 'end':
         setActing(null);
         if (ev.reason === 'limit') log('Se llegó al límite de turnos: gana quien conserva más vida.', 'weak');
@@ -2310,7 +2555,7 @@ function battleUI(c, sendAction) {
       playing = false;
       view = clone(msg.state);
       paintAll();
-      if (view.status === 'active') say(frame.you == null ? 'Eligiendo…' : view.phase === 'replace' && !view.sides[frame.you].mustSwitch ? `${view.sides[1 - frame.you].name} elige quién entra…` : '¿Qué haces ahora?');
+      if (view.status === 'active') say(frame.you == null ? 'Eligiendo…' : view.phase !== 'choose' && !view.sides[frame.you].mustSwitch ? `${view.sides[1 - frame.you].name} elige quién entra…` : '¿Qué haces ahora?');
     } else if (msg.t === 'start' || msg.t === 'presence') {
       view = clone(msg.state);
       paintAll();

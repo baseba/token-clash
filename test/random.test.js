@@ -79,18 +79,18 @@ test('randomize ignores the trainer edits and does not touch the original', () =
 const pikachu = (extra) => ({ id: 'pika', finalID: 25, baseID: 25, rarity: 'rare', level: 50, ivs: { hp: 15, atk: 15, def: 15, spd: 15 }, ...extra });
 
 test('a saved move that does not work is swapped for another learned one at random', () => {
-  const e = pikachu({ moveset: ['thunderbolt', 'electro-ball', 'quick-attack'] });
+  const e = pikachu({ learned: ['fling'], moveset: ['thunderbolt', 'fling', 'quick-attack'] });
   const moves = movesetFor(e);
   assert.equal(moves.length, 3);
   assert.equal(moves[0], 'thunderbolt');
   assert.equal(moves[2], 'quick-attack');
-  assert.ok(!moves.includes('electro-ball'));
+  assert.ok(!moves.includes('fling'));
   assert.ok(validMoveset(e, moves));
   assert.deepEqual(movesetFor(e), moves);
 });
 
 test('with no other move to learn it is left with fewer moves', () => {
-  const e = pikachu({ level: 1, learned: [], moveset: ['growl', 'electro-ball', 'thunder-shock'] });
+  const e = pikachu({ level: 1, learned: ['fling'], moveset: ['growl', 'fling', 'thunder-shock'] });
   assert.deepEqual(movesetFor(e), ['growl', 'thunder-shock']);
 });
 

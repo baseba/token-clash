@@ -19,8 +19,9 @@ const hitOn = (ev, side) => ev.filter((e) => e.t === 'damage' && e.side === side
 const attacker = (moves, extra) => mon('atk', 68, moves, { abilityChoice: 'guts', ...extra });
 const wall = (moves = ['growl', 'tackle', 'swords-dance'], extra) => mon('def', 143, moves, { abilityChoice: 'thick-fat', level: 60, ...extra });
 
-test('moves that cannot be reproduced faithfully are not selectable', () => {
-  for (const id of ['future-sight', 'doom-desire', 'rollout', 'ice-ball', 'uproar', 'rage', 'belch']) assert.equal(moveData(id).supported, false, id);
+test('only moves that need items or a double battle stay unselectable', () => {
+  for (const id of ['belch', 'trick', 'fling', 'recycle', 'helping-hand', 'follow-me', 'ally-switch', 'magic-room', 'embargo']) assert.equal(moveData(id).supported, false, id);
+  for (const id of ['future-sight', 'doom-desire', 'rollout', 'ice-ball', 'uproar', 'rage', 'protect', 'substitute', 'spikes', 'baton-pass', 'metronome', 'sleep-talk', 'transform', 'counter', 'trick-room']) assert.equal(moveData(id).supported, true, id);
 });
 
 test('Sorpresa and Escaramuza only work on the first action after entering', () => {
@@ -133,8 +134,27 @@ test('Atadura traps the rival and hurts it 1/8 each turn', () => {
 
 test('Ida y Vuelta switches the user out, and Cola Dragón drags the rival out', () => {
   const b = battle([mon('s', 123, ['u-turn']), mon('z', 41, ['bite'])], [wall(), mon('w2', 25, ['growl'])]);
-  turn(b, 'u-turn', 'growl');
-  assert.equal(b.sides[0].mustSwitch, true);
+  const ev = turn(b, 'u-turn', 'growl');
+  assert.equal(b.sides[0].active, 1);
+  assert.equal(b.phase, 'choose');
+  const out = ev.findIndex((e) => e.t === 'switchOut' && e.side === 0);
+  const foeMove = ev.findIndex((e) => e.t === 'move' && e.side === 1);
+  assert.ok(out > 0 && out < foeMove);
+  assert.ok(ev.some((e) => e.t === 'boost' && e.side === 0 && e.stat === 'atk' && ev.indexOf(e) > foeMove));
+  assert.equal(b.sides[0].team[1].boosts.atk, -1);
+  assert.equal(b.sides[0].team[0].boosts.atk, 0);
+
+  const pick = battle([mon('s', 123, ['u-turn']), mon('z', 41, ['bite']), mon('y', 25, ['growl'])], [wall(), mon('w2', 25, ['growl'])]);
+  const first = turn(pick, 'u-turn', 'tackle');
+  assert.equal(pick.phase, 'switchout');
+  assert.deepEqual(validActions(pick, 0), [{ type: 'switch', to: 1 }, { type: 'switch', to: 2 }]);
+  assert.ok(!first.some((e) => e.t === 'move' && e.side === 1));
+  const rest = submit(pick, 0, { type: 'switch', to: 2 });
+  assert.equal(pick.sides[0].active, 2);
+  assert.ok(rest.some((e) => e.t === 'move' && e.side === 1));
+  assert.ok(rest.some((e) => e.t === 'damage' && e.side === 0));
+  assert.equal(pick.sides[0].team[0].hp, pick.sides[0].team[0].stats.hp);
+  assert.equal(pick.phase, 'choose');
 
   let dragged = false;
   for (let seed = 1; seed < 20 && !dragged; seed++) {

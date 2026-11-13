@@ -90,6 +90,7 @@ await mapLimit(ids, async (id) => {
     hiddenAbility: bySlot.find((a) => a.is_hidden)?.ability.name ?? null,
     learnset: levelUpMoves(mon.moves),
     genderRate: sp.gender_rate,
+    weight: mon.weight / 10,
   };
   if (sp.evolution_chain) {
     species[id].chainId = idFromUrl(sp.evolution_chain.url);
@@ -139,7 +140,12 @@ const statBoosts = (boosts) => (boosts ? Object.fromEntries(Object.entries(boost
 const SELF_TARGETS = new Set(['self', 'allySide', 'adjacentAllyOrSelf', 'allies']);
 const FIELD_TARGETS = new Set(['all', 'foeSide']);
 const WEATHER = { raindance: 'rain', sunnyday: 'sun', sandstorm: 'sand', hail: 'hail', snowscape: 'snow', snow: 'snow' };
-const FLAGS = ['contact', 'punch', 'bite', 'sound', 'pulse', 'bullet', 'slicing', 'wind', 'dance', 'heal', 'charge', 'recharge'];
+const FLAGS = [
+  'contact', 'punch', 'bite', 'sound', 'pulse', 'bullet', 'slicing', 'wind', 'dance', 'heal', 'charge', 'recharge',
+  'protect', 'reflectable', 'snatch', 'mirror', 'bypasssub', 'metronome', 'powder', 'gravity', 'defrost', 'failencore',
+  'nosleeptalk', 'noassist', 'failcopycat', 'failmimic', 'failinstruct', 'failmefirst', 'nosketch', 'cantusetwice',
+];
+const SPREAD_TARGETS = new Set(['allAdjacent', 'allAdjacentFoes']);
 
 function secondaryOf(sec) {
   const out = { chance: sec.chance ?? 100 };
@@ -180,6 +186,14 @@ function battleMove(sd) {
   if (sd.damage) m.fixedDamage = sd.damage;
   if (sd.selfdestruct === 'always') m.selfDestruct = true;
   if (sd.willCrit) m.crit = 3;
+  if (SPREAD_TARGETS.has(sd.target)) m.spread = true;
+  if (sd.breaksProtect) m.breaksProtect = true;
+  if (sd.sleepUsable) m.sleepUsable = true;
+  if (sd.stallingMove) m.stalling = true;
+  if (sd.sideCondition) m.sideCondition = sd.sideCondition.toLowerCase();
+  if (sd.pseudoWeather) m.pseudoWeather = sd.pseudoWeather.toLowerCase();
+  if (sd.selfSwitch) m.selfSwitchKind = sd.selfSwitch === true ? 'switch' : String(sd.selfSwitch).toLowerCase();
+  if (sd.ignoreImmunity) m.ignoresImmunity = true;
   return m;
 }
 

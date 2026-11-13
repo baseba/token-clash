@@ -8,6 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { effectiveness } from '../public/types.js';
 import { abilityInfo, knownAbility, INERT } from './abilities.js';
+import { MOVE_RULES, IMPOSSIBLE_MOVES } from './moves.js';
 
 export { effectiveness };
 
@@ -76,7 +77,6 @@ const SPECIAL_STATUS_MOVES = new Set(['rest', 'synthesis', 'morning-sun', 'moonl
 const GRASSY_HALVED = new Set(['earthquake', 'bulldoze', 'magnitude']);
 const SCREEN_MOVES = { reflect: 'reflect', 'light-screen': 'lightscreen', 'aurora-veil': 'auroraveil' };
 const SCREEN_BREAKERS = new Set(['brick-break', 'psychic-fangs', 'raging-bull']);
-const UNSUPPORTED_MOVES = new Set(['future-sight', 'doom-desire', 'rollout', 'ice-ball', 'uproar', 'rage', 'belch']);
 const FIRST_TURN_ONLY = new Set(['fake-out', 'first-impression', 'mat-block']);
 const RAMPAGE = new Set(['outrage', 'thrash', 'petal-dance', 'raging-fury']);
 const BINDING = new Set(['bind', 'wrap', 'fire-spin', 'whirlpool', 'sand-tomb', 'clamp', 'infestation', 'magma-storm', 'thunder-cage', 'snap-trap']);
@@ -99,6 +99,8 @@ function supportedMove(m) {
   if (m.category !== 'status') return m.power > 0 || !!m.fixedDamage || !!m.ohko;
   return !!(m.boosts || m.self || m.status || m.screen || SUPPORTED_VOLATILES.has(m.volatile) || m.heal || m.weather || m.terrain || SPECIAL_STATUS_MOVES.has(m.id));
 }
+
+export const ALL_MOVE_IDS = () => Object.keys(MOVEDEX);
 
 export function moveData(id) {
   const d = MOVEDEX[id];
@@ -134,7 +136,8 @@ export function moveData(id) {
   if (id === 'snore') m.usableAsleep = true;
   if (id === 'smack-down' || id === 'thousand-arrows') m.grounds = true;
   if (id === 'thousand-arrows') m.hitsAirborne = true;
-  m.supported = supportedMove(m) && !UNSUPPORTED_MOVES.has(id);
+  if (id === 'defense-curl') m.curls = true;
+  m.supported = !IMPOSSIBLE_MOVES.has(id) && (supportedMove(m) || !!MOVE_RULES[id]);
   return m;
 }
 
