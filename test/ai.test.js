@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBattle, submit, validActions, needsAction } from '../server/battle.js';
 import { rng, buildFighter, speciesData } from '../server/creatures.js';
-import { AI_LEVELS, LAST_AI_SPECIES, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from '../server/ai.js';
+import { AI_LEVELS, AI_POOL_SHARE, LAST_AI_SPECIES, aiPool, aiTeamPool, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from '../server/ai.js';
 
 const fullyEvolved = (id) => {
   const d = speciesData(id);
@@ -19,20 +19,41 @@ test('every difficulty builds six distinct Pokémon from generations 1 to 5 with
         assert.ok(e.finalID >= 1 && e.finalID <= LAST_AI_SPECIES, `${difficulty}: #${e.finalID}`);
         const f = buildFighter(e);
         assert.ok(f.moves.length >= 1 && f.moves.every((m) => m.supported), `${difficulty}: ${f.name}`);
-        if (difficulty !== 'easy') assert.ok(fullyEvolved(e.finalID), `${difficulty}: ${f.name} no está evolucionado`);
+        assert.ok(fullyEvolved(e.finalID), `${difficulty}: ${f.name} no está evolucionado`);
       }
     }
   }
 });
 
-test('harder AIs give their Pokémon better IVs and attacks of more than one type', () => {
-  const easy = buildAiTeam({ difficulty: 'easy', level: 50, random: rng(1) });
-  const hard = buildAiTeam({ difficulty: 'veryhard', level: 50, random: rng(1) });
-  assert.ok(hard[0].ivs.atk > easy[0].ivs.atk);
-  for (const e of hard) {
-    const attackTypes = new Set(buildFighter(e).moves.filter((m) => m.kind === 'attack').map((m) => m.type));
-    assert.ok(attackTypes.size >= Math.min(2, buildFighter(e).moves.filter((m) => m.kind === 'attack').length), buildFighter(e).name);
+test('the AI team rolls the same dice as the random mode', () => {
+  for (const difficulty of AI_LEVELS) {
+    const team = buildAiTeam({ difficulty, level: 50, random: rng(`d:${difficulty}`) });
+    for (const e of team) {
+      assert.deepEqual(e.ivs, { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 }, difficulty);
+      assert.equal(e.nature, undefined, difficulty);
+    }
   }
+});
+
+test('each harder AI draws from a smaller share of the strongest fully evolved Pokémon', () => {
+  const bst = (id) => speciesData(id).stats.reduce((a, x) => a + x, 0);
+  const pools = AI_LEVELS.map((difficulty) => aiTeamPool(difficulty, 50));
+  const evolved = pools[0].length;
+  assert.deepEqual(AI_LEVELS.map((d) => AI_POOL_SHARE[d]), [1, 0.8, 0.6, 0.5, 0.4]);
+  assert.ok(pools[0].every(fullyEvolved));
+  assert.ok(evolved > aiPool().length / 3);
+  pools.forEach((pool, i) => {
+    assert.equal(pool.length, Math.ceil(evolved * AI_POOL_SHARE[AI_LEVELS[i]]), AI_LEVELS[i]);
+    if (i) {
+      assert.ok(pool.every((id) => pools[i - 1].includes(id)), AI_LEVELS[i]);
+      const left = pools[i - 1].filter((id) => !pool.includes(id));
+      assert.ok(Math.min(...pool.map(bst)) >= Math.max(...left.map(bst)), AI_LEVELS[i]);
+    }
+  });
+});
+
+test('the pool never drops below a full party, even at low levels', () => {
+  for (const difficulty of AI_LEVELS) assert.ok(aiTeamPool(difficulty, 1).length >= 6, difficulty);
 });
 
 test('the AI builds its team and picks its three without looking at yours', () => {
@@ -47,15 +68,16 @@ test('the AI builds its team and picks its three without looking at yours', () =
 });
 
 test('the hard AIs still bring strong Pokémon, but not always the same ones', () => {
+  const pool = new Set(aiTeamPool('veryhard', 50));
   const teams = [0, 1, 2, 3].map((seed) => buildAiTeam({ difficulty: 'veryhard', level: 50, random: rng(`v:${seed}`) }).map((e) => e.finalID).sort().join());
   assert.ok(new Set(teams).size > 1);
-  for (const t of teams) for (const id of t.split(',')) assert.ok(speciesData(Number(id)).stats.reduce((a, x) => a + x, 0) >= 500);
+  for (const t of teams) for (const id of t.split(',')) assert.ok(pool.has(Number(id)));
 });
 
-test('the random party of the AI comes from generations 1 to 5 too', () => {
+test('the random party of the AI comes from fully evolved Pokémon of generations 1 to 5 too', () => {
   const party = buildAiRandomParty({ level: 40, random: rng(3) });
   assert.equal(party.length, 6);
-  assert.ok(party.every((e) => e.finalID <= LAST_AI_SPECIES && e.level === 40));
+  assert.ok(party.every((e) => e.finalID <= LAST_AI_SPECIES && e.level === 40 && fullyEvolved(e.finalID)));
 });
 
 test('the AI always takes three distinct Pokémon to the battle', () => {
