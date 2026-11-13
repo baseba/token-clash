@@ -12,8 +12,10 @@ import { createBattle, submit, autoAction, needsAction, validActions, publicStat
 import { createPreview, pick, fillMissing, previewReady, chosenEntries, previewView, PARTY_SIZE } from './preview.js';
 import { openStore } from './store.js';
 import { serverStats } from './stats.js';
+import { openRooms, matchFor, visibilityOf, joinBlocker, HOST_GRACE_MS } from './lobby.js';
+import { TOURNAMENT_SIZES, aiName, humanCount, reachedRound, addSeat, removeSeat, setReady, allReady, isFull, seatOf, nextAiId, shuffledOrder, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor } from './tournament.js';
 import { randomParty } from './random.js';
-import { AI_LEVELS, AI_LABELS, JEV_LEVEL, aiTrainerId, aiLevelOf, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
+import { AI_LEVELS, JEV_LEVEL, aiTrainerId, aiLevelOf, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
 import { chooseJevAction, jevConfigured } from './jev.js';
 
 const PORT = Number(process.env.PORT || 8080);
@@ -24,6 +26,12 @@ const TRUST_CF = process.env.TRUST_CF_CONNECTING_IP === '1';
 const TURN_MS = Number(process.env.TURN_MS || 60_000);
 const PREVIEW_MS = Number(process.env.PREVIEW_MS || 60_000);
 const ROLL_MS = Number(process.env.ROLL_MS ?? 6_000);
+const MATCH_MS = Number(process.env.MATCH_MS ?? 5_000);
+const DRAW_MS = Number(process.env.DRAW_MS ?? 6_000);
+const BETWEEN_MS = Number(process.env.BETWEEN_MS ?? 15_000);
+const AI_PACE_MS = Number(process.env.AI_PACE_MS ?? 2_500);
+const ABSENT_MS = Number(process.env.ABSENT_MS ?? 15_000);
+const SEAT_GRACE_MS = Number(process.env.SEAT_GRACE_MS ?? 30_000);
 // Skynet needs a way to reach Jev: JEV_API_URL (the egress proxy, which holds the key) or a key to
 // call TypeSafe directly. Without either, the level is neither offered nor accepted.
 const JEV_API_KEY = process.env.JEV_API_KEY || '';
@@ -227,6 +235,8 @@ function challengeView(c, viewerId = null) {
     levelCap: c.levelCap,
     mode: c.mode ?? 'team',
     ai: c.ai ?? null,
+    visibility: visibilityOf(c),
+    tournament: c.tournamentId && db.tournaments[c.tournamentId]?.bracket ? tournamentLabel(db.tournaments[c.tournamentId], { round: c.round, index: c.match }) : null,
     createdAt: c.createdAt,
     host: { id: c.hostId, name: host?.name ?? c.hostName },
     guest: c.guestId ? { id: c.guestId, name: db.trainers[c.guestId]?.name ?? c.guestName } : null,
@@ -269,12 +279,13 @@ function previewFrame(r, ws, extra) {
 
 function armPreviewTimer(id, r, extraMs = 0) {
   clearTimeout(r.timer);
-  r.deadline = Date.now() + PREVIEW_MS + extraMs;
+  const ms = (someoneAbsent(id, r, r.preview.sides) ? Math.min(ABSENT_MS, PREVIEW_MS) : PREVIEW_MS) + extraMs;
+  r.deadline = Date.now() + ms;
   r.timer = setTimeout(() => {
     if (!r.preview) return;
     fillMissing(r.preview);
     startBattle(id, r);
-  }, PREVIEW_MS + extraMs);
+  }, ms);
   r.timer.unref?.();
 }
 
@@ -288,7 +299,19 @@ function startBattle(id, r) {
   });
   armTimer(id, r);
   broadcast(r, { t: 'start' });
-  aiTurn(id, r);
+  nextAiTurn(id, r);
+}
+
+const aiOnly = (b) => b.sides.every((side) => aiLevelOf(side.trainerId));
+
+function nextAiTurn(id, r) {
+  if (r.battle && aiOnly(r.battle)) setTimeout(() => aiTurn(id, r), AI_PACE_MS).unref?.();
+  else aiTurn(id, r);
+}
+
+function someoneAbsent(id, r, sides) {
+  if (!db.challenges[id]?.tournamentId) return false;
+  return sides.some((side) => !aiLevelOf(side.trainerId) && ![...r.sockets].some((ws) => ws.trainerId === side.trainerId && ws.readyState === 1));
 }
 
 function aiTurn(id, r) {
@@ -333,7 +356,20 @@ async function jevTurn(id, r, s) {
   else broadcast(r, { t: 'ready' });
 }
 
+function inRoom(r, trainerId) {
+  return [...r.sockets].some((ws) => ws.trainerId === trainerId && ws.readyState === 1);
+}
+
 function frameFor(r, ws, extra = {}) {
+  if (r.readyCheck) {
+    const players = r.readyCheck.players;
+    const you = players.findIndex((p) => p.id === ws.trainerId);
+    return { t: 'lobby', players: players.map((p) => ({ ...p, ready: r.readyCheck.ready.has(p.id), online: inRoom(r, p.id) })), you: you === -1 ? null : you };
+  }
+  if (r.countdown) {
+    const you = r.countdown.players.findIndex((p) => p.id === ws.trainerId);
+    return { ...extra, t: 'countdown', ms: Math.max(0, r.countdown.endsAt - Date.now()), players: r.countdown.players, you: you === -1 ? null : you, tournament: r.countdown.tournament ?? null };
+  }
   if (r.preview) return previewFrame(r, ws, extra);
   const you = sideOf(r.battle, ws.trainerId);
   return {
@@ -356,7 +392,8 @@ function armTimer(id, r) {
   r.timer = null;
   r.deadline = null;
   if (!r.battle || r.battle.status !== 'active') return;
-  r.deadline = Date.now() + TURN_MS;
+  const ms = someoneAbsent(id, r, r.battle.sides) ? Math.min(ABSENT_MS, TURN_MS) : TURN_MS;
+  r.deadline = Date.now() + ms;
   r.timer = setTimeout(() => {
     // Whoever has not chosen gets an automatic move, so a battle always ends.
     let events = null;
@@ -367,7 +404,7 @@ function armTimer(id, r) {
       }
     });
     afterResolve(id, r, events ?? [], true);
-  }, TURN_MS);
+  }, ms);
   r.timer.unref?.();
 }
 
@@ -375,7 +412,7 @@ function afterResolve(id, r, events, timedOut = false) {
   if (r.battle.status === 'finished') finishBattle(id, r);
   else armTimer(id, r);
   broadcast(r, { t: 'events', events, timedOut });
-  aiTurn(id, r);
+  nextAiTurn(id, r);
 }
 
 function finishBattle(id, r) {
@@ -392,10 +429,11 @@ function finishBattle(id, r) {
     c.winnerId = b.sides[b.winner].trainerId;
     const w = db.trainers[b.sides[b.winner].trainerId];
     const l = db.trainers[b.sides[1 - b.winner].trainerId];
-    if (w && !c.ai) w.wins += 1;
-    if (l && !c.ai) l.losses += 1;
+    if (w && !c.ai && !c.tournamentId) w.wins += 1;
+    if (l && !c.ai && !c.tournamentId) l.losses += 1;
   }
   store.save();
+  if (c.tournamentId) tournamentMatchDone(c, b.winner);
   // Keep the finished room a while for late viewers, then drop it.
   setTimeout(() => {
     const cur = rooms.get(id);
@@ -419,7 +457,7 @@ function startAiChallenge(t, { mode, levelCap, level }) {
     hostName: t.name,
     hostTeam,
     guestId: aiTrainerId(level),
-    guestName: `IA ${AI_LABELS[level]}`,
+    guestName: aiName(level).name,
     guestTeam: aiTeam,
     levelCap,
     mode,
@@ -441,6 +479,326 @@ function startAiChallenge(t, { mode, levelCap, level }) {
   store.save();
   armPreviewTimer(id, r, mode === 'random' ? ROLL_MS : 0);
   return c;
+}
+
+function hostWaiting(c) {
+  const r = rooms.get(c.id);
+  return !!r && [...r.sockets].some((ws) => ws.trainerId === c.hostId && ws.readyState === 1);
+}
+
+function publicRooms() {
+  return openRooms(db.challenges, { hostWaiting });
+}
+
+const lobbySockets = new Set();
+const sentRooms = new WeakMap();
+let lobbyTimer = null;
+
+function roomsFrame(ws) {
+  const list = [...publicRooms().map((c) => roomView(c, ws.trainerId)), ...listedTournaments().map((T) => tournamentRoomView(T, ws.trainerId))].sort((a, b) => a.createdAt - b.createdAt);
+  return JSON.stringify({ t: 'rooms', rooms: list.slice(0, 40) });
+}
+
+function sendRooms(ws, force = false) {
+  if (ws.readyState !== 1) return;
+  const frame = roomsFrame(ws);
+  if (!force && sentRooms.get(ws) === frame) return;
+  sentRooms.set(ws, frame);
+  ws.send(frame);
+}
+
+function notifyLobby() {
+  if (lobbyTimer) return;
+  lobbyTimer = setTimeout(() => {
+    lobbyTimer = null;
+    for (const ws of lobbySockets) sendRooms(ws);
+  }, 50);
+}
+
+function closeRoom(c) {
+  c.status = 'cancelled';
+  store.save();
+  const r = rooms.get(c.id);
+  if (r) for (const ws of r.sockets) if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'closed' }));
+  notifyLobby();
+}
+
+function roomView(c, viewerId) {
+  const host = db.trainers[c.hostId];
+  return { id: c.id, kind: 'duel', mode: c.mode ?? 'team', levelCap: c.levelCap ?? null, createdAt: c.createdAt, host: { name: host?.name ?? c.hostName, wins: host?.wins ?? 0, losses: host?.losses ?? 0 }, mine: c.hostId === viewerId };
+}
+
+function joinChallenge(c, t) {
+  const host = db.trainers[c.hostId];
+  const random = c.mode === 'random';
+  if (random) {
+    if (!host?.roster.length) return 'El anfitrión ya no tiene Pokémon.';
+    c.hostTeam = randomParty(host.roster);
+    c.guestTeam = randomParty(t.roster);
+  } else c.guestTeam = teamEntries(t).map((e) => ({ ...e }));
+  c.status = 'active';
+  c.guestId = t.id;
+  c.guestName = t.name;
+  store.save();
+  const r = room(c.id);
+  r.readyCheck = { ready: new Set(), players: [countdownPlayer(c.hostId, c.hostName), countdownPlayer(t.id, t.name)] };
+  broadcast(r, { t: 'lobby' });
+  notifyLobby();
+  return null;
+}
+
+function startCountdown(c, r, tournament = null) {
+  r.readyCheck = null;
+  r.countdown = { endsAt: Date.now() + MATCH_MS, players: [countdownPlayer(c.hostId, c.hostName), countdownPlayer(c.guestId, c.guestName)], tournament };
+  r.countdownTimer = setTimeout(() => openPreview(c, r), MATCH_MS);
+  broadcast(r, { t: 'countdown' });
+}
+
+function setRoomReady(c, r, trainerId, ready) {
+  if (!r.readyCheck?.players.some((p) => p.id === trainerId)) return;
+  if (ready) r.readyCheck.ready.add(trainerId);
+  else r.readyCheck.ready.delete(trainerId);
+  if (r.readyCheck.players.every((p) => r.readyCheck.ready.has(p.id))) startCountdown(c, r);
+  else broadcast(r, { t: 'lobby' });
+}
+
+function reopenRoom(c, r) {
+  if (!r.readyCheck) return;
+  r.readyCheck = null;
+  c.status = 'open';
+  if (c.mode === 'random') c.hostTeam = [];
+  delete c.guestId;
+  delete c.guestName;
+  delete c.guestTeam;
+  store.save();
+  for (const ws of r.sockets) if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'reopened', host: ws.trainerId === c.hostId }));
+  notifyLobby();
+}
+
+function countdownPlayer(id, fallbackName) {
+  const level = aiLevelOf(id);
+  if (level) return { id, name: fallbackName, ai: level, wins: 0, losses: 0, rosterSize: 0, shinies: 0 };
+  const t = db.trainers[id];
+  return { id, name: t?.name ?? fallbackName, ai: null, wins: t?.wins ?? 0, losses: t?.losses ?? 0, rosterSize: t?.roster.length ?? 0, shinies: t?.roster.filter((e) => e.shiny).length ?? 0 };
+}
+
+function openPreview(c, r) {
+  r.countdown = null;
+  if (c.status !== 'active') return;
+  r.preview = createPreview({
+    levelCap: c.levelCap,
+    mode: c.mode ?? 'team',
+    sides: [
+      { trainerId: c.hostId, name: db.trainers[c.hostId]?.name ?? c.hostName, entries: c.hostTeam },
+      { trainerId: c.guestId, name: db.trainers[c.guestId]?.name ?? c.guestName, entries: c.guestTeam },
+    ],
+  });
+  r.preview.sides.forEach((side, s) => {
+    const level = aiLevelOf(side.trainerId);
+    if (level) pick(r.preview, s, aiPicks({ difficulty: level, own: side.entries }));
+  });
+  if (previewReady(r.preview)) return startBattle(c.id, r);
+  armPreviewTimer(c.id, r, c.mode === 'random' ? ROLL_MS : 0);
+  broadcast(r, { t: 'preview' });
+}
+
+// ---------- tournaments ----------
+const tourSockets = new Map();
+const tourTimers = new Map();
+
+function tourWatchers(id) {
+  let set = tourSockets.get(id);
+  if (!set) tourSockets.set(id, (set = new Set()));
+  return set;
+}
+
+function inTournament(id, trainerId) {
+  return [...(tourSockets.get(id) ?? [])].some((ws) => ws.trainerId === trainerId && ws.readyState === 1);
+}
+
+function tournamentView(T, viewerId = null) {
+  const you = seatOf(T, viewerId);
+  return {
+    id: T.id,
+    status: T.status,
+    mode: T.mode,
+    levelCap: T.levelCap ?? null,
+    size: T.size,
+    visibility: T.visibility,
+    createdAt: T.createdAt,
+    hostId: T.hostId,
+    host: viewerId === T.hostId,
+    you: you === -1 ? null : you,
+    seats: T.seats.map((seat) => {
+      const t = seat.ai ? null : db.trainers[seat.id];
+      return { name: seat.name, ai: seat.ai ?? null, ready: seat.ready, online: seat.ai ? true : inTournament(T.id, seat.id), wins: t?.wins ?? 0, losses: t?.losses ?? 0, rosterSize: t?.roster.length ?? 0 };
+    }),
+    rounds: (T.bracket ?? []).map((round, i) => ({ name: roundName(T.size, i), matches: round.map((m) => ({ a: m.a, b: m.b, winner: m.winner, coinFlip: !!m.coinFlip, challengeId: m.challengeId })) })),
+    current: T.current ?? null,
+    drawAt: T.drawAt ?? null,
+    nextAt: T.nextAt ?? null,
+    champion: T.champion ?? null,
+    played: T.bracket ? T.bracket.flat().filter((m) => m.winner !== null).length : 0,
+    total: T.bracket ? totalMatches(T.bracket) : T.size - 1,
+    aiLevels: AI_AVAILABLE,
+    serverNow: Date.now(),
+  };
+}
+
+function broadcastTournament(T) {
+  for (const ws of tourSockets.get(T.id) ?? []) if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'tour', tournament: tournamentView(T, ws.trainerId) }));
+  if (T.visibility === 'public') notifyLobby();
+}
+
+function listedTournaments(now = Date.now()) {
+  return Object.values(db.tournaments)
+    .filter((T) => T.status === 'open' && T.visibility === 'public' && !isFull(T) && (now - T.createdAt < HOST_GRACE_MS || inTournament(T.id, T.hostId)))
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+function tournamentRoomView(T, viewerId) {
+  const host = db.trainers[T.hostId];
+  return { id: T.id, kind: 'tournament', mode: T.mode, levelCap: T.levelCap ?? null, size: T.size, filled: T.seats.length, createdAt: T.createdAt, host: { name: host?.name ?? T.seats[0]?.name, wins: host?.wins ?? 0, losses: host?.losses ?? 0 }, mine: seatOf(T, viewerId) !== -1 };
+}
+
+function createTournament(t, { mode, levelCap, size, visibility }) {
+  const id = newId(6);
+  const T = { id, hostId: t.id, mode, levelCap, size, visibility, status: 'open', createdAt: Date.now(), seats: [] };
+  addSeat(T, { id: t.id, name: t.name, ai: null });
+  db.tournaments[id] = T;
+  store.save();
+  watchSeat(T, t.id);
+  if (visibility === 'public') setTimeout(notifyLobby, HOST_GRACE_MS + 100).unref();
+  return T;
+}
+
+function joinTournament(T, t) {
+  if (T.status !== 'open') throw new Error(T.status === 'running' || T.status === 'finished' ? 'Llegaste tarde: este torneo ya partió.' : 'Este torneo se cerró.');
+  addSeat(T, { id: t.id, name: t.name, ai: null });
+  store.save();
+  watchSeat(T, t.id);
+  afterSeatsChange(T);
+}
+
+function afterSeatsChange(T) {
+  if (allReady(T)) return startTournament(T);
+  store.save();
+  broadcastTournament(T);
+}
+
+function closeTournament(T) {
+  T.status = 'cancelled';
+  store.save();
+  broadcastTournament(T);
+  notifyLobby();
+}
+
+function watchSeat(T, trainerId) {
+  const key = `${T.id}:${trainerId}`;
+  clearTimeout(tourTimers.get(key));
+  tourTimers.set(
+    key,
+    setTimeout(() => {
+      tourTimers.delete(key);
+      if (T.status !== 'open' || inTournament(T.id, trainerId)) return;
+      if (trainerId === T.hostId) return closeTournament(T);
+      const i = seatOf(T, trainerId);
+      if (i > 0) {
+        T.seats.splice(i, 1);
+        afterSeatsChange(T);
+      }
+    }, SEAT_GRACE_MS),
+  );
+  tourTimers.get(key).unref?.();
+}
+
+function humanAverageLevel(T) {
+  const entries = T.seats.filter((seat) => !seat.ai).flatMap((seat) => (db.trainers[seat.id] ? teamEntries(db.trainers[seat.id]) : []));
+  return averageLevel(entries);
+}
+
+function startTournament(T) {
+  T.status = 'running';
+  T.startedAt = Date.now();
+  T.bracket = createBracket(shuffledOrder(T.size));
+  T.drawAt = Date.now();
+  T.aiLevel = T.levelCap ?? humanAverageLevel(T);
+  T.nextAt = Date.now() + DRAW_MS;
+  store.save();
+  broadcastTournament(T);
+  notifyLobby();
+  setTimeout(() => startTournamentMatch(T), DRAW_MS).unref?.();
+}
+
+function seatTeam(T, seat) {
+  if (seat.ai) return T.mode === 'random' ? buildAiRandomParty({ level: T.aiLevel }) : buildAiTeam({ difficulty: seat.ai, level: T.aiLevel });
+  const t = db.trainers[seat.id];
+  if (!t?.roster.length) return buildAiRandomParty({ level: T.aiLevel });
+  return T.mode === 'random' ? randomParty(t.roster) : teamEntries(t).map((e) => ({ ...e }));
+}
+
+function startTournamentMatch(T) {
+  if (T.status !== 'running') return;
+  const at = nextMatch(T.bracket);
+  if (!at) return;
+  const m = T.bracket[at.round][at.index];
+  const [first, second] = [T.seats[m.a], T.seats[m.b]];
+  const [host, guest] = first.ai && !second.ai ? [second, first] : [first, second];
+  const id = newId(6);
+  const c = {
+    id,
+    hostId: host.id,
+    hostName: host.name,
+    hostTeam: seatTeam(T, host),
+    guestId: guest.id,
+    guestName: guest.name,
+    guestTeam: seatTeam(T, guest),
+    levelCap: T.levelCap,
+    mode: T.mode,
+    ai: guest.ai ?? host.ai ?? null,
+    aiOnly: !!(host.ai && guest.ai),
+    visibility: 'private',
+    tournamentId: T.id,
+    round: at.round,
+    match: at.index,
+    status: 'active',
+    createdAt: Date.now(),
+  };
+  db.challenges[id] = c;
+  m.challengeId = id;
+  T.current = { ...at, challengeId: id };
+  T.nextAt = null;
+  store.save();
+  startCountdown(c, room(id), tournamentLabel(T, at));
+  broadcastTournament(T);
+}
+
+function tournamentLabel(T, at) {
+  const final = at.round === T.bracket.length - 1;
+  return { id: T.id, size: T.size, round: roundName(T.size, at.round), next: final ? null : roundName(T.size, at.round + 1), final, number: matchNumber(T.bracket, at), total: totalMatches(T.bracket) };
+}
+
+function tournamentMatchDone(c, winnerSide) {
+  const T = db.tournaments[c.tournamentId];
+  if (!T || T.status !== 'running') return;
+  const m = T.bracket[c.round][c.match];
+  let winner = T.seats.findIndex((seat) => seat.id === c.winnerId);
+  if (winnerSide === null || winner === -1) {
+    winner = Math.random() < 0.5 ? m.a : m.b;
+    m.coinFlip = true;
+  }
+  const champion = recordWinner(T.bracket, { round: c.round, index: c.match }, winner);
+  T.current = null;
+  if (champion !== null) {
+    T.status = 'finished';
+    T.champion = champion;
+    T.finishedAt = Date.now();
+  } else {
+    T.nextAt = Date.now() + BETWEEN_MS;
+    setTimeout(() => startTournamentMatch(T), BETWEEN_MS).unref?.();
+  }
+  store.save();
+  broadcastTournament(T);
 }
 
 // ---------- HTTP ----------
@@ -557,7 +915,7 @@ async function api(req, res, url) {
     const t = trainerFrom(req);
     if (!t) return send(res, 401, { error: 'Sin sesión' });
     const list = Object.values(db.challenges)
-      .filter((c) => !c.ai && (c.hostId === t.id || c.guestId === t.id))
+      .filter((c) => !c.ai && !c.tournamentId && (c.hostId === t.id || c.guestId === t.id))
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 30)
       .map((c) => ({
@@ -566,17 +924,33 @@ async function api(req, res, url) {
         levelCap: c.levelCap,
         mode: c.mode ?? 'team',
         ai: c.ai ?? null,
+        visibility: visibilityOf(c),
         createdAt: c.createdAt,
         opponent: c.hostId === t.id ? (c.guestId ? db.trainers[c.guestId]?.name ?? c.guestName : null) : db.trainers[c.hostId]?.name ?? c.hostName,
         won: c.status === 'finished' ? c.winnerId === t.id : null,
         mine: c.hostId === t.id,
       }));
-    return send(res, 200, { challenges: list });
+    const tournaments = Object.values(db.tournaments)
+      .filter((T) => seatOf(T, t.id) !== -1 && (T.status === 'open' || T.status === 'running' || (T.status === 'finished' && humanCount(T) >= 2)))
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 15)
+      .map((T) => {
+        const seat = seatOf(T, t.id);
+        const reached = T.bracket ? reachedRound(T.bracket, seat) : -1;
+        return { id: T.id, size: T.size, mode: T.mode, levelCap: T.levelCap ?? null, status: T.status, humans: humanCount(T), createdAt: T.createdAt, champion: T.champion === seat, reached: reached === -1 ? null : roundName(T.size, reached) };
+      });
+    return send(res, 200, { challenges: list, tournaments });
   }
 
   if (p === '/api/stats' && method === 'GET') {
-    const live = [...rooms.values()].filter((r) => r.sockets.size > 0 && (r.preview || r.battle?.status === 'active')).length;
+    const live = [...rooms.values()].filter((r) => r.sockets.size > 0 && (r.countdown || r.preview || r.battle?.status === 'active')).length;
     return send(res, 200, { ...serverStats(db), live: { battles: live, startedAt: STARTED_AT, version: ASSET_VERSION } });
+  }
+
+  if (p === '/api/rooms' && method === 'GET') {
+    const viewer = trainerFrom(req)?.id ?? null;
+    const list = [...publicRooms().map((c) => roomView(c, viewer)), ...listedTournaments().map((T) => tournamentRoomView(T, viewer))].sort((a, b) => a.createdAt - b.createdAt);
+    return send(res, 200, { rooms: list.slice(0, 40) });
   }
 
   if (p === '/api/leaderboard' && method === 'GET') {
@@ -596,6 +970,15 @@ async function api(req, res, url) {
     const mode = body.mode === 'random' ? 'random' : 'team';
     if (body.ai === JEV_LEVEL && !JEV_ON) return send(res, 503, { error: 'Skynet no está disponible en este servidor.' });
     if (AI_AVAILABLE.includes(body.ai)) return send(res, 200, { challenge: challengeView(startAiChallenge(t, { mode, levelCap, level: body.ai }), t.id) });
+    const visibility = body.visibility === 'private' ? 'private' : 'public';
+    if (visibility === 'public') {
+      const { own, rival } = matchFor(publicRooms(), { trainerId: t.id, mode, levelCap });
+      if (rival && !joinChallenge(rival, t)) {
+        if (own) closeRoom(own);
+        return send(res, 200, { challenge: challengeView(rival, t.id), joined: true });
+      }
+      if (own) return send(res, 200, { challenge: challengeView(own, t.id) });
+    }
     const id = newId(6);
     db.challenges[id] = {
       id,
@@ -604,10 +987,15 @@ async function api(req, res, url) {
       hostTeam: mode === 'random' ? [] : teamEntries(t).map((e) => ({ ...e })),
       levelCap,
       mode,
+      visibility,
       status: 'open',
       createdAt: Date.now(),
     };
     store.save();
+    if (visibility === 'public') {
+      notifyLobby();
+      setTimeout(notifyLobby, HOST_GRACE_MS + 100).unref();
+    }
     return send(res, 200, { challenge: challengeView(db.challenges[id], t.id) });
   }
 
@@ -621,9 +1009,10 @@ async function api(req, res, url) {
     const t = trainerFrom(req);
     const c = db.challenges[m[1]];
     if (!c) return send(res, 404, { error: 'Ese desafío no existe.' });
-    if (!t || c.hostId !== t.id || c.status !== 'open') return send(res, 403, { error: 'No puedes cancelar este desafío.' });
-    c.status = 'cancelled';
-    store.save();
+    const checking = c.status === 'active' && rooms.get(c.id)?.readyCheck;
+    if (!t || c.hostId !== t.id || (c.status !== 'open' && !checking) || c.tournamentId) return send(res, 403, { error: 'No puedes cerrar esta sala.' });
+    if (checking) rooms.get(c.id).readyCheck = null;
+    closeRoom(c);
     return send(res, 200, { challenge: challengeView(c, t.id) });
   }
 
@@ -632,32 +1021,88 @@ async function api(req, res, url) {
     const t = trainerFrom(req);
     if (!t) return send(res, 401, { error: 'Primero importa tu equipo.' });
     const c = db.challenges[m[1]];
-    if (!c) return send(res, 404, { error: 'Ese desafío no existe.' });
-    if (c.hostId === t.id) return send(res, 400, { error: 'No puedes aceptar tu propio desafío. Mándale el link a otro jugador.' });
-    if (c.status !== 'open') return send(res, 409, { error: 'Este desafío ya no está abierto.' });
-    const host = db.trainers[c.hostId];
-    const random = c.mode === 'random';
-    if (random) {
-      if (!host?.roster.length) return send(res, 409, { error: 'El anfitrión ya no tiene Pokémon.' });
-      c.hostTeam = randomParty(host.roster);
-      c.guestTeam = randomParty(t.roster);
-    } else c.guestTeam = teamEntries(t).map((e) => ({ ...e }));
-    c.status = 'active';
-    c.guestId = t.id;
-    c.guestName = t.name;
-    const r = room(c.id);
-    r.preview = createPreview({
-      levelCap: c.levelCap,
-      mode: c.mode ?? 'team',
-      sides: [
-        { trainerId: c.hostId, name: host?.name ?? c.hostName, entries: c.hostTeam },
-        { trainerId: t.id, name: t.name, entries: c.guestTeam },
-      ],
-    });
-    store.save();
-    armPreviewTimer(c.id, r, random ? ROLL_MS : 0);
-    broadcast(r, { t: 'preview' });
+    const blocked = joinBlocker(c, { trainerId: t.id, hostWaiting });
+    if (blocked) return send(res, blocked.status, { error: blocked.error });
+    const failed = joinChallenge(c, t);
+    if (failed) return send(res, 409, { error: failed });
     return send(res, 200, { challenge: challengeView(c, t.id) });
+  }
+
+  if (p === '/api/tournaments' && method === 'POST') {
+    const t = trainerFrom(req);
+    if (!t) return send(res, 401, { error: 'Primero importa tu equipo.' });
+    if (limited(`challenge:${t.id}`, 30, 10 * 60_000)) return send(res, 429, { error: 'Demasiados desafíos, espera unos minutos.' });
+    const body = await readBody(req);
+    const opts = { mode: body.mode === 'random' ? 'random' : 'team', levelCap: body.levelCap === 50 ? 50 : null, size: TOURNAMENT_SIZES.includes(body.size) ? body.size : 8, visibility: body.visibility === 'private' ? 'private' : 'public' };
+    if (opts.visibility === 'public') {
+      const { own, rival, seated } = tournamentMatchFor(listedTournaments(), { trainerId: t.id, ...opts });
+      if (seated ?? own) return send(res, 200, { tournament: tournamentView(seated ?? own, t.id) });
+      if (rival) {
+        joinTournament(rival, t);
+        return send(res, 200, { tournament: tournamentView(rival, t.id), joined: true });
+      }
+    }
+    const T = createTournament(t, opts);
+    notifyLobby();
+    return send(res, 200, { tournament: tournamentView(T, t.id) });
+  }
+
+  m = /^\/api\/tournaments\/([A-Za-z0-9_-]{4,20})(?:\/(join|leave|ready|ai|seats\/(\d+)))?$/.exec(p);
+  if (m) {
+    const T = db.tournaments[m[1]];
+    const t = trainerFrom(req);
+    if (!T) return send(res, 404, { error: 'Ese torneo no existe.' });
+    if (!m[2] && method === 'GET') return send(res, 200, { tournament: tournamentView(T, t?.id) });
+    if (!t) return send(res, 401, { error: 'Primero importa tu equipo.' });
+    const host = T.hostId === t.id;
+    const lobbyOnly = () => {
+      if (T.status !== 'open') throw new Error(T.status === 'cancelled' ? 'Este torneo se cerró.' : 'El torneo ya partió.');
+    };
+    try {
+      if (!m[2] && method === 'DELETE') {
+        if (!host) return send(res, 403, { error: 'Solo el dueño puede cerrar el torneo.' });
+        lobbyOnly();
+        closeTournament(T);
+      } else if (m[2] === 'join' && method === 'POST') {
+        if (seatOf(T, t.id) !== -1) return send(res, 200, { tournament: tournamentView(T, t.id) });
+        joinTournament(T, t);
+      } else if (m[2] === 'leave' && method === 'POST') {
+        lobbyOnly();
+        if (host) closeTournament(T);
+        else {
+          const i = seatOf(T, t.id);
+          if (i === -1) return send(res, 409, { error: 'No estás en este torneo.' });
+          T.seats.splice(i, 1);
+          afterSeatsChange(T);
+        }
+      } else if (m[2] === 'ready' && method === 'POST') {
+        lobbyOnly();
+        const body = await readBody(req);
+        setReady(T, t.id, body.ready !== false);
+        afterSeatsChange(T);
+      } else if (m[2] === 'ai' && method === 'POST') {
+        if (!host) return send(res, 403, { error: 'Solo el dueño puede agregar IAs.' });
+        lobbyOnly();
+        const body = await readBody(req);
+        if (!AI_AVAILABLE.includes(body.level)) return send(res, 400, { error: 'Esa dificultad no está disponible.' });
+        const count = Math.max(1, Math.min(T.size - T.seats.length, Number(body.count) || 1));
+        if (isFull(T)) return send(res, 409, { error: 'El torneo ya está lleno.' });
+        for (let i = 0; i < count; i++) {
+          const { id } = nextAiId(T, body.level);
+          const { base, name } = aiName(body.level, T.seats.map((seat) => seat.aiBase).filter(Boolean));
+          addSeat(T, { id, name, aiBase: base, ai: body.level });
+        }
+        afterSeatsChange(T);
+      } else if (m[3] && method === 'DELETE') {
+        if (!host) return send(res, 403, { error: 'Solo el dueño puede quitar jugadores.' });
+        lobbyOnly();
+        removeSeat(T, Number(m[3]));
+        afterSeatsChange(T);
+      } else return send(res, 405, { error: 'Método no permitido' });
+    } catch (e) {
+      return send(res, 409, { error: e.message });
+    }
+    return send(res, 200, { tournament: tournamentView(T, t.id) });
   }
 
   return send(res, 404, { error: 'No encontrado' });
@@ -670,11 +1115,11 @@ const server = createServer(async (req, res) => {
     // Live battle count for deploy/deploy.sh, which asks from inside the container (podman exec) so
     // it can wait until nobody is fighting. Loopback only: cloudflared reaches us from another container.
     if (url.pathname === '/healthz/battles' && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)) {
-      return send(res, 200, String([...rooms.values()].filter((r) => r.preview || r.battle?.status === 'active').length));
+      return send(res, 200, String([...rooms.values()].filter((r) => r.readyCheck || r.countdown || r.preview || r.battle?.status === 'active').length));
     }
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed');
-    if (url.pathname === '/' || url.pathname === '/equipo' || url.pathname === '/stats' || /^\/b\/[A-Za-z0-9_-]{4,20}$/.test(url.pathname)) return await serveStatic(req, res, 'index.html');
+    if (url.pathname === '/' || url.pathname === '/equipo' || url.pathname === '/stats' || /^\/[bt]\/[A-Za-z0-9_-]{4,20}$/.test(url.pathname)) return await serveStatic(req, res, 'index.html');
     return await serveStatic(req, res, url.pathname);
   } catch (e) {
     if (e instanceof SaveError) return send(res, 400, { error: e.message });
@@ -718,7 +1163,41 @@ function onSocket(ws) {
     } catch {
       return;
     }
-    if (msg.t === 'hello' && !ws.roomId) {
+    if (msg.t === 'lobby' && !ws.roomId && !lobbySockets.has(ws)) {
+      if (typeof msg.token === 'string') ws.trainerId = byToken.get(sha(msg.token))?.id ?? null;
+      lobbySockets.add(ws);
+      ws.on('close', () => lobbySockets.delete(ws));
+      return sendRooms(ws, true);
+    }
+    if (msg.t === 'tour' && !ws.roomId && !ws.tourId && !lobbySockets.has(ws)) {
+      const T = typeof msg.id === 'string' ? db.tournaments[msg.id] : null;
+      if (!T) return ws.send(JSON.stringify({ t: 'error', error: 'Ese torneo no existe.' }));
+      if (typeof msg.token === 'string') ws.trainerId = seen(byToken.get(sha(msg.token)))?.id ?? null;
+      ws.tourId = T.id;
+      tourWatchers(T.id).add(ws);
+      ws.on('close', () => {
+        tourSockets.get(T.id)?.delete(ws);
+        if (seatOf(T, ws.trainerId) !== -1 && T.status === 'open') {
+          watchSeat(T, ws.trainerId);
+          broadcastTournament(T);
+        }
+      });
+      broadcastTournament(T);
+      return;
+    }
+    if (msg.t === 'set-ready' && ws.roomId) {
+      const r = rooms.get(ws.roomId);
+      const c = db.challenges[ws.roomId];
+      if (r && c) setRoomReady(c, r, ws.trainerId, msg.ready !== false);
+      return;
+    }
+    if (msg.t === 'leave' && ws.roomId) {
+      const r = rooms.get(ws.roomId);
+      const c = db.challenges[ws.roomId];
+      if (r?.readyCheck && c?.guestId === ws.trainerId) reopenRoom(c, r);
+      return;
+    }
+    if (msg.t === 'hello' && !ws.roomId && !ws.tourId && !lobbySockets.has(ws)) {
       if (typeof msg.token === 'string') ws.trainerId = seen(byToken.get(sha(msg.token)))?.id ?? null;
       const c = typeof msg.room === 'string' ? db.challenges[msg.room] : null;
       if (!c) return ws.send(JSON.stringify({ t: 'error', error: 'Ese desafío no existe.' }));
@@ -727,10 +1206,23 @@ function onSocket(ws) {
       r.sockets.add(ws);
       ws.on('close', () => {
         r.sockets.delete(ws);
+        if (ws.trainerId === c.hostId) notifyLobby();
+        if (r.readyCheck && r.readyCheck.players.some((p) => p.id === ws.trainerId)) {
+          broadcast(r, { t: 'lobby' });
+          setTimeout(() => {
+            if (!r.readyCheck || inRoom(r, ws.trainerId)) return;
+            if (ws.trainerId === c.hostId) {
+              r.readyCheck = null;
+              closeRoom(c);
+            } else reopenRoom(c, r);
+          }, SEAT_GRACE_MS).unref?.();
+        }
         if (r.battle || r.preview) broadcast(r, { t: 'presence' });
-        if (!r.battle && !r.preview && r.sockets.size === 0) rooms.delete(c.id);
+        if (!r.battle && !r.preview && !r.countdown && !r.readyCheck && r.sockets.size === 0) rooms.delete(c.id);
       });
-      if (r.battle || r.preview) broadcast(r, { t: 'presence' });
+      if (ws.trainerId === c.hostId && c.status === 'open') notifyLobby();
+      if (r.battle || r.preview || r.readyCheck) broadcast(r, { t: 'presence' });
+      else if (r.countdown) ws.send(JSON.stringify(frameFor(r, ws)));
       else ws.send(JSON.stringify({ t: 'waiting', watchers: r.sockets.size }));
       return;
     }
