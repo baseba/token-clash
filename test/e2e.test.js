@@ -142,7 +142,8 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   assert.equal(stats.data.totals.battles, 1);
   assert.equal(stats.data.recent[0].id, id);
   assert.ok(stats.data.topMons.length >= 1);
-  assert.equal(typeof stats.data.live.online, 'number');
+  assert.equal(typeof stats.data.live.battles, 'number');
+  assert.equal(stats.data.totals.activeNow, 1);
 });
 
 test('random battle rolls a party from each collection', async () => {

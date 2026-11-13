@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serverStats, rankingOf } from '../server/stats.js';
+import { serverStats, rankingOf, playersOf } from '../server/stats.js';
 
 const trainer = (id, name, wins, losses, roster, totalTokens = 0) => ({ id, name, wins, losses, roster, totalTokens });
 const fighter = (speciesName, sprite) => ({ speciesName, sprite, types: ['normal'] });
@@ -11,12 +11,38 @@ const battle = (id, hostId, guestId, winnerSide, extra = {}) => ({
   ...extra,
 });
 
-test('the ranking orders by wins, then fewer losses, with the win rate', () => {
-  const ranking = rankingOf([trainer('a', 'Ana', 2, 2, []), trainer('b', 'Beto', 3, 1, [{ shiny: true }, {}]), trainer('c', 'Caro', 2, 0, [])]);
+test('the ranking orders by wins, then win rate, and leaves out who never fought', () => {
+  const ranking = rankingOf([trainer('a', 'Ana', 2, 2, []), trainer('b', 'Beto', 3, 1, [{ shiny: true }, {}]), trainer('c', 'Caro', 2, 0, []), trainer('z', 'Zoe', 0, 0, [])]);
   assert.deepEqual(ranking.map((t) => t.name), ['Beto', 'Caro', 'Ana']);
   assert.equal(ranking[0].winRate, 0.75);
   assert.equal(ranking[0].shinies, 1);
-  assert.equal(rankingOf([trainer('z', 'Zoe', 0, 0, [])])[0].winRate, null);
+});
+
+test('accounts that imported the same save count as one player', () => {
+  const groups = playersOf([trainer('a', 'Ana', 0, 0, [{ id: 'p1' }, { id: 'p2' }]), trainer('b', 'Beto', 0, 0, [{ id: 'p3' }]), trainer('c', 'Ana 2', 0, 0, [{ id: 'p2' }, { id: 'p9' }])]);
+  assert.deepEqual(groups.map((g) => g.map((t) => t.id)), [['a', 'c'], ['b']]);
+});
+
+test('totals count each save once and activity by last visit', () => {
+  const now = 10 * 24 * 60 * 60_000;
+  const save = [{ id: 'p1', finalID: 25, shiny: true }, { id: 'p2', finalID: 133 }];
+  const db = {
+    trainers: {
+      a: { ...trainer('a', 'Ana', 0, 0, save, 900), lastSeen: now - 60_000 },
+      b: { ...trainer('b', 'Ana otra vez', 0, 0, [...save, { id: 'p3', finalID: 1 }], 1000), lastSeen: now - 2 * 60 * 60_000 },
+      c: { ...trainer('c', 'Caro', 0, 0, [{ id: 'q1', finalID: 25 }], 50), lastSeen: now - 3 * 24 * 60 * 60_000 },
+    },
+    challenges: {},
+  };
+  const { totals } = serverStats(db, now);
+  assert.equal(totals.trainers, 2);
+  assert.equal(totals.accounts, 3);
+  assert.equal(totals.pokemon, 4);
+  assert.equal(totals.shinies, 1);
+  assert.equal(totals.species, 3);
+  assert.equal(totals.tokens, 1050);
+  assert.equal(totals.activeNow, 1);
+  assert.equal(totals.activeToday, 1);
 });
 
 test('server stats count only battles between players and the Pokémon they used', () => {
@@ -29,9 +55,10 @@ test('server stats count only battles between players and the Pokémon they used
       x4: { id: 'x4', hostId: 'a', status: 'open', createdAt: 5 },
     },
   };
+  db.challenges.x5 = battle('x5', 'a', 'b', null, { turns: 101 });
   const s = serverStats(db);
-  assert.deepEqual(s.totals, { trainers: 2, pokemon: 3, species: 2, shinies: 1, tokens: 150, battles: 2, aiBattles: 1, randomBattles: 1, avgTurns: 15 });
-  assert.deepEqual(s.recent.map((c) => [c.id, c.winner]), [['x2', 'guest'], ['x1', 'host']]);
-  assert.equal(s.recent[0].host, 'Beto');
-  assert.deepEqual(s.topMons.map((m) => [m.name, m.uses, m.wins]), [['Pikachu', 4, 2], ['Eevee', 2, 1]]);
+  assert.deepEqual(s.totals, { trainers: 2, accounts: 2, pokemon: 3, species: 2, shinies: 1, tokens: 150, battles: 3, randomBattles: 1, draws: 1, avgTurns: 43.3, aiBattles: 1, aiWins: 1, activeNow: 0, activeToday: 0 });
+  assert.deepEqual(s.recent.map((c) => [c.id, c.winner]), [['x5', null], ['x2', 'guest'], ['x1', 'host']]);
+  assert.equal(s.recent[1].host, 'Beto');
+  assert.deepEqual(s.topMons.map((m) => [m.name, m.uses, m.wins]), [['Pikachu', 6, 2], ['Eevee', 3, 1]]);
 });
