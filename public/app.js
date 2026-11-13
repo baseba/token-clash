@@ -106,6 +106,14 @@ const STATUS_TEXT = { brn: 'se quema', par: 'queda paralizado', psn: 'queda enve
 const CURE_TEXT = { brn: 'ya no está quemado', par: 'ya no está paralizado', psn: 'ya no está envenenado', tox: 'ya no está envenenado', slp: 'se despierta', frz: 'se descongela' };
 const WEATHER = { sun: '☀️ Sol', rain: '🌧️ Lluvia', sand: '🌪️ Tormenta de arena', snow: '❄️ Nieve', hail: '🧊 Granizo', harshsun: '🔆 Sol abrasador', heavyrain: '⛈️ Diluvio', winds: '🌀 Turbulencias' };
 const WEATHER_START = { sun: 'El sol pega fuerte.', rain: 'Empieza a llover.', sand: 'Se desata una tormenta de arena.', snow: 'Empieza a nevar.', hail: 'Empieza a granizar.', harshsun: 'El sol abrasa: los ataques de Agua se evaporan.', heavyrain: 'Cae un diluvio: los ataques de Fuego se apagan.', winds: 'Soplan turbulencias que protegen a los Volador.' };
+const SCREEN = { reflect: 'Reflejo', lightscreen: 'Pantalla de Luz', auroraveil: 'Velo Aurora' };
+const SCREEN_GUARDS = { reflect: 'los ataques físicos', lightscreen: 'los ataques especiales', auroraveil: 'los ataques físicos y especiales' };
+const SCREEN_END = {
+  time: (name, team) => `${name} del equipo de ${team} se desvanece.`,
+  broken: (name, team) => `¡Se rompe ${name} del equipo de ${team}!`,
+  defog: (name, team) => `El viento se lleva ${name} del equipo de ${team}.`,
+  cleaner: (name, team) => `Antibarrera elimina ${name} del equipo de ${team}.`,
+};
 const TERRAIN = { electric: '⚡ Campo Eléctrico', grassy: '🌿 Campo de Hierba', misty: '🌫️ Campo de Niebla', psychic: '🔮 Campo Psíquico' };
 const STAT = { atk: ['ATQ', 'ataque'], def: ['DEF', 'defensa'], satk: ['AT.E', 'ataque especial'], sdef: ['DF.E', 'defensa especial'], spd: ['VEL', 'velocidad'], acc: ['PRE', 'precisión'], eva: ['EVA', 'evasión'] };
 const CANT = { recharge: 'necesita recargarse.', slp: 'está dormido.', frz: 'está congelado.', par: 'está paralizado: no puede moverse.', flinch: 'retrocede y no se mueve.', attract: 'está enamorado y no ataca.' };
@@ -189,6 +197,7 @@ function moveEffects(m) {
   for (const [k, v] of Object.entries(m.self || {})) out.push(`${v < 0 ? 'Baja' : 'Sube'} su ${STAT[k][1]}${Math.abs(v) > 1 ? ` ${Math.abs(v)} niveles` : ''}.`);
   if (m.recoil) out.push('El usuario recibe 1/3 del daño como retroceso.');
   if (m.drain) out.push(`Recupera el ${Math.round(m.drain * 100)}% del daño causado.`);
+  if (m.breaksScreens) out.push('Rompe Reflejo, Pantalla de Luz y Velo Aurora antes de golpear.');
   return out;
 }
 
@@ -271,7 +280,7 @@ function infoCard(f, { own, owner, close }) {
 
 function abilityChip(info) {
   if (!info) return null;
-  return h('span', { class: `ability${info.inert ? ' inert' : ''}`, title: info.inert ? `${info.desc}\n\n${info.inert}` : info.desc }, info.name);
+  return h('span', { class: `ability${info.inert ? ' inert' : ''}`, tabindex: 0, 'data-tip': info.desc, 'data-tip-note': info.inert || null }, info.name);
 }
 
 function monCard(f, opts = {}) {
@@ -279,7 +288,8 @@ function monCard(f, opts = {}) {
   return h(
     'div',
     {
-      class: `mon${opts.picked ? ' picked' : ''}`,
+      class: `mon${f.shiny ? ' shiny-card' : ''}${opts.picked ? ' picked' : ''}${opts.cls ? ` ${opts.cls}` : ''}`,
+      'aria-label': opts.label ?? null,
       tabindex: clickable ? 0 : null,
       role: clickable ? 'button' : null,
       'aria-pressed': clickable ? String(!!opts.picked) : null,
@@ -287,7 +297,7 @@ function monCard(f, opts = {}) {
       onkeydown: clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opts.onclick(); } } : null,
     },
     opts.badge ? h('span', { class: 'badge' }, opts.badge) : null,
-    f.shiny ? h('span', { class: 'shiny', title: 'Brillante' }, '✨') : null,
+    f.shiny ? h('span', { class: 'shiny', 'data-tip': 'Shiny' }, '✨') : null,
     h('div', { html: creatureHTML(f) }),
     h('div', { class: 'nm', title: f.name !== f.speciesName ? `${f.name} (${f.speciesName})` : f.name }, f.name),
     h('div', { class: 'meta' }, typeChips(f.types), h('span', null, `Nv ${f.level}`), opts.rarity !== false ? h('span', null, RARITY[f.rarity] || '') : null),
@@ -295,7 +305,8 @@ function monCard(f, opts = {}) {
     opts.stats
       ? h('div', { class: 'stats' }, ...[['PV', 'hp'], ['ATQ', 'atk'], ['DEF', 'def'], ['AT.E', 'satk'], ['DF.E', 'sdef'], ['VEL', 'spd']].map(([l, k]) => h('span', null, h('b', null, f.stats[k]), l)))
       : null,
-    opts.onEdit ? h('button', { class: 'edit', title: 'Ponerle apodo', 'aria-label': `Apodo para ${f.name}`, onclick: (e) => { e.stopPropagation(); opts.onEdit(); } }, '✎') : null,
+    opts.extra ?? null,
+    opts.onEdit ? h('button', { class: 'edit', 'data-tip': 'Ponerle apodo', 'aria-label': `Apodo para ${f.name}`, onclick: (e) => { e.stopPropagation(); opts.onEdit(); } }, '✎') : null,
   );
 }
 
@@ -318,6 +329,43 @@ document.addEventListener('click', (e) => {
   nav(a.pathname);
 });
 window.addEventListener('popstate', route);
+
+const $tip = h('div', { class: 'tip', role: 'tooltip', hidden: true });
+document.body.append($tip);
+let tipTarget = null;
+function showTip(el) {
+  tipTarget = el;
+  $tip.replaceChildren(el.dataset.tip, ...(el.dataset.tipNote ? [h('span', { class: 'tip-note' }, el.dataset.tipNote)] : []));
+  $tip.hidden = false;
+  const r = el.getBoundingClientRect();
+  const t = $tip.getBoundingClientRect();
+  const gap = 8;
+  const left = Math.min(Math.max(16, r.left + r.width / 2 - t.width / 2), innerWidth - t.width - 16);
+  const above = r.top - t.height - gap >= 8;
+  $tip.style.left = `${left}px`;
+  $tip.style.top = `${above ? r.top - t.height - gap : r.bottom + gap}px`;
+  $tip.style.setProperty('--arrow-x', `${r.left + r.width / 2 - left}px`);
+  $tip.classList.toggle('below', !above);
+  requestAnimationFrame(() => $tip.classList.add('show'));
+}
+function hideTip() {
+  tipTarget = null;
+  $tip.classList.remove('show');
+  $tip.hidden = true;
+}
+document.addEventListener('mouseover', (e) => {
+  if (tipTarget && !tipTarget.isConnected) hideTip();
+  const el = e.target.closest?.('[data-tip]');
+  if (el === tipTarget) return;
+  el ? showTip(el) : hideTip();
+});
+document.addEventListener('focusin', (e) => {
+  const el = e.target.closest?.('[data-tip]');
+  el ? showTip(el) : hideTip();
+});
+document.addEventListener('focusout', hideTip);
+document.addEventListener('click', hideTip, true);
+addEventListener('scroll', hideTip, { passive: true, capture: true });
 document.addEventListener(
   'load',
   (e) => {
@@ -331,12 +379,23 @@ document.addEventListener(
   true,
 );
 
+function markNav() {
+  const current = location.pathname === '/stats' ? 'stats' : location.pathname === '/' ? 'home' : null;
+  for (const a of document.querySelectorAll('[data-nav]')) {
+    if (a.dataset.nav === current) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  }
+}
+
 function route() {
+  hideTip();
   cleanup?.();
   cleanup = null;
+  markNav();
   const m = /^\/b\/([A-Za-z0-9_-]{4,20})$/.exec(location.pathname);
   if (m) return battlePage(m[1]);
   if (location.pathname === '/equipo') return teamPage();
+  if (location.pathname === '/stats') return statsPage();
   return homePage();
 }
 
@@ -386,7 +445,7 @@ function importCard({ onDone, compact: small = false } = {}) {
       }
       me = data.me;
       renderWho();
-      toast(`¡Listo! ${me.rosterSize} criaturas importadas`);
+      toast(`¡Listo! ${me.rosterSize} Pokémon importados`);
       onDone?.();
     } catch (e) {
       err.textContent = e.message;
@@ -416,7 +475,7 @@ function importCard({ onDone, compact: small = false } = {}) {
       h('li', null, 'En PokeTokenBar: Ajustes → Backup & Transfer → Exportar. Arrastra el ', h('code', null, 'PokeTokenBar-Save-….json'), '.'),
       h('li', null, 'O directo el archivo vivo: en Finder ⌘⇧G y pega ', h('code', null, '~/Library/Application Support/PokeTokenBar/companion-state.json')),
     ),
-    h('p', { class: 'muted small' }, 'Solo guardamos números: especie, nivel, rareza, IVs y si es brillante. Nada de tu Mac ni de tus logs.'),
+    h('p', { class: 'muted small' }, 'Solo guardamos números: especie, nivel, rareza, IVs y si es shiny. Nada de tu Mac ni de tus logs.'),
   );
 }
 
@@ -433,6 +492,18 @@ function demoMon(i) {
   return { sprite: ['4', '7', '1'][i], rarity: 'rare' };
 }
 
+function feedbackButton() {
+  const dialog = h(
+    'dialog',
+    { class: 'feedback-dialog', 'aria-label': '¿Encontraste un bug o quieres proponer una mejora?' },
+    h('img', { src: '/hazlo-tu.png', alt: 'Hazlo tú HDTPM, que aquí nadie es tu empleado', width: 498, height: 491 }),
+    h('button', { class: 'btn sm', onclick: () => dialog.close() }, 'Ok 😔'),
+  );
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+  const btn = h('button', { class: 'feedback-btn', onclick: () => dialog.showModal() }, h('span', { class: 'feedback-icon', 'aria-hidden': 'true' }, '?'), '¿Encontraste un bug o quieres proponer una mejora?');
+  return h('section', { class: 'feedback' }, btn, dialog);
+}
+
 function renderLanding() {
   $app.replaceChildren(
     h(
@@ -441,13 +512,13 @@ function renderLanding() {
       h(
         'div',
         null,
-        h('h1', null, 'Tus tokens criaron criaturas. Ahora a pelear.'),
-        h('p', { class: 'lead' }, 'Sube el save de PokeTokenBar, arma un equipo de 3 y manda un link a tus colegas. Cada especie pelea con su tipo real, sus golpes y stats según el nivel que le diste a punta de tokens.'),
+        h('h1', null, 'Tus tokens criaron Pokémon. Ahora a pelear.'),
+        h('p', { class: 'lead' }, 'Sube el save de PokeTokenBar, arma tu equipo y desafía a otro jugador con un link, o pelea contra la IA. Cada especie pelea con su tipo real, sus golpes y stats según el nivel que le diste a punta de tokens.'),
         h('div', { class: 'hero-mons' }, [0, 1, 2].map((i) => h('div', { html: creatureHTML(demoMon(i)) }))),
       ),
       importCard({ onDone: renderHome }),
     ),
-    h('section', null, leaderboardCard()),
+    feedbackButton(),
   );
 }
 
@@ -455,6 +526,9 @@ function renderHome() {
   const byId = new Map(me.roster.map((f) => [f.uid, f]));
   const team = me.team.map((id) => byId.get(id)).filter(Boolean);
   let levelCap = null;
+  let mode = 'team';
+  let rival = 'friend';
+  let aiLevel = 'mid';
 
   async function saveTeam(next) {
     try {
@@ -468,11 +542,14 @@ function renderHome() {
     const ids = me.team.slice();
     const i = ids.indexOf(f.uid);
     if (i >= 0) {
-      if (ids.length === 1) return toast('Tu equipo necesita al menos una criatura');
+      if (ids.length === 1) return toast('Tu equipo necesita al menos un Pokémon');
       ids.splice(i, 1);
-    } else if (ids.length >= PARTY_SIZE) return toast(`Tu equipo ya tiene ${PARTY_SIZE}: quita uno primero`);
-    else ids.push(f.uid);
-    saveTeam(ids);
+      return saveTeam(ids);
+    }
+    const added = addToParty(ids, f.uid);
+    if (!added.swapped && ids.length >= PARTY_SIZE) return toast(`Tu equipo ya tiene ${PARTY_SIZE}: quita uno primero`);
+    if (added.swapped) toast(swapNote(added.swapped, f));
+    saveTeam(added.ids);
   }
   async function rename(f) {
     const n = window.prompt(`Apodo para ${f.speciesName} (vacío para quitarlo)`, f.nickname || '');
@@ -487,7 +564,7 @@ function renderHome() {
   async function createChallenge(btn) {
     btn.disabled = true;
     try {
-      const { challenge } = await api('/api/challenges', { method: 'POST', body: { levelCap } });
+      const { challenge } = await api('/api/challenges', { method: 'POST', body: { levelCap, mode, ...(rival === 'ai' ? { ai: aiLevel } : {}) } });
       nav(`/b/${challenge.id}`);
     } catch (e) {
       toast(e.message);
@@ -495,19 +572,43 @@ function renderHome() {
     }
   }
 
-  const capBtns = [
-    h('button', { class: 'btn sm primary', 'aria-pressed': 'true' }, 'Nivel real'),
-    h('button', { class: 'btn sm', 'aria-pressed': 'false' }, 'Todos a nivel 50'),
-  ];
-  capBtns.forEach((b, i) =>
-    b.addEventListener('click', () => {
-      levelCap = i === 1 ? 50 : null;
-      capBtns.forEach((x, j) => {
-        x.classList.toggle('primary', i === j);
-        x.setAttribute('aria-pressed', String(i === j));
-      });
-    }),
+  function choice(kind, options, current, onPick) {
+    const items = options.map((o) =>
+      h(
+        'button',
+        { type: 'button', class: `${kind}-item`, 'aria-pressed': String(o.value === current), onclick: () => { items.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i].value === o.value))); onPick(o.value); } },
+        o.icon ? h('span', { class: `${kind}-icon`, 'aria-hidden': 'true' }, o.icon) : null,
+        o.desc ? h('span', { class: `${kind}-text` }, h('b', null, o.label), h('small', null, o.desc)) : o.label,
+      ),
+    );
+    return items;
+  }
+  const field = (label, control, ...rest) => h('div', { class: 'nb-field' }, h('span', { class: 'nb-label' }, label), control, ...rest);
+
+  const aiNote = h('p', { class: 'nb-note' });
+  const startBtn = h('button', { class: 'btn primary nb-start', onclick: (e) => createChallenge(e.currentTarget) });
+  const aiField = field('Dificultad', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Dificultad de la IA' }, choice('seg', AI_ORDER.map((k) => ({ value: k, label: AI_LABEL[k] })), aiLevel, (v) => { aiLevel = v; paint(); })), aiNote);
+  function paint() {
+    aiField.classList.toggle('is-hidden', rival !== 'ai');
+    aiNote.textContent = AI_NOTES[aiLevel][mode];
+    startBtn.textContent = rival === 'ai' ? `🤖 Pelear contra la IA · ${AI_LABEL[aiLevel]}` : '⚔︎ Crear link de desafío';
+  }
+  const battleForm = h(
+    'div',
+    { class: 'nb-form' },
+    field('Modo', h('div', { class: 'cards2', role: 'group', 'aria-label': 'Modo de juego' }, choice('pick', [
+      { value: 'team', icon: MODE_ICON.team, label: MODE_LABEL.team, desc: `Los ${PARTY_SIZE} que armaste.` },
+      { value: 'random', icon: MODE_ICON.random, label: MODE_LABEL.random, desc: `Los dados sortean ${PARTY_SIZE} de tu colección, con movimientos y habilidad al azar.` },
+    ], mode, (v) => { mode = v; paint(); }))),
+    field('Rival', h('div', { class: 'cards2', role: 'group', 'aria-label': 'Rival' }, choice('pick', [
+      { value: 'friend', icon: '👥', label: 'Contra otro jugador', desc: 'Te damos un link para mandarle.' },
+      { value: 'ai', icon: '🤖', label: 'La IA', desc: 'Peleas ahora mismo, con Pokémon de la 1.ª a la 5.ª generación.' },
+    ], rival, (v) => { rival = v; paint(); }))),
+    aiField,
+    field('Nivel', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Nivel' }, choice('seg', [{ value: null, label: 'Nivel real' }, { value: 50, label: 'Todos a nivel 50' }], levelCap, (v) => { levelCap = v; })), h('p', { class: 'nb-note' }, 'Nivel 50 empareja la pelea: gana la estrategia, no quién quemó más tokens.')),
+    startBtn,
   );
+  paint();
 
   const reimport = h('div', { hidden: true }, importCard({ onDone: renderHome }));
 
@@ -515,7 +616,7 @@ function renderHome() {
     h(
       'section',
       null,
-      h('div', { class: 'row between' }, h('h1', null, `Hola, ${me.name}`), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} criaturas`), h('span', { class: 'chip' }, `✨ ${me.shinies} brillantes`), h('span', { class: 'chip', title: 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))),
+      h('div', { class: 'row between' }, h('h1', null, `Hola, ${me.name}`), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))),
     ),
     h(
       'section',
@@ -529,11 +630,8 @@ function renderHome() {
       h(
         'div',
         { class: 'card' },
-        h('h2', null, 'Desafiar a un colega'),
-        h('p', { class: 'muted' }, `Se crea un link con tu equipo actual. Antes de pelear, cada uno ve los ${PARTY_SIZE} del otro (solo sprite y nombre) y elige ${BATTLE_SIZE}. Turnos de 60 segundos.`),
-        h('div', { class: 'row', role: 'group', 'aria-label': 'Nivel' }, capBtns),
-        h('p', { class: 'muted small' }, '“Nivel 50” empareja la pelea: gana la estrategia, no quién quemó más tokens.'),
-        h('button', { class: 'btn primary', onclick: (e) => createChallenge(e.currentTarget) }, '⚔︎ Crear link de desafío'),
+        h('div', { class: 'nb-head' }, h('h2', null, 'Nueva batalla'), h('p', { class: 'muted small' }, `Cada uno ve los ${PARTY_SIZE} del otro y elige ${BATTLE_SIZE} · turnos de 60 s`)),
+        battleForm,
       ),
     ),
     h(
@@ -543,12 +641,13 @@ function renderHome() {
       reimport,
       h('div', { class: 'mons', style: null }, me.roster.map((f) => monCard(f, { picked: me.team.includes(f.uid), stats: true, badge: f.active ? 'Criando' : null, onclick: () => nav(`/equipo?p=${f.uid}`), onEdit: () => rename(f) }))),
     ),
-    h('section', { class: 'grid2' }, myChallengesCard(), leaderboardCard()),
+    h('section', null, myChallengesCard()),
     h(
       'section',
       null,
       h('p', { class: 'muted small' }, 'Tu sesión vive en este navegador. Para entrar desde otro: ', h('a', { href: '#', onclick: (e) => { e.preventDefault(); copy(`${location.origin}/#key=${token}`, 'Link de acceso copiado. No lo compartas: entra como tú.'); } }, 'copiar link de acceso'), '.'),
     ),
+    feedbackButton(),
   );
 }
 
@@ -565,7 +664,7 @@ function myChallengesCard() {
             : c.status === 'active' ? h('span', { class: 'pulse' }, 'En curso')
             : c.status === 'open' ? h('span', { class: 'muted' }, 'Abierto')
             : h('span', { class: 'muted' }, c.status === 'cancelled' ? 'Cancelado' : 'Cortado');
-          return h('a', { class: 'item', href: `/b/${c.id}`, 'data-link': true }, h('span', null, label, c.levelCap ? h('span', { class: 'muted small' }, ' · Nv 50') : null), st);
+          return h('a', { class: 'item', href: `/b/${c.id}`, 'data-link': true }, h('span', null, label, h('span', { class: 'muted small' }, ` · ${MODE_ICON[c.mode] ?? MODE_ICON.team}`), c.levelCap ? h('span', { class: 'muted small' }, ' · Nv 50') : null), st);
         }),
       );
     })
@@ -573,23 +672,194 @@ function myChallengesCard() {
   return h('div', { class: 'card' }, h('h2', null, 'Tus batallas'), list);
 }
 
-function leaderboardCard() {
-  const list = h('div', { class: 'list' }, h('p', { class: 'muted' }, 'Cargando…'));
-  api('/api/leaderboard')
-    .then(({ trainers }) => {
-      if (!trainers.length) return list.replaceChildren(h('p', { class: 'muted' }, 'Nadie ha llegado todavía. Sé el primero.'));
-      list.replaceChildren(
-        ...trainers.map((t, i) =>
-          h('div', { class: 'item' }, h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 1}`), h('strong', null, t.name), h('span', { class: 'muted small' }, `${t.rosterSize} criaturas · ${compact(t.totalTokens)} tokens`)), h('span', null, h('span', { class: 'w' }, `${t.wins}V`), ' ', h('span', { class: 'l' }, `${t.losses}D`))),
+const percent = (x) => (x == null ? '—' : `${Math.round(x * 100)}%`);
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+function ago(ts) {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return 'recién';
+  const m = Math.round(s / 60);
+  if (m < 60) return `hace ${m} min`;
+  const hr = Math.round(m / 60);
+  if (hr < 48) return `hace ${hr} h`;
+  return `hace ${Math.round(hr / 24)} días`;
+}
+
+const isMe = (t) => !!me && t.id === me.id;
+const record = (t) => h('span', { class: 'record' }, h('span', { class: 'w' }, `${t.wins}V`), ' ', h('span', { class: 'l' }, `${t.losses}D`));
+const rateBar = (t) => h('span', { class: 'rate', 'data-tip': t.games ? `${t.wins} de ${t.games} batallas ganadas` : 'Sin batallas todavía' }, h('span', { class: 'rate-bar' }, h('i', { style: { width: percent(t.winRate ?? 0) } })), h('span', { class: 'rate-num' }, percent(t.winRate)));
+const trainerMeta = (t) => `${t.rosterSize} Pokémon · ${t.shinies} shiny · ${compact(t.totalTokens)} tokens`;
+
+function podium(top) {
+  const medals = ['🥇', '🥈', '🥉'];
+  return h(
+    'div',
+    { class: 'podium' },
+    top.map((t, i) =>
+      h(
+        'div',
+        { class: `podium-card place-${i + 1}${isMe(t) ? ' is-me' : ''}` },
+        h('span', { class: 'podium-medal', 'aria-label': `Puesto ${i + 1}` }, medals[i]),
+        h('b', { class: 'podium-name' }, t.name, isMe(t) ? h('span', { class: 'muted small' }, ' (tú)') : null),
+        record(t),
+        rateBar(t),
+        h('small', { class: 'muted' }, trainerMeta(t)),
+      ),
+    ),
+  );
+}
+
+function rankingCard(ranking) {
+  const body = !ranking.length
+    ? [h('p', { class: 'muted' }, 'Nadie ha llegado todavía. Sé el primero.')]
+    : [
+        podium(ranking.slice(0, 3)),
+        ranking.length > 3
+          ? h(
+              'div',
+              { class: 'list rank-list' },
+              ranking.slice(3).map((t, i) =>
+                h(
+                  'div',
+                  { class: `item${isMe(t) ? ' is-me' : ''}` },
+                  h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 4}`), h('span', { class: 'rank-who' }, h('strong', null, t.name, isMe(t) ? h('span', { class: 'muted small' }, ' (tú)') : null), h('small', { class: 'muted' }, trainerMeta(t)))),
+                  h('span', { class: 'row rank-right' }, rateBar(t), record(t)),
+                ),
+              ),
+            )
+          : null,
+      ];
+  return h('div', { class: 'card' }, h('div', { class: 'row between' }, h('h2', null, '🏆 Ranking'), h('span', { class: 'muted small' }, 'Solo batallas entre jugadores')), ...body);
+}
+
+function recentCard(recent) {
+  const who = (name, won) => h('span', { class: won ? 'winner' : null }, won ? `🏆 ${name}` : name);
+  const list = recent.length
+    ? h(
+        'div',
+        { class: 'list' },
+        recent.map((c) =>
+          h(
+            'a',
+            { class: 'item recent', href: `/b/${c.id}`, 'data-link': true },
+            h('span', { class: 'recent-vs' }, who(c.host, c.winner === 'host'), h('span', { class: 'muted' }, ' vs '), who(c.guest, c.winner === 'guest'), c.winner ? null : h('span', { class: 'muted small' }, ' · empate')),
+            h('span', { class: 'muted small recent-meta' }, `${MODE_ICON[c.mode] ?? MODE_ICON.team}${c.levelCap ? ' · Nv 50' : ''}${c.turns ? ` · ${c.turns} turnos` : ''} · ${ago(c.finishedAt)}`),
+          ),
         ),
-      );
-    })
-    .catch(() => list.replaceChildren(h('p', { class: 'muted' }, 'No pude cargar el ranking.')));
-  return h('div', { class: 'card' }, h('h2', null, '🏆 Ranking de la oficina'), list);
+      )
+    : h('p', { class: 'muted' }, 'Todavía no hay batallas entre jugadores.');
+  return h('div', { class: 'card' }, h('h2', null, '🕑 Batallas recientes'), list);
+}
+
+function numbersCard(totals, live) {
+  const rows = [
+    ['⚔︎', 'Batallas entre jugadores', totals.battles],
+    [MODE_ICON.random, 'De ellas, aleatorias', totals.randomBattles],
+    ['⏱', 'Turnos por batalla (promedio)', totals.avgTurns ?? '—'],
+    ['🤖', 'Peleas contra la IA', totals.aiBattles],
+    ['📚', 'Especies distintas en el servidor', totals.species],
+    ['🟢', 'Conectados ahora', live.online],
+  ];
+  return h('div', { class: 'card' }, h('h2', null, '📈 En números'), h('div', { class: 'list' }, rows.map(([icon, label, value]) => h('div', { class: 'item' }, h('span', null, `${icon} ${label}`), h('strong', { class: 'num-value' }, value)))));
+}
+
+function topMonsSection(mons) {
+  const body = mons.length
+    ? h(
+        'div',
+        { class: 'mons' },
+        mons.map((m, i) =>
+          h(
+            'div',
+            { class: 'mon top-mon' },
+            h('span', { class: 'badge' }, `#${i + 1}`),
+            h('div', { html: creatureHTML({ sprite: m.sprite }) }),
+            h('div', { class: 'nm' }, m.name),
+            h('div', { class: 'meta' }, typeChips(m.types ?? [])),
+            h('div', { class: 'top-mon-line' }, h('b', null, plural(m.uses, 'uso', 'usos')), h('span', { class: 'muted' }, ` · gana ${percent(m.wins / m.uses)}`)),
+          ),
+        ),
+      )
+    : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aparecen cuando haya batallas entre jugadores.'));
+  return h('section', null, h('div', { class: 'row between' }, h('h2', null, '🔥 Pokémon más usados'), h('span', { class: 'muted small' }, 'En batallas entre jugadores')), body);
+}
+
+async function statsPage() {
+  document.title = 'Stats · Token Clash';
+  await loadMe();
+  renderWho();
+  $app.replaceChildren(h('p', { class: 'muted center pad' }, 'Cargando…'));
+  let data;
+  try {
+    data = await api('/api/stats');
+  } catch (e) {
+    $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No pude cargar las stats'), h('p', { class: 'muted' }, e.message)));
+    return;
+  }
+  const { totals, ranking, recent, topMons, live } = data;
+  $app.replaceChildren(
+    h(
+      'section',
+      null,
+      h(
+        'div',
+        { class: 'row between' },
+        h('h1', null, 'Stats'),
+        h(
+          'div',
+          { class: 'row' },
+          h('span', { class: 'chip live-chip' }, h('i', { class: 'live-dot', 'aria-hidden': 'true' }), `${plural(live.battles, 'batalla', 'batallas')} en vivo`),
+          h('span', { class: 'chip' }, `🧢 ${plural(totals.trainers, 'entrenador', 'entrenadores')}`),
+          h('span', { class: 'chip' }, `📚 ${compact(totals.pokemon)} Pokémon`),
+          h('span', { class: 'chip' }, `✨ ${totals.shinies} shiny`),
+          h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens de todos los entrenadores según PokeTokenBar' }, `🪙 ${compact(totals.tokens)} tokens`),
+        ),
+      ),
+    ),
+    h('section', null, rankingCard(ranking)),
+    h('section', { class: 'grid2' }, recentCard(recent), numbersCard(totals, live)),
+    topMonsSection(topMons),
+    h('section', null, h('p', { class: 'muted small center' }, `Versión ${live.version} · servidor encendido ${ago(live.startedAt)}`)),
+    feedbackButton(),
+  );
 }
 
 // ---------- team ----------
 const PARTY_SIZE = 6;
+const MODE_ICON = { team: '🎒', random: '🎲' };
+const MODE_LABEL = { team: 'Batalla con tu equipo', random: 'Batalla aleatoria' };
+const AI_ORDER = ['easy', 'mid', 'hard', 'veryhard'];
+const AI_LABEL = { easy: 'Fácil', mid: 'Media', hard: 'Difícil', veryhard: 'Muy difícil' };
+const AI_NOTES = {
+  easy: {
+    team: 'Arma su equipo al azar con Pokémon de la 1.ª a la 5.ª generación y ataca sin pensar, como un Pokémon salvaje.',
+    random: 'Sus 6 también salen de los dados. Ataca sin pensar, como un Pokémon salvaje.',
+  },
+  mid: {
+    team: 'Usa Pokémon evolucionados con sus mejores golpes. Evita movimientos inútiles, pero no cambia de Pokémon.',
+    random: 'Sus 6 salen de los dados. Evita movimientos inútiles, pero no cambia de Pokémon.',
+  },
+  hard: {
+    team: 'Equipo fuerte y variado, con naturalezas y movimientos de cobertura. Busca el KO y a veces cambia si va perdiendo.',
+    random: 'Sus 6 salen de los dados. Elige bien a quién sacar, busca el KO y a veces cambia si va perdiendo.',
+  },
+  veryhard: {
+    team: 'Arma su equipo para contrarrestar el tuyo, con lo mejor de la 1.ª a la 5.ª generación. Calcula velocidad y daño, y cambia cuando le conviene.',
+    random: 'Sus 6 salen de los dados, pero calcula velocidad y daño, elige el mejor enfrentamiento y cambia cuando le conviene.',
+  },
+};
+
+function addToParty(ids, uid) {
+  const byId = new Map(me.roster.map((f) => [f.uid, f]));
+  const f = byId.get(uid);
+  const twin = ids.findIndex((id) => byId.get(id)?.speciesId === f.speciesId);
+  if (twin < 0) return { ids: [...ids, uid], swapped: null };
+  const next = ids.slice();
+  next[twin] = uid;
+  return { ids: next, swapped: byId.get(ids[twin]) };
+}
+
+const swapNote = (from, to) => `Solo puedes llevar un ${to.speciesName}: cambié ${from.shiny ? 'el shiny' : 'el normal'} por ${to.shiny ? 'el shiny ✨' : 'el normal'}.`;
 const BATTLE_SIZE = 3;
 const CATEGORY_ICON = { physical: '💥', special: '🌀', status: '✦' };
 const STAT_ROWS = [['PS', 'hp'], ['Ataque', 'atk'], ['Defensa', 'def'], ['At. Esp.', 'satk'], ['Def. Esp.', 'sdef'], ['Velocidad', 'spd']];
@@ -632,10 +902,10 @@ function partyRow(team) {
     { class: 'party-row' },
     Array.from({ length: PARTY_SIZE }, (_, i) => {
       const f = team[i];
-      if (!f) return h('a', { class: 'party-cell empty', href: '/equipo', 'data-link': true, title: 'Agregar un Pokémon' }, ballFrame(null), h('div', { class: 'name-plate' }, h('b', null, '???')));
+      if (!f) return h('a', { class: 'party-cell empty', href: '/equipo', 'data-link': true, 'aria-label': 'Agregar un Pokémon' }, ballFrame(null), h('div', { class: 'name-plate' }, h('b', null, '???')));
       return h(
         'a',
-        { class: 'party-cell', href: `/equipo?p=${f.uid}`, title: `Editar a ${f.name}`, onclick: (e) => { e.preventDefault(); nav(`/equipo?p=${f.uid}`); } },
+        { class: 'party-cell', href: `/equipo?p=${f.uid}`, 'aria-label': `Editar a ${f.name}`, onclick: (e) => { e.preventDefault(); nav(`/equipo?p=${f.uid}`); } },
         h('span', { class: 'slot-num' }, i + 1),
         i === 0 ? h('span', { class: 'lead-tag' }, 'Líder') : null,
         ballFrame(f),
@@ -663,6 +933,7 @@ async function teamPage() {
   let selected = params.get('p') || me.team[0] || me.roster[0]?.uid;
   let query = '';
   let typeFilter = '';
+  let shinyFilter = '';
   let dragFrom = null;
   let editor = null;
 
@@ -689,11 +960,16 @@ async function teamPage() {
       ids.splice(i, 1);
       return setParty(ids);
     }
+    const added = addToParty(ids, uid);
+    if (added.swapped) {
+      toast(swapNote(added.swapped, me.roster.find((f) => f.uid === uid)));
+      return setParty(added.ids, { pop: uid });
+    }
     if (ids.length >= PARTY_SIZE) {
       playClass(partyEl, 'shake');
       return toast(`Tu equipo ya tiene ${PARTY_SIZE}: quita uno primero.`);
     }
-    return setParty([...ids, uid], { pop: uid });
+    return setParty(added.ids, { pop: uid });
   }
   function select(uid) {
     if (editor?.dirty() && !window.confirm('Tienes cambios sin guardar. ¿Descartarlos?')) return;
@@ -710,7 +986,7 @@ async function teamPage() {
     partyEl.replaceChildren(
       ...Array.from({ length: PARTY_SIZE }, (_, i) => {
         const f = party[i];
-        if (!f) return h('div', { class: 'party-cell empty', title: 'Elige un Pokémon de tu colección' }, ballFrame(null), h('div', { class: 'name-plate' }, h('b', null, '???')));
+        if (!f) return h('div', { class: 'party-cell empty', 'aria-label': 'Elige un Pokémon de tu colección' }, ballFrame(null), h('div', { class: 'name-plate' }, h('b', null, '???')));
         const cell = h(
           'div',
           {
@@ -735,7 +1011,7 @@ async function teamPage() {
           i === 0 ? h('span', { class: 'lead-tag' }, 'Líder') : null,
           ballFrame(f),
           h('div', { class: 'name-plate' }, h('b', null, f.shiny ? `✨ ${f.name}` : f.name), h('small', null, `Nv ${f.level}`), typeChips(f.types)),
-          h('button', { class: 'cell-remove', type: 'button', title: 'Quitar del equipo', 'aria-label': `Quitar a ${f.name}`, onclick: (e) => { e.stopPropagation(); toggle(f.uid); } }, '✕'),
+          h('button', { class: 'cell-remove', type: 'button', 'data-tip': 'Quitar del equipo', 'aria-label': `Quitar a ${f.name}`, onclick: (e) => { e.stopPropagation(); toggle(f.uid); } }, '✕'),
         );
         return cell;
       }),
@@ -750,19 +1026,19 @@ async function teamPage() {
 
   function paintCollection() {
     const q = query.toLowerCase();
-    const list = me.roster.filter((f) => (!q || f.name.toLowerCase().includes(q) || f.speciesName.toLowerCase().includes(q)) && (!typeFilter || f.types.includes(typeFilter)));
+    const list = me.roster.filter((f) => (!q || f.name.toLowerCase().includes(q) || f.speciesName.toLowerCase().includes(q)) && (!typeFilter || f.types.includes(typeFilter)) && (!shinyFilter || (shinyFilter === 'shiny') === !!f.shiny));
     grid.replaceChildren(
       ...(list.length
         ? list.map((f) => {
             const inParty = me.team.includes(f.uid);
-            return h(
-              'div',
-              { class: `col-tile${inParty ? ' in-party' : ''}${f.uid === selected ? ' selected' : ''}`, role: 'button', tabindex: 0, onclick: () => select(f.uid), onkeydown: (e) => e.key === 'Enter' && select(f.uid), title: f.name },
-              h('div', { class: 'col-sprite', html: creatureHTML(f) }),
-              h('b', null, f.name),
-              h('small', null, `#${f.speciesId} · Nv ${f.level}`),
-              h('button', { class: `col-add${inParty ? ' on' : ''}`, type: 'button', title: inParty ? 'Quitar del equipo' : 'Agregar al equipo', onclick: (e) => { e.stopPropagation(); toggle(f.uid); } }, inParty ? '✓' : '+'),
-            );
+            return monCard(f, {
+              stats: true,
+              badge: `#${f.speciesId}`,
+              cls: `coll-card${inParty ? ' in-party' : ''}${f.uid === selected ? ' selected' : ''}`,
+              label: `Editar a ${f.name}`,
+              onclick: () => select(f.uid),
+              extra: h('button', { class: `col-add${inParty ? ' on' : ''}`, type: 'button', 'data-tip': inParty ? 'Quitar del equipo' : 'Agregar al equipo', 'aria-label': inParty ? `Quitar a ${f.name} del equipo` : `Agregar a ${f.name} al equipo`, onclick: (e) => { e.stopPropagation(); toggle(f.uid); }, onkeydown: (e) => e.stopPropagation() }, inParty ? '✓' : '+'),
+            });
           })
         : [h('p', { class: 'muted' }, 'Ningún Pokémon coincide con el filtro.')]),
     );
@@ -781,12 +1057,13 @@ async function teamPage() {
     });
   }
 
+  const shinySelect = h('select', { 'aria-label': 'Filtrar shiny', onchange: (e) => { shinyFilter = e.target.value; paintCollection(); } }, h('option', { value: '' }, 'Shiny y normales'), h('option', { value: 'shiny' }, '✨ Solo shiny'), h('option', { value: 'plain' }, 'Solo normales'));
   const typeSelect = h('select', { 'aria-label': 'Filtrar por tipo', onchange: (e) => { typeFilter = e.target.value; paintCollection(); } }, h('option', { value: '' }, 'Todos los tipos'), Object.keys(TYPES).map((t) => h('option', { value: t }, typeLabel(t))));
   $app.replaceChildren(
-    h('div', { class: 'team-head' }, h('h1', null, 'Tu equipo ', countEl), h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: downloadEditedSave, title: 'Baja tu save con los movimientos y habilidades que cambiaste, para importarlo en PokeTokenBar' }, '⬇ Descargar save editado'), h('a', { class: 'btn sm', href: '/', 'data-link': true }, '← Inicio'))),
+    h('div', { class: 'team-head' }, h('h1', null, 'Tu equipo ', countEl), h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: downloadEditedSave, 'data-tip': 'Baja tu save con los movimientos y habilidades que cambiaste, para importarlo en PokeTokenBar' }, '⬇ Descargar save editado'), h('a', { class: 'btn sm', href: '/', 'data-link': true }, '← Inicio'))),
     h('section', { class: 'party-board' }, partyEl, h('p', { class: 'hint' }, `Arrastra para ordenar · el líder abre la pelea · antes de cada combate eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}`)),
     panel,
-    h('section', { class: 'collection-board' }, h('div', { class: 'row between' }, h('h2', null, `Colección `, h('span', { class: 'muted' }, `(${me.rosterSize})`)), h('div', { class: 'row' }, h('input', { type: 'search', placeholder: 'Buscar por nombre…', 'aria-label': 'Buscar Pokémon', oninput: (e) => { query = e.target.value.trim(); paintCollection(); } }), typeSelect)), grid),
+    h('section', { class: 'collection-board' }, h('div', { class: 'row between' }, h('h2', null, `Colección `, h('span', { class: 'muted' }, `(${me.rosterSize})`)), h('div', { class: 'coll-filters' }, h('input', { type: 'search', placeholder: 'Buscar por nombre…', 'aria-label': 'Buscar Pokémon', oninput: (e) => { query = e.target.value.trim(); paintCollection(); } }), typeSelect, shinySelect)), grid),
   );
   paintParty();
   paintCollection();
@@ -822,7 +1099,7 @@ async function monPanel(uid, panel, { inParty, toggleParty, onSaved }) {
   async function save(btn) {
     btn.disabled = true;
     try {
-      mon = (await api(`/api/me/mons/${uid}`, { method: 'PUT', body: { moves, ability } })).mon;
+      mon = (await api(`/api/me/mons/${uid}`, { method: 'PUT', body: { ...(moves.length ? { moves } : {}), ...(ability ? { ability } : {}) } })).mon;
       me = (await api('/api/me')).me;
       original.moves = moves.slice();
       original.ability = ability;
@@ -856,17 +1133,18 @@ async function monPanel(uid, panel, { inParty, toggleParty, onSaved }) {
         if (!m) return h('div', { class: 'move-slot empty' }, h('span', null, 'Elige un movimiento de la tabla'));
         return h(
           'button',
-          { type: 'button', class: 'move-slot', style: typeTint(m.type), title: `${m.desc}\nClic para quitarlo`, onclick: () => toggleMove(m.key) },
+          { type: 'button', class: 'move-slot', style: typeTint(m.type), 'data-tip': m.desc, 'data-tip-note': 'Clic para quitarlo', onclick: () => toggleMove(m.key) },
           h('span', { class: 'ms-top' }, h('b', null, m.name), h('span', { class: 'ms-x' }, '✕')),
           h('span', { class: 'ms-meta' }, h('span', { class: 'type-badge', style: typeTint(m.type) }, typeLabel(m.type)), h('span', null, `${CATEGORY[m.category]}${m.power ? ` · ${m.power}` : ''} · PP ${m.pp}`)),
         );
       }),
     );
     abilityEl.replaceChildren(
+      ...(ability ? [] : [h('p', { class: 'muted small' }, 'Sin habilidad: ninguna de las de su especie tiene efecto en Token Clash.')]),
       ...mon.abilityOptions.map((a) =>
         h(
           'button',
-          { type: 'button', class: `ability-card${a.key === ability ? ' on' : ''}`, 'aria-pressed': String(a.key === ability), onclick: () => { ability = a.key; paint(); } },
+          { type: 'button', class: `ability-card${a.key === ability ? ' on' : ''}${a.inert ? ' unusable' : ''}`, 'aria-pressed': String(a.key === ability), disabled: !!a.inert, 'data-tip': a.inert ? 'Esta habilidad no tiene efecto en Token Clash: no se puede elegir.' : null, onclick: () => { ability = a.key; paint(); } },
           h('span', { class: 'ac-head' }, h('span', { class: 'ac-radio' }), h('b', null, a.name), a.hidden ? h('span', { class: 'ac-tag' }, 'Oculta') : null),
           h('span', { class: 'ac-desc' }, a.desc),
           a.inert ? h('span', { class: 'ac-inert' }, a.inert) : null,
@@ -874,14 +1152,14 @@ async function monPanel(uid, panel, { inParty, toggleParty, onSaved }) {
       ),
     );
     const q = filter.toLowerCase();
-    const rows = mon.movepool.filter((m) => (!onlyUsable || m.supported || moves.includes(m.key)) && (!q || m.name.toLowerCase().includes(q) || typeLabel(m.type).toLowerCase().includes(q)));
+    const rows = mon.movepool.filter((m) => (!onlyUsable || m.supported) && (!q || m.name.toLowerCase().includes(q) || typeLabel(m.type).toLowerCase().includes(q)));
     tbody.replaceChildren(
       ...(rows.length
         ? rows.map((m) => {
             const on = moves.includes(m.key);
             return h(
               'tr',
-              { class: `${on ? 'on' : ''}${m.supported ? '' : ' unsupported'}`, tabindex: m.supported || on ? 0 : -1, title: m.supported ? m.desc : 'Este movimiento todavía no tiene efecto en Token Clash.', onclick: () => (m.supported || on) && toggleMove(m.key), onkeydown: (e) => e.key === 'Enter' && (m.supported || on) && toggleMove(m.key) },
+              { class: `${on ? 'on' : ''}${m.supported ? '' : ' unsupported'}`, tabindex: m.supported ? 0 : -1, 'aria-disabled': m.supported ? null : 'true', onclick: () => m.supported && toggleMove(m.key), onkeydown: (e) => e.key === 'Enter' && m.supported && toggleMove(m.key) },
               h('td', { class: 'num' }, m.level ?? '—'),
               h('td', { class: 'mv-cell' }, h('span', { class: 'check' }, on ? '✓' : ''), h('b', null, m.name), h('small', null, m.supported ? m.desc : 'Sin efecto en Token Clash todavía')),
               h('td', null, h('span', { class: 'type-badge', style: typeTint(m.type) }, typeLabel(m.type))),
@@ -1021,7 +1299,13 @@ async function battlePage(id) {
 function renderLobby(c, { onAccepted }) {
   const mine = me && c.host.id === me.id;
   const link = `${location.origin}/b/${c.id}`;
-  const capNote = c.levelCap ? h('span', { class: 'chip' }, 'Todos a nivel 50') : h('span', { class: 'chip' }, 'Nivel real');
+  const random = c.mode === 'random';
+  const capNote = [
+    h('span', { class: 'chip' }, `${MODE_ICON[c.mode] ?? MODE_ICON.team} ${MODE_LABEL[c.mode] ?? MODE_LABEL.team}`),
+    c.levelCap ? h('span', { class: 'chip' }, 'Todos a nivel 50') : h('span', { class: 'chip' }, 'Nivel real'),
+  ];
+  const diceTeam = (n) => h('div', { class: 'mini-team' }, Array.from({ length: n }, (_, i) => h('div', { class: 'mon mon-hidden', 'aria-label': 'Pokémon por sortear' }, h('span', { class: 'badge' }, i + 1), h('div', { class: 'die idle' }, DIE_FACES[i % DIE_FACES.length]), h('div', { class: 'nm' }, '???'))));
+  const randomHint = h('p', { class: 'muted small' }, `Cuando los dos estén listos, los dados sortean ${PARTY_SIZE} Pokémon de la colección de cada uno, sin repetir, con movimientos y habilidad al azar.`);
 
   if (mine) {
     const input = h('input', { type: 'text', readonly: true, value: link, 'aria-label': 'Link del desafío', onfocus: (e) => e.target.select() });
@@ -1030,11 +1314,13 @@ function renderLobby(c, { onAccepted }) {
         'section',
         { class: 'card' },
         h('h1', null, 'Tu desafío está listo'),
-        h('p', { class: 'muted' }, 'Mándale este link a un colega. La pelea parte apenas lo acepte; deja esta página abierta para jugar en vivo.'),
+        h('p', { class: 'muted' }, 'Mándale este link a otro jugador. La pelea parte apenas lo acepte; deja esta página abierta para jugar en vivo.'),
         h('div', { class: 'share' }, input, h('button', { class: 'btn primary', onclick: () => copy(link, 'Link copiado, ¡a provocar!') }, 'Copiar')),
         h('div', { class: 'row', style: null }, capNote, h('span', { class: 'muted pulse' }, '⏳ Esperando rival…')),
       ),
-      h('section', { class: 'card' }, h('h2', null, 'Tu equipo para esta pelea'), h('div', { class: 'mini-team' }, c.hostTeam.map((f, i) => monCard(f, { badge: i + 1, stats: true, rarity: false })))),
+      random
+        ? h('section', { class: 'card' }, h('h2', null, 'Tu equipo saldrá de los dados'), diceTeam(c.hostTeamSize), randomHint)
+        : h('section', { class: 'card' }, h('h2', null, 'Tu equipo para esta pelea'), h('div', { class: 'mini-team' }, c.hostTeam.map((f, i) => monCard(f, { badge: i + 1, stats: true, rarity: false })))),
       h('section', null, h('button', {
         class: 'btn danger',
         onclick: async () => {
@@ -1065,7 +1351,16 @@ function renderLobby(c, { onAccepted }) {
     const byId = new Map(me.roster.map((f) => [f.uid, f]));
     return me.team.map((id) => byId.get(id)).filter(Boolean);
   };
-  const right = me
+  const right = me && random
+    ? h(
+        'div',
+        { class: 'card' },
+        h('h2', null, 'Tu equipo saldrá de los dados'),
+        diceTeam(Math.min(PARTY_SIZE, me.rosterSize)),
+        randomHint,
+        h('button', { class: 'btn primary', onclick: (e) => accept(e.currentTarget) }, '🎲 Aceptar y lanzar los dados'),
+      )
+    : me
     ? h(
         'div',
         { class: 'card' },
@@ -1077,7 +1372,7 @@ function renderLobby(c, { onAccepted }) {
     : importCard({ onDone: () => renderLobby(c, { onAccepted }) });
 
   $app.replaceChildren(
-    h('section', null, h('h1', null, `${c.host.name} te desafía`), h('div', { class: 'row' }, capNote, h('span', { class: 'muted' }, 'Pelea en vivo por turnos. Si alguien no elige en 60 s, su criatura ataca sola.'))),
+    h('section', null, h('h1', null, `${c.host.name} te desafía`), h('div', { class: 'row' }, capNote, h('span', { class: 'muted' }, 'Pelea en vivo por turnos. Si alguien no elige en 60 s, su Pokémon ataca solo.'))),
     h(
       'section',
       { class: 'vs' },
@@ -1085,7 +1380,9 @@ function renderLobby(c, { onAccepted }) {
         'div',
         { class: 'card' },
         h('h2', null, `Equipo de ${c.host.name}`),
-        c.hostTeam.length
+        random
+          ? [diceTeam(c.hostTeamSize), h('p', { class: 'muted small' }, 'Nadie sabe qué le tocará hasta que rueden los dados.')]
+          : c.hostTeam.length
           ? h('div', { class: 'mini-team' }, c.hostTeam.map((f, i) => monCard(f, { badge: i + 1, stats: true, rarity: false })))
           : [
               h('div', { class: 'mini-team' }, Array.from({ length: c.hostTeamSize ?? 3 }, (_, i) => h('div', { class: 'mon mon-hidden', 'aria-label': 'Pokémon oculto' }, h('span', { class: 'badge' }, i + 1), h('div', { class: 'ball' }), h('div', { class: 'nm' }, '???')))),
@@ -1098,12 +1395,22 @@ function renderLobby(c, { onAccepted }) {
   );
 }
 
+const DIE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const ROLL_START_MS = 700;
+const ROLL_STEP_MS = 450;
+const rolledRooms = new Set();
+
 function previewUI(c, sendPick) {
   let last = null;
   let total = 0;
   let picks = [];
   let sent = false;
   let entered = false;
+  let rolling = false;
+  let revealed = 0;
+  let justRevealed = -1;
+  const rollTimers = [];
+  let dieTick = null;
   const bar = h('i');
   const timerText = h('span', { class: 'timer' });
   const root = h('div', { class: 'prep' });
@@ -1116,8 +1423,35 @@ function previewUI(c, sendPick) {
     bar.style.width = `${total ? Math.min(100, (left / total) * 100) : 100}%`;
   }, 200);
 
+  function startRoll(n) {
+    rolling = true;
+    revealed = 0;
+    root.classList.add('rolling');
+    dieTick = setInterval(() => {
+      for (const d of root.querySelectorAll('.die.spin')) d.textContent = DIE_FACES[Math.floor(Math.random() * DIE_FACES.length)];
+    }, 90);
+    for (let i = 0; i < n; i++) {
+      rollTimers.push(setTimeout(() => {
+        revealed = i + 1;
+        justRevealed = i;
+        render();
+      }, ROLL_START_MS + i * ROLL_STEP_MS));
+    }
+    rollTimers.push(setTimeout(() => {
+      rolling = false;
+      justRevealed = -1;
+      clearInterval(dieTick);
+      root.classList.remove('rolling');
+      rolledRooms.add(c.id);
+      render();
+    }, ROLL_START_MS + n * ROLL_STEP_MS + 300));
+  }
+
+  const dieCard = (i) => h('div', { class: 'prep-card dice-slot', 'aria-label': 'Lanzando dados' }, h('div', { class: 'die spin', style: { animationDelay: `${-i * 110}ms` } }, DIE_FACES[i % DIE_FACES.length]), h('b', null, '???'));
+  const revealClass = (i) => (rolling && i === justRevealed ? ' reveal' : '');
+
   function choose(i, needed) {
-    if (sent) return;
+    if (sent || rolling) return;
     const at = picks.indexOf(i);
     if (at >= 0) picks.splice(at, 1);
     else if (picks.length < needed) picks.push(i);
@@ -1135,7 +1469,7 @@ function previewUI(c, sendPick) {
         'div',
         { class: 'card prep-side' },
         h('div', { class: 'row between' }, h('h2', null, title), side.ready ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, 'Eligiendo…')),
-        h('div', { class: 'prep-grid' }, side.party.map((f, i) => h('div', { class: `prep-card seen${entered ? '' : ' enter'}`, style: { animationDelay: `${i * 70}ms` } }, h('div', { html: creatureHTML(f) }), h('b', null, f.name)))),
+        h('div', { class: 'prep-grid' }, side.party.map((f, i) => (rolling && i >= revealed ? dieCard(i) : h('div', { class: `prep-card seen${entered || rolling ? '' : ' enter'}${revealClass(i)}`, style: { animationDelay: `${i * 70}ms` } }, h('div', { html: creatureHTML(f) }), h('b', null, f.name), typeChips(f.types ?? []))))),
       );
     if (!own) {
       root.replaceChildren(seen(p.sides[0], p.sides[0].name), h('div', { class: 'vs-mark' }, 'VS'), seen(p.sides[1], p.sides[1].name));
@@ -1143,30 +1477,35 @@ function previewUI(c, sendPick) {
       return;
     }
     const done = own.ready || sent;
+    const random = p.mode === 'random';
     const chosen = own.picks ?? picks;
     const mine = h(
       'div',
       { class: 'card prep-side mine' },
-      h('h2', null, done ? 'Tu equipo para esta pelea' : `Elige ${own.needed} de tus ${own.party.length}`),
-      h('p', { class: 'muted small' }, done ? 'El primero sale a pelear.' : 'Tócalos en el orden en que quieres usarlos: el primero sale a pelear. Si se acaba el tiempo, se eligen al azar.'),
+      h('h2', null, rolling ? '🎲 Lanzando los dados…' : done ? 'Tu equipo para esta pelea' : `Elige ${own.needed} de tus ${own.party.length}`),
+      h('p', { class: 'muted small' }, rolling ? 'Sorteando Pokémon, movimientos y habilidades de tu colección.' : done ? 'El primero sale a pelear.' : 'Tócalos en el orden en que quieres usarlos: el primero sale a pelear. Si se acaba el tiempo, se eligen al azar.'),
       h(
         'div',
         { class: 'prep-grid' },
         own.party.map((f, i) => {
+          if (rolling && i >= revealed) return dieCard(i);
           const order = chosen.indexOf(i);
           return h(
             'button',
-            { type: 'button', class: `prep-card${entered ? '' : ' enter'}${order >= 0 ? ' chosen' : ''}${done && order < 0 ? ' benched' : ''}`, style: { animationDelay: entered ? '0ms' : `${i * 70}ms` }, disabled: done, onclick: () => choose(i, own.needed) },
+            { type: 'button', class: `prep-card${entered || rolling ? '' : ' enter'}${revealClass(i)}${order >= 0 ? ' chosen' : ''}${done && order < 0 ? ' benched' : ''}`, style: { animationDelay: entered ? '0ms' : `${i * 70}ms` }, disabled: done || rolling, onclick: () => choose(i, own.needed) },
             order >= 0 ? h('span', { class: 'badge' }, order + 1) : null,
             h('div', { html: creatureHTML(f) }),
             h('b', null, f.name),
             h('small', { class: 'muted' }, `Nv ${f.level}`),
             typeChips(f.types),
+            random && f.abilityInfo ? abilityChip(f.abilityInfo) : null,
             h('small', { class: 'prep-moves muted' }, f.moves.map((m) => m.name).join(' · ')),
           );
         }),
       ),
-      done
+      rolling
+        ? h('p', { class: 'pulse' }, '🎲 Los dados están rodando…')
+        : done
         ? h('p', { class: 'pulse' }, foe.ready ? '¡Comienza la batalla!' : `Esperando a ${foe.name}…`)
         : h('button', { type: 'button', class: 'btn primary', disabled: picks.length !== own.needed, onclick: () => { sent = true; sendPick(picks.slice()); render(); } }, `Continuar (${picks.length}/${own.needed})`),
     );
@@ -1176,12 +1515,16 @@ function previewUI(c, sendPick) {
 
   return {
     update(msg) {
+      const first = !last;
       last = msg;
       if (!total && msg.deadline) total = Math.max(1, msg.deadline - Date.now());
+      if (first && msg.preview.mode === 'random' && !rolledRooms.has(c.id)) startRoll(Math.max(...msg.preview.sides.map((s) => s.party.length)));
       render();
     },
     destroy() {
       clearInterval(tick);
+      clearInterval(dieTick);
+      rollTimers.forEach(clearTimeout);
     },
   };
 }
@@ -1197,7 +1540,7 @@ function battleUI(c, sendAction) {
   const sideAt = (p) => (p === 'me' ? mine : 1 - mine);
   const hud = (p) => {
     const r = { name: h('span'), lvl: h('span'), sub: h('div', { class: 'sub' }), bar: h('i'), num: h('div', { class: 'hpnum' }) };
-    const info = h('button', { class: 'info-btn', type: 'button', title: 'Ver info', 'aria-label': 'Ver info del Pokémon', onclick: () => openInfo(sideAt(p)) }, 'i');
+    const info = h('button', { class: 'info-btn', type: 'button', 'data-tip': 'Ver info', 'aria-label': 'Ver info del Pokémon', onclick: () => openInfo(sideAt(p)) }, 'i');
     r.el = h('div', { class: `hud ${p}` }, h('div', { class: 'nm' }, r.name, h('span', { class: 'nm-end' }, r.lvl, info)), r.sub, h('div', { class: 'hp' }, r.bar), r.num);
     return r;
   };
@@ -1208,7 +1551,7 @@ function battleUI(c, sendAction) {
     field: h('span', { class: 'field' }),
     sky: h('div', { class: 'sky', 'aria-hidden': 'true' }),
     ground: h('div', { class: 'terrain-glow', 'aria-hidden': 'true' }),
-    spot: { foe: h('div', { class: 'spot foe', title: 'Ver info', onclick: () => openInfo(sideAt('foe')) }), me: h('div', { class: 'spot me', title: 'Ver info', onclick: () => openInfo(sideAt('me')) }) },
+    spot: { foe: h('div', { class: 'spot foe', onclick: () => openInfo(sideAt('foe')) }), me: h('div', { class: 'spot me', onclick: () => openInfo(sideAt('me')) }) },
     hud: { foe: hud('foe'), me: hud('me') },
     info: h('dialog', { class: 'info-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() }),
     say: h('div', { class: 'say', 'aria-live': 'polite' }),
@@ -1361,6 +1704,8 @@ function battleUI(c, sendAction) {
       enter = true;
     }
     spot.classList.toggle('faint', f.hp <= 0);
+    const screens = sd.screens || {};
+    for (const kind of Object.keys(SCREEN)) spot.classList.toggle(`screen-${kind}`, !!screens[kind] && f.hp > 0);
     if (enter) anim(spot, 'enter', 500);
 
     const pct = Math.max(0, (f.hp / f.stats.hp) * 100);
@@ -1389,6 +1734,7 @@ function battleUI(c, sendAction) {
         h('span', { class: 'owner' }, isYou(side) ? `${sd.name} (tú)` : sd.name),
         boosts ? h('span', { class: 'boosts' }, boosts) : null,
         marks ? h('span', { class: 'boosts' }, marks) : null,
+        ...Object.entries(sd.screens || {}).map(([kind, turns]) => h('span', { class: `screen-chip ${kind}`, tabindex: 0, 'data-tip': `Reduce a la mitad el daño de ${SCREEN_GUARDS[kind]} contra este equipo. Quedan ${turns} turnos.` }, `🛡️ ${SCREEN[kind]} ${turns}`)),
         h('span', { class: 'dots', 'aria-label': 'Equipo' }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
       ].filter(Boolean),
     );
@@ -1436,13 +1782,13 @@ function battleUI(c, sendAction) {
                 onclick: async (e) => {
                   e.currentTarget.disabled = true;
                   try {
-                    const { challenge } = await api('/api/challenges', { method: 'POST', body: { levelCap: c.levelCap } });
+                    const { challenge } = await api('/api/challenges', { method: 'POST', body: { levelCap: c.levelCap, mode: c.mode, ...(c.ai ? { ai: c.ai } : {}) } });
                     nav(`/b/${challenge.id}`);
                   } catch (err) {
                     toast(err.message);
                   }
                 },
-              }, '⚔︎ Revancha (nuevo link)')
+              }, c.ai ? '⚔︎ Revancha' : '⚔︎ Revancha (nuevo link)')
             : null,
           h('a', { class: 'btn', href: '/', 'data-link': true }, 'Inicio'),
         ),
@@ -1498,7 +1844,7 @@ function battleUI(c, sendAction) {
                 : [h('span', { class: 'mv-desc' }, m.desc)];
             return h(
               'button',
-              { class: `move${pp === 0 ? ' no-pp' : ''}`, title: m.desc, disabled: !moveSet.has(i), onclick: () => act({ type: 'move', move: i }, m.name) },
+              { class: `move${pp === 0 ? ' no-pp' : ''}`, 'data-tip': m.kind === 'attack' ? m.desc : null, 'data-tip-note': pp === 0 ? 'Sin PP: no se puede usar.' : null, disabled: !moveSet.has(i), onclick: () => act({ type: 'move', move: i }, m.name) },
               h('span', { class: 'mv' }, m.name, h('small', { class: `pp${pp <= Math.ceil(m.pp / 4) ? ' low' : ''}` }, `PP ${pp}/${m.pp}`)),
               h('span', { class: 'mi' }, typeChip(m.type), info),
             );
@@ -1686,6 +2032,23 @@ function battleUI(c, sendAction) {
         paintField();
         tell(['El campo vuelve a la normalidad.'], { cls: 'weak' });
         return 700;
+      case 'screen': {
+        const side = sd(ev.side);
+        side.screens = { ...(side.screens || {}), [ev.screen]: ev.turns };
+        paint(ev.side);
+        anim(els.spot[pos(ev.side)], 'power', 600);
+        tell([`${SCREEN[ev.screen]} protege al equipo de ${side.name} contra ${SCREEN_GUARDS[ev.screen]}.`], { side: ev.side });
+        return 900;
+      }
+      case 'screenEnd': {
+        const side = sd(ev.side);
+        const { [ev.screen]: _gone, ...rest } = side.screens || {};
+        side.screens = rest;
+        paint(ev.side);
+        if (ev.cause === 'broken') anim(els.spot[pos(ev.side)], 'hit', 400);
+        tell([(SCREEN_END[ev.cause] ?? SCREEN_END.time)(SCREEN[ev.screen], side.name)], { side: ev.side, cls: ev.cause === 'time' ? 'weak' : null });
+        return 800;
+      }
       case 'hazard':
         tell([`Púas tóxicas rodean al equipo de ${sd(ev.side).name}.`], { side: ev.side, cls: 'weak' });
         return 800;

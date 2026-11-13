@@ -4,14 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Token Clash</title>
-  <meta name="description" content="Batallas entre colegas con las criaturas que criaste con tus tokens.">
+  <meta name="description" content="Batallas contra otros jugadores con los Pokémon que criaste con tus tokens.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css?v=dev">
   <script type="module" src="/app.js?v=dev"></script>
 </head>
 <body>
   <header class="top">
-    <a class="logo" href="/" data-link><span class="logo-mark">⚔︎</span> Token Clash</a>
+    <a class="logo" href="/" data-link><span class="logo-mark">⚔︎</span> <span class="logo-text">Token Clash</span></a>
+    <nav class="nav" aria-label="Principal">
+      <a href="/" data-link data-nav="home">🏠 Inicio</a>
+      <a href="/stats" data-link data-nav="stats">📊 Stats</a>
+    </nav>
     <div id="who"></div>
   </header>
   <main id="app"><p class="muted center pad">Cargando…</p></main>

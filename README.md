@@ -1,6 +1,6 @@
 # Token Clash
 
-Batallas por turnos entre colegas con las criaturas que cada uno crió en
+Batallas por turnos entre jugadores con los Pokémon que cada uno crió en
 [PokeTokenBar](https://github.com/chattymin/PokeTokenBar) a punta de tokens.
 
 En vivo: **https://clash.mirrordev.xyz**
@@ -9,16 +9,21 @@ En vivo: **https://clash.mirrordev.xyz**
 
 1. En PokeTokenBar: Ajustes → Backup & Transfer → Exportar (`PokeTokenBar-Save-YYYY-MM-DD.json`).
    También sirve el archivo vivo `~/Library/Application Support/PokeTokenBar/companion-state.json`.
-2. Arrástralo en la web con tu nombre de entrenador. Arma un equipo de 3.
-3. "Crear link de desafío" → mándaselo a un colega. Cuando acepta, pelean en vivo (60 s por turno;
-   si alguien no elige, su criatura ataca sola). Cualquiera más con el link puede mirar.
+2. Arrástralo en la web con tu nombre de entrenador. Arma un equipo de 6.
+3. "Crear link de desafío" → mándaselo a otro jugador. Cuando acepta, pelean en vivo (60 s por turno;
+   si alguien no elige, su Pokémon ataca solo). Cualquiera más con el link puede mirar.
+   Modos: "🎒 Batalla con tu equipo" (los 6 que armaste) y "🎲 Batalla aleatoria" (los dados sortean hasta 6 de la
+   colección de cada uno, sin repetir especie, con movimientos y habilidad al azar). En ambos, cada uno elige 3.
+   También se puede pelear contra la IA (Fácil, Media, Difícil o Muy difícil), que usa Pokémon de la 1.ª a la
+   5.ª generación. Con tu equipo, la dificultad cambia cómo arma su equipo y cómo pelea; en aleatoria, solo cómo
+   pelea. Las peleas contra la IA no cuentan para el ranking ni quedan en tu historial.
 4. Ranking de victorias en la portada. Opción "Todos a nivel 50" para que gane la estrategia.
 
-## Criaturas (PokeAPI)
+## Pokémon (PokeAPI)
 
-El save solo aporta números: especie, cadena evolutiva, rareza, nivel, IVs y si es brillante. Todo lo demás sale de
+El save solo aporta números: especie, cadena evolutiva, rareza, nivel, IVs y si es shiny. Todo lo demás sale de
 [PokeAPI](https://pokeapi.co): nombre, stats base (ataque y ataque especial se promedian, igual defensa y defensa
-especial), tipos reales (uno o dos) y sprites de frente y espalda, también los brillantes. Los ataques son nombres
+especial), tipos reales (uno o dos) y sprites de frente y espalda, también los shiny. Los ataques son nombres
 reales de movimientos elegidos según los tipos de la especie (`species()` en `server/creatures.js`).
 
 Los datos viven en `server/pokeapi.json` y `public/sprites/`. El servidor nunca llama a la PokeAPI (en producción no
@@ -50,6 +55,8 @@ npm test        # parser, motor de batalla y flujo completo con WebSocket
 - `scripts/import-pokeapi.mjs`: genera `server/pokeapi.json` y `public/sprites/`.
 - `public/types.js`: tipos y tabla de efectividad.
 - `server/battle.js`: motor puro de batalla (aleatoriedad inyectada).
+- `server/ai.js`: la IA: arma su equipo y elige qué hacer cada turno (aleatoriedad inyectada).
+- `server/random.js`: sorteo de la batalla aleatoria (equipo, movimientos y habilidad; aleatoriedad inyectada).
 - `server/index.js`: HTTP + WebSocket, desafíos, ranking. Persistencia en `data/db.json`.
 - `public/`: frontend sin build (JS de módulos, sprites PNG).
 
