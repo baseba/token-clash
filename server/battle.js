@@ -219,6 +219,7 @@ function boost(b, f, changes, source = null, opts = {}) {
 }
 
 function grounded(b, f) {
+  if (f.vol.smackedDown) return true;
   return !f.types.includes('flying') && !flag(b, f, 'levitates');
 }
 
@@ -437,6 +438,8 @@ function typeEffectiveness(b, move, attacker, target) {
   let eff = 1;
   for (const type of target.types) {
     let e = effectiveness(move.type, [type]);
+    if (move.extraType) e *= effectiveness(move.extraType, [type]);
+    if (e === 0 && type === 'flying' && move.type === 'ground' && (move.hitsAirborne || target.vol.smackedDown)) e = 1;
     if (e === 0 && type === 'ghost' && (move.type === 'normal' || move.type === 'fighting') && flag(b, attacker, 'hitsGhost')) e = 1;
     if (e > 1 && type === 'flying' && weather(b) === 'winds') e = 1;
     eff *= e;
@@ -522,6 +525,7 @@ function wakeAbilities(b, except) {
 function faint(b, f, by = null, move = null, lastHit = 0) {
   if (f.fainted || f.hp > 0) return;
   f.fainted = true;
+  b.sides[sideIndex(b, f)].faintedTurn = b.turn;
   const hadGas = f.ability === 'neutralizing-gas';
   emit(b, { t: 'faint', side: sideIndex(b, f), name: nameOf(f) });
   run(b, f, 'onFaint', by, move, lastHit);
@@ -551,6 +555,8 @@ function trapped(b, s) {
   const me = activeOf(b, s);
   const foe = foeOf(b, me);
   if (!foe || me.types.includes('ghost')) return false;
+  if (me.vol.noRetreat || me.vol.bound) return true;
+  if (me.vol.trappedBy && onField(b, me.vol.trappedBy)) return true;
   return run(b, foe, 'onTrapFoe', me) === true;
 }
 
@@ -570,7 +576,7 @@ export function validActions(b, s) {
   const switches = side.team.map((f, i) => ({ type: 'switch', to: i })).filter((a) => a.to !== side.active && side.team[a.to].hp > 0);
   if (b.phase === 'replace') return switches;
   const f = side.team[side.active];
-  const forced = f.vol.mustRecharge ?? f.vol.charging;
+  const forced = f.vol.mustRecharge ?? f.vol.charging ?? f.vol.rampage?.move;
   if (forced != null) return [{ type: 'move', move: forced }];
   const usable = usableMoves(b, f).map(({ i }) => ({ type: 'move', move: i }));
   const moves = usable.length ? usable : [{ type: 'move', move: STRUGGLE_MOVE }];
@@ -615,8 +621,9 @@ function canAct(b, me, move) {
   };
   if (me.status === 'slp') {
     me.statusTurns -= flag(b, me, 'wakesFaster') ? 2 : 1;
-    if (me.statusTurns > 0) return cant('slp');
-    cure(b, me);
+    if (me.statusTurns > 0) {
+      if (!move.usableAsleep) return cant('slp');
+    } else cure(b, me);
   }
   if (me.status === 'frz') {
     if (!move.thaws && b.random() >= 0.2) return cant('frz');
@@ -644,7 +651,10 @@ function canAct(b, me, move) {
   }
   if (me.vol.attract) {
     if (!onField(b, me.vol.attract)) delete me.vol.attract;
-    else if (b.random() < 0.5) return cant('attract');
+    else {
+      emit(b, { t: 'infatuated', side, name: nameOf(me), by: nameOf(me.vol.attract) });
+      if (b.random() < 0.5) return cant('attract');
+    }
   }
   if (me.status === 'par' && b.random() < 0.25) return cant('par');
   return true;
@@ -667,6 +677,185 @@ function spendPP(b, me, move) {
   me.pp[move.key] = Math.max(0, (me.pp[move.key] ?? 0) - (foe && abilityKey(b, foe) === 'pressure' ? 2 : 1));
 }
 
+const FOCUS_MOVES = new Set(['focus-punch', 'shell-trap', 'beak-blast']);
+const STATUSED = new Set(['brn', 'par', 'psn', 'tox']);
+const WEATHER_BALL = { sun: 'fire', harshsun: 'fire', rain: 'water', heavyrain: 'water', sand: 'rock', hail: 'ice', snow: 'ice' };
+const TERRAIN_PULSE = { electric: 'electric', grassy: 'grass', misty: 'fairy', psychic: 'psychic' };
+
+function moveOfAction(b, s, idx) {
+  const f = activeOf(b, s);
+  return idx === STRUGGLE_MOVE ? STRUGGLE : f.moves[idx];
+}
+
+const asleep = (b, f) => f.status === 'slp' || flag(b, f, 'comatose');
+
+function failReason(b, me, foe, move, firstAction) {
+  const s = sideIndex(b, me);
+  if (move.firstTurnOnly && !firstAction) return 'notFirstTurn';
+  if (move.id === 'sucker-punch' || move.id === 'thunderclap') {
+    const theirs = b.chosen?.[1 - s];
+    if (!foe || b.moved.has(foe) || !theirs || theirs.kind === 'status') return 'suckerPunch';
+  }
+  if (move.id === 'focus-punch' && me.turnHit) return 'lostFocus';
+  if (move.id === 'shell-trap' && !me.turnHit?.physical) return 'shellTrap';
+  if (move.id === 'last-resort') {
+    const others = me.moves.filter((m) => m.key !== 'last-resort');
+    if (!others.length || others.some((m) => !me.vol.usedMoves?.has(m.key))) return 'lastResort';
+  }
+  if (move.id === 'dream-eater' && (!foe || !asleep(b, foe))) return 'notAsleep';
+  if (move.id === 'snore' && !asleep(b, me)) return 'notAsleepSelf';
+  if (move.id === 'steel-roller' && !b.field.terrain) return 'noTerrain';
+  if (move.losesType && !me.types.includes(move.losesType)) return 'noType';
+  if (move.id === 'synchronoise' && foe && !foe.types.some((t) => me.types.includes(t))) return 'noSharedType';
+  if (move.id === 'captivate' && foe && (!foe.gender || !me.gender || foe.gender === me.gender)) return !foe.gender || !me.gender ? 'genderless' : 'sameGender';
+  if (move.selfCost && me.hp <= Math.floor(me.stats.hp * move.selfCost)) return 'lowHp';
+  return null;
+}
+
+export function moveWillFail(b, s, idx) {
+  if (idx === STRUGGLE_MOVE) return false;
+  const me = activeOf(b, s);
+  const move = me.moves[idx];
+  if (!move || move.id === 'sucker-punch' || move.id === 'thunderclap' || move.id === 'focus-punch' || move.id === 'shell-trap') return false;
+  return failReason(b, me, foeOf(b, me), move, !me.vol.acted) !== null;
+}
+
+function adaptMove(b, me, move) {
+  const w = weather(b);
+  if (move.id === 'weather-ball' && WEATHER_BALL[w]) {
+    move.type = WEATHER_BALL[w];
+    move.power = 100;
+  }
+  if (move.id === 'terrain-pulse' && b.field.terrain && grounded(b, me)) {
+    move.type = TERRAIN_PULSE[b.field.terrain];
+    move.power = 100;
+  }
+  if (move.id === 'revelation-dance') move.type = me.types[0];
+  if (move.id === 'photon-geyser' && me.stats.atk * stageMult(me.boosts.atk) > me.stats.satk * stageMult(me.boosts.satk)) move.category = 'physical';
+}
+
+function basePower(b, me, target, move) {
+  const s = sideIndex(b, me);
+  const side = b.sides[s];
+  const p = move.power;
+  switch (move.id) {
+    case 'eruption':
+    case 'water-spout':
+    case 'dragon-energy':
+      return Math.max(1, Math.floor((150 * me.hp) / me.stats.hp));
+    case 'facade':
+      return STATUSED.has(me.status) ? p * 2 : p;
+    case 'hex':
+      return target.status || flag(b, target, 'comatose') ? p * 2 : p;
+    case 'venoshock':
+      return poisoned(target.status) ? p * 2 : p;
+    case 'brine':
+      return target.hp * 2 <= target.stats.hp ? p * 2 : p;
+    case 'acrobatics':
+      return p * 2;
+    case 'payback':
+      return b.moved.has(target) ? p * 2 : p;
+    case 'avalanche':
+    case 'revenge':
+      return me.turnHit?.by === target ? p * 2 : p;
+    case 'assurance':
+      return target.turnHit ? p * 2 : p;
+    case 'stored-power':
+    case 'power-trip':
+      return p + 20 * Object.values(me.boosts).reduce((sum, v) => sum + Math.max(0, v), 0);
+    case 'fury-cutter':
+      return Math.min(160, p * 2 ** (me.vol.furyCutter ?? 0));
+    case 'echoed-voice':
+      return Math.min(200, p * (b.echo?.turn === b.turn ? b.echo.count : 1));
+    case 'retaliate':
+      return side.faintedTurn === b.turn - 1 ? p * 2 : p;
+    case 'last-respects':
+      return p + 50 * side.team.filter((o) => o !== me && o.hp <= 0).length;
+    case 'rage-fist':
+      return Math.min(350, p + 50 * (me.timesHit ?? 0));
+    case 'rising-voltage':
+      return b.field.terrain === 'electric' && grounded(b, target) ? p * 2 : p;
+    case 'expanding-force':
+      return b.field.terrain === 'psychic' && grounded(b, me) ? p * 1.5 : p;
+    case 'psyblade':
+      return b.field.terrain === 'electric' ? p * 1.5 : p;
+    case 'smelling-salts':
+      return target.status === 'par' ? p * 2 : p;
+    case 'wake-up-slap':
+      return asleep(b, target) ? p * 2 : p;
+    case 'bolt-beak':
+    case 'fishious-rend':
+      return b.moved.has(target) ? p : p * 2;
+    case 'stomping-tantrum':
+    case 'temper-flare':
+      return me.vol.lastFailed ? p * 2 : p;
+    case 'fickle-beam':
+      return b.random() < 0.3 ? p * 2 : p;
+    default:
+      return p;
+  }
+}
+
+function startEcho(b) {
+  b.echo = b.echo?.turn === b.turn - 1 || b.echo?.turn === b.turn ? { turn: b.turn, count: Math.min(5, (b.echo.turn === b.turn ? b.echo.count : b.echo.count + 1)) } : { turn: b.turn, count: 1 };
+}
+
+function afterHit(b, me, target, move, total) {
+  const s = sideIndex(b, me);
+  if (target.hp > 0) {
+    if (move.id === 'smelling-salts' && target.status === 'par') cure(b, target);
+    if (move.id === 'wake-up-slap' && target.status === 'slp') cure(b, target);
+    if (move.id === 'clear-smog' && Object.values(target.boosts).some(Boolean)) {
+      target.boosts = freshBoosts();
+      emit(b, { t: 'boostsReset', side: 1 - s, name: nameOf(target) });
+    }
+    if (move.grounds && !target.vol.smackedDown && (target.types.includes('flying') || flag(b, target, 'levitates'))) {
+      target.vol.smackedDown = true;
+      emit(b, { t: 'volatile', side: 1 - s, name: nameOf(target), kind: 'smackdown' });
+    }
+    if (move.binds && !target.vol.bound) {
+      target.vol.bound = { turns: 4 + Math.floor(b.random() * 2), by: me, move: move.name };
+      emit(b, { t: 'volatile', side: 1 - s, name: nameOf(target), kind: 'bound', move: move.name });
+    }
+    if (move.traps && !target.vol.trappedBy) {
+      target.vol.trappedBy = me;
+      emit(b, { t: 'volatile', side: 1 - s, name: nameOf(target), kind: 'trapped' });
+      if (move.id === 'jaw-lock' && !me.vol.trappedBy) me.vol.trappedBy = target;
+    }
+    if (move.id === 'salt-cure' && !target.vol.saltCure) {
+      target.vol.saltCure = true;
+      emit(b, { t: 'volatile', side: 1 - s, name: nameOf(target), kind: 'saltcure' });
+    }
+  }
+  if (move.id === 'fell-stinger' && target.hp <= 0 && me.hp > 0) boost(b, me, { atk: 3 }, me);
+  if (move.losesType && me.hp > 0) setTypes(b, me, me.types.filter((t) => t !== move.losesType));
+  if (move.id === 'steel-roller' && b.field.terrain) clearTerrain(b);
+  if (move.id === 'glaive-rush') me.vol.glaiveRush = b.turn;
+  if (move.selfSwitch && me.hp > 0 && b.sides[s].team.some((o) => o !== me && o.hp > 0)) me.vol.exitPending = true;
+  if (move.forceSwitch && target.hp > 0 && total > 0) dragOut(b, target);
+}
+
+function stealBoosts(b, me, target) {
+  const stolen = Object.fromEntries(Object.entries(target.boosts).filter(([, v]) => v > 0));
+  if (!Object.keys(stolen).length) return;
+  const s = sideIndex(b, target);
+  for (const [k, v] of Object.entries(stolen)) {
+    target.boosts[k] = 0;
+    emit(b, { t: 'boost', side: s, name: nameOf(target), stat: k, by: -v, stage: 0 });
+  }
+  boost(b, me, stolen, me);
+}
+
+function dragOut(b, target) {
+  const s = sideIndex(b, target);
+  const bench = b.sides[s].team.map((f, i) => i).filter((i) => i !== b.sides[s].active && b.sides[s].team[i].hp > 0);
+  if (!bench.length || flag(b, target, 'suctionCups')) return;
+  const to = bench[Math.floor(b.random() * bench.length)];
+  emit(b, { t: 'dragged', side: s, name: nameOf(target) });
+  if (doSwitch(b, s, to)) wakeAbilities(b, activeOf(b, s));
+  runEntry(b, s);
+}
+
 function useMove(b, s, moveIdx, priority, why = null) {
   const me = activeOf(b, s);
   if (me.hp <= 0) return;
@@ -679,11 +868,18 @@ function useMove(b, s, moveIdx, priority, why = null) {
   const base = moveIdx === STRUGGLE_MOVE ? STRUGGLE : me.moves[moveIdx];
   const move = { ...base, flags: [...base.flags], effectivePriority: priority };
   const charged = me.vol.charging === moveIdx;
+  const continuing = me.vol.rampage?.move === moveIdx;
+  const firstAction = !me.vol.acted;
+  me.vol.acted = true;
+  delete me.vol.focusing;
   if (!canAct(b, me, move)) {
     delete me.vol.charging;
+    delete me.vol.rampage;
+    delete me.vol.furyCutter;
     return;
   }
   run(b, me, 'onBeforeMoveForm', move);
+  adaptMove(b, me, move);
   run(b, me, 'onModifyMove', move);
   run(b, me, 'onPrepareMove', move);
   me.revealedMoves.add(base.key);
@@ -699,17 +895,39 @@ function useMove(b, s, moveIdx, priority, why = null) {
     return;
   }
   delete me.vol.charging;
-  if (!charged) spendPP(b, me, move);
+  if (!charged && !continuing) spendPP(b, me, move);
 
-  if (move.selfDestruct && anyActiveHas(b, 'damp')) {
+  if (move.selfDestruct && move.kind !== 'status' && anyActiveHas(b, 'damp')) {
     emit(b, { t: 'nothing', side: s });
     return;
   }
+  const failed = failReason(b, me, foe, move, firstAction);
+  if (failed) {
+    emit(b, { t: 'nothing', side: s, reason: failed });
+    me.vol.lastFailed = true;
+    delete me.vol.rampage;
+    delete me.vol.furyCutter;
+    return;
+  }
+  if (base.id === 'echoed-voice') b.echo = b.echo?.turn === b.turn ? b.echo : { turn: b.turn, count: b.echo?.turn === b.turn - 1 ? Math.min(5, b.echo.count + 1) : 1 };
+  (me.vol.usedMoves ??= new Set()).add(base.key);
+  let dealt = 0;
   if (move.kind === 'status') statusMove(b, me, foe, move);
   else {
-    const dealt = attack(b, me, foe, move);
+    dealt = attack(b, me, foe, move) || 0;
     if (dealt && move.flags.includes('recharge') && me.hp > 0) me.vol.mustRecharge = moveIdx;
     if (move.recoilMaxHp && me.hp > 0) hurt(b, me, me.stats.hp * move.recoilMaxHp, 'recoil');
+    me.vol.lastFailed = !dealt;
+  }
+  if (base.id === 'fury-cutter' && dealt) me.vol.furyCutter = Math.min(2, (me.vol.furyCutter ?? 0) + 1);
+  else delete me.vol.furyCutter;
+  if (base.rampage && me.hp > 0) {
+    if (!me.vol.rampage) me.vol.rampage = { move: moveIdx, left: 1 + Math.floor(b.random() * 2) };
+    else me.vol.rampage.left -= 1;
+    if (me.vol.rampage.left <= 0) {
+      delete me.vol.rampage;
+      addVolatile(b, me, 'confusion', me);
+    }
   }
   if (move.selfDestruct && me.hp > 0) {
     me.hp = 0;
@@ -725,6 +943,20 @@ function useMove(b, s, moveIdx, priority, why = null) {
 
 function selfStatus(b, me, move) {
   let did = false;
+  if (move.selfCost) hurt(b, me, me.stats.hp * move.selfCost, 'cost');
+  if (move.id === 'no-retreat') {
+    if (me.vol.noRetreat) {
+      emit(b, { t: 'nothing', side: sideIndex(b, me) });
+      return;
+    }
+    me.vol.noRetreat = true;
+  }
+  if (move.id === 'charge' && !me.vol.charge) {
+    me.vol.charge = true;
+    emit(b, { t: 'volatile', side: sideIndex(b, me), name: nameOf(me), kind: 'charge' });
+    did = true;
+  }
+  if (move.id === 'growth' && isSun(weather(b))) move = { ...move, boosts: { atk: 2, satk: 2 } };
   if (move.weather) did = setWeather(b, move.weather, null) || did;
   if (move.terrain) did = setTerrain(b, move.terrain, null) || did;
   if (move.screen) did = setScreen(b, sideIndex(b, me), move.screen) || did;
@@ -852,12 +1084,12 @@ function powerMods(b, me, target, move) {
 function computeDamage(b, me, target, move, eff, hitPower) {
   const crit = rollCrit(b, me, target, move);
   const physical = move.category === 'physical';
-  const atkKey = physical ? 'atk' : 'satk';
-  const defKey = physical ? 'def' : 'sdef';
+  const atkKey = move.usesDefense ? 'def' : physical ? 'atk' : 'satk';
+  const defKey = physical || move.hitsPhysicalDef ? 'def' : 'sdef';
   const attacker = move.usesTargetAttack ? target : me;
   let atkStage = flag(b, target, 'unaware') ? 0 : attacker.boosts[atkKey];
   if (crit && atkStage < 0) atkStage = 0;
-  let defStage = flag(b, me, 'unaware') ? 0 : target.boosts[defKey];
+  let defStage = flag(b, me, 'unaware') || move.ignoresDefBoosts ? 0 : target.boosts[defKey];
   if (crit && defStage > 0) defStage = 0;
   const w = weather(b);
 
@@ -868,12 +1100,14 @@ function computeDamage(b, me, target, move, eff, hitPower) {
 
   let dmg = (((2 * me.level) / 5 + 2) * hitPower * powerMods(b, me, target, move) * (a / d)) / 50 + 2;
   const mw = weatherFor(b, me);
-  if (isSun(mw)) dmg *= move.type === 'fire' ? 1.5 : move.type === 'water' ? 0.5 : 1;
+  if (isSun(mw)) dmg *= move.type === 'fire' || move.id === 'hydro-steam' ? 1.5 : move.type === 'water' ? 0.5 : 1;
   if (isRain(mw)) dmg *= move.type === 'water' ? 1.5 : move.type === 'fire' ? 0.5 : 1;
   if (move.type && me.types.includes(move.type)) dmg *= flag(b, me, 'stab') ? abilityDef(b, me).stab : 1.5;
   dmg *= eff * (0.85 + b.random() * 0.15) * (crit ? 1.5 : 1);
-  if (me.status === 'brn' && physical && !flag(b, me, 'ignoresBurn')) dmg *= 0.5;
+  if (me.status === 'brn' && physical && !flag(b, me, 'ignoresBurn') && move.id !== 'facade') dmg *= 0.5;
   if (!crit && screened(b, me, target, move)) dmg *= 0.5;
+  if ((move.id === 'collision-course' || move.id === 'electro-drift') && eff > 1) dmg *= 5461 / 4096;
+  if (target.vol.glaiveRush != null && b.turn - target.vol.glaiveRush <= 1) dmg *= 2;
   dmg *= mul(b, me, 'onAttackerFinal', move, target, { eff, crit }) * mul(b, target, 'onDefenderFinal', move, me, { eff, crit });
   return { dmg: Math.max(1, Math.round(dmg)), crit };
 }
@@ -917,22 +1151,30 @@ function attack(b, me, target, move) {
     return;
   }
   const typeEff = typeEffectiveness(b, move, me, target);
-  if (typeEff === 0) {
-    emit(b, { t: 'immune', side: 1 - s });
-    return;
-  }
+  const crash = () => move.crashes && me.hp > 0 && hurt(b, me, me.stats.hp / 2, 'crash');
   b.mold = flag(b, me, 'moldBreaker') ? { target } : null;
   try {
-    if (run(b, target, 'onTryHit', move, me)) return;
+    if (run(b, target, 'onTryHit', move, me)) {
+      crash();
+      return;
+    }
+    if (typeEff === 0) {
+      emit(b, { t: 'immune', side: 1 - s });
+      crash();
+      return;
+    }
     if (b.field.terrain === 'psychic' && move.effectivePriority > 0 && grounded(b, target)) {
       emit(b, { t: 'immune', side: 1 - s, terrain: 'psychic' });
       return;
     }
     if (!hits(b, me, target, move)) {
       emit(b, { t: 'miss', side: s });
+      crash();
       return;
     }
     if (move.breaksScreens) clearScreens(b, sideIndex(b, target), 'broken');
+    move.power = basePower(b, me, target, move);
+    if (move.id === 'spectral-thief') stealBoosts(b, me, target);
     const eff = chain(b, target, 'onEffectiveness', typeEff, move, me);
     const count = rollHits(b, me, move);
     let total = 0;
@@ -941,14 +1183,20 @@ function attack(b, me, target, move) {
     for (let i = 0; i < count && target.hp > 0 && me.hp > 0; i++) {
       const hitPower = i > 0 && !move.multihit ? move.power * 0.25 : move.power;
       const { dmg, crit } = move.ohko || move.fixedDamage ? { dmg: fixedDamage(me, target, move), crit: false } : computeDamage(b, me, target, move, eff, hitPower);
-      const dealt = Math.min(target.hp, chain(b, target, 'onDamage', dmg, move, me));
+      let dealt = Math.min(target.hp, chain(b, target, 'onDamage', dmg, move, me));
+      if (move.leavesOne && dealt >= target.hp) dealt = Math.max(0, target.hp - 1);
       const before = target.hp;
       target.hp -= dealt;
       total += dealt;
       lastHit = dealt;
       landed += 1;
       emit(b, { t: 'damage', side: 1 - s, amount: dealt, hp: target.hp, max: target.stats.hp, eff, crit });
+      if (dealt > 0) {
+        target.turnHit = { by: me, physical: move.category === 'physical' };
+        target.timesHit = (target.timesHit ?? 0) + 1;
+      }
       if (target.status === 'frz' && move.type === 'fire' && target.hp > 0) cure(b, target);
+      if (target.vol.focusing === 'beak-blast' && move.flags.includes('contact') && me.hp > 0) setStatus(b, me, 'brn', target);
       run(b, target, 'onDamagingHit', move, me, { crit, before, dmg: dealt });
     }
     if (landed > 1) emit(b, { t: 'hits', side: 1 - s, count: landed });
@@ -966,6 +1214,7 @@ function attack(b, me, target, move) {
     }
     if (me.hp > 0) run(b, me, 'onAfterMoveHit', move, target, total);
     if (target.hp <= 0) faint(b, target, me, move, lastHit);
+    afterHit(b, me, target, move, total);
     return total;
   } finally {
     b.mold = null;
@@ -997,8 +1246,11 @@ function resolveTurn(b) {
   const events = [{ t: 'turn', turn: b.turn }];
   b.ev = events;
   b.moved = new Set();
+  for (const f of activeFighters(b)) f.activeTurns += 1;
   const acts = b.sides.map((side, s) => ({ s, ...side.action }));
+  b.chosen = acts.map((a) => (a.type === 'move' ? moveOfAction(b, a.s, a.move) : null));
   for (const side of b.sides) side.action = null;
+  for (const side of b.sides) for (const f of side.team) delete f.turnHit;
 
   const entered = [];
   for (const a of acts) {
@@ -1016,7 +1268,7 @@ function resolveTurn(b) {
       const f = activeOf(b, a.s);
       const move = a.move === STRUGGLE_MOVE ? STRUGGLE : f.moves[a.move];
       const frac = run(b, f, 'onFractionalPriority', move);
-      return { ...a, prio: chain(b, f, 'onModifyPriority', move.priority, move), frac: typeof frac === 'number' ? frac : 0, spd: speedOf(b, f), tie: b.random() };
+      return { ...a, f, prio: chain(b, f, 'onModifyPriority', move.priority, move), frac: typeof frac === 'number' ? frac : 0, spd: speedOf(b, f), tie: b.random() };
     })
     .sort((x, y) => y.prio - x.prio || y.frac - x.frac || y.spd - x.spd || y.tie - x.tie);
 
@@ -1025,6 +1277,15 @@ function resolveTurn(b) {
   movers.forEach((a, i) => (a.why = i === 0 ? why : null));
 
   for (const a of movers) {
+    const move = moveOfAction(b, a.s, a.move);
+    if (FOCUS_MOVES.has(move.id) && a.f.hp > 0) {
+      a.f.vol.focusing = move.id;
+      emit(b, { t: 'focus', side: a.s, name: nameOf(a.f), move: move.name, key: move.id });
+    }
+  }
+
+  for (const a of movers) {
+    if (activeOf(b, a.s) !== a.f) continue;
     useMove(b, a.s, a.move, a.prio, a.why);
     settle(b);
     if (checkEnd(b)) return done(b, events);
@@ -1076,6 +1337,14 @@ function residual(b) {
         else heal(b, seeder, drained);
       }
     }
+    if (f.hp > 0 && f.vol.bound) {
+      const bound = f.vol.bound;
+      if (!onField(b, bound.by) || --bound.turns <= 0) {
+        delete f.vol.bound;
+        emit(b, { t: 'volatileEnd', side: sideIndex(b, f), name: nameOf(f), kind: 'bound', move: bound.move });
+      } else hurt(b, f, f.stats.hp / 8, 'bound');
+    }
+    if (f.hp > 0 && f.vol.saltCure) hurt(b, f, f.stats.hp / (f.types.includes('water') || f.types.includes('steel') ? 4 : 8), 'saltcure');
   }
   settle(b);
   for (const f of order()) run(b, f, 'onEndTurn');
@@ -1095,7 +1364,6 @@ function residual(b) {
       delete f.vol.disabled;
     }
     delete f.vol.flinch;
-    f.activeTurns += 1;
   }
   b.sides.forEach((side, s) => {
     for (const kind of SCREEN_KINDS) {
@@ -1193,6 +1461,11 @@ function publicVolatiles(f) {
     ...(v.flashFire ? { flashFire: true } : {}),
     ...(v.disabled ? { disabled: v.disabled.name } : {}),
     ...(v.slowStart ? { slowStart: v.slowStart } : {}),
+    ...(v.bound ? { bound: v.bound.move } : {}),
+    ...(v.trappedBy ? { trapped: true } : {}),
+    ...(v.saltCure ? { saltcure: true } : {}),
+    ...(v.smackedDown ? { smackdown: true } : {}),
+    ...(v.noRetreat ? { noRetreat: true } : {}),
   };
 }
 

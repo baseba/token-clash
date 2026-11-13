@@ -26,6 +26,21 @@ test('the effect follows the move: id first, then its flags', () => {
   assert.equal(shape('swords-dance'), 'boost');
   assert.equal(shape('recover'), 'heal');
   assert.equal(shape('rain-dance'), 'weather');
-  assert.equal(shape('thunder-wave'), 'psywave');
+  assert.equal(shape('thunder-wave'), 'bolt');
+  assert.equal(shape('toxic'), 'psywave');
   assert.equal(shape('growl'), 'sound');
+});
+
+test('status moves and special attacks get an effect that matches what they do', () => {
+  const shape = (id) => moveShape(eventFor(moveData(id)));
+  const expected = {
+    attract: 'hearts', charm: 'hearts', 'sweet-kiss': 'hearts',
+    'sleep-powder': 'powder', spore: 'powder', 'stun-spore': 'powder',
+    defog: 'gust', 'poison-gas': 'gust', smokescreen: 'gust',
+    flash: 'flash', 'confuse-ray': 'beam', 'will-o-wisp': 'projectile', 'leech-seed': 'drain', 'string-shot': 'stream',
+    'dragon-claw': 'slash', 'shadow-claw': 'slash', 'photon-geyser': 'beam', 'dynamax-cannon': 'beam',
+    'thunder-cage': 'bolt', 'volt-switch': 'bolt', 'sheer-cold': 'storm', 'sand-tomb': 'storm',
+    'mind-blown': 'blast', 'water-spout': 'eruption', 'thousand-waves': 'quake', 'make-it-rain': 'rain',
+  };
+  for (const [id, want] of Object.entries(expected)) assert.equal(shape(id), want, id);
 });

@@ -117,8 +117,27 @@ const VOLATILE_INFO = {
   flashFire: () => ({ icon: '🔥', name: 'Absorbe Fuego', desc: 'Sus ataques de Fuego son 50% más fuertes.' }),
   disabled: (v) => ({ icon: '🚫', name: 'Anulación', desc: `No puede usar ${v} por unos turnos.` }),
   slowStart: () => ({ icon: '🐢', name: 'Inicio lento', desc: 'Su Ataque y su Velocidad están a la mitad durante unos turnos.' }),
+  bound: (v) => ({ icon: '🪢', name: 'Apresado', desc: `${v} le quita 1/8 de sus PS cada turno y no lo deja cambiar, por 4 o 5 turnos.` }),
+  trapped: () => ({ icon: '⛓️', name: 'Atrapado', desc: 'No puede cambiar mientras quien lo atrapó siga en combate.' }),
+  saltcure: () => ({ icon: '🧂', name: 'Salazón', desc: 'Pierde 1/8 de sus PS cada turno (1/4 si es de tipo Agua o Acero).' }),
+  smackdown: () => ({ icon: '⬇️', name: 'En el suelo', desc: 'Lo derribaron: los ataques de Tierra le afectan.' }),
+  noRetreat: () => ({ icon: '🚩', name: 'Bastión Final', desc: 'No puede cambiar de Pokémon.' }),
 };
-const NOTHING_WHY = { sameGender: 'los dos son del mismo género', genderless: 'uno de los dos no tiene género' };
+const NOTHING_WHY = {
+  sameGender: 'los dos son del mismo género',
+  genderless: 'uno de los dos no tiene género',
+  notFirstTurn: 'solo funciona en su primer turno en combate',
+  suckerPunch: 'el rival no iba a atacar',
+  lostFocus: 'perdió la concentración al recibir un golpe',
+  shellTrap: 'no recibió un golpe físico',
+  lastResort: 'todavía no usa sus otros movimientos',
+  notAsleep: 'el rival no está dormido',
+  notAsleepSelf: 'solo se puede usar dormido',
+  noTerrain: 'no hay ningún campo activo',
+  noType: 'ya no tiene el tipo que necesita',
+  noSharedType: 'no comparten ningún tipo',
+  lowHp: 'no le quedan suficientes PS',
+};
 const GENDER = { male: { sym: '♂', name: 'Macho' }, female: { sym: '♀', name: 'Hembra' } };
 const genderMark = (g) => (GENDER[g] ? h('span', { class: `gender ${g}`, 'data-tip': GENDER[g].name, 'aria-label': GENDER[g].name }, GENDER[g].sym) : null);
 const statusLabel = (status) => `${STATUS_INFO[status].icon} ${STATUS_INFO[status].short ?? STATUS_INFO[status].name}`;
@@ -141,7 +160,7 @@ const SCREEN_END = {
 const TERRAIN = { electric: '⚡ Campo Eléctrico', grassy: '🌿 Campo de Hierba', misty: '🌫️ Campo de Niebla', psychic: '🔮 Campo Psíquico' };
 const STAT = { atk: ['ATQ', 'ataque'], def: ['DEF', 'defensa'], satk: ['AT.E', 'ataque especial'], sdef: ['DF.E', 'defensa especial'], spd: ['VEL', 'velocidad'], acc: ['PRE', 'precisión'], eva: ['EVA', 'evasión'] };
 const CANT = { recharge: 'necesita recargarse.', slp: 'está dormido.', frz: 'está congelado.', par: 'está paralizado: no puede moverse.', flinch: 'retrocede y no se mueve.', attract: 'está enamorado y no ataca.' };
-const HURT = { leechseed: ' por las drenadoras', brn: ' por la quemadura', psn: ' por el veneno', tox: ' por el veneno', sand: ' por la tormenta de arena', hail: ' por el granizo', recoil: ' por el retroceso', ooze: ' por el lodo líquido', ability: '' };
+const HURT = { leechseed: ' por las drenadoras', brn: ' por la quemadura', psn: ' por el veneno', tox: ' por el veneno', sand: ' por la tormenta de arena', hail: ' por el granizo', recoil: ' por el retroceso', ooze: ' por el lodo líquido', bound: ' por estar apresado', saltcure: ' por la salazón', crash: ' al estrellarse', cost: ' para potenciarse', ability: '' };
 const VOLATILE = {
   confusion: () => 'queda confuso.',
   attract: () => 'se enamora.',
@@ -149,7 +168,17 @@ const VOLATILE = {
   perish: () => 'oye el canto mortal: caerá en 3 turnos.',
   charge: () => 'se carga de electricidad.',
   leechseed: () => 'queda sembrado con drenadoras.',
+  bound: (ev) => `queda apresado por ${ev.move}.`,
+  trapped: () => 'ya no puede huir.',
+  saltcure: () => 'queda en salazón.',
+  smackdown: () => 'cae al suelo.',
 };
+const VOLATILE_END = {
+  disable: (ev) => `vuelve a poder usar ${ev.move}.`,
+  bound: (ev) => `se libera de ${ev.move}.`,
+  confusion: () => 'ya no está confuso.',
+};
+const FOCUS_TEXT = { 'focus-punch': 'se concentra…', 'shell-trap': 'prepara una trampa de caparazón…', 'beak-blast': 'calienta su pico…' };
 const ABILITY_NOTE = {
   noDrop: () => 'evita que le bajen las características.',
   bounce: () => 'devuelve el movimiento.',
@@ -1766,7 +1795,7 @@ function battleUI(c, sendAction) {
       .filter(([k]) => f.boosts[k])
       .map(([k, [label]]) => `${label} ${signed(f.boosts[k])}`)
       .join(' · ');
-    const volatiles = conditionsOf({ volatiles: f.volatiles }).filter((c) => ['confusion', 'attract', 'perish', 'charge'].includes(c.key));
+    const volatiles = conditionsOf({ volatiles: f.volatiles }).filter((c) => ['confusion', 'attract', 'perish', 'charge', 'bound', 'trapped', 'saltcure'].includes(c.key));
     r.sub.replaceChildren(
       ...[
         typeChips(f.types),
@@ -1914,6 +1943,7 @@ function battleUI(c, sendAction) {
 
   // Plays one event on screen and in the log; returns how long to linger on it.
   let currentMove = null;
+  let draggedSide = null;
 
   function showDamage(ev, linger) {
     const f = activeOf(ev.side);
@@ -1973,6 +2003,22 @@ function battleUI(c, sendAction) {
         float(ev.side, '¡Falló!', 'miss');
         tell(['¡pero falló!', ev.reason ? h('small', { class: 'why' }, ` · ${NOTHING_WHY[ev.reason]}`) : ''], { side: ev.side, sub: true, cls: 'weak' });
         return ev.reason ? 1100 : 800;
+      case 'focus':
+        anim(els.spot[pos(ev.side)], 'power', 600);
+        tell([...mon(ev.side, ev.name), ` ${FOCUS_TEXT[ev.key] ?? 'se prepara…'}`], { side: ev.side, sub: true });
+        return 800;
+      case 'dragged':
+        anim(els.spot[pos(ev.side)], 'dodge', 500);
+        draggedSide = ev.side;
+        tell(['¡', ...mon(ev.side, ev.name), ' es arrastrado fuera del combate!'], { side: ev.side, cls: 'weak' });
+        return 800;
+      case 'boostsReset': {
+        const f = activeOf(ev.side);
+        f.boosts = Object.fromEntries(Object.keys(f.boosts || {}).map((k) => [k, 0]));
+        paint(ev.side);
+        tell(['Se anulan los cambios de características de ', ...mon(ev.side, ev.name), '.'], { side: ev.side, sub: true });
+        return 800;
+      }
       case 'charging':
         anim(els.spot[pos(ev.side)], 'power', 600);
         tell([...mon(ev.side, ev.name), ` se prepara para usar ${ev.move}…`], { side: ev.side, sub: true });
@@ -2032,24 +2078,45 @@ function battleUI(c, sendAction) {
           anim(spot, `afflicted-${ev.reason}`, 900);
           return Promise.all([sleep(900), fx.status(ev.reason, spot)]);
         }
+        if (ev.reason === 'attract') {
+          float(ev.side, '💔', 'status-float');
+          anim(spot, 'afflicted-slp', 900);
+          return 900;
+        }
+        if (ev.reason === 'flinch') {
+          float(ev.side, '¡Retrocede!', 'miss');
+          anim(spot, 'afflicted-frz', 700);
+          return Promise.all([sleep(800), fx.condition('flinch', spot)]);
+        }
         float(ev.side, '…', 'miss');
         return 900;
       }
-      case 'confused':
+      case 'confused': {
+        const spot = els.spot[pos(ev.side)];
+        float(ev.side, '😵 Confuso', 'status-float');
+        anim(spot, 'dizzy', 1100);
         tell([...mon(ev.side, ev.name), ' está confuso…'], { side: ev.side, sub: true, cls: 'weak' });
-        return 700;
+        return Promise.all([sleep(800), fx.condition('confusion', spot)]);
+      }
+      case 'infatuated': {
+        const spot = els.spot[pos(ev.side)];
+        float(ev.side, '💘 Enamorado', 'status-float');
+        tell([...mon(ev.side, ev.name), ` está enamorado de ${ev.by}.`], { side: ev.side, sub: true, cls: 'weak' });
+        return Promise.all([sleep(800), fx.condition('attract', spot)]);
+      }
       case 'volatile': {
         const f = activeOf(ev.side);
-        f.volatiles = { ...f.volatiles, [ev.kind]: ev.kind === 'perish' ? 4 : true };
+        f.volatiles = { ...f.volatiles, [ev.kind]: ev.kind === 'perish' ? 4 : ev.kind === 'bound' ? ev.move : true };
         paint(ev.side);
         tell([...mon(ev.side, ev.name), ` ${VOLATILE[ev.kind]?.(ev) ?? ''}`], { side: ev.side, sub: true, cls: 'weak' });
-        return 900;
+        if (ev.kind === 'confusion') anim(els.spot[pos(ev.side)], 'dizzy', 1100);
+        return Promise.all([sleep(900), fx.condition(ev.kind, els.spot[pos(ev.side)])]);
       }
       case 'volatileEnd': {
         const f = activeOf(ev.side);
         if (f.volatiles) delete f.volatiles[ev.kind];
         paint(ev.side);
-        tell([...mon(ev.side, ev.name), ev.kind === 'disable' ? ` vuelve a poder usar ${ev.move}.` : ' ya no está confuso.'], { side: ev.side, sub: true });
+        tell([...mon(ev.side, ev.name), ` ${(VOLATILE_END[ev.kind] ?? VOLATILE_END.confusion)(ev)}`], { side: ev.side, sub: true });
         return 700;
       }
       case 'perish': {
@@ -2057,7 +2124,7 @@ function battleUI(c, sendAction) {
         f.volatiles = { ...f.volatiles, perish: ev.count + 1 };
         paint(ev.side);
         tell(['Canto mortal: a ', ...mon(ev.side, ev.name), ` le quedan ${ev.count}.`], { side: ev.side, sub: true, cls: 'weak' });
-        return 700;
+        return Promise.all([sleep(800), fx.condition('perish', els.spot[pos(ev.side)])]);
       }
       case 'hurt': {
         const f = activeOf(ev.side);
@@ -2070,6 +2137,9 @@ function battleUI(c, sendAction) {
           anim(els.spot[pos(ev.side)], `afflicted-${ev.cause}`, 900);
           fx.status(ev.cause, els.spot[pos(ev.side)]);
         }
+        const condition = { leechseed: 'leechdrain', bound: 'bound', saltcure: 'saltcure', confusion: 'confusion' }[ev.cause];
+        if (condition) fx.condition(condition, els.spot[pos(ev.side)], els.spot[pos(1 - ev.side)]);
+        if (ev.cause === 'confusion') anim(els.spot[pos(ev.side)], 'dizzy', 1100);
         const why = ev.cause === 'confusion' ? ' se hiere a sí mismo' : ` pierde ${amountText(ev)}${HURT[ev.cause] ?? ''}`;
         tell([...mon(ev.side, f.name), `${why} (${hpText(ev, before)} → ${hpText(ev, ev.hp)}).`], { side: ev.side, sub: true, cls: 'weak' });
         return 900;
@@ -2176,7 +2246,10 @@ function battleUI(c, sendAction) {
         if (ev.look) Object.assign(activeOf(s), ev.look);
         paint(s);
         const who = isYou(s) ? 'mandas' : `${sd(s).name} manda`;
-        if (ev.forced) tell([isYou(s) ? 'Mandas a ' : `${sd(s).name} manda a `, h('b', null, ev.name), '.'], { side: s });
+        if (draggedSide === s) {
+          draggedSide = null;
+          tell(['Sale ', h('b', null, ev.name), ' en su lugar.'], { side: s });
+        } else if (ev.forced) tell([isYou(s) ? 'Mandas a ' : `${sd(s).name} manda a `, h('b', null, ev.name), '.'], { side: s });
         else tell([isYou(s) ? 'Retiras a ' : `${sd(s).name} retira a `, h('b', null, from), ` y ${who} a `, h('b', null, ev.name), '.'], { side: s });
         return 1000;
       }

@@ -1,5 +1,5 @@
 import { buildFighter, speciesData, formData, statsFor, effectiveness, usableMovepool, moveData, shuffled, rng, STRUGGLE, MOVES_PER_FIGHTER } from './creatures.js';
-import { validActions, submit, needsAction, STRUGGLE_MOVE } from './battle.js';
+import { validActions, submit, needsAction, moveWillFail, STRUGGLE_MOVE } from './battle.js';
 import { randomize } from './random.js';
 import { PARTY_SIZE, BATTLE_SIZE } from './preview.js';
 
@@ -273,6 +273,7 @@ export function scoreMove(b, s, idx, knowsAbilities = true, deep = true) {
   const foe = foeSide.team[foeSide.active];
   const move = moveOf(me, idx);
   if (!foe || foe.hp <= 0) return 1;
+  if (moveWillFail(b, s, idx)) return 0;
   if (move.kind !== 'status' && move.category !== 'status') {
     const dmg = estimateDamage(b, me, foe, move, knowsAbilities);
     if (dmg <= 0) return 0;
