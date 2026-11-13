@@ -822,3 +822,6 @@ a.party-cell, a.party-cell.empty { cursor: pointer; }
 .gender.male { color: #6cb6ff; }
 .gender.female { color: #ff8cc6; }
 .gender.none { color: var(--muted); font-weight: 700; }
+
+.spot.dizzy .creature { animation: dizzy 1.1s ease-in-out; }
+@keyframes dizzy { 0%, 100% { transform: none; } 20% { transform: rotate(-7deg) translateX(-3%); } 45% { transform: rotate(6deg) translateX(3%); } 70% { transform: rotate(-4deg); } }

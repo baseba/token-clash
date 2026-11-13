@@ -45,11 +45,33 @@ const SHAPE_IDS = {
   rise: ['stone-edge', 'precipice-blades', 'power-gem', 'spikes'],
   darts: ['pin-missile', 'bullet-seed', 'icicle-spear', 'rock-blast', 'fury-attack', 'double-kick', 'double-slap', 'comet-punch', 'arm-thrust', 'twineedle', 'tail-slap', 'water-shuriken', 'scale-shot', 'triple-axel'],
 };
-const BY_ID = Object.fromEntries(Object.entries(SHAPE_IDS).flatMap(([shape, ids]) => ids.map((id) => [id, shape])));
+const MORE_SHAPE_IDS = {
+  beam: ['dynamax-cannon', 'moongeist-beam', 'photon-geyser', 'fleur-cannon', 'armor-cannon', 'core-enforcer', 'roar-of-time', 'techno-blast', 'dragon-energy', 'electro-shot', 'freeze-dry', 'confuse-ray'],
+  blast: ['mind-blown', 'blue-flare', 'fusion-flare', 'sacred-fire', 'seed-flare', 'shell-trap', 'burn-up'],
+  storm: ['sheer-cold', 'glaciate', 'sand-tomb', 'flower-trick', 'fiery-dance'],
+  bolt: ['thunder-cage', 'thunderclap', 'rising-voltage', 'volt-switch', 'fusion-bolt', 'aura-wheel', 'thunder-wave', 'eerie-impulse'],
+  psywave: ['psystrike', 'psycho-boost', 'expanding-force', 'hyperspace-hole', 'lumina-crash', 'last-respects'],
+  pulse: ['synchronoise', 'night-daze', 'sonic-boom'],
+  rain: ['make-it-rain', 'pay-day', 'thousand-arrows', 'judgment', 'salt-cure'],
+  quake: ['thousand-waves', 'lands-wrath'],
+  slash: ['spacial-rend', 'crush-claw', 'metal-claw', 'shadow-claw', 'dragon-claw', 'dire-claw', 'guillotine', 'vine-whip', 'power-whip', 'fire-lash'],
+  eruption: ['water-spout'],
+  meteor: ['grav-apple', 'tera-starstorm'],
+  rise: ['drum-beating'],
+  stream: ['incinerate', 'brine', 'string-shot', 'electroweb'],
+  gust: ['razor-wind', 'smog', 'clear-smog', 'defog', 'poison-gas', 'smokescreen'],
+  flash: ['flash'],
+  projectile: ['will-o-wisp', 'sand-attack', 'tar-shot'],
+  hearts: ['attract', 'charm', 'sweet-kiss', 'lovely-kiss', 'baby-doll-eyes', 'captivate', 'tearful-look', 'play-nice', 'decorate', 'flatter'],
+  powder: ['sleep-powder', 'stun-spore', 'poison-powder', 'spore', 'cotton-spore', 'magic-powder', 'rage-powder', 'aromatic-mist', 'sweet-scent'],
+};
+const BY_ID = Object.fromEntries([SHAPE_IDS, MORE_SHAPE_IDS].flatMap((group) => Object.entries(group).flatMap(([shape, ids]) => ids.map((id) => [id, shape]))));
+const STATUS_SHAPES = new Set(['hearts', 'powder', 'gust', 'bolt', 'flash', 'projectile', 'stream', 'beam', 'drain', 'rise']);
 
 export const SHAPE_NAMES = [
   'projectile', 'orb', 'stream', 'beam', 'bolt', 'storm', 'gust', 'psywave', 'eruption', 'bubbles', 'pulse', 'sound', 'drain',
   'meteor', 'rain', 'flash', 'blast', 'quake', 'rise', 'darts', 'strike', 'punch', 'bite', 'slash', 'boost', 'heal', 'weather',
+  'hearts', 'powder',
 ];
 
 const STAT_COLOR = { atk: 'fighting', def: 'steel', satk: 'psychic', sdef: 'water', spd: 'electric', acc: 'normal', eva: 'flying' };
@@ -65,8 +87,9 @@ export function moveShape(ev) {
     if (ev.effect === 'boost') return 'boost';
     if (ev.effect === 'heal') return 'heal';
     if (ev.effect === 'weather') return 'weather';
+    if (STATUS_SHAPES.has(BY_ID[ev.key])) return BY_ID[ev.key];
     if (flags.includes('sound')) return 'sound';
-    return BY_ID[ev.key] === 'drain' ? 'drain' : 'psywave';
+    return 'psywave';
   }
   if (BY_ID[ev.key]) return BY_ID[ev.key];
   if (ev.drain) return 'drain';
@@ -510,7 +533,67 @@ export function createFx(arena) {
     await Promise.all(jobs);
   }
 
+  const HEART = 'polygon(50% 100%, 6% 52%, 0 30%, 8% 10%, 28% 2%, 50% 18%, 72% 2%, 92% 10%, 100% 30%, 94% 52%)';
+
+  async function hearts(on, { count = 8 } = {}) {
+    const u = unit();
+    const jobs = [];
+    for (let i = 0; i < count; i++) {
+      const s = u * rnd(5.5, 8);
+      const el = node({ width: `${s}px`, height: `${s}px`, marginLeft: `${-s / 2}px`, marginTop: `${-s / 2}px`, clipPath: HEART, background: 'radial-gradient(circle at 35% 30%, #ffe1f0, #ff6fae 55%, #d6337f)', filter: 'drop-shadow(0 0 3px rgba(255, 90, 160, .7))' });
+      const p = { x: on.x + rnd(-u * 9, u * 9), y: on.y + rnd(-u * 2, u * 6) };
+      const sway = rnd(-u * 5, u * 5);
+      jobs.push(wait(i * 90).then(() => play(el, [{ transform: at(p, 'scale(0.4)'), opacity: 0 }, { transform: at({ x: p.x + sway, y: p.y - u * 8 }, 'scale(1.1)'), opacity: 1, offset: 0.4 }, { transform: at({ x: p.x - sway, y: p.y - u * 18 }, 'scale(0.8)'), opacity: 0 }], { duration: 900 })));
+    }
+    await Promise.all(jobs);
+  }
+
+  async function powder(to, type) {
+    await rainOn(to, type, { count: 26, shape: 'dot', size: 3.6, height: 30 });
+  }
+
+  async function orbit(on, type, { count = 3, ms = 1100, rx = 9, ry = 3, lift = 12 } = {}) {
+    const u = unit();
+    const c = { x: on.x, y: on.y - u * lift };
+    const jobs = [];
+    for (let i = 0; i < count; i++) {
+      const el = particle(type, u * 6, 'star');
+      const frames = Array.from({ length: 13 }, (_, k) => {
+        const a = (Math.PI * 2 * k) / 12 + (Math.PI * 2 * i) / count;
+        return { transform: at({ x: c.x + Math.cos(a) * u * rx, y: c.y + Math.sin(a) * u * ry }, `rotate(${k * 30}deg)`), opacity: k === 0 || k === 12 ? 0 : 1 };
+      });
+      jobs.push(play(el, frames, { duration: ms, easing: 'linear' }));
+    }
+    await Promise.all(jobs);
+  }
+
+  async function squeeze(on, type) {
+    const u = unit();
+    const [light, mid, dark] = PALETTE[type] || PALETTE.normal;
+    const jobs = [];
+    for (let i = 0; i < 2; i++) {
+      const band = node({ width: `${u * 26}px`, height: `${u * 8}px`, marginLeft: `${-u * 13}px`, marginTop: `${-u * 4}px`, borderRadius: '50%', border: `${u * 1.3}px solid ${mid}`, boxShadow: `0 0 ${u}px ${light}, inset 0 0 ${u}px ${dark}` });
+      const p = { x: on.x, y: on.y + u * (i ? 4 : -3) };
+      jobs.push(wait(i * 140).then(() => play(band, [{ transform: at(p, 'scale(1.5)'), opacity: 0 }, { transform: at(p, 'scale(1)'), opacity: 1, offset: 0.35 }, { transform: at(p, 'scale(0.85, 0.75)'), opacity: 1, offset: 0.7 }, { transform: at(p, 'scale(1)'), opacity: 0 }], { duration: 760 })));
+    }
+    await Promise.all(jobs);
+  }
+
+  async function notes(on) {
+    const u = unit();
+    const jobs = [];
+    for (let i = 0; i < 4; i++) {
+      const el = node({ fontSize: `${u * 9}px`, lineHeight: '1', color: '#e9d8ff', fontWeight: '900', textShadow: '0 0 6px rgba(150, 110, 255, .8)' });
+      el.textContent = i % 2 ? '♫' : '♪';
+      const p = { x: on.x + rnd(-u * 9, u * 9), y: on.y };
+      jobs.push(wait(i * 120).then(() => play(el, [{ transform: at(p), opacity: 0 }, { opacity: 1, offset: 0.3 }, { transform: at({ x: p.x + rnd(-u * 4, u * 4), y: p.y - u * 16 }), opacity: 0 }], { duration: 900 })));
+    }
+    await Promise.all(jobs);
+  }
+
   const SHAPES = {
+    hearts: (f, t) => hearts(t),
+    powder: (f, t, ty) => powder(t, ty),
     projectile: (f, t, ty) => projectile(f, t, ty),
     orb: (f, t, ty) => projectile(f, t, ty, { big: true }),
     stream: (f, t, ty) => stream(f, t, ty),
@@ -556,6 +639,38 @@ export function createFx(arena) {
       const type = STATUS_TYPE[status] || 'normal';
       if (status === 'slp') return sleepy(on);
       return burstAt(on, type, { count: 12, spread: 10, size: 3, ms: 700 });
+    },
+    condition(kind, spot, otherSpot = null) {
+      if (reduced()) return Promise.resolve();
+      const on = center(spot);
+      switch (kind) {
+        case 'confusion':
+          return orbit(on, 'electric');
+        case 'attract':
+          return hearts(on);
+        case 'leechseed':
+          return burstAt(on, 'grass', { count: 10, spread: 7, size: 3 });
+        case 'leechdrain':
+          return otherSpot ? drain(center(otherSpot), on, 'grass') : burstAt(on, 'grass');
+        case 'bound':
+          return squeeze(on, 'ground');
+        case 'trapped':
+          return squeeze(on, 'steel');
+        case 'saltcure':
+          return burstAt(on, 'ice', { count: 12, spread: 8, size: 3 });
+        case 'smackdown':
+          return rainOn(on, 'rock', { count: 4, size: 8, height: 40 });
+        case 'perish':
+          return notes(on);
+        case 'charge':
+          return burstAt(on, 'electric', { count: 14, spread: 8 });
+        case 'disable':
+          return burstAt(on, 'dark', { count: 8, spread: 6 });
+        case 'flinch':
+          return burstAt(on, 'normal', { count: 5, spread: 5, size: 2.4, ms: 380 });
+        default:
+          return Promise.resolve();
+      }
     },
     impact(type, spot) {
       if (reduced()) return Promise.resolve();

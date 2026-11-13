@@ -651,7 +651,10 @@ function canAct(b, me, move) {
   }
   if (me.vol.attract) {
     if (!onField(b, me.vol.attract)) delete me.vol.attract;
-    else if (b.random() < 0.5) return cant('attract');
+    else {
+      emit(b, { t: 'infatuated', side, name: nameOf(me), by: nameOf(me.vol.attract) });
+      if (b.random() < 0.5) return cant('attract');
+    }
   }
   if (me.status === 'par' && b.random() < 0.25) return cant('par');
   return true;

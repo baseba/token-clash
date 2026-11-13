@@ -2078,18 +2078,39 @@ function battleUI(c, sendAction) {
           anim(spot, `afflicted-${ev.reason}`, 900);
           return Promise.all([sleep(900), fx.status(ev.reason, spot)]);
         }
+        if (ev.reason === 'attract') {
+          float(ev.side, '💔', 'status-float');
+          anim(spot, 'afflicted-slp', 900);
+          return 900;
+        }
+        if (ev.reason === 'flinch') {
+          float(ev.side, '¡Retrocede!', 'miss');
+          anim(spot, 'afflicted-frz', 700);
+          return Promise.all([sleep(800), fx.condition('flinch', spot)]);
+        }
         float(ev.side, '…', 'miss');
         return 900;
       }
-      case 'confused':
+      case 'confused': {
+        const spot = els.spot[pos(ev.side)];
+        float(ev.side, '😵 Confuso', 'status-float');
+        anim(spot, 'dizzy', 1100);
         tell([...mon(ev.side, ev.name), ' está confuso…'], { side: ev.side, sub: true, cls: 'weak' });
-        return 700;
+        return Promise.all([sleep(800), fx.condition('confusion', spot)]);
+      }
+      case 'infatuated': {
+        const spot = els.spot[pos(ev.side)];
+        float(ev.side, '💘 Enamorado', 'status-float');
+        tell([...mon(ev.side, ev.name), ` está enamorado de ${ev.by}.`], { side: ev.side, sub: true, cls: 'weak' });
+        return Promise.all([sleep(800), fx.condition('attract', spot)]);
+      }
       case 'volatile': {
         const f = activeOf(ev.side);
         f.volatiles = { ...f.volatiles, [ev.kind]: ev.kind === 'perish' ? 4 : ev.kind === 'bound' ? ev.move : true };
         paint(ev.side);
         tell([...mon(ev.side, ev.name), ` ${VOLATILE[ev.kind]?.(ev) ?? ''}`], { side: ev.side, sub: true, cls: 'weak' });
-        return 900;
+        if (ev.kind === 'confusion') anim(els.spot[pos(ev.side)], 'dizzy', 1100);
+        return Promise.all([sleep(900), fx.condition(ev.kind, els.spot[pos(ev.side)])]);
       }
       case 'volatileEnd': {
         const f = activeOf(ev.side);
@@ -2103,7 +2124,7 @@ function battleUI(c, sendAction) {
         f.volatiles = { ...f.volatiles, perish: ev.count + 1 };
         paint(ev.side);
         tell(['Canto mortal: a ', ...mon(ev.side, ev.name), ` le quedan ${ev.count}.`], { side: ev.side, sub: true, cls: 'weak' });
-        return 700;
+        return Promise.all([sleep(800), fx.condition('perish', els.spot[pos(ev.side)])]);
       }
       case 'hurt': {
         const f = activeOf(ev.side);
@@ -2116,6 +2137,9 @@ function battleUI(c, sendAction) {
           anim(els.spot[pos(ev.side)], `afflicted-${ev.cause}`, 900);
           fx.status(ev.cause, els.spot[pos(ev.side)]);
         }
+        const condition = { leechseed: 'leechdrain', bound: 'bound', saltcure: 'saltcure', confusion: 'confusion' }[ev.cause];
+        if (condition) fx.condition(condition, els.spot[pos(ev.side)], els.spot[pos(1 - ev.side)]);
+        if (ev.cause === 'confusion') anim(els.spot[pos(ev.side)], 'dizzy', 1100);
         const why = ev.cause === 'confusion' ? ' se hiere a sí mismo' : ` pierde ${amountText(ev)}${HURT[ev.cause] ?? ''}`;
         tell([...mon(ev.side, f.name), `${why} (${hpText(ev, before)} → ${hpText(ev, ev.hp)}).`], { side: ev.side, sub: true, cls: 'weak' });
         return 900;
