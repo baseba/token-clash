@@ -87,7 +87,7 @@ Túnel (ya creado, una sola vez): `cloudflared tunnel create token-clash`,
 `cloudflared tunnel route dns token-clash clash.mirrordev.xyz`, y el token directo al secret
 `cloudflared-token-clash-token` de Podman.
 
-Clave de Jev (una sola vez): `podman secret create token-clash-jev-key - < archivo-con-la-clave`. Sin el proxy
+Clave de Jev (una sola vez): `podman secret create token-clash-jev-key archivo-con-la-clave`. Sin el proxy
 corriendo, Skynet sigue apareciendo pero juega como Muy difícil (`journalctl --user -u token-clash` lo avisa).
 
 ### Deploy automático

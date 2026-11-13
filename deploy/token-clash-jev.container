@@ -10,7 +10,7 @@ Network=token-clash.network
 Network=token-clash-egress.network
 Exec=node server/jev-proxy.js
 Environment=PORT=8081
-# Created once: podman secret create token-clash-jev-key - < archivo-con-la-clave
+# Created once: podman secret create token-clash-jev-key archivo-con-la-clave
 # Only this container has the key; the app doesn't.
 Secret=token-clash-jev-key,type=env,target=JEV_API_KEY
 
