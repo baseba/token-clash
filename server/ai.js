@@ -4,7 +4,6 @@ import { randomize } from './random.js';
 import { PARTY_SIZE, BATTLE_SIZE } from './preview.js';
 
 export const AI_LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
-export const AI_LABELS = { easy: 'Fácil', mid: 'Media', hard: 'Difícil', veryhard: 'Muy difícil', skynet: 'Skynet' };
 // Skynet's turns are decided by Jev (server/jev.js). Everything else, and its fallback when Jev
 // can't answer, is the very hard AI.
 export const JEV_LEVEL = 'skynet';
@@ -14,7 +13,6 @@ export const LAST_AI_SPECIES = 649;
 
 export const aiTrainerId = (level) => `${AI_PREFIX}${level}`;
 export const aiLevelOf = (trainerId) => (typeof trainerId === 'string' && trainerId.startsWith(AI_PREFIX) ? trainerId.slice(AI_PREFIX.length).split('#')[0] : null);
-export const isAiLevel = (level) => AI_LEVELS.includes(level);
 
 const IMMUNE_BY_ABILITY = {
   levitate: 'ground', 'volt-absorb': 'electric', 'lightning-rod': 'electric', 'motor-drive': 'electric', 'water-absorb': 'water',
@@ -94,19 +92,6 @@ export function pickMoveset(entry, difficulty, random) {
     chosen.push(best);
   }
   return chosen.map((x) => x.id);
-}
-
-function typeMatchup(attackTypes, defendTypes) {
-  let best = 0;
-  for (const t of attackTypes) best = Math.max(best, effectiveness(t, defendTypes));
-  return best;
-}
-
-export function speciesMatchup(mine, theirs) {
-  const offense = typeMatchup(mine.types, theirs.types);
-  const defense = typeMatchup(theirs.types, mine.types);
-  const score = (e) => (e === 0 ? -2 : e >= 4 ? 3 : e >= 2 ? 2 : e < 1 ? -1 : 0);
-  return score(offense) - score(defense);
 }
 
 function usableAtLevel(id, level) {

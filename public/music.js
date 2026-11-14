@@ -12,7 +12,7 @@ function pulseWave(ctx, duty) {
 
 const TYPE_PITCH = { normal: 1, fire: 1.1, water: 0.9, electric: 1.35, grass: 1, ice: 1.45, fighting: 0.8, poison: 0.85, ground: 0.6, flying: 1.2, psychic: 1.15, bug: 1.25, rock: 0.7, ghost: 0.75, dragon: 0.8, dark: 0.7, steel: 1.2, fairy: 1.4 };
 
-export const CRY_VARIANTS = ['latest', 'legacy'];
+const CRY_VARIANTS = ['latest', 'legacy'];
 
 const CRY_MANIFEST = '/cries/cries.json';
 const MOVE_SFX_MANIFEST = '/sfx/moves/moves.json';
@@ -95,9 +95,7 @@ export function moveSfxCues(manifest, key, byPlayer = true) {
   return cues.map(([at, url, gain, rate]) => ({ at, url, gain, rate }));
 }
 
-export const SFX_TYPES = ['water', 'fire', 'electric', 'grass', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
 
-export const SFX_SHAPES = ['projectile', 'orb', 'stream', 'beam', 'bolt', 'storm', 'gust', 'psywave', 'eruption', 'bubbles', 'pulse', 'sound', 'drain', 'meteor', 'rain', 'flash', 'blast', 'quake', 'rise', 'darts', 'strike', 'punch', 'bite', 'slash', 'boost', 'heal', 'weather', 'hearts', 'powder', 'aura'];
 
 export function createPlayer({ storage = null } = {}) {
   let ctx = null;

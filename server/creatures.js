@@ -150,7 +150,6 @@ export function lineage(id) {
 const CHILDREN = new Map();
 for (const [id, d] of Object.entries(POKEAPI)) if (d.evolvesFrom) CHILDREN.set(d.evolvesFrom, [...(CHILDREN.get(d.evolvesFrom) ?? []), Number(id)]);
 
-export const speciesCount = () => Object.keys(POKEAPI).length;
 
 export function family(id) {
   const root = lineage(id).at(-1) ?? id;

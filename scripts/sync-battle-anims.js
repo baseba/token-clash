@@ -17,25 +17,23 @@ const SE = new URL('se/', SFX);
 const CUES = new URL('moves/moves.json', SFX);
 const CONCURRENCY = 16;
 const HEADERS = { 'user-agent': 'token-clash-importer' };
-export const MS_PER_ANIM_FRAME = 50;
+const MS_PER_ANIM_FRAME = 50;
 
-export const COMMON_ANIMS = [
+const COMMON_ANIMS = [
   'common-poison', 'common-toxic', 'common-paralysis', 'common-sleep', 'common-frozen', 'common-burn',
-  'common-confusion', 'common-attract', 'common-bind', 'common-wrap', 'common-curse', 'common-leech-seed',
-  'common-fire-spin', 'common-whirlpool', 'common-sand-tomb', 'common-magma-storm', 'common-clamp', 'common-infestation',
-  'common-protect', 'common-salt-cure', 'common-health-up',
+  'common-confusion', 'common-attract', 'common-bind', 'common-curse', 'common-leech-seed', 'common-protect', 'common-salt-cure',
   'common-sunny', 'common-harsh-sun', 'common-rain', 'common-heavy-rain', 'common-sandstorm', 'common-hail', 'common-snow', 'common-strong-winds',
   'common-electric-terrain', 'common-grassy-terrain', 'common-misty-terrain', 'common-psychic-terrain',
 ];
 
-export const CHARGE_ANIMS = [
+const CHARGE_ANIMS = [
   'beak-blast', 'bounce', 'dig', 'dive', 'doom-desire', 'electro-shot', 'fly', 'freeze-shock', 'future-sight', 'geomancy',
   'ice-burn', 'meteor-beam', 'phantom-force', 'razor-wind', 'shadow-force', 'skull-bash', 'sky-attack', 'sky-drop',
   'solar-beam', 'solar-blade',
 ].map((move) => `${move}-charging`);
 
-const UI_IMAGES = ['pokeball/pb.png', 'pokeball/pb_opening.png', 'pokeball/pb_open.png', 'effects/pb_particles.png', 'effects/battle_stats.png'];
-const SE_SOUNDS = ['pb_throw', 'pb_rel', 'pb_bounce_1', 'hit', 'hit_strong', 'hit_weak', 'faint', 'stat_up', 'stat_down', 'restore', 'pb_tray_ball'];
+const UI_IMAGES = ['pokeball/pb.png', 'pokeball/pb_open.png', 'effects/pb_particles.png', 'effects/battle_stats.png'];
+const SE_SOUNDS = ['pb_throw', 'pb_rel', 'hit', 'hit_strong', 'hit_weak', 'faint', 'stat_up', 'stat_down', 'restore', 'pb_tray_ball'];
 
 async function fetchRetry(url, tries = 4) {
   for (let i = 1; ; i++) {
@@ -75,7 +73,7 @@ export function compactFrame(e) {
   return [e.target ?? 2, e.x ?? 0, e.y ?? 0, e.zoomX ?? 0, e.zoomY ?? 0, e.angle ?? 0, e.mirror ? 1 : 0, e.visible ? 1 : 0, e.blendType ?? 0, e.graphicFrame ?? 0, e.opacity ?? 0, e.priority ?? 0, e.focus || 1, tone];
 }
 
-export function compactConfig(config, columns = () => 5) {
+function compactConfig(config, columns = () => 5) {
   const events = Object.values(config.frameTimedEvents ?? {}).flat().sort((a, b) => a.frameIndex - b.frameIndex);
   const bg = events
     .filter((e) => e.eventType === 'AnimTimedAddBgEvent' || e.eventType === 'AnimTimedUpdateBgEvent')
