@@ -347,6 +347,18 @@ const stageMult = (k, s) => {
   return s >= 0 ? (base + s) / base : base / (base - s);
 };
 
+const multText = (k, stage) => `×${stageMult(k, stage).toFixed(2).replace(/\.?0+$/, '')}`;
+function boostChips(boosts, { long = false } = {}) {
+  return Object.entries(STAT)
+    .filter(([k]) => boosts?.[k])
+    .map(([k, [label, word]]) => {
+      const stage = boosts[k];
+      const up = stage > 0;
+      const tip = `${word.charAt(0).toUpperCase()}${word.slice(1)} ${signed(stage)}: ${up ? 'sube' : 'baja'} a ${multText(k, stage)}`;
+      return h('span', { class: `boost ${up ? 'up' : 'down'}`, tabindex: 0, 'data-tip': tip }, h('i', { 'aria-hidden': 'true' }, up ? '▲' : '▼'), long ? `${word} ${signed(stage)} (${multText(k, stage)})` : `${label} ${signed(stage)}`);
+    });
+}
+
 function moveEffects(m) {
   const out = [];
   if (m.kind && m.kind !== 'attack') out.push(m.desc);
@@ -405,12 +417,14 @@ function infoCard(f, { own, owner, close }) {
       'section',
       null,
       h('h3', null, 'Cambios de características'),
-      boosts.length
-        ? h('p', null, boosts.map(([k, [label]]) => `${label} ${signed(f.boosts[k])} (×${stageMult(k, f.boosts[k]).toFixed(2).replace(/\.?0+$/, '')})`).join(' · '))
-        : h('p', { class: 'muted' }, 'Sin cambios.'),
+      boosts.length ? h('div', { class: 'boost-list' }, boostChips(f.boosts, { long: true })) : h('p', { class: 'muted' }, 'Sin cambios.'),
     ),
     own
-      ? h('section', null, h('h3', null, 'Características'), h('div', { class: 'info-stats' }, [['PS', 'hp'], ['Ataque', 'atk'], ['Defensa', 'def'], ['At. Esp.', 'satk'], ['Def. Esp.', 'sdef'], ['Velocidad', 'spd']].map(([l, k]) => h('span', null, h('b', null, f.stats[k]), l))))
+      ? h('section', null, h('h3', null, 'Características'), h('div', { class: 'info-stats' }, [['PS', 'hp'], ['Ataque', 'atk'], ['Defensa', 'def'], ['At. Esp.', 'satk'], ['Def. Esp.', 'sdef'], ['Velocidad', 'spd']].map(([l, k]) => {
+          const stage = k === 'hp' ? 0 : f.boosts?.[k] ?? 0;
+          const now = Math.floor(f.stats[k] * stageMult(k, stage));
+          return h('span', { class: stage > 0 ? 'up' : stage < 0 ? 'down' : null, 'data-tip': stage ? `${f.stats[k]} sin cambios · ${multText(k, stage)}` : null }, h('b', null, now, stage ? h('i', { 'aria-hidden': 'true' }, stage > 0 ? ' ▲' : ' ▼') : null), l);
+        })))
       : null,
     h(
       'section',
@@ -1891,7 +1905,7 @@ async function battlePage(id, seq) {
       match?.destroy();
       match = null;
       if (msg.preview) {
-        prep ??= previewUI(c, (picks) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'pick', picks })));
+        prep ??= previewUI(c, (picks) => send({ t: 'pick', picks }), (picks) => send({ t: 'choosing', picks }));
         prep.update(msg);
         return;
       }
@@ -2571,8 +2585,28 @@ function preloadFor(you, parties) {
   parties.forEach((party, s) => preloadSprites([...(party ?? []), { sprite: 'substitute' }], { back: s === you }));
 }
 
-function previewUI(c, sendPick) {
+function matchupOf(f, foes) {
+  const attacking = f.moves?.length ? [...new Set(f.moves.filter((m) => m.category !== 'status' && m.power).map((m) => m.type))] : f.types ?? [];
+  const strong = foes.filter((o) => attacking.some((t) => effectiveness(t, o.types) >= 2));
+  const weak = foes.filter((o) => (o.types ?? []).some((t) => effectiveness(t, f.types) >= 2));
+  return { strong, weak, byMoves: !!f.moves?.length };
+}
+
+function matchupBadges(f, foes) {
+  if (!foes?.length) return null;
+  const { strong, weak, byMoves } = matchupOf(f, foes);
+  const names = (list) => list.map((o) => o.name).join(', ');
+  return h(
+    'span',
+    { class: 'matchup' },
+    h('span', { class: `mu up${strong.length ? '' : ' none'}`, tabindex: 0, 'data-tip': strong.length ? `${byMoves ? 'Sus movimientos' : 'Sus tipos'} pegan súper eficaz a: ${names(strong)}` : 'No tiene ventaja de tipo contra el rival' }, `⚔️ ${strong.length}`),
+    h('span', { class: `mu down${weak.length ? '' : ' none'}`, tabindex: 0, 'data-tip': weak.length ? `Lo amenazan por tipo: ${names(weak)}` : 'Ningún rival le pega súper eficaz por tipo' }, `⚠️ ${weak.length}`),
+  );
+}
+
+function previewUI(c, sendPick, sendDraft = () => {}) {
   let last = null;
+  let revealSeen = false;
   let total = 0;
   let picks = [];
   let sent = false;
@@ -2586,7 +2620,8 @@ function previewUI(c, sendPick) {
   const bar = h('i');
   const timerText = h('span', { class: 'timer' });
   const root = h('div', { class: 'prep' });
-  $app.replaceChildren(h('div', { class: 'status-line' }, h('b', null, '⚔︎ Preparación de batalla'), timerText), h('div', { class: 'prep-timer' }, bar), root);
+  const title = h('b', null, '⚔︎ Preparación de batalla');
+  $app.replaceChildren(h('div', { class: 'status-line' }, title, timerText), h('div', { class: 'prep-timer' }, bar), root);
   const tick = setInterval(() => {
     if (!last?.deadline) return;
     const left = Math.max(0, last.deadline - Date.now());
@@ -2630,6 +2665,7 @@ function previewUI(c, sendPick) {
     if (at >= 0) picks.splice(at, 1);
     else if (picks.length < needed) picks.push(i);
     else return toast(`Ya elegiste ${needed}: toca uno para sacarlo.`);
+    sendDraft(picks.slice());
     render();
   }
 
@@ -2644,7 +2680,23 @@ function previewUI(c, sendPick) {
     });
   }
 
-  const seenCard = (f, s, i) => ({ el: h('div', { class: `prep-card seen${cardAnim(s, i)}`, style: { animationDelay: `${i * 70}ms` } }, h('div', { html: creatureHTML(f) }), h('b', null, f.name, genderMark(f.gender)), typeChips(f.types ?? [])) });
+  function seenCard(f, s, i) {
+    const badge = h('span', { class: 'badge', hidden: true });
+    const full = !!f.moves;
+    const el = h(
+      'div',
+      { class: `prep-card seen${full ? ' full' : ''}${cardAnim(s, i)}`, style: { animationDelay: `${i * 70}ms` } },
+      badge,
+      h('div', { html: creatureHTML(f) }),
+      h('b', null, f.name, genderMark(f.gender)),
+      full ? h('small', { class: 'muted' }, `Nv ${f.level}`) : null,
+      typeChips(f.types ?? []),
+      full && f.abilityInfo ? abilityChip(f.abilityInfo) : null,
+      full ? h('small', { class: 'prep-moves muted' }, f.moves.map((m) => m.name).join(' · ')) : null,
+      matchupBadges(f, last.preview.sides[1 - s].party),
+    );
+    return { el, badge };
+  }
 
   function ownCard(f, i, own, random) {
     const badge = h('span', { class: 'badge', hidden: true });
@@ -2658,6 +2710,7 @@ function previewUI(c, sendPick) {
       typeChips(f.types),
       random && f.abilityInfo ? abilityChip(f.abilityInfo) : null,
       h('small', { class: 'prep-moves muted' }, f.moves.map((m) => m.name).join(' · ')),
+      matchupBadges(f, last.preview.sides[1 - last.you].party),
     );
     return { el, badge };
   }
@@ -2670,10 +2723,21 @@ function previewUI(c, sendPick) {
 
   function paintSide(v, side) {
     syncGrid(v.grid, v.slots, side.party, v.s, (f, i) => seenCard(f, v.s, i));
-    const key = rollingOn(v.s) ? 'roll' : side.ready ? 'ready' : 'picking';
+    const shown = side.picks ?? side.locked ?? side.draft ?? null;
+    const drafting = !side.picks && !side.locked && !!side.draft;
+    v.slots.forEach((slot, i) => {
+      if (slot.kind !== 'card' || !slot.badge) return;
+      const order = shown ? shown.indexOf(i) : -1;
+      slot.el.classList.toggle('chosen', order >= 0 && !drafting);
+      slot.el.classList.toggle('drafting', order >= 0 && drafting);
+      slot.el.classList.toggle('benched', !!side.picks && order < 0);
+      slot.badge.hidden = order < 0;
+      slot.badge.textContent = order >= 0 ? String(order + 1) : '';
+    });
+    const key = rollingOn(v.s) ? 'roll' : side.picks ? 'revealed' : side.ready ? 'ready' : side.draft ? `picking:${side.draft.length}` : 'picking';
     if (key === v.statusKey) return;
     v.statusKey = key;
-    v.status.replaceChildren(key === 'roll' ? h('span', { class: 'muted small pulse' }, '🎲 Sorteando…') : key === 'ready' ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, 'Eligiendo…'));
+    v.status.replaceChildren(key === 'roll' ? h('span', { class: 'muted small pulse' }, '🎲 Sorteando…') : key === 'revealed' ? h('span', { class: 'chip ready-chip' }, '👁 Eligió estos 3') : key === 'ready' ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, side.draft ? `Eligiendo… ${side.draft.length}/${side.needed}` : 'Eligiendo…'));
   }
 
   function build(p, you) {
@@ -2712,7 +2776,7 @@ function previewUI(c, sendPick) {
       m.footMode = mode;
       m.foot.replaceChildren(mode === 'pick' ? m.pickBtn : m.footNote);
     }
-    m.footNote.textContent = rollingMe ? '🎲 Los dados están rodando…' : foe.ready ? '¡Comienza la batalla!' : `Esperando a ${foe.name}…`;
+    m.footNote.textContent = rollingMe ? '🎲 Los dados están rodando…' : last.preview.revealed || foe.ready ? '¡Los dos eligieron! La batalla parte en segundos.' : `Esperando a ${foe.name}…`;
     m.pickBtn.disabled = picks.length !== own.needed || rolling;
     m.pickBtn.textContent = `Continuar (${picks.length}/${own.needed})`;
   }
@@ -2721,6 +2785,8 @@ function previewUI(c, sendPick) {
     const p = last.preview;
     const you = last.you;
     view ??= build(p, you);
+    root.classList.toggle('is-revealed', !!p.revealed);
+    title.textContent = you == null ? (p.revealed ? '👁 Elecciones reveladas' : '👁 Preparación de batalla · eligiendo') : p.revealed ? '⚔︎ ¡Todo listo!' : '⚔︎ Preparación de batalla';
     for (const v of view.sides) paintSide(v, p.sides[v.s]);
     if (view.mine) paintMine(view.mine, p.sides[you], p.sides[1 - you], p.mode === 'random');
     entered = true;
@@ -2731,6 +2797,10 @@ function previewUI(c, sendPick) {
       const first = !last;
       last = msg;
       preloadFor(msg.you, msg.preview.sides.map((side) => side.party));
+      if (msg.preview.revealed && !revealSeen) {
+        revealSeen = true;
+        total = Math.max(1, (msg.deadline ?? Date.now()) - Date.now());
+      }
       if (!total && msg.deadline) total = Math.max(1, msg.deadline - Date.now());
       if (first && !rolledRooms.has(c.id)) {
         const sides = msg.preview.sides;
@@ -2762,9 +2832,9 @@ function battleUI(c, sendAction) {
 
   const sideAt = (p) => (p === 'me' ? mine : 1 - mine);
   const hud = (p) => {
-    const r = { name: h('span'), lvl: h('span'), sub: h('div', { class: 'sub' }), bar: h('i'), num: h('div', { class: 'hpnum' }) };
+    const r = { name: h('span'), lvl: h('span'), sub: h('div', { class: 'sub' }), bar: h('i'), num: h('div', { class: 'hpnum' }), conds: h('div', { class: 'conds' }) };
     const info = h('button', { class: 'info-btn', type: 'button', 'data-tip': 'Ver info', 'aria-label': 'Ver info del Pokémon', onclick: () => openInfo(sideAt(p)) }, 'i');
-    r.el = h('div', { class: `hud ${p}` }, h('div', { class: 'nm' }, r.name, h('span', { class: 'nm-end' }, r.lvl, info)), r.sub, h('div', { class: 'hp' }, r.bar), r.num);
+    r.el = h('div', { class: `hud ${p}` }, h('div', { class: 'nm' }, r.name, h('span', { class: 'nm-end' }, r.lvl, info)), r.sub, h('div', { class: 'hp' }, r.bar), r.num, r.conds);
     return r;
   };
   const els = {
@@ -2967,23 +3037,23 @@ function battleUI(c, sendAction) {
 
     r.name.replaceChildren(f.shiny ? `✨ ${f.name}` : f.name, genderMark(f.gender) ?? '');
     r.lvl.textContent = `Nv ${f.level}`;
-    const boosts = Object.entries(STAT)
-      .filter(([k]) => f.boosts[k])
-      .map(([k, [label]]) => `${label} ${signed(f.boosts[k])}`)
-      .join(' · ');
     const volatiles = conditionsOf({ volatiles: f.volatiles }).filter((c) => !['flashFire', 'disabled', 'slowStart', 'smackdown', 'noRetreat', 'foresight', 'miracleeye', 'focusenergy', 'gastroacid', 'imprison'].includes(c.key));
     r.sub.replaceChildren(
       ...[
         typeChips(f.types),
-        f.status ? h('span', { class: `cond ${f.status}`, tabindex: 0, 'data-tip': STATUS_INFO[f.status].name, 'data-tip-note': STATUS_INFO[f.status].desc }, statusLabel(f.status)) : null,
+        f.status && f.hp > 0 ? h('span', { class: `cond ${f.status}`, tabindex: 0, 'data-tip': STATUS_INFO[f.status].name, 'data-tip-note': STATUS_INFO[f.status].desc }, statusLabel(f.status)) : null,
         h('span', { class: 'owner' }, isYou(side) ? `${sd.name} (tú)` : sd.name),
-        boosts ? h('span', { class: 'boosts' }, boosts) : null,
-        ...volatiles.map((c) => h('span', { class: 'vol-chip', tabindex: 0, 'data-tip': c.name, 'data-tip-note': c.desc }, `${c.icon} ${c.name}`)),
-        ...Object.entries(sd.screens || {}).map(([kind, turns]) => h('span', { class: `screen-chip ${kind}`, tabindex: 0, 'data-tip': `Reduce a la mitad el daño de ${SCREEN_GUARDS[kind]} contra este equipo. Quedan ${turns} turnos.` }, `🛡️ ${SCREEN[kind]} ${turns}`)),
-        ...sideChips(sd),
-        h('span', { class: 'dots', 'aria-label': 'Equipo' }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
+        h('span', { class: 'dots', 'aria-label': `Equipo: ${sd.team.filter((t) => t.hp > 0).length} de ${sd.team.length} en pie`, 'data-tip': `${sd.team.filter((t) => t.hp > 0).length} de ${sd.team.length} en pie` }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
       ].filter(Boolean),
     );
+    const condChips = [
+      ...(f.hp > 0 ? boostChips(f.boosts) : []),
+      ...(f.hp > 0 ? volatiles : []).map((c) => h('span', { class: 'vol-chip', tabindex: 0, 'data-tip': c.name, 'data-tip-note': c.desc }, `${c.icon} ${c.name}`)),
+      ...Object.entries(sd.screens || {}).map(([kind, turns]) => h('span', { class: `screen-chip ${kind}`, tabindex: 0, 'data-tip': `Reduce a la mitad el daño de ${SCREEN_GUARDS[kind]} contra este equipo. Quedan ${turns} turnos.` }, `🛡️ ${SCREEN[kind]} ${turns}`)),
+      ...sideChips(sd),
+    ];
+    r.conds.replaceChildren(...condChips);
+    r.conds.hidden = !condChips.length;
   }
 
   function sideChips(sd) {
@@ -3235,8 +3305,8 @@ function battleUI(c, sendAction) {
         const up = (ev.by ?? 1) > 0;
         f.boosts[ev.stat] = ev.stage;
         paint(ev.side);
-        float(ev.side, `${label} ${up ? '▲' : '▼'}`, up ? 'up' : 'miss');
-        tell([...mon(ev.side, f.name), ` ${up ? 'sube' : 'baja'} su ${word}${Math.abs(ev.by ?? 1) >= 2 ? ' mucho' : ''} (${signed(ev.stage)}).`], { side: ev.side, sub: true, cls: up ? null : 'weak' });
+        float(ev.side, `${label} ${up ? '▲' : '▼'}${Math.abs(ev.by ?? 1) >= 2 ? (up ? '▲' : '▼') : ''}`, up ? 'up' : 'down');
+        tell([...mon(ev.side, f.name), ` ${up ? 'sube' : 'baja'} su ${word}${Math.abs(ev.by ?? 1) >= 2 ? ' mucho' : ''} `, h('span', { class: `stat-delta ${up ? 'up' : 'down'}` }, `${up ? '▲' : '▼'} ${signed(ev.stage)}`), '.'], { side: ev.side, sub: true });
         return 900;
       }
       case 'ability': {
