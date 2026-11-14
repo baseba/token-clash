@@ -32,7 +32,7 @@ En vivo: **https://clash.mirrordev.xyz**
      - **Privada:** no aparece en Salas abiertas; solo entra quien tenga el link.
      - Una sala pública deja de aparecer si el anfitrión cierra la página. Cuando alguien entra, los dos se ven en
        la sala y cada uno aprieta **¡Estoy listo!**; con los dos listos parte una cuenta regresiva de 5 s antes de
-       elegir sus Pokémon (70 s para elegir). Ningún jugador ve qué eligió el rival ni en qué orden; cuando los dos
+       elegir sus Pokémon (80 s para elegir). Ningún jugador ve qué eligió el rival ni en qué orden; cuando los dos
        eligen, pasan 4 s y parte la pelea en vivo (60 s por turno; si alguien no elige, su Pokémon ataca solo).
        Cualquiera más con el link puede mirar: en la preparación ve los dos equipos completos, lo que cada uno va
        marcando mientras elige, los 3 elegidos de cada lado durante esos 4 s y, en cada
@@ -101,7 +101,7 @@ El mismo script baja la música de PokeRogue a `public/music/` con sus puntos de
 un tema de combate contra entrenadores acorde a lo que muestra (Alola en la playa, el gimnasio de Sinnoh en la cueva,
 el Team Aqua en el océano, la campeona de Sinnoh en la nieve, etc.; la lista está en `public/music.js`), los menús
 tocan las pistas tranquilas de bioma (`town`, `tall_grass`, `laboratory`, `plains`), la preparación
-`encounter_ace_trainer` y al ganar suena `bw/victory_trainer` (o `bw/victory_champion` en un torneo). No hay
+`menu` y al ganar suena `bw/victory_trainer` (o `bw/victory_champion` en un torneo). No hay
 música sintética. `public/battle-anims.js` las reproduce cuadro a cuadro sobre el campo; lo que no tenga animación usa los efectos
 sintéticos de `public/fx.js` y `public/music.js`. El campo de batalla replica el de PokeRogue: un escenario lógico de
 320×180 escalado al ancho disponible, con nuestros fondos (`public/backgrounds/`) escalados al ancho del campo y

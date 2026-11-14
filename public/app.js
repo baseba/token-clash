@@ -2727,6 +2727,7 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
         revealed = i + 1;
         justRevealed = i;
         render();
+        revealEffects(i);
       }, ROLL_START_MS + i * ROLL_STEP_MS));
     }
     rollTimers.push(setTimeout(() => {
@@ -2744,12 +2745,25 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
   const cardAnim = (s, i) => `${entered || rollingOn(s) ? '' : ' enter'}${rollingOn(s) && i === justRevealed ? ' reveal' : ''}`;
   let view = null;
 
+  function revealEffects(step) {
+    const cards = [...root.querySelectorAll('.prep-card.reveal:not([data-revealed])')];
+    if (!cards.length) return;
+    music.sfx('reveal', { rate: 2 ** ((step * 2) / 12) });
+    for (const card of cards) {
+      card.dataset.revealed = '1';
+      card.querySelector('.creature')?.classList.add('revealed-flash');
+    }
+  }
+
   function choose(i, needed) {
     if (sent || rollingOn(last?.you)) return;
     const at = picks.indexOf(i);
     if (at >= 0) picks.splice(at, 1);
-    else if (picks.length < needed) picks.push(i);
-    else return toast(`Ya elegiste ${needed}: toca uno para sacarlo.`);
+    else if (picks.length < needed) {
+      picks.push(i);
+      const f = last?.preview.sides[last.you]?.party[i];
+      if (f) music.sfx('cry', { sprite: f.sprite });
+    } else return toast(`Ya elegiste ${needed}: toca uno para sacarlo.`);
     sendDraft(picks.slice());
     render();
   }

@@ -53,7 +53,7 @@ const SCREEN_TRACKS = {
   'tab:collection': 'tall_grass',
   'tab:pokedex': 'laboratory',
   'tab:stats': 'plains',
-  prep: 'encounter_ace_trainer',
+  prep: 'menu',
   'victory:win': 'bw/victory_trainer',
   'victory:champion': 'bw/victory_champion',
 };
@@ -67,7 +67,7 @@ export function trackFor(id) {
   return scene ? SCENE_TRACKS[scene] ?? null : SCREEN_TRACKS[id] ?? null;
 }
 
-const SE_FILES = { throw: 'pb_throw', switch: 'pb_rel', faint: 'faint', up: 'stat_up', down: 'stat_down', heal: 'restore' };
+const SE_FILES = { throw: 'pb_throw', switch: 'pb_rel', faint: 'faint', up: 'stat_up', down: 'stat_down', heal: 'restore', reveal: 'pb_tray_ball' };
 
 export function sampleFor(kind, opts = {}) {
   if (kind === 'hit') {
@@ -333,10 +333,10 @@ export function createPlayer({ storage = null } = {}) {
     }
   }
 
-  async function playSampleOr(out, url, fallback) {
+  async function playSampleOr(out, url, fallback, rate = 1) {
     const buffer = await loadBuffer(url);
     if (ctx.state !== 'running') return;
-    if (buffer) playBuffer(out, buffer, { gain: 0.35 });
+    if (buffer) playBuffer(out, buffer, { gain: 0.35, rate });
     else fallback();
   }
 
@@ -440,7 +440,7 @@ export function createPlayer({ storage = null } = {}) {
       if (!out) return;
       if (kind === 'move') return playMove(out, opts);
       const sample = sampleFor(kind, opts);
-      if (sample) return playSampleOr(out, sample, () => synthSfx(out, kind, opts));
+      if (sample) return playSampleOr(out, sample, () => synthSfx(out, kind, opts), opts.rate ?? 1);
       const key = animSoundFor(kind, opts);
       if (key) return playCuesOr(out, key, opts.byPlayer ?? true, () => synthSfx(out, kind, opts));
       return synthSfx(out, kind, opts);

@@ -25,7 +25,7 @@ const DATA_DIR = process.env.DATA_DIR || fileURLToPath(new URL('../data', import
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || '';
 const TRUST_CF = process.env.TRUST_CF_CONNECTING_IP === '1';
 const TURN_MS = Number(process.env.TURN_MS || 60_000);
-const PREVIEW_MS = Number(process.env.PREVIEW_MS || 70_000);
+const PREVIEW_MS = Number(process.env.PREVIEW_MS || 80_000);
 const ROLL_MS = Number(process.env.ROLL_MS ?? 6_000);
 const MATCH_MS = Number(process.env.MATCH_MS ?? 5_000);
 const REVEAL_MS = Number(process.env.REVEAL_MS ?? 4_000);

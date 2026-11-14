@@ -1170,3 +1170,6 @@ body[data-watching="false"] .stage { outline: 3px solid rgb(255 207 74 / .7); ou
 .dmg-num.status { color: #fff3b0; font-size: 11px; }
 .spot.flinch .creature img { animation: flinch-jolt .5s ease-out; }
 @keyframes flinch-jolt { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-4px); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(1px); } }
+.creature.revealed-flash img { animation: reveal-flash .4s ease-out; }
+@keyframes reveal-flash { 0% { filter: brightness(0) invert(1); scale: 1.12; } 45% { filter: brightness(1.6); scale: 1; } 100% { filter: none; scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .creature.revealed-flash img { animation: none; } }

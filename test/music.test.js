@@ -31,7 +31,7 @@ test('menus play the calm biome tracks, and prep and victories their own', () =>
   assert.equal(trackFor('tab:collection'), 'tall_grass');
   assert.equal(trackFor('tab:pokedex'), 'laboratory');
   assert.equal(trackFor('tab:stats'), 'plains');
-  assert.equal(trackFor('prep'), 'encounter_ace_trainer');
+  assert.equal(trackFor('prep'), 'menu');
   assert.equal(trackFor('victory:champion'), 'bw/victory_champion');
   assert.equal(trackFor('scene:unknown'), null);
   assert.equal(trackFor('unknown'), null);

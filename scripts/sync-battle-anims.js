@@ -35,7 +35,7 @@ export const CHARGE_ANIMS = [
 ].map((move) => `${move}-charging`);
 
 const UI_IMAGES = ['pokeball/pb.png', 'pokeball/pb_opening.png', 'pokeball/pb_open.png', 'effects/pb_particles.png', 'effects/battle_stats.png'];
-const SE_SOUNDS = ['pb_throw', 'pb_rel', 'pb_bounce_1', 'hit', 'hit_strong', 'hit_weak', 'faint', 'stat_up', 'stat_down', 'restore'];
+const SE_SOUNDS = ['pb_throw', 'pb_rel', 'pb_bounce_1', 'hit', 'hit_strong', 'hit_weak', 'faint', 'stat_up', 'stat_down', 'restore', 'pb_tray_ball'];
 
 async function fetchRetry(url, tries = 4) {
   for (let i = 1; ; i++) {

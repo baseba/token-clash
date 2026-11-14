@@ -92,6 +92,7 @@ test('sound effects use the PokeRogue samples and animation cues', () => {
   assert.equal(sampleFor('hit', { eff: 0 }), null);
   assert.equal(sampleFor('throw'), '/sfx/se/pb_throw.wav');
   assert.equal(sampleFor('miss'), null);
+  assert.equal(sampleFor('reveal'), '/sfx/se/pb_tray_ball.wav');
   assert.equal(animSoundFor('status', { status: 'par' }), 'common-paralysis');
   assert.equal(animSoundFor('weather', { weather: 'rain' }), 'common-rain');
   assert.equal(animSoundFor('miss'), null);
