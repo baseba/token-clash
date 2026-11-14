@@ -80,3 +80,18 @@ test('how far each seat got in the bracket', () => {
   assert.equal(reachedRound(bracket, 0), 0);
   assert.equal(reachedRound(bracket, 2), 1);
 });
+
+test('a match waits for its players and for everyone following the tournament to reach the room', async () => {
+  const { pendingArrivals } = await import('../server/tournament.js');
+  assert.deepEqual(pendingArrivals({ players: ['ana'], followers: ['ana', 'beto', 'caro'], present: ['beto'] }), ['ana', 'caro']);
+  assert.deepEqual(pendingArrivals({ players: ['ana'], followers: [], present: ['ana'] }), []);
+  assert.deepEqual(pendingArrivals({ players: [], followers: ['beto'], present: [] }), ['beto']);
+});
+
+test('an AI-only battle waits for viewers still playing the previous turn', async () => {
+  const { viewersBehind } = await import('../server/tournament.js');
+  assert.equal(viewersBehind([3, 2], 3), true);
+  assert.equal(viewersBehind([3, undefined], 3), true);
+  assert.equal(viewersBehind([3, 4], 3), false);
+  assert.equal(viewersBehind([], 3), false);
+});

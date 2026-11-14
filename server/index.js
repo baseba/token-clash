@@ -14,7 +14,7 @@ import { openStore } from './store.js';
 import { serverStats } from './stats.js';
 import { pokedexOf } from './pokedex.js';
 import { openRooms, matchFor, visibilityOf, joinBlocker, HOST_GRACE_MS } from './lobby.js';
-import { TOURNAMENT_SIZES, aiName, humanCount, reachedRound, addSeat, removeSeat, setReady, allReady, isFull, seatOf, nextAiId, shuffledOrder, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor } from './tournament.js';
+import { TOURNAMENT_SIZES, aiName, humanCount, pendingArrivals, viewersBehind, reachedRound, addSeat, removeSeat, setReady, allReady, isFull, seatOf, nextAiId, shuffledOrder, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor } from './tournament.js';
 import { randomParty } from './random.js';
 import { AI_LEVELS, JEV_LEVEL, aiTrainerId, aiLevelOf, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
 import { chooseJevAction, jevConfigured } from './jev.js';
@@ -36,6 +36,8 @@ const BETWEEN_MS = Number(process.env.BETWEEN_MS ?? 15_000);
 const AI_PACE_MS = Number(process.env.AI_PACE_MS ?? 2_500);
 const ABSENT_MS = Number(process.env.ABSENT_MS ?? 15_000);
 const SEAT_GRACE_MS = Number(process.env.SEAT_GRACE_MS ?? 30_000);
+const ARRIVAL_MS = Number(process.env.ARRIVAL_MS ?? 45_000);
+const AI_WATCH_MS = Number(process.env.AI_WATCH_MS ?? 20_000);
 // Skynet needs a way to reach Jev: JEV_API_URL (the egress proxy, which holds the key) or a key to
 // call TypeSafe directly. Without either, the level is neither offered nor accepted.
 const JEV_API_KEY = process.env.JEV_API_KEY || '';
@@ -283,7 +285,8 @@ function previewFrame(r, ws, extra) {
 
 function armPreviewTimer(id, r, extraMs = 0) {
   clearTimeout(r.timer);
-  const ms = (someoneAbsent(id, r, r.preview.sides) ? Math.min(ABSENT_MS, PREVIEW_MS) : PREVIEW_MS) + extraMs;
+  r.previewShort = someoneAbsent(id, r, r.preview.sides);
+  const ms = (r.previewShort ? Math.min(ABSENT_MS, PREVIEW_MS) : PREVIEW_MS) + extraMs;
   r.deadline = Date.now() + ms;
   r.timer = setTimeout(() => {
     if (!r.preview) return;
@@ -320,8 +323,18 @@ function startBattle(id, r) {
 const aiOnly = (b) => b.sides.every((side) => aiLevelOf(side.trainerId));
 
 function nextAiTurn(id, r) {
-  if (r.battle && aiOnly(r.battle)) setTimeout(() => aiTurn(id, r), AI_PACE_MS).unref?.();
-  else aiTurn(id, r);
+  const b = r.battle;
+  if (!b || !aiOnly(b)) return aiTurn(id, r);
+  const turn = b.turn;
+  const since = Date.now();
+  const check = () => {
+    if (r.battle !== b) return;
+    const waited = Date.now() - since;
+    const watching = [...r.sockets].filter((ws) => ws.readyState === 1).map((ws) => ws.seenTurn);
+    if (waited >= AI_PACE_MS && (waited >= AI_WATCH_MS || !viewersBehind(watching, turn))) return aiTurn(id, r);
+    setTimeout(check, 250).unref?.();
+  };
+  setTimeout(check, Math.min(AI_PACE_MS, 250)).unref?.();
 }
 
 function someoneAbsent(id, r, sides) {
@@ -383,7 +396,7 @@ function frameFor(r, ws, extra = {}) {
   }
   if (r.countdown) {
     const you = r.countdown.players.findIndex((p) => p.id === ws.trainerId);
-    return { ...extra, t: 'countdown', ms: Math.max(0, r.countdown.endsAt - Date.now()), players: r.countdown.players, you: you === -1 ? null : you, tournament: r.countdown.tournament ?? null };
+    return { ...extra, t: 'countdown', ms: Math.max(0, r.countdown.endsAt - Date.now()), players: r.countdown.players, you: you === -1 ? null : you, tournament: r.countdown.tournament ?? null, waiting: r.countdown.waiting ?? null };
   }
   if (r.preview) return previewFrame(r, ws, extra);
   const you = sideOf(r.battle, ws.trainerId);
@@ -564,9 +577,40 @@ function joinChallenge(c, t) {
 
 function startCountdown(c, r, tournament = null) {
   r.readyCheck = null;
-  r.countdown = { endsAt: Date.now() + MATCH_MS, players: [countdownPlayer(c.hostId, c.hostName), countdownPlayer(c.guestId, c.guestName)], tournament };
-  r.countdownTimer = setTimeout(() => openPreview(c, r), MATCH_MS);
+  r.countdown = { startedAt: Date.now(), endsAt: Date.now() + MATCH_MS, players: [countdownPlayer(c.hostId, c.hostName), countdownPlayer(c.guestId, c.guestName)], tournament };
+  r.countdownTimer = setTimeout(() => openWhenArrived(c, r), MATCH_MS);
   broadcast(r, { t: 'countdown' });
+}
+
+function tournamentFollowers(tournamentId) {
+  const ids = new Set();
+  for (const ws of tourSockets.get(tournamentId) ?? []) if (ws.readyState === 1 && ws.trainerId) ids.add(ws.trainerId);
+  for (const [id, room] of rooms) {
+    if (db.challenges[id]?.tournamentId !== tournamentId) continue;
+    for (const ws of room.sockets) if (ws.readyState === 1 && ws.trainerId) ids.add(ws.trainerId);
+  }
+  return [...ids].filter((id) => !aiLevelOf(id));
+}
+
+function openWhenArrived(c, r) {
+  if (!r.countdown) return;
+  const pending = c.tournamentId
+    ? pendingArrivals({
+        players: [c.hostId, c.guestId].filter((id) => !aiLevelOf(id)),
+        followers: tournamentFollowers(c.tournamentId),
+        present: [...r.sockets].filter((ws) => ws.readyState === 1).map((ws) => ws.trainerId),
+      })
+    : [];
+  if (pending.length && Date.now() - r.countdown.startedAt < MATCH_MS + ARRIVAL_MS) {
+    const waiting = pending.map((id) => db.trainers[id]?.name ?? '…');
+    const changed = JSON.stringify(waiting) !== JSON.stringify(r.countdown.waiting);
+    r.countdown.waiting = waiting;
+    r.countdown.endsAt = Date.now();
+    if (changed) broadcast(r, { t: 'countdown' });
+    r.countdownTimer = setTimeout(() => openWhenArrived(c, r), 500);
+    return;
+  }
+  openPreview(c, r);
 }
 
 function setRoomReady(c, r, trainerId, ready) {
@@ -1268,9 +1312,14 @@ function onSocket(ws) {
         if (!r.battle && !r.preview && !r.countdown && !r.readyCheck && r.sockets.size === 0) rooms.delete(c.id);
       });
       if (ws.trainerId === c.hostId && c.status === 'open') notifyLobby();
+      if (r.preview && !r.preview.revealed && r.previewShort && sideIn(r.preview.sides, ws.trainerId) !== null && !someoneAbsent(c.id, r, r.preview.sides)) armPreviewTimer(c.id, r);
       if (r.battle || r.preview || r.readyCheck) broadcast(r, { t: 'presence' });
       else if (r.countdown) ws.send(JSON.stringify(frameFor(r, ws)));
       else ws.send(JSON.stringify({ t: 'waiting', watchers: r.sockets.size }));
+      return;
+    }
+    if (msg.t === 'seen' && ws.roomId) {
+      ws.seenTurn = Math.max(ws.seenTurn ?? 0, Number(msg.turn) || 0);
       return;
     }
     if (msg.t === 'choosing' && ws.roomId) {
