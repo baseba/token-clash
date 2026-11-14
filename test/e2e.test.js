@@ -36,7 +36,7 @@ before(async () => {
   jevProxy = createJevProxy({ apiKey: FAKE_JEV_KEY, upstream: `http://127.0.0.1:${fakeJev.address().port}/v1/systemone` });
   await new Promise((r) => jevProxy.listen(0, '127.0.0.1', r));
   proc = spawn(process.execPath, ['server/index.js'], {
-    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'tc-')), TURN_MS: '1500', PREVIEW_MS: '1500', ROLL_MS: '0', MATCH_MS: '300', DRAW_MS: '100', BETWEEN_MS: '100', AI_PACE_MS: '20', ABSENT_MS: '1500', SEAT_GRACE_MS: '60000', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${jevProxy.address().port}/v1/systemone` },
+    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'tc-')), TURN_MS: '1500', PREVIEW_MS: '1500', ROLL_MS: '0', MATCH_MS: '300', REVEAL_MS: '200', DICE_ANIM_MS: '0', AI_PICK_MS: '60', DRAW_MS: '100', BETWEEN_MS: '100', AI_PACE_MS: '20', ABSENT_MS: '1500', SEAT_GRACE_MS: '60000', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${jevProxy.address().port}/v1/systemone` },
     stdio: 'inherit',
   });
   for (let i = 0; i < 50; i++) {
@@ -193,8 +193,9 @@ test('a battle against the AI starts at once and stays out of the ranking and th
     assert.match(ch.data.challenge.guest.name, / ai - muy difícil$/);
     const host = player(ch.data.challenge.id, a.data.token);
     const preview = await new Promise((r) => host.ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.preview) r(m.preview); }));
-    assert.equal(preview.sides[1].ready, true);
+    assert.equal(preview.sides[1].ready, false, 'the AI takes its time to pick');
     assert.ok(preview.sides[1].party.length === 6);
+    await new Promise((r) => host.ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.preview?.sides[1].ready) r(); }));
     const end = await host.ended;
     assert.ok(end.state.winner === 0 || end.state.winner === 1 || end.state.winner === null);
     host.ws.close();

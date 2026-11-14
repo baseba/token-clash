@@ -9,7 +9,7 @@ import { parseSave, SaveError, uniqueSpecies, uniqueVariants, carryTeam } from '
 import { buildFighter, movepool, validMoveset, abilityOptions, usableAbility, movesetFor, speciesData, lineageLearnset, MOVES_PER_FIGHTER } from './creatures.js';
 import { abilityInfo } from './abilities.js';
 import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents } from './battle.js';
-import { createPreview, pick, fillMissing, previewReady, chosenEntries, previewView, PARTY_SIZE } from './preview.js';
+import { createPreview, pick, fillMissing, previewReady, chosenEntries, previewView, picksNeeded, PARTY_SIZE } from './preview.js';
 import { openStore } from './store.js';
 import { serverStats } from './stats.js';
 import { pokedexOf } from './pokedex.js';
@@ -25,9 +25,12 @@ const DATA_DIR = process.env.DATA_DIR || fileURLToPath(new URL('../data', import
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || '';
 const TRUST_CF = process.env.TRUST_CF_CONNECTING_IP === '1';
 const TURN_MS = Number(process.env.TURN_MS || 60_000);
-const PREVIEW_MS = Number(process.env.PREVIEW_MS || 60_000);
+const PREVIEW_MS = Number(process.env.PREVIEW_MS || 70_000);
 const ROLL_MS = Number(process.env.ROLL_MS ?? 6_000);
 const MATCH_MS = Number(process.env.MATCH_MS ?? 5_000);
+const REVEAL_MS = Number(process.env.REVEAL_MS ?? 4_000);
+const DICE_ANIM_MS = Number(process.env.DICE_ANIM_MS ?? 4_500);
+const AI_PICK_MS = Number(process.env.AI_PICK_MS ?? 5_000);
 const DRAW_MS = Number(process.env.DRAW_MS ?? 6_000);
 const BETWEEN_MS = Number(process.env.BETWEEN_MS ?? 15_000);
 const AI_PACE_MS = Number(process.env.AI_PACE_MS ?? 2_500);
@@ -285,8 +288,19 @@ function armPreviewTimer(id, r, extraMs = 0) {
   r.timer = setTimeout(() => {
     if (!r.preview) return;
     fillMissing(r.preview);
-    startBattle(id, r);
+    revealPicks(id, r);
   }, ms);
+  r.timer.unref?.();
+}
+
+function revealPicks(id, r) {
+  if (!r.preview || r.preview.revealed) return;
+  if (REVEAL_MS <= 0) return startBattle(id, r);
+  clearTimeout(r.timer);
+  r.preview.revealed = true;
+  r.deadline = Date.now() + REVEAL_MS;
+  broadcast(r, { t: 'preview' });
+  r.timer = setTimeout(() => r.preview && startBattle(id, r), REVEAL_MS);
   r.timer.unref?.();
 }
 
@@ -476,9 +490,9 @@ function startAiChallenge(t, { mode, levelCap, level }) {
       { trainerId: c.guestId, name: c.guestName, entries: aiTeam },
     ],
   });
-  pick(r.preview, 1, aiPicks({ difficulty: level, own: r.preview.sides[1].entries }));
   store.save();
   armPreviewTimer(id, r, mode === 'random' ? ROLL_MS : 0);
+  scheduleAiPick(id, r, 1, level);
   return c;
 }
 
@@ -594,13 +608,36 @@ function openPreview(c, r) {
       { trainerId: c.guestId, name: db.trainers[c.guestId]?.name ?? c.guestName, entries: c.guestTeam },
     ],
   });
-  r.preview.sides.forEach((side, s) => {
-    const level = aiLevelOf(side.trainerId);
-    if (level) pick(r.preview, s, aiPicks({ difficulty: level, own: side.entries }));
-  });
-  if (previewReady(r.preview)) return startBattle(c.id, r);
   armPreviewTimer(c.id, r, c.mode === 'random' ? ROLL_MS : 0);
   broadcast(r, { t: 'preview' });
+  r.preview.sides.forEach((side, s) => {
+    const level = aiLevelOf(side.trainerId);
+    if (level) scheduleAiPick(c.id, r, s, level);
+  });
+}
+
+function scheduleAiPick(id, r, s, level) {
+  const preview = r.preview;
+  const choice = aiPicks({ difficulty: level, own: preview.sides[s].entries });
+  const still = () => r.preview === preview && !preview.sides[s].picks;
+  const step = AI_PICK_MS / (choice.length + 1);
+  choice.forEach((_, i) => {
+    setTimeout(() => {
+      if (!still()) return;
+      preview.sides[s].draft = choice.slice(0, i + 1);
+      broadcastWatchers(r);
+    }, DICE_ANIM_MS + step * (i + 1)).unref?.();
+  });
+  setTimeout(() => {
+    if (!still()) return;
+    pick(preview, s, choice);
+    if (previewReady(preview)) revealPicks(id, r);
+    else broadcast(r, { t: 'preview' });
+  }, DICE_ANIM_MS + AI_PICK_MS).unref?.();
+}
+
+function broadcastWatchers(r) {
+  for (const ws of r.sockets) if (ws.readyState === 1 && (!r.preview || sideIn(r.preview.sides, ws.trainerId) === null)) ws.send(JSON.stringify(frameFor(r, ws, { t: 'preview' })));
 }
 
 // ---------- tournaments ----------
@@ -1236,6 +1273,17 @@ function onSocket(ws) {
       else ws.send(JSON.stringify({ t: 'waiting', watchers: r.sockets.size }));
       return;
     }
+    if (msg.t === 'choosing' && ws.roomId) {
+      const r = rooms.get(ws.roomId);
+      if (!r?.preview || r.preview.revealed) return;
+      const s = sideIn(r.preview.sides, ws.trainerId);
+      if (s === null || r.preview.sides[s].picks) return;
+      const side = r.preview.sides[s];
+      const draft = Array.isArray(msg.picks) ? [...new Set(msg.picks.map(Number))].filter((i) => Number.isInteger(i) && i >= 0 && i < side.entries.length).slice(0, picksNeeded(r.preview, s)) : [];
+      side.draft = draft;
+      broadcastWatchers(r);
+      return;
+    }
     if (msg.t === 'pick' && ws.roomId) {
       const r = rooms.get(ws.roomId);
       if (!r?.preview) return;
@@ -1246,7 +1294,7 @@ function onSocket(ws) {
       } catch (e) {
         return ws.send(JSON.stringify({ t: 'error', error: e.message }));
       }
-      if (previewReady(r.preview)) startBattle(ws.roomId, r);
+      if (previewReady(r.preview)) revealPicks(ws.roomId, r);
       else broadcast(r, { t: 'preview' });
       return;
     }

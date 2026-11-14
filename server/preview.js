@@ -54,14 +54,18 @@ export function previewView(p, viewer = null) {
     sides: p.sides.map((side, s) => {
       const fighters = side.entries.map((e) => buildFighter(e, { levelCap: p.levelCap }));
       const own = viewer === s;
+      const watching = viewer === null;
       return {
         trainerId: side.trainerId,
         name: side.name,
         ready: !!side.picks,
         needed: picksNeeded(p, s),
-        party: own ? fighters : fighters.map(seenCard),
-        picks: own ? side.picks : null,
+        party: own || watching ? fighters : fighters.map(seenCard),
+        picks: own || (watching && p.revealed) ? side.picks : null,
+        draft: watching && !side.picks ? side.draft ?? [] : null,
+        locked: watching && !!side.picks ? side.picks : null,
       };
     }),
+    revealed: !!p.revealed,
   };
 }
