@@ -189,3 +189,18 @@ test('the AI does not pick a move that is sure to fail', async () => {
   turn(b, 'karate-chop', 'growl');
   assert.equal(scoreMove(b, 0, idx(b, 0, 'fake-out')), 0);
 });
+
+test('Impresionar makes the foe flinch about 30% of the time, but only when it hits first', () => {
+  const flinches = (fast, slow, user) => {
+    let count = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const b = battle(mon('a', fast, user === 0 ? ['astonish'] : ['tackle']), mon('b', slow, user === 1 ? ['astonish'] : ['tackle']), seed);
+      const events = turn(b, user === 0 ? 'astonish' : 'tackle', user === 1 ? 'astonish' : 'tackle');
+      if (events.some((e) => e.t === 'cant' && e.reason === 'flinch')) count++;
+    }
+    return count;
+  };
+  const faster = flinches(94, 80, 0);
+  assert.ok(faster > 35 && faster < 90, `${faster}/200`);
+  assert.equal(flinches(94, 80, 1), 0);
+});
