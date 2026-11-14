@@ -1,7 +1,9 @@
 import { creatureHTML, loadAnimatedSprites, preloadSprites, spriteURL } from './creature.js?v=dev';
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
-import { createFx } from './fx.js?v=dev';
+import { createPlayer } from './music.js?v=dev';
+import { createFx, moveShape } from './fx.js?v=dev';
+import { chargeAnim, COMMON_PRELOAD, hpTweenMs } from './battle-anims.js?v=dev';
 import { patchSave } from './savepatch.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
 
@@ -203,13 +205,17 @@ const SCREEN_END = {
 const TERRAIN = { electric: '⚡ Campo Eléctrico', grassy: '🌿 Campo de Hierba', misty: '🌫️ Campo de Niebla', psychic: '🔮 Campo Psíquico' };
 const STAT = { atk: ['ATQ', 'ataque'], def: ['DEF', 'defensa'], satk: ['AT.E', 'ataque especial'], sdef: ['DF.E', 'defensa especial'], spd: ['VEL', 'velocidad'], acc: ['PRE', 'precisión'], eva: ['EVA', 'evasión'] };
 const CANT = {
-  recharge: 'necesita recargarse.', slp: 'está dormido.', frz: 'está congelado.', par: 'está paralizado: no puede moverse.', flinch: 'retrocede y no se mueve.', attract: 'está enamorado y no ataca.',
+  recharge: 'necesita recargarse.', slp: 'está dormido.', frz: 'está congelado.', par: 'está paralizado: no puede moverse.', flinch: '¡retrocede y no puede moverse!', attract: 'está enamorado y no ataca.',
   taunt: (ev) => `está provocado: no puede usar ${ev.move}.`,
   torment: (ev) => `no puede usar ${ev.move} dos veces seguidas.`,
   twice: (ev) => `no puede usar ${ev.move} dos veces seguidas.`,
   healBlock: (ev) => `no puede curarse: no usa ${ev.move}.`,
   gravity: (ev) => `no puede usar ${ev.move} con la gravedad.`,
   imprison: (ev) => `no puede usar ${ev.move}: está sellado.`,
+};
+const flinchNote = (m) => {
+  const chance = m.secondary?.find((sec) => sec.flinch)?.chance;
+  return chance ? `${chance}% de hacer retroceder al rival (pierde su turno) si golpeas antes que él.` : null;
 };
 const cantText = (ev) => {
   const c = CANT[ev.reason];
@@ -368,7 +374,7 @@ function moveEffects(m) {
   if (m.crit) out.push('Alta probabilidad de golpe crítico.');
   for (const s of m.secondary || []) {
     if (s.status) out.push(`${s.chance}% de ${INFLICT[s.status]}.`);
-    if (s.flinch) out.push(`${s.chance}% de hacer retroceder.`);
+    if (s.flinch) out.push(`${s.chance}% de hacer retroceder (solo si golpea antes que el rival).`);
     if (s.confuse) out.push(`${s.chance}% de confundir.`);
     for (const k of Object.keys(s.boosts || {})) out.push(`${s.chance}% de bajar ${STAT_THE[k]} del rival.`);
     if (s.self) out.push(`${s.chance}% de subir su ${Object.keys(s.self).map((k) => STAT[k][1]).join(', ')}.`);
@@ -618,7 +624,7 @@ document.addEventListener(
   'load',
   (e) => {
     const img = e.target;
-    if (!(img instanceof HTMLImageElement) || !img.closest('.creature')) return;
+    if (!(img instanceof HTMLImageElement) || !img.closest('.creature') || img.closest('.spot')) return;
     const native = img.naturalWidth !== SPRITE_CANVAS || img.naturalHeight !== SPRITE_CANVAS;
     img.classList.toggle('native', native);
     img.style.width = native ? `${(img.naturalWidth / SPRITE_CANVAS) * 100}%` : '';
@@ -635,8 +641,76 @@ function markNav() {
   }
 }
 
+const TAB_MUSIC = { '/': 'tab:home', '/coleccion': 'tab:collection', '/pokedex': 'tab:pokedex', '/stats': 'tab:stats' };
+const music = createPlayer({
+  storage: {
+    getItem: (k) => ls.get(k),
+    setItem: (k, v) => ls.set(k, v),
+  },
+});
+['pointerdown', 'keydown'].forEach((type) => document.addEventListener(type, () => music.unlock(), { capture: true }));
+
+function renderSound() {
+  const host = document.getElementById('sound');
+  if (!host) return;
+  const silent = () => music.muted || (music.volume('music') === 0 && music.volume('sfx') === 0);
+  const icon = () => (silent() ? '🔇' : '🔊');
+  const btn = h('button', { class: 'sound-btn', type: 'button', 'aria-label': 'Mezclador de sonido', 'aria-haspopup': 'true', 'aria-expanded': 'false' }, icon());
+  const muteBox = h('input', { type: 'checkbox', checked: music.muted ? true : null });
+  const sliders = [];
+  const channel = (kind, label, icon) => {
+    const value = h('span', { class: 'mix-value' }, `${Math.round(music.volume(kind) * 100)}%`);
+    const slider = h('input', { type: 'range', min: 0, max: 100, value: Math.round(music.volume(kind) * 100), 'aria-label': `Volumen de ${label.toLowerCase()}` });
+    slider.addEventListener('input', () => {
+      music.setVolume(kind, Number(slider.value) / 100);
+      if (music.muted && Number(slider.value) > 0) {
+        music.setMuted(false);
+        muteBox.checked = false;
+      }
+      value.textContent = `${slider.value}%`;
+      paint();
+    });
+    sliders.push(slider);
+    return h('label', { class: 'mix-row' }, h('span', { class: 'mix-label' }, icon, ' ', label), slider, value);
+  };
+  const panel = h(
+    'div',
+    { class: 'mixer', hidden: true, role: 'group', 'aria-label': 'Mezclador de sonido' },
+    h('b', { class: 'mix-title' }, 'Sonido'),
+    channel('music', 'Música de fondo', '🎵'),
+    channel('sfx', 'Movimientos', '💥'),
+    h('label', { class: 'mix-mute' }, muteBox, ' Silenciar todo'),
+  );
+  const paint = () => {
+    btn.textContent = icon();
+    sliders.forEach((sl) => (sl.disabled = music.muted));
+  };
+  muteBox.addEventListener('change', () => {
+    music.setMuted(muteBox.checked);
+    paint();
+  });
+  const close = () => {
+    panel.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    panel.hidden = !panel.hidden;
+    btn.setAttribute('aria-expanded', String(!panel.hidden));
+  });
+  panel.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => e.key === 'Escape' && close());
+  paint();
+  host.replaceChildren(btn, panel);
+}
+renderSound();
+
 function route() {
   hideTip();
+  if (TAB_MUSIC[location.pathname]) music.play(TAB_MUSIC[location.pathname]);
+  else if (location.pathname.startsWith('/t/')) music.play('tab:home');
+  else if (location.pathname.startsWith('/b/')) music.play('prep');
   closeRoomsFeed();
   cleanup?.();
   cleanup = null;
@@ -1415,6 +1489,14 @@ const MODE_LABEL = { team: 'Batalla con tu equipo', random: 'Batalla aleatoria' 
 const AI_ORDER = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
 const TOURNAMENT_SIZES = [4, 8, 16];
 const AI_LABEL = { easy: 'Fácil', mid: 'Media', hard: 'Difícil', veryhard: 'Muy difícil', skynet: 'Skynet' };
+const AI_TITLE = / - (fácil|media|difícil|muy difícil|skynet)$/i;
+const trainerShort = (name) => String(name ?? '').replace(AI_TITLE, '');
+const trainerTitle = (name) => AI_TITLE.exec(String(name ?? ''))?.[1] ?? null;
+function trainerName(name, attrs = {}) {
+  const title = trainerTitle(name);
+  if (!title) return h('b', attrs, name);
+  return h('span', { ...attrs, class: `trainer-name${attrs.class ? ` ${attrs.class}` : ''}` }, h('b', null, trainerShort(name)), h('small', { class: 'trainer-title' }, title));
+}
 const AI_NOTES = {
   easy: {
     team: 'Los dados sortean sus 6 entre todos los Pokémon evolucionados de la 1.ª a la 5.ª generación. Ataca sin pensar, como un Pokémon salvaje.',
@@ -1878,6 +1960,7 @@ async function battlePage(id, seq) {
       ws.send(JSON.stringify({ t: 'hello', room: id, token }));
     };
     ws.onmessage = (e) => {
+      if (closed) return;
       const msg = JSON.parse(e.data);
       if (msg.t === 'error') return toast(msg.error);
       if (msg.t === 'closed') {
@@ -1916,6 +1999,7 @@ async function battlePage(id, seq) {
       }
       if (!battle) {
         battle = battleUI(c, (action) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'act', action })));
+        music.play(`scene:${sceneFor(c.id).file}`);
       }
       battle.push(msg);
     };
@@ -1939,6 +2023,7 @@ async function battlePage(id, seq) {
     const you = me ? c.final.sides.findIndex((s) => s.trainerId === me.id) : -1;
     bar.update(you === -1 ? null : you, c.final.sides.map((side) => side.name));
     battle = battleUI(c, () => {});
+    music.play(`scene:${sceneFor(c.id).file}`);
     battle.push({ state: c.final, you: you === -1 ? null : you, actions: [], deadline: null });
     return;
   }
@@ -2087,8 +2172,8 @@ function seatCard(p, { you = false, host = false, onRemove = null } = {}) {
     'div',
     { class: `seat${you ? ' is-you' : ''}${p.ready ? ' is-ready' : ''}${p.online === false ? ' is-away' : ''}` },
     avatar(p),
-    h('div', { class: 'seat-body' }, h('span', { class: 'seat-name' }, h('b', null, p.name), host ? h('span', { 'data-tip': 'Dueño de la sala' }, '👑') : null, you ? h('span', { class: 'chip match-you' }, 'Tú') : null), h('span', { class: 'seat-meta' }, p.ai ? h('span', { class: 'muted small' }, `Dificultad ${(AI_LABEL[p.ai] ?? '').toLowerCase()}`) : record(p), status), p.online === false ? h('span', { class: 'muted small' }, 'Desconectado') : null),
-    onRemove ? h('button', { class: 'btn sm ghost seat-x', type: 'button', 'aria-label': `Quitar a ${p.name}`, 'data-tip': 'Quitar', onclick: (e) => { e.currentTarget.disabled = true; onRemove(); } }, '✕') : null,
+    h('div', { class: 'seat-body' }, h('span', { class: 'seat-name' }, h('b', null, trainerShort(p.name)), host ? h('span', { 'data-tip': 'Dueño de la sala' }, '👑') : null, you ? h('span', { class: 'chip match-you' }, 'Tú') : null), h('span', { class: 'seat-meta' }, p.ai ? h('span', { class: 'trainer-title' }, trainerTitle(p.name) ?? (AI_LABEL[p.ai] ?? '').toLowerCase()) : record(p), status), p.online === false ? h('span', { class: 'muted small' }, 'Desconectado') : null),
+    onRemove ? h('button', { class: 'btn sm ghost seat-x', type: 'button', 'aria-label': `Quitar a ${trainerShort(p.name)}`, 'data-tip': 'Quitar', onclick: (e) => { e.currentTarget.disabled = true; onRemove(); } }, '✕') : null,
   );
 }
 
@@ -2131,7 +2216,7 @@ function roomBar(c) {
     update(you, names = null) {
       const watching = you === null;
       document.body.dataset.watching = String(watching);
-      const vs = names?.length === 2 ? `${names[0]} vs ${names[1]}` : '';
+      const vs = names?.length === 2 ? `${trainerShort(names[0])} vs ${trainerShort(names[1])}` : '';
       const tour = c.tournament;
       el.hidden = false;
       el.className = `room-bar ${watching ? 'is-watching' : 'is-playing'}`;
@@ -2329,13 +2414,13 @@ function tournamentUI(id, justPlayed = null) {
     const done = m.winner !== null;
     const won = done && m.winner === i;
     const cls = ['bk-slot', seat ? '' : 'is-tbd', seat && i === T.you ? 'is-you' : '', won ? 'won' : '', done && !won ? 'lost' : ''].filter(Boolean).join(' ');
-    const sub = !seat ? 'Espera ganador' : seat.ai ? `IA ${(AI_LABEL[seat.ai] ?? '').toLowerCase()}` : i === T.you ? 'Tú' : `${seat.wins}V ${seat.losses}D`;
+    const sub = !seat ? 'Espera ganador' : seat.ai ? trainerTitle(seat.name) ?? `IA ${(AI_LABEL[seat.ai] ?? '').toLowerCase()}` : i === T.you ? 'Tú' : `${seat.wins}V ${seat.losses}D`;
     return h(
       'div',
       { class: cls, 'data-round': round, 'data-side': side },
       h('span', { class: 'bk-seed' }, seat ? seedOf(i) : ''),
       h('span', { class: `bk-av${seat?.ai ? ' is-ai' : ''}${!seat ? ' is-empty' : ''}`, 'aria-hidden': 'true', style: seat?.ai ? { background: aiColor(seat.name) } : null }, !seat ? '?' : seat.ai ? '🤖' : (seat.name.trim()[0] ?? '?').toUpperCase()),
-      h('span', { class: 'bk-who', title: seat?.name ?? null }, h('span', { class: 'bk-name' }, seat ? (seat.ai ? seat.name.replace(/ - [^-]+$/, '') : seat.name) : 'Por definir'), h('small', { class: 'bk-sub' }, sub)),
+      h('span', { class: 'bk-who', title: seat?.name ?? null }, h('span', { class: 'bk-name' }, seat ? (trainerShort(seat.name)) : 'Por definir'), h('small', { class: 'bk-sub' }, sub)),
       h('span', { class: 'bk-mark', 'aria-label': won ? 'Ganó' : done && seat ? 'Perdió' : null }, won ? (m.coinFlip ? h('span', { 'data-tip': 'Empate: avanzó por sorteo' }, '🪙') : '✔') : done && seat ? '✕' : ''),
     );
   }
@@ -2398,7 +2483,7 @@ function tournamentUI(id, justPlayed = null) {
               h('span', { class: 'bk-cup', 'aria-hidden': 'true' }, '🏆'),
               champion ? h('span', { class: `bk-av big${champion.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true', style: champion.ai ? { background: aiColor(champion.name) } : null }, champion.ai ? '🤖' : (champion.name.trim()[0] ?? '?').toUpperCase()) : null,
               h('b', { class: 'bk-champ-name' }, champion?.name ?? '¿Quién será?'),
-              runnerUp ? h('small', { class: 'muted' }, `🥈 ${runnerUp.name}`) : h('small', { class: 'muted' }, `${T.size} jugadores · ${T.total} peleas`),
+              runnerUp ? h('small', { class: 'muted' }, `🥈 ${trainerShort(runnerUp.name)}`) : h('small', { class: 'muted' }, `${T.size} jugadores · ${T.total} peleas`),
             ),
           ),
         ),
@@ -2418,7 +2503,7 @@ function tournamentUI(id, justPlayed = null) {
     const left = T.nextAt ? Math.max(0, Math.ceil((T.nextAt - nowServer()) / 1000)) : null;
     if (T.status === 'finished') {
       const champ = T.seats[T.champion];
-      return h('section', { class: 'card tour-live is-champ' }, h('h2', null, T.champion === T.you ? '🏆 ¡Ganaste el torneo!' : `🏆 ¡${champ.name} gana el torneo!`), h('p', { class: 'muted' }, `${T.total} peleas jugadas.`), h('a', { class: 'btn primary', href: '/', 'data-link': true }, 'Volver al inicio'));
+      return h('section', { class: 'card tour-live is-champ' }, h('h2', null, T.champion === T.you ? '🏆 ¡Ganaste el torneo!' : `🏆 ¡${trainerShort(champ.name)} gana el torneo!`), h('p', { class: 'muted' }, `${T.total} peleas jugadas.`), h('a', { class: 'btn primary', href: '/', 'data-link': true }, 'Volver al inicio'));
     }
     if (T.current) {
       const m = T.rounds[T.current.round].matches[T.current.index];
@@ -2443,7 +2528,7 @@ function tournamentUI(id, justPlayed = null) {
   }
 
   function animateDraw(root) {
-    const names = T.seats.map((s) => s.name);
+    const names = T.seats.map((s) => trainerShort(s.name));
     const order = T.rounds[0].matches.flatMap((m) => [[m.a, m], [m.b, m]]);
     const slots = [...root.querySelectorAll('.bk-slot[data-round="0"]')];
     slots.forEach((el, i) => {
@@ -2539,9 +2624,9 @@ function countdownUI(c) {
       'div',
       { class: `match-player side-${side}${you ? ' is-you' : ''}` },
       avatar(p),
-      h('b', { class: 'match-name' }, p.name),
+      trainerName(p.name, { class: 'match-name' }),
       you ? h('span', { class: 'chip match-you' }, 'Tú') : null,
-      p.ai ? h('span', { class: 'chip' }, `🤖 IA ${AI_LABEL[p.ai] ?? ''}`) : record(p),
+      p.ai ? h('span', { class: 'chip' }, '🤖 IA') : record(p),
       p.ai ? null : h('span', { class: 'muted small' }, `📚 ${p.rosterSize} Pokémon · ✨ ${p.shinies} shiny`),
     );
   function tick() {
@@ -2742,12 +2827,12 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
 
   function build(p, you) {
     if (you == null) {
-      const sides = [sideView(0, p.sides[0].name), sideView(1, p.sides[1].name)];
+      const sides = [sideView(0, trainerName(p.sides[0].name)), sideView(1, trainerName(p.sides[1].name))];
       root.replaceChildren(sides[0].el, h('div', { class: 'vs-mark' }, 'VS'), sides[1].el);
       return { sides, mine: null };
     }
     const foeSide = 1 - you;
-    const foe = sideView(foeSide, `Equipo de ${p.sides[foeSide].name}`);
+    const foe = sideView(foeSide, ['Equipo de ', trainerName(p.sides[foeSide].name)]);
     const mine = { title: h('h2'), note: h('p', { class: 'muted small' }), grid: h('div', { class: 'prep-grid' }), foot: h('div', { class: 'prep-foot' }), footMode: null, footNote: h('p', { class: 'pulse' }), slots: [] };
     mine.pickBtn = h('button', { type: 'button', class: 'btn primary', onclick: () => { sent = true; sendPick(picks.slice()); render(); } });
     root.replaceChildren(h('div', { class: 'card prep-side mine' }, mine.title, mine.note, mine.grid, mine.foot), h('div', { class: 'vs-mark' }, 'VS'), foe.el);
@@ -2820,6 +2905,15 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
   };
 }
 
+const ACTION_GAP_MS = 750;
+const WEATHER_TYPE = { sun: 'fire', harshsun: 'fire', rain: 'water', heavyrain: 'water', sand: 'ground', hail: 'ice', snow: 'ice', wind: 'flying' };
+
+function moveSound(ev, byPlayer) {
+  const shape = moveShape(ev);
+  const self = ev.kind === 'status' && ev.target === 'self' && shape !== 'heal' && shape !== 'weather';
+  music.sfx('move', { key: ev.key, byPlayer, shape: self ? (shape === 'boost' ? 'boost' : 'aura') : shape, type: ev.type });
+}
+
 function battleUI(c, sendAction) {
   let frame = null; // last frame from the server
   let view = null; // what is on screen (lags behind frame while events play)
@@ -2829,6 +2923,8 @@ function battleUI(c, sendAction) {
   let queue = Promise.resolve();
   let resultShown;
   const shown = new Promise((r) => (resultShown = r));
+  let dead = false;
+  const sound = (kind, opts) => !dead && music.sfx(kind, opts);
 
   const sideAt = (p) => (p === 'me' ? mine : 1 - mine);
   const hud = (p) => {
@@ -2852,18 +2948,33 @@ function battleUI(c, sendAction) {
     log: h('div', { class: 'card log' }),
   };
   const scene = sceneFor(c.id);
-  const arena = h('div', { class: 'arena', style: { backgroundImage: `url(${scene.image})` } }, els.ground, els.spot.foe, els.spot.me, els.sky, els.hud.foe.el, els.hud.me.el);
-  arena.style.setProperty('--pad-me-fill', scene.me[0]);
-  arena.style.setProperty('--pad-me-rim', scene.me[1]);
-  arena.style.setProperty('--pad-foe-fill', scene.foe[0]);
-  arena.style.setProperty('--pad-foe-rim', scene.foe[1]);
-  const fx = createFx(arena);
+  const field = h(
+    'div',
+    { class: 'battle-field' },
+    h('img', { class: 'arena-bg', src: scene.image, alt: '', draggable: 'false' }),
+    h('div', { class: 'battle-pad foe', 'aria-hidden': 'true' }),
+    h('div', { class: 'battle-pad me', 'aria-hidden': 'true' }),
+    els.ground,
+    els.spot.foe,
+    els.spot.me,
+    els.sky,
+  );
+  const arena = h('div', { class: 'arena' }, field, els.hud.foe.el, els.hud.me.el, els.say);
+  for (const side of ['me', 'foe']) {
+    arena.style.setProperty(`--pad-${side}-fill`, scene[side][0]);
+    arena.style.setProperty(`--pad-${side}-rim`, scene[side][1]);
+  }
+  const fitField = () => arena.style.setProperty('--s', String(arena.clientWidth / 320));
+  const resize = new ResizeObserver(fitField);
+  resize.observe(arena);
+  const fx = createFx(arena, field);
   $app.replaceChildren(
     h('div', { class: 'status-line' }, els.turn, els.vs, els.field, els.timer),
-    h('div', { class: 'stage' }, arena, els.say),
+    h('div', { class: 'stage' }, arena),
     h('div', { class: 'battle-layout' }, els.controls, els.log),
     els.info,
   );
+  fitField();
 
   const tick = setInterval(() => {
     if (!frame?.deadline || frame.state.status !== 'active') {
@@ -2876,10 +2987,25 @@ function battleUI(c, sendAction) {
   }, 250);
 
   const pos = (side) => (side === mine ? 'me' : 'foe');
+  const sendOut = async (side) => {
+    const spot = els.spot[pos(side)];
+    spot.classList.add('incoming');
+    sound('throw');
+    await fx.sendOut(spot, pos(side) === 'me', () => {
+      sound('switch');
+      spot.classList.remove('incoming');
+      cry(side);
+    });
+    spot.classList.remove('incoming');
+  };
+  const cry = (side, faint = false) => {
+    const f = activeOf(side);
+    if (f) sound('cry', { sprite: f.sprite, faint });
+  };
   const activeOf = (side) => view.sides[side].team[view.sides[side].active];
   const isYou = (side) => frame?.you === side;
   // "tu Bigfin" / "Bigfin de Pedro": the same creature can be on both teams, so always say whose.
-  const mon = (side, name) => (isYou(side) ? ['tu ', h('b', null, name)] : [h('b', null, name), ` de ${view.sides[side].name}`]);
+  const mon = (side, name) => (isYou(side) ? ['tu ', h('b', null, name)] : [h('b', null, name), ` de ${trainerShort(view.sides[side].name)}`]);
   const capFirst = (parts) => {
     const [first, ...rest] = parts.flat();
     return typeof first === 'string' ? [first.replace(/\p{L}/u, (ch) => ch.toUpperCase()), ...rest] : [first, ...rest];
@@ -2893,14 +3019,21 @@ function battleUI(c, sendAction) {
     els.log.append(h('p', { class: cls || null }, parts));
     els.log.scrollTop = els.log.scrollHeight;
   }
-  function say(parts, side) {
-    els.say.className = `say${side == null ? '' : ` by-${pos(side)}`}`;
+  function say(parts, side, sub = false) {
     // The same nodes also go to the log, so the banner gets copies.
-    els.say.replaceChildren(h('span', null, [parts].flat(Infinity).map((n) => (n instanceof Node ? n.cloneNode(true) : n))));
+    const line = h('span', { class: sub ? 'say-detail' : 'say-main' }, [parts].flat(Infinity).map((n) => (n instanceof Node ? n.cloneNode(true) : n)));
+    const main = els.say.querySelector('.say-main');
+    if (sub && main) {
+      els.say.querySelector('.say-detail')?.remove();
+      els.say.append(line);
+      return;
+    }
+    els.say.className = `say${side == null ? '' : ` by-${pos(side)}`}`;
+    els.say.replaceChildren(line);
   }
   function tell(parts, { side = null, cls = null, sub = false } = {}) {
     const text = capFirst(parts);
-    say(text, side);
+    say(text, side, sub);
     log(sub ? ['↳ ', ...text] : text, [side == null ? '' : `by-${pos(side)}`, sub ? 'sub' : '', cls || ''].filter(Boolean).join(' '));
   }
 
@@ -2910,24 +3043,27 @@ function battleUI(c, sendAction) {
     el.classList.add(cls);
     setTimeout(() => el.classList.remove(cls), ms);
   }
-  // Floating text over a creature: damage numbers, "¡Falla!", "+20 PV"…
-  function float(side, text, cls) {
+  function popNumber(side, text, cls = '') {
     const spot = els.spot[pos(side)];
-    const el = h('span', { class: `float ${cls || ''}` }, text);
-    spot.append(el);
-    setTimeout(() => el.remove(), 1400);
+    const img = spot.querySelector('.creature img');
+    const top = spot.offsetTop - (img?.offsetHeight ?? 40) * 0.6;
+    const el = h('span', { class: `dmg-num ${cls}`, 'aria-hidden': 'true' }, text);
+    el.style.left = `${spot.offsetLeft}px`;
+    el.style.top = `${top}px`;
+    field.append(el);
+    setTimeout(() => el.remove(), 1300);
   }
+  const amountLabel = (ev, sign) => `${sign}${ev.amount}${ev.pct ? '%' : ''}`;
+
   function abilityPop(side, ev) {
-    const spot = els.spot[pos(side)];
-    spot.querySelector('.ab-pop')?.remove();
+    arena.querySelector(`.ab-pop.${pos(side)}`)?.remove();
     const el = h('div', { class: `ab-pop ${pos(side)}`, 'aria-hidden': 'true' }, h('small', null, ev.name), h('b', null, ev.ability));
-    spot.append(el);
-    anim(spot, 'power', 600);
+    arena.append(el);
     setTimeout(() => el.remove(), 1900);
   }
 
   async function splash() {
-    const el = h('div', { class: 'vs-splash' }, h('b', { class: 'me' }, view.sides[mine].name), h('span', null, 'VS'), h('b', { class: 'foe' }, view.sides[1 - mine].name));
+    const el = h('div', { class: 'vs-splash' }, trainerName(view.sides[mine].name, { class: 'me' }), h('span', null, 'VS'), trainerName(view.sides[1 - mine].name, { class: 'foe' }));
     arena.append(el);
     await wait(1700);
     el.remove();
@@ -2953,16 +3089,18 @@ function battleUI(c, sendAction) {
     const sub = tour
       ? {
           win: champ ? '¡Ganaste el torneo!' : `Avanzas a ${tour.next === 'Final' ? 'la Final' : tour.next}.`,
-          lose: `${view.sides[1 - mine].name} sigue en el torneo. Quedaste fuera en ${tour.round}.`,
+          lose: `${trainerShort(view.sides[1 - mine].name)} sigue en el torneo. Quedaste fuera en ${tour.round}.`,
           draw: 'Empate: el que avanza se decide por sorteo.',
           watch: champ ? `${view.sides[winner]?.name} es campeón del torneo · ${loser} queda segundo.` : `${view.sides[winner]?.name} avanza a ${tour.next === 'Final' ? 'la Final' : tour.next} · ${loser} queda fuera.`,
         }[kind]
-      : { win: `Venciste a ${view.sides[1 - mine].name}.`, lose: `${view.sides[1 - mine].name} ganó esta vez.`, draw: 'Nadie quedó en pie.', watch: `${view.sides[0].name} vs ${view.sides[1].name}` }[kind];
+      : { win: `Venciste a ${trainerShort(view.sides[1 - mine].name)}.`, lose: `${trainerShort(view.sides[1 - mine].name)} ganó esta vez.`, draw: 'Nadie quedó en pie.', watch: `${trainerShort(view.sides[0].name)} vs ${trainerShort(view.sides[1].name)}` }[kind];
     const icon = { win: '🏆', lose: '💀', draw: '🤝', watch: champ ? '🏆' : '🏁' }[kind];
-    const duel = winner === null ? null : h('div', { class: 'result-duel' }, [0, 1].map((side) => h('span', { class: `result-side ${side === winner ? 'won' : 'lost'}` }, side === winner ? '👑 ' : '', view.sides[side].name)));
+    const duel = winner === null ? null : h('div', { class: 'result-duel' }, [0, 1].map((side) => h('span', { class: `result-side ${side === winner ? 'won' : 'lost'}` }, side === winner ? '👑 ' : '', trainerName(view.sides[side].name))));
     const el = h('div', { class: `result ${kind}`, onclick: () => el.remove() }, h('div', { class: 'result-card' }, h('span', { class: 'result-icon' }, icon), h('h2', null, title), duel, h('p', null, sub), h('small', null, tour ? 'Siguen las llaves del torneo' : 'Toca para cerrar')));
     arena.append(el);
     if (kind === 'win' || kind === 'watch') confetti(el);
+    if (kind === 'win' && !dead) music.victory(champ ? 'champion' : 'win');
+    if (kind === 'lose' && !dead) music.stop();
     resultShown();
   }
 
@@ -2970,7 +3108,7 @@ function battleUI(c, sendAction) {
     if (!view) return;
     const f = activeOf(side);
     const own = isYou(side) || view.status === 'finished';
-    els.info.replaceChildren(infoCard(f, { own, owner: view.sides[side].name, close: () => els.info.close() }));
+    els.info.replaceChildren(infoCard(f, { own, owner: trainerShort(view.sides[side].name), close: () => els.info.close() }));
     if (!els.info.open) els.info.showModal();
   }
 
@@ -2981,14 +3119,14 @@ function battleUI(c, sendAction) {
 
   const amountText = (ev) => (ev.pct ? `${ev.amount}%` : `${ev.amount} PV`);
   const hpText = (ev, v) => (ev.pct ? `${v}%` : `${v}`);
-  const floatAmount = (ev, sign) => `${sign}${ev.amount}${ev.pct ? '%' : ''}`;
 
-  function countTo(el, from, to, max, percent = false) {
+  function countTo(el, from, to, max, percent = false, ms = hpTweenMs(from, to)) {
     const label = (n) => (percent ? `${n}%` : `${n} / ${max} PV`);
     const t0 = performance.now();
     const step = (t) => {
-      const k = Math.min(1, (t - t0) / 500);
-      el.textContent = label(Math.round(from + (to - from) * k));
+      const k = Math.min(1, (t - t0) / ms);
+      const eased = Math.sin((k * Math.PI) / 2);
+      el.textContent = label(Math.round(from + (to - from) * eased));
       if (k < 1 && el.dataset.to === String(to)) requestAnimationFrame(step);
     };
     el.dataset.to = String(to);
@@ -3017,23 +3155,17 @@ function battleUI(c, sendAction) {
     else delete spot.dataset.status;
     if (!spot.querySelector('.sub-doll')) spot.append(h('div', { class: 'sub-doll', 'aria-hidden': 'true', html: creatureHTML({ sprite: 'substitute' }, { back: p === 'me', eager: true }) }));
     spot.classList.toggle('has-sub', !!f.volatiles?.substitute && f.hp > 0);
-    let aura = spot.querySelector('.status-aura');
-    if (!aura) {
-      aura = h('div', { class: 'status-aura', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'));
-      spot.append(aura);
-    }
-    if (enter) anim(spot, 'enter', 500);
 
     const pct = Math.max(0, (f.hp / f.stats.hp) * 100);
     r.bar.className = pct < 20 ? 'low' : pct < 50 ? 'mid' : '';
-    if (fresh) {
-      r.bar.style.transition = 'none';
-      r.bar.style.width = `${pct}%`;
-      void r.bar.offsetWidth;
-      r.bar.style.transition = '';
-    } else r.bar.style.width = `${pct}%`;
+    const before = parseFloat(r.bar.style.width);
+    const snap = fresh || Number.isNaN(before);
     const shown = Number(r.num.dataset.to);
-    countTo(r.num, fresh || Number.isNaN(shown) ? f.hp : shown, f.hp, f.stats.hp, !!f.hpPercent);
+    const from = fresh || Number.isNaN(shown) ? f.hp : shown;
+    const ms = snap || from === f.hp ? 0 : hpTweenMs(from, f.hp);
+    r.bar.style.transitionDuration = `${ms}ms`;
+    r.bar.style.width = `${pct}%`;
+    countTo(r.num, from, f.hp, f.stats.hp, !!f.hpPercent, Math.max(1, ms));
 
     r.name.replaceChildren(f.shiny ? `✨ ${f.name}` : f.name, genderMark(f.gender) ?? '');
     r.lvl.textContent = `Nv ${f.level}`;
@@ -3042,7 +3174,7 @@ function battleUI(c, sendAction) {
       ...[
         typeChips(f.types),
         f.status && f.hp > 0 ? h('span', { class: `cond ${f.status}`, tabindex: 0, 'data-tip': STATUS_INFO[f.status].name, 'data-tip-note': STATUS_INFO[f.status].desc }, statusLabel(f.status)) : null,
-        h('span', { class: 'owner' }, isYou(side) ? `${sd.name} (tú)` : sd.name),
+        h('span', { class: 'owner' }, isYou(side) ? `${trainerShort(sd.name)} (tú)` : trainerShort(sd.name)),
         h('span', { class: 'dots', 'aria-label': `Equipo: ${sd.team.filter((t) => t.hp > 0).length} de ${sd.team.length} en pie`, 'data-tip': `${sd.team.filter((t) => t.hp > 0).length} de ${sd.team.length} en pie` }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
       ].filter(Boolean),
     );
@@ -3054,6 +3186,7 @@ function battleUI(c, sendAction) {
     ];
     r.conds.replaceChildren(...condChips);
     r.conds.hidden = !condChips.length;
+    return ms;
   }
 
   function sideChips(sd) {
@@ -3083,14 +3216,14 @@ function battleUI(c, sendAction) {
     paint(1);
     paintField();
     els.turn.textContent = view.status === 'finished' ? 'Fin de la batalla' : `Turno ${view.turn}`;
-    const tag = (side) => h('span', { class: `who by-${pos(side)}` }, isYou(side) ? `${view.sides[side].name} (tú)` : view.sides[side].name);
+    const tag = (side) => h('span', { class: `who by-${pos(side)}` }, isYou(side) ? `${trainerShort(view.sides[side].name)} (tú)` : trainerShort(view.sides[side].name));
     els.vs.replaceChildren(tag(mine), h('span', { class: 'muted' }, ' vs '), tag(1 - mine));
   }
 
   function renderControls() {
     const st = frame.state;
     const you = frame.you;
-    const foeName = st.sides[1 - mine].name;
+    const foeName = trainerShort(st.sides[1 - mine].name);
     const box = els.controls;
     box.replaceChildren();
 
@@ -3100,9 +3233,9 @@ function battleUI(c, sendAction) {
         return;
       }
       const won = st.winner === you;
-      const title = st.winner === null ? 'Empate' : you === null ? `¡Gana ${st.sides[st.winner].name}!` : won ? '¡Ganaste! 🏆' : 'Perdiste… 😵';
+      const title = st.winner === null ? 'Empate' : you === null ? `¡Gana ${trainerShort(st.sides[st.winner].name)}!` : won ? '¡Ganaste! 🏆' : 'Perdiste… 😵';
       box.append(
-        h('div', { class: 'banner' }, h('h2', null, title), h('p', { class: 'muted' }, `${st.sides[0].name} vs ${st.sides[1].name} · ${st.turn} turnos`)),
+        h('div', { class: 'banner' }, h('h2', null, title), h('p', { class: 'muted' }, `${trainerShort(st.sides[0].name)} vs ${trainerShort(st.sides[1].name)} · ${st.turn} turnos`)),
         c.tournament ? h('p', { class: 'muted pulse' }, 'Volviendo a las llaves del torneo…') : null,
         h(
           'div',
@@ -3130,8 +3263,8 @@ function battleUI(c, sendAction) {
     }
 
     if (you === null) {
-      if (c.tournament) box.append(h('h2', null, '👁 Estás mirando'), h('p', { class: 'muted' }, `${st.sides[0].name} vs ${st.sides[1].name} · ${c.tournament.round}. Cuando termine te llevamos a las llaves y a la siguiente pelea.`), h('a', { class: 'btn', href: `/t/${c.tournament.id}`, 'data-link': true }, 'Ver llaves'));
-      else box.append(h('h2', null, 'Estás mirando'), h('p', { class: 'muted' }, `${st.sides[0].name} vs ${st.sides[1].name}. Para pelear tú, busca rival desde el inicio.`), h('a', { class: 'btn', href: '/', 'data-link': true }, 'Ir al inicio'));
+      if (c.tournament) box.append(h('h2', null, '👁 Estás mirando'), h('p', { class: 'muted' }, `${trainerShort(st.sides[0].name)} vs ${trainerShort(st.sides[1].name)} · ${c.tournament.round}. Cuando termine te llevamos a las llaves y a la siguiente pelea.`), h('a', { class: 'btn', href: `/t/${c.tournament.id}`, 'data-link': true }, 'Ver llaves'));
+      else box.append(h('h2', null, 'Estás mirando'), h('p', { class: 'muted' }, `${trainerShort(st.sides[0].name)} vs ${trainerShort(st.sides[1].name)}. Para pelear tú, busca rival desde el inicio.`), h('a', { class: 'btn', href: '/', 'data-link': true }, 'Ir al inicio'));
       return;
     }
 
@@ -3179,7 +3312,7 @@ function battleUI(c, sendAction) {
                 : [h('span', { class: 'mv-desc' }, m.desc)];
             return h(
               'button',
-              { class: `move${pp === 0 ? ' no-pp' : ''}`, 'data-tip': m.kind === 'attack' ? m.desc : null, 'data-tip-note': pp === 0 ? 'Sin PP: no se puede usar.' : null, disabled: !moveSet.has(i), onclick: () => act({ type: 'move', move: i }, m.name) },
+              { class: `move${pp === 0 ? ' no-pp' : ''}`, 'data-tip': m.kind === 'attack' ? m.desc : null, 'data-tip-note': pp === 0 ? 'Sin PP: no se puede usar.' : flinchNote(m), disabled: !moveSet.has(i), onclick: () => act({ type: 'move', move: i }, m.name) },
               h('span', { class: 'mv' }, m.name, h('small', { class: `pp${pp <= Math.ceil(m.pp / 4) ? ' low' : ''}` }, `PP ${pp}/${m.pp}`)),
               h('span', { class: 'mi' }, typeChip(m.type), info),
             );
@@ -3211,27 +3344,24 @@ function battleUI(c, sendAction) {
   let currentMove = null;
   let draggedSide = null;
 
-  function showDamage(ev, linger) {
+  async function showDamage(ev, linger) {
     const f = activeOf(ev.side);
     const before = f.hp;
-    f.hp = ev.hp;
-    paint(ev.side);
-    anim(els.spot[pos(ev.side)], 'hit', 500);
-    anim(els.hud[pos(ev.side)].el, 'hurt', 600);
-    float(ev.side, floatAmount(ev, '−'), ev.crit || ev.eff > 1 ? 'dmg big' : ev.eff < 1 ? 'dmg small' : 'dmg');
+    anim(els.spot[pos(ev.side)], 'hit', 700);
     const notes = [ev.crit ? '¡Golpe crítico!' : '', ev.eff > 1 ? '¡Es muy eficaz!' : ev.eff < 1 ? 'No es muy eficaz…' : ''].filter(Boolean).join(' ');
     tell([...mon(ev.side, f.name), ` pierde ${amountText(ev)} (${hpText(ev, before)} → ${hpText(ev, ev.hp)})`, notes ? h('span', { class: ev.eff < 1 && !ev.crit ? 'weak' : 'strong' }, ` ${notes}`) : ''], { side: ev.side, sub: true });
-    return linger;
+    await wait(700);
+    f.hp = ev.hp;
+    popNumber(ev.side, amountLabel(ev, '−'), ev.crit ? 'crit' : ev.eff > 1 ? 'strong' : ev.eff < 1 ? 'weak' : '');
+    await wait(paint(ev.side) + linger);
   }
 
   async function playHit(ev, hit) {
     const move = currentMove.ev;
     const from = els.spot[pos(move.side)];
-    if ((move.flags || []).includes('contact')) anim(from, `lunge-${pos(move.side)}`, 400);
+    moveSound({ ...move, multihit: false }, move.side === mine);
     await fx.move({ ...move, multihit: false }, from, els.spot[pos(ev.side)]);
-    showDamage(ev, 0);
-    float(ev.side, `${hit}×`, 'hit-count');
-    await wait(hit > 1 ? 380 : 450);
+    await showDamage(ev, hit > 1 ? 200 : 300);
   }
 
   function play(ev) {
@@ -3247,22 +3377,23 @@ function battleUI(c, sendAction) {
         els.spot[pos(ev.side)].classList.remove('is-hidden-move');
         setActing(ev.side);
         currentMove = ev.kind === 'attack' ? { ev, hits: 0 } : null;
-        if (ev.kind === 'attack' && (ev.flags || []).includes('contact')) anim(els.spot[pos(ev.side)], `lunge-${pos(ev.side)}`, 500);
-        else anim(els.spot[pos(ev.side)], 'power', 600);
         tell([...mon(ev.side, ev.name), ' usa ', h('b', { class: 'mvname' }, ev.move), ev.type ? ' ' : '', ev.type ? typeChip(ev.type) : '', ev.why ? h('small', { class: 'why' }, ` · ${WHY[ev.why]}`) : ''], { side: ev.side });
         if (ev.multihit) return sleep(350);
-        return Promise.all([sleep(450), wait(250).then(() => fx.move(ev, els.spot[pos(ev.side)], els.spot[pos(1 - ev.side)]))]);
+        return Promise.all([sleep(450), wait(250).then(() => {
+          moveSound(ev, ev.side === mine);
+          return fx.move(ev, els.spot[pos(ev.side)], els.spot[pos(1 - ev.side)]);
+        })]);
       }
       case 'damage': {
+        sound('hit', { eff: ev.eff, crit: ev.crit });
         const hit = currentMove && currentMove.ev.side === 1 - ev.side ? ++currentMove.hits : 0;
         const repeated = hit > 0 && (currentMove.ev.multihit || hit > 1);
         if (repeated) return playHit(ev, hit);
-        return showDamage(ev, 1050);
+        return showDamage(ev, 600);
       }
       case 'miss': {
+        sound('miss');
         const t = 1 - ev.side;
-        anim(els.spot[pos(t)], 'dodge', 500);
-        float(t, '¡Esquiva!', 'miss');
         tell(['falla: ', ...mon(t, activeOf(t).name), ' lo esquiva.'], { side: ev.side, sub: true, cls: 'weak' });
         return 900;
       }
@@ -3271,15 +3402,12 @@ function battleUI(c, sendAction) {
           tell(['¡Pero no pasa nada!'], { side: ev.side, sub: true, cls: 'weak' });
           return 800;
         }
-        float(ev.side, '¡Falló!', 'miss');
         tell(['¡pero falló!', ev.reason ? h('small', { class: 'why' }, ` · ${NOTHING_WHY[ev.reason]}`) : ''], { side: ev.side, sub: true, cls: 'weak' });
         return ev.reason ? 1100 : 800;
       case 'focus':
-        anim(els.spot[pos(ev.side)], 'power', 600);
         tell([...mon(ev.side, ev.name), ` ${FOCUS_TEXT[ev.key] ?? 'se prepara…'}`], { side: ev.side, sub: true });
         return 800;
       case 'dragged':
-        anim(els.spot[pos(ev.side)], 'dodge', 500);
         draggedSide = ev.side;
         tell(['¡', ...mon(ev.side, ev.name), ' es arrastrado fuera del combate!'], { side: ev.side, cls: 'weak' });
         return 800;
@@ -3292,20 +3420,21 @@ function battleUI(c, sendAction) {
       }
       case 'charging': {
         const spot = els.spot[pos(ev.side)];
-        anim(spot, 'power', 700);
         if (ev.hidden) spot.classList.add('is-hidden-move');
         const text = CHARGE_TEXT[ev.key];
         tell([...capFirst(mon(ev.side, ev.name)), text ? ` ${text}` : ` se prepara para usar ${ev.move}…`], { side: ev.side });
         log([...capFirst(mon(ev.side, ev.name)), ` carga ${ev.move}: atacará el próximo turno.`], 'weak');
-        return 1300;
+        sound('charge', { key: ev.key, byPlayer: ev.side === mine });
+        return Promise.all([sleep(1300), fx.charge(ev.key, spot, els.spot[pos(1 - ev.side)])]);
       }
       case 'boost': {
         const f = activeOf(ev.side);
         const [label, word] = STAT[ev.stat] ?? [ev.stat, ev.stat];
         const up = (ev.by ?? 1) > 0;
+        sound(up ? 'up' : 'down');
+        fx.stat(up, els.spot[pos(ev.side)]);
         f.boosts[ev.stat] = ev.stage;
         paint(ev.side);
-        float(ev.side, `${label} ${up ? '▲' : '▼'}${Math.abs(ev.by ?? 1) >= 2 ? (up ? '▲' : '▼') : ''}`, up ? 'up' : 'down');
         tell([...mon(ev.side, f.name), ` ${up ? 'sube' : 'baja'} su ${word}${Math.abs(ev.by ?? 1) >= 2 ? ' mucho' : ''} `, h('span', { class: `stat-delta ${up ? 'up' : 'down'}` }, `${up ? '▲' : '▼'} ${signed(ev.stage)}`), '.'], { side: ev.side, sub: true });
         return 900;
       }
@@ -3329,10 +3458,10 @@ function battleUI(c, sendAction) {
         return 800;
       }
       case 'status': {
+        sound('status', { status: ev.status });
         const f = activeOf(ev.side);
         f.status = ev.status;
         paint(ev.side);
-        float(ev.side, statusLabel(ev.status), `status-float ${ev.status}`);
         tell([...mon(ev.side, f.name), ` ${STATUS_TEXT[ev.status]}.`], { side: ev.side, sub: true, cls: 'weak' });
         return Promise.all([sleep(700), fx.status(ev.status, els.spot[pos(ev.side)])]);
       }
@@ -3340,44 +3469,36 @@ function battleUI(c, sendAction) {
         const f = activeOf(ev.side);
         f.status = null;
         paint(ev.side);
-        float(ev.side, '✓ Curado', 'up');
-        anim(els.spot[pos(ev.side)], 'cured', 700);
         tell([...mon(ev.side, f.name), ` ${CURE_TEXT[ev.status] ?? 'se recupera'}.`], { side: ev.side, sub: true });
         return Promise.all([sleep(800), fx.impact('fairy', els.spot[pos(ev.side)])]);
       }
       case 'cant': {
         if (ev.reason === 'truant') return 0;
         const spot = els.spot[pos(ev.side)];
-        tell([...mon(ev.side, ev.name), ` ${cantText(ev)}`], { side: ev.side, cls: 'weak' });
+        tell([...mon(ev.side, ev.name), ` ${cantText(ev)}`], { side: ev.side, cls: ev.reason === 'flinch' ? null : 'weak' });
         if (STATUS_INFO[ev.reason]) {
-          float(ev.side, statusLabel(ev.reason), `status-float ${ev.reason}`);
-          anim(spot, `afflicted-${ev.reason}`, 900);
           return Promise.all([sleep(900), fx.status(ev.reason, spot)]);
         }
         if (ev.reason === 'attract') {
-          float(ev.side, '💔', 'status-float');
-          anim(spot, 'afflicted-slp', 900);
           return 900;
         }
         if (ev.reason === 'flinch') {
-          float(ev.side, '¡Retrocede!', 'miss');
-          anim(spot, 'afflicted-frz', 700);
-          return Promise.all([sleep(800), fx.condition('flinch', spot)]);
+          popNumber(ev.side, '¡Retrocede!', 'status');
+          anim(spot, 'flinch', 500);
+          return Promise.all([sleep(1000), fx.condition('flinch', spot)]);
         }
-        float(ev.side, '…', 'miss');
         return 900;
       }
       case 'confused': {
         const spot = els.spot[pos(ev.side)];
-        float(ev.side, '😵 Confuso', 'status-float');
-        anim(spot, 'dizzy', 1100);
         tell([...mon(ev.side, ev.name), ' está confuso…'], { side: ev.side, sub: true, cls: 'weak' });
+        sound('condition', { kind: 'confusion' });
         return Promise.all([sleep(800), fx.condition('confusion', spot)]);
       }
       case 'infatuated': {
         const spot = els.spot[pos(ev.side)];
-        float(ev.side, '💘 Enamorado', 'status-float');
         tell([...mon(ev.side, ev.name), ` está enamorado de ${ev.by}.`], { side: ev.side, sub: true, cls: 'weak' });
+        sound('condition', { kind: 'attract' });
         return Promise.all([sleep(800), fx.condition('attract', spot)]);
       }
       case 'volatile': {
@@ -3385,7 +3506,7 @@ function battleUI(c, sendAction) {
         f.volatiles = { ...f.volatiles, [ev.kind]: ev.kind === 'perish' ? 4 : ev.kind === 'bound' ? ev.move : true };
         paint(ev.side);
         tell([...mon(ev.side, ev.name), ` ${VOLATILE[ev.kind]?.(ev) ?? ''}`], { side: ev.side, sub: true, cls: 'weak' });
-        if (ev.kind === 'confusion') anim(els.spot[pos(ev.side)], 'dizzy', 1100);
+        sound('condition', { kind: ev.kind });
         return Promise.all([sleep(900), fx.condition(ev.kind, els.spot[pos(ev.side)])]);
       }
       case 'volatileEnd': {
@@ -3403,25 +3524,24 @@ function battleUI(c, sendAction) {
         return Promise.all([sleep(800), fx.condition('perish', els.spot[pos(ev.side)])]);
       }
       case 'hurt': {
+        sound('cause', { cause: ev.cause });
         const f = activeOf(ev.side);
         const before = f.hp;
-        f.hp = ev.hp;
-        paint(ev.side);
-        anim(els.hud[pos(ev.side)].el, 'hurt', 600);
-        float(ev.side, floatAmount(ev, '−'), 'dmg small');
-        if (STATUS_INFO[ev.cause]) {
-          anim(els.spot[pos(ev.side)], `afflicted-${ev.cause}`, 900);
-          fx.status(ev.cause, els.spot[pos(ev.side)]);
-        }
-        const condition = { leechseed: 'leechdrain', bound: 'bound', saltcure: 'saltcure', confusion: 'confusion' }[ev.cause];
-        if (condition) fx.condition(condition, els.spot[pos(ev.side)], els.spot[pos(1 - ev.side)]);
-        if (ev.cause === 'confusion') anim(els.spot[pos(ev.side)], 'dizzy', 1100);
+        const spot = els.spot[pos(ev.side)];
         const why = ev.cause === 'confusion' ? ' se hiere a sí mismo' : ` pierde ${amountText(ev)}${HURT[ev.cause] ?? ''}`;
         tell([...mon(ev.side, f.name), `${why} (${hpText(ev, before)} → ${hpText(ev, ev.hp)}).`], { side: ev.side, sub: true, cls: 'weak' });
-        return 900;
+        return (async () => {
+          await (ev.cause === 'confusion' ? fx.condition('confusion', spot) : fx.hurt(ev.cause, spot, els.spot[pos(1 - ev.side)]));
+          if (!STATUS_INFO[ev.cause]) {
+            anim(spot, 'hit', 700);
+            await wait(700);
+          }
+          f.hp = ev.hp;
+          popNumber(ev.side, amountLabel(ev, '−'), 'weak');
+          await wait(paint(ev.side) + 300);
+        })();
       }
       case 'immune':
-        float(ev.side, 'Inmune', 'miss');
         tell(['no afecta a ', ...mon(ev.side, activeOf(ev.side).name), '.'], { side: 1 - ev.side, sub: true, cls: 'weak' });
         return 900;
       case 'hits':
@@ -3437,7 +3557,8 @@ function battleUI(c, sendAction) {
         view.field = { ...view.field, weather: ev.weather, weatherSuppressed: false };
         paintField();
         tell([WEATHER_START[ev.weather] ?? 'Cambia el clima.']);
-        return 900;
+        sound('weather', { weather: ev.weather, type: WEATHER_TYPE[ev.weather] });
+        return Promise.all([sleep(900), fx.weather(ev.weather, WEATHER_TYPE[ev.weather] ?? 'normal')]);
       case 'weatherEnd':
         view.field = { ...view.field, weather: null };
         paintField();
@@ -3447,7 +3568,8 @@ function battleUI(c, sendAction) {
         view.field = { ...view.field, terrain: ev.terrain };
         paintField();
         tell([`Aparece un ${TERRAIN[ev.terrain] ?? 'campo'}.`]);
-        return 900;
+        sound('terrain', { terrain: ev.terrain });
+        return Promise.all([sleep(900), fx.terrain(ev.terrain)]);
       case 'terrainEnd':
         view.field = { ...view.field, terrain: null };
         paintField();
@@ -3457,8 +3579,7 @@ function battleUI(c, sendAction) {
         const side = sd(ev.side);
         side.screens = { ...(side.screens || {}), [ev.screen]: ev.turns };
         paint(ev.side);
-        anim(els.spot[pos(ev.side)], 'power', 600);
-        tell([`${SCREEN[ev.screen]} protege al equipo de ${side.name} contra ${SCREEN_GUARDS[ev.screen]}.`], { side: ev.side });
+        tell([`${SCREEN[ev.screen]} protege al equipo de ${trainerShort(side.name)} contra ${SCREEN_GUARDS[ev.screen]}.`], { side: ev.side });
         return 900;
       }
       case 'screenEnd': {
@@ -3466,15 +3587,15 @@ function battleUI(c, sendAction) {
         const { [ev.screen]: _gone, ...rest } = side.screens || {};
         side.screens = rest;
         paint(ev.side);
-        if (ev.cause === 'broken') anim(els.spot[pos(ev.side)], 'hit', 400);
-        tell([(SCREEN_END[ev.cause] ?? SCREEN_END.time)(SCREEN[ev.screen], side.name)], { side: ev.side, cls: ev.cause === 'time' ? 'weak' : null });
+        if (ev.cause === 'broken') anim(els.spot[pos(ev.side)], 'hit', 700);
+        tell([(SCREEN_END[ev.cause] ?? SCREEN_END.time)(SCREEN[ev.screen], trainerShort(side.name))], { side: ev.side, cls: ev.cause === 'time' ? 'weak' : null });
         return 800;
       }
       case 'hazard':
-        tell([`Púas tóxicas rodean al equipo de ${sd(ev.side).name}.`], { side: ev.side, cls: 'weak' });
+        tell([`Púas tóxicas rodean al equipo de ${trainerShort(sd(ev.side).name)}.`], { side: ev.side, cls: 'weak' });
         return 800;
       case 'hazardEnd':
-        tell([`Desaparecen las púas tóxicas del lado de ${sd(ev.side).name}.`], { side: ev.side });
+        tell([`Desaparecen las púas tóxicas del lado de ${trainerShort(sd(ev.side).name)}.`], { side: ev.side });
         return 700;
       case 'types': {
         const f = activeOf(ev.side);
@@ -3487,7 +3608,6 @@ function battleUI(c, sendAction) {
         const f = activeOf(ev.side);
         Object.assign(f, { stats: ev.stats, types: ev.types, hp: ev.hp, ...(ev.sprite ? { sprite: ev.sprite } : {}) });
         paint(ev.side);
-        anim(els.spot[pos(ev.side)], 'power', 600);
         return 700;
       }
       case 'transform': {
@@ -3498,63 +3618,79 @@ function battleUI(c, sendAction) {
         return 1000;
       }
       case 'heal': {
+        sound('heal');
         const f = activeOf(ev.side);
         const before = f.hp;
         f.hp = ev.hp;
-        paint(ev.side);
-        float(ev.side, floatAmount(ev, '+'), 'heal');
+        popNumber(ev.side, amountLabel(ev, '+'), 'heal');
+        const hpMs = paint(ev.side);
         tell([...mon(ev.side, f.name), ` recupera ${amountText(ev)} (${hpText(ev, before)} → ${hpText(ev, ev.hp)}).`], { side: ev.side, sub: true });
-        return 1000;
+        return Math.max(1000, hpMs + 300);
       }
       case 'faint': {
         els.spot[pos(ev.side)].classList.remove('is-hidden-move');
         const f = activeOf(ev.side);
-        f.hp = 0;
         setActing(null);
-        paint(ev.side);
-        tell(['💀 ', ...mon(ev.side, f.name), ' cae rendido.'], { side: ev.side, cls: 'ko' });
-        return 1200;
+        return (async () => {
+          cry(ev.side, true);
+          await wait(900);
+          sound('faint');
+          f.hp = 0;
+          paint(ev.side);
+          await wait(500);
+          tell(['💀 ', ...mon(ev.side, f.name), ' cae rendido.'], { side: ev.side, cls: 'ko' });
+          await wait(700);
+        })();
       }
       case 'switch': {
-        els.spot[pos(ev.side)].classList.remove('is-hidden-move');
         const s = ev.side;
+        const spot = els.spot[pos(s)];
         const from = ev.from || activeOf(s).name;
-        sd(s).active = ev.to;
-        if (ev.mon) sd(s).team[ev.to] = ev.mon;
-        if (ev.look) Object.assign(activeOf(s), ev.look);
-        paint(s);
-        const who = isYou(s) ? 'mandas' : `${sd(s).name} manda`;
-        if (draggedSide === s) {
+        const dragged = draggedSide === s;
+        const recalling = !ev.forced && !dragged && activeOf(s)?.hp > 0;
+        const who = isYou(s) ? 'mandas' : `${trainerShort(sd(s).name)} manda`;
+        if (dragged) {
           draggedSide = null;
           tell(['Sale ', h('b', null, ev.name), ' en su lugar.'], { side: s });
-        } else if (ev.forced) tell([isYou(s) ? 'Mandas a ' : `${sd(s).name} manda a `, h('b', null, ev.name), '.'], { side: s });
-        else tell([isYou(s) ? 'Retiras a ' : `${sd(s).name} retira a `, h('b', null, from), ` y ${who} a `, h('b', null, ev.name), '.'], { side: s });
-        return 1000;
+        } else if (ev.forced) tell([isYou(s) ? 'Mandas a ' : `${trainerShort(sd(s).name)} manda a `, h('b', null, ev.name), '.'], { side: s });
+        else tell([isYou(s) ? 'Retiras a ' : `${trainerShort(sd(s).name)} retira a `, h('b', null, from), ` y ${who} a `, h('b', null, ev.name), '.'], { side: s });
+        return (async () => {
+          if (recalling) {
+            sound('switch');
+            await fx.recall(spot);
+            await wait(250);
+          }
+          spot.classList.remove('is-hidden-move');
+          sd(s).active = ev.to;
+          if (ev.mon) sd(s).team[ev.to] = ev.mon;
+          if (ev.look) Object.assign(activeOf(s), ev.look);
+          spot.classList.add('incoming');
+          paint(s);
+          await Promise.all([sendOut(s), sleep(1000)]);
+        })();
       }
       case 'switchOut':
-        anim(els.spot[pos(ev.side)], 'dodge', 500);
         tell([...mon(ev.side, ev.name), ' vuelve con su entrenador.'], { side: ev.side, sub: true });
-        return 700;
+        sound('switch');
+        return Promise.all([sleep(700), fx.recall(els.spot[pos(ev.side)])]);
       case 'replace':
-        tell([isYou(ev.side) ? 'Elige quién entra.' : `${sd(ev.side).name} elige quién entra…`], { side: ev.side, cls: 'weak' });
+        tell([isYou(ev.side) ? 'Elige quién entra.' : `${trainerShort(sd(ev.side).name)} elige quién entra…`], { side: ev.side, cls: 'weak' });
         return 500;
       case 'protect':
-        anim(els.spot[pos(ev.side)], 'power', 600);
         tell([...mon(ev.side, ev.name), ev.kind === 'endure' ? ' se prepara para aguantar.' : ' se protege.'], { side: ev.side, sub: true });
-        return Promise.all([sleep(700), fx.condition('protect', els.spot[pos(ev.side)])]);
+        return 700;
       case 'protected':
-        float(ev.side, '🛡️', 'status-float');
+        sound('condition', { kind: 'protect' });
         tell(['¡', ...mon(ev.side, ev.name), ' se protegió!'], { side: ev.side, sub: true, cls: 'weak' });
         return Promise.all([sleep(800), fx.condition('protect', els.spot[pos(ev.side)])]);
       case 'protectBroken':
         tell(['¡Rompe la protección de ', ...mon(ev.side, ev.name), '!'], { side: ev.side, sub: true });
         return 700;
       case 'endured':
-        float(ev.side, '¡Aguanta!', 'up');
         tell(['¡', ...mon(ev.side, ev.name), ' aguantó el golpe!'], { side: ev.side, sub: true });
         return 800;
       case 'subDamage':
-        anim(els.spot[pos(ev.side)], 'hit', 500);
+        anim(els.spot[pos(ev.side)], 'hit', 700);
         tell(['El sustituto de ', ...mon(ev.side, ev.name), ' recibe el golpe.'], { side: ev.side, sub: true });
         return 800;
       case 'sideStart': {
@@ -3563,7 +3699,7 @@ function battleUI(c, sendAction) {
         else if (ev.kind === 'wish') side.wish = true;
         else if (!['quickguard', 'wideguard', 'craftyshield', 'matblock'].includes(ev.kind)) side.conds = { ...(side.conds || {}), [ev.kind]: true };
         paint(ev.side);
-        tell([SIDE_COND[ev.kind]?.start(side.name, ev) ?? ''], { side: ev.side });
+        tell([SIDE_COND[ev.kind]?.start(trainerShort(side.name), ev) ?? ''], { side: ev.side });
         return 900;
       }
       case 'sideEnd': {
@@ -3571,7 +3707,7 @@ function battleUI(c, sendAction) {
         if (side.hazards && ev.kind in side.hazards) side.hazards = { ...side.hazards, [ev.kind]: ev.kind === 'spikes' ? 0 : false };
         if (side.conds) delete side.conds[ev.kind];
         paint(ev.side);
-        tell([SIDE_COND[ev.kind]?.end?.(side.name) ?? ''], { side: ev.side, cls: 'weak' });
+        tell([SIDE_COND[ev.kind]?.end?.(trainerShort(side.name)) ?? ''], { side: ev.side, cls: 'weak' });
         return 700;
       }
       case 'fieldStart':
@@ -3613,7 +3749,7 @@ function battleUI(c, sendAction) {
       case 'teamCured':
         for (const t of sd(ev.side).team) if (t.hp > 0) t.status = null;
         paint(ev.side);
-        tell([`El equipo de ${sd(ev.side).name} se cura de sus problemas de estado.`], { side: ev.side });
+        tell([`El equipo de ${trainerShort(sd(ev.side).name)} se cura de sus problemas de estado.`], { side: ev.side });
         return 900;
       case 'revive': {
         const t = sd(ev.side).team[ev.index];
@@ -3626,9 +3762,9 @@ function battleUI(c, sendAction) {
         tell([...mon(ev.side, ev.name), ` prevé un ataque: ${ev.move}.`], { side: ev.side, sub: true });
         return 800;
       case 'futureHit':
-        anim(els.spot[pos(ev.side)], 'hit', 500);
+        anim(els.spot[pos(ev.side)], 'hit', 700);
         tell(['¡', h('b', null, ev.move), ' golpea a ', ...mon(ev.side, ev.name), '!'], { side: ev.side });
-        return Promise.all([sleep(700), fx.move({ kind: 'attack', type: 'psychic', key: 'psychic', flags: [] }, els.spot[pos(ev.side)], els.spot[pos(ev.side)])]);
+        return Promise.all([sleep(700), fx.move({ kind: 'attack', type: 'psychic', key: 'future-sight', flags: [] }, els.spot[pos(1 - ev.side)], els.spot[pos(ev.side)])]);
       case 'wish':
         tell([`¡Se cumple el deseo de ${ev.name}!`], { side: ev.side });
         return 700;
@@ -3673,21 +3809,31 @@ function battleUI(c, sendAction) {
   }
 
   async function apply(msg) {
+    if (dead) return;
     // A viewer who just accepted reconnects as a player: redraw from their side.
     const first = !frame || (msg.you != null && msg.you !== mine);
     frame = msg;
     if (first) {
       mine = msg.you ?? 0;
       view = clone(msg.state);
+      const fighters = view.sides.flatMap((side) => side.team.filter(Boolean));
+      const moveKeys = fighters.flatMap((f) => (f.moves ?? []).map((m) => m.key)).filter(Boolean);
+      const animKeys = [...moveKeys, ...moveKeys.map(chargeAnim), ...COMMON_PRELOAD];
+      music.preload({ sprites: fighters.map((f) => f.sprite), moves: animKeys });
+      fx.preload(animKeys);
       for (const p of ['me', 'foe']) delete els.spot[p].dataset.key;
       paintAll();
       if (msg.state.status === 'active' && !els.log.childElementCount) {
-        log(`${view.sides[0].name} vs ${view.sides[1].name}. ¡A pelear!`, 'turn');
-        say(msg.you == null ? `${view.sides[0].name} vs ${view.sides[1].name}` : '¡A pelear! Elige tu jugada.');
+        log(`${trainerShort(view.sides[0].name)} vs ${trainerShort(view.sides[1].name)}. ¡A pelear!`, 'turn');
+        say(msg.you == null ? `${trainerShort(view.sides[0].name)} vs ${trainerShort(view.sides[1].name)}` : '¡A pelear! Elige tu jugada.');
         if (msg.state.turn === 1) {
           playing = true;
           renderControls();
+          els.spot.foe.classList.add('incoming');
+          els.spot.me.classList.add('incoming');
           await splash();
+          await sendOut(1 - mine);
+          await sendOut(mine);
           playing = false;
         }
         if (msg.state.intro?.length) {
@@ -3703,7 +3849,7 @@ function battleUI(c, sendAction) {
       }
       if (msg.state.status === 'finished') {
         const w = msg.state.winner;
-        tell([w === null ? 'Empate.' : isYou(w) ? '¡Ganaste esta batalla! 🏆' : `¡${view.sides[w].name} ganó esta batalla!`], { cls: 'win' });
+        tell([w === null ? 'Empate.' : isYou(w) ? '¡Ganaste esta batalla! 🏆' : `¡${trainerShort(view.sides[w].name)} ganó esta batalla!`], { cls: 'win' });
         showResult(w);
       }
     } else if (msg.events?.length) {
@@ -3711,12 +3857,20 @@ function battleUI(c, sendAction) {
       sent = null;
       renderControls();
       if (msg.timedOut) log('⏱ Se acabó el tiempo: la máquina eligió por quien no alcanzó.', 'weak');
-      for (const ev of msg.events) await settle(play(ev));
+      let acted = false;
+      for (const ev of msg.events) {
+        if (dead) return;
+        if (ev.t === 'move' || ev.t === 'switch' || ev.t === 'charging') {
+          if (acted) await wait(ACTION_GAP_MS);
+          acted = true;
+        }
+        await settle(play(ev));
+      }
       setActing(null);
       playing = false;
       view = clone(msg.state);
       paintAll();
-      if (view.status === 'active') say(frame.you == null ? 'Eligiendo…' : view.phase !== 'choose' && !view.sides[frame.you].mustSwitch ? `${view.sides[1 - frame.you].name} elige quién entra…` : '¿Qué haces ahora?');
+      if (view.status === 'active') say(frame.you == null ? 'Eligiendo…' : view.phase !== 'choose' && !view.sides[frame.you].mustSwitch ? `${trainerShort(view.sides[1 - frame.you].name)} elige quién entra…` : '¿Qué haces ahora?');
     } else if (msg.t === 'start' || msg.t === 'presence') {
       view = clone(msg.state);
       paintAll();
@@ -3737,7 +3891,9 @@ function battleUI(c, sendAction) {
     },
     resultShown: () => shown,
     destroy() {
+      dead = true;
       clearInterval(tick);
+      resize.disconnect();
     },
   };
 }
