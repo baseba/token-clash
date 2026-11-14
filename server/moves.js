@@ -6,7 +6,6 @@ export const IMPOSSIBLE_MOVES = new Set([
   'after-you', 'ally-switch', 'follow-me', 'rage-powder', 'helping-hand', 'magnetic-flux',
 ]);
 
-const PROTECT_KINDS = new Set(['protect', 'detect', 'kings-shield', 'spiky-shield', 'baneful-bunker', 'obstruct', 'silk-trap', 'burning-bulwark']);
 const SIDE_TURNS = { tailwind: 4, safeguard: 5, mist: 5, 'lucky-chant': 5 };
 const ROOM_TURNS = { gravity: 5, 'trick-room': 5, 'wonder-room': 5, 'mud-sport': 5, 'water-sport': 5 };
 const NO_COPY_ABILITY = new Set(['wonder-guard', 'multitype', 'illusion', 'stance-change', 'schooling', 'comatose', 'shields-down', 'disguise', 'rks-system', 'battle-bond', 'power-construct', 'ice-face', 'gulp-missile', 'zen-mode', 'imposter', 'trace', 'receiver', 'power-of-alchemy', 'neutralizing-gas', 'as-one-glastrier', 'as-one-spectrier', 'commander', 'zero-to-hero', 'tera-shift', 'protosynthesis', 'quark-drive']);
@@ -541,5 +540,3 @@ export const MOVE_RULES = {
 
 MOVE_RULES['ice-ball'] = MOVE_RULES.rollout;
 
-export const supportsMove = (id) => !IMPOSSIBLE_MOVES.has(id) && !!MOVE_RULES[id];
-export const isProtectKind = (id) => PROTECT_KINDS.has(id);

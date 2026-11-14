@@ -24,7 +24,6 @@ export const TYPES = {
 };
 
 export const typeLabel = (t) => TYPES[t]?.label ?? t;
-export const typeNames = (types) => (types || []).map(typeLabel).join(' ');
 
 // Attacking type -> { defending type: multiplier }. Only the non-1 cases are listed (2 = super
 // effective, 0.5 = resisted, 0 = immune). Gen 6+ chart.

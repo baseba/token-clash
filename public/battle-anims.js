@@ -1,5 +1,5 @@
-export const FRAME_MS = 50;
-export const FIELD = { width: 320, height: 180 };
+const FRAME_MS = 50;
+const FIELD = { width: 320, height: 180 };
 const USER_FOCUS = { x: 106, y: 116 };
 const TARGET_FOCUS = { x: 234, y: 52 };
 const CELL = 96;

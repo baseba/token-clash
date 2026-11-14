@@ -204,3 +204,12 @@ test('Impresionar makes the foe flinch about 30% of the time, but only when it h
   assert.ok(faster > 35 && faster < 90, `${faster}/200`);
   assert.equal(flinches(94, 80, 1), 0);
 });
+
+test('spectators see both whole teams, while a player only sees the foes that came out', () => {
+  const b = battle([mon('a', 25, ['tackle']), mon('b', 1, ['tackle'])], [mon('c', 4, ['tackle']), mon('d', 7, ['tackle'])]);
+  const asPlayer = publicState(b, 0).sides[1].team;
+  assert.equal(asPlayer[0].hidden, undefined);
+  assert.equal(asPlayer[1].hidden, true);
+  const asSpectator = publicState(b, null).sides;
+  assert.ok(asSpectator.every((side) => side.team.every((f) => !f.hidden && f.name)));
+});

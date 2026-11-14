@@ -1998,7 +1998,7 @@ async function battlePage(id, seq) {
         prep = null;
       }
       if (!battle) {
-        battle = battleUI(c, (action) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'act', action })));
+        battle = battleUI(c, (action) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'act', action })), (turn) => send({ t: 'seen', turn }));
         music.play(`scene:${sceneFor(c.id).file}`);
       }
       battle.push(msg);
@@ -2619,6 +2619,7 @@ function countdownUI(c) {
   let endsAt = 0;
   let shown = null;
   let timer = null;
+  let waiting = null;
   const player = (p, side, you) =>
     h(
       'div',
@@ -2630,6 +2631,10 @@ function countdownUI(c) {
       p.ai ? null : h('span', { class: 'muted small' }, `📚 ${p.rosterSize} Pokémon · ✨ ${p.shinies} shiny`),
     );
   function tick() {
+    if (waiting) {
+      number.textContent = '⏳';
+      return;
+    }
     const left = Math.max(0, endsAt - Date.now());
     const sec = Math.ceil(left / 1000);
     if (sec === shown) return;
@@ -2645,7 +2650,10 @@ function countdownUI(c) {
       const watching = msg.you === null;
       const tour = msg.tournament;
       heading.textContent = tour ? (watching ? `👁 Próxima pelea · ${tour.round}` : `⚔︎ ¡Te toca! · ${tour.round}`) : watching ? 'Sala llena' : '¡Rival encontrado!';
-      caption.textContent = tour ? `Pelea ${tour.number} de ${tour.total} · parte en…` : 'La preparación parte en…';
+      waiting = msg.waiting?.length ? msg.waiting.map(trainerShort) : null;
+      caption.textContent = waiting
+        ? `Esperando a ${waiting.length > 2 ? `${waiting.slice(0, 2).join(', ')} y ${waiting.length - 2} más` : waiting.join(' y ')}…`
+        : tour ? `Pelea ${tour.number} de ${tour.total} · parte en…` : 'La preparación parte en…';
       late.hidden = !watching || !me || !!tour;
       cards.replaceChildren(player(msg.players[0], 0, msg.you === 0), h('div', { class: 'match-center' }, h('div', { class: 'vs-mark' }, 'VS'), number), player(msg.players[1], 1, msg.you === 1));
       if (!root.isConnected) $app.replaceChildren(root);
@@ -2928,7 +2936,7 @@ function moveSound(ev, byPlayer) {
   music.sfx('move', { key: ev.key, byPlayer, shape: self ? (shape === 'boost' ? 'boost' : 'aura') : shape, type: ev.type });
 }
 
-function battleUI(c, sendAction) {
+function battleUI(c, sendAction, sendSeen = () => {}) {
   let frame = null; // last frame from the server
   let view = null; // what is on screen (lags behind frame while events play)
   let playing = false;
@@ -2956,6 +2964,7 @@ function battleUI(c, sendAction) {
     ground: h('div', { class: 'terrain-glow', 'aria-hidden': 'true' }),
     spot: { foe: h('div', { class: 'spot foe', onclick: () => openInfo(sideAt('foe')) }), me: h('div', { class: 'spot me', onclick: () => openInfo(sideAt('me')) }) },
     hud: { foe: hud('foe'), me: hud('me') },
+    team: { me: h('aside', { class: 'team-panel me', 'aria-label': 'Equipo de la izquierda' }), foe: h('aside', { class: 'team-panel foe', 'aria-label': 'Equipo de la derecha' }) },
     info: h('dialog', { class: 'info-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() }),
     say: h('div', { class: 'say', 'aria-live': 'polite' }),
     controls: h('div', { class: 'card' }),
@@ -2984,7 +2993,7 @@ function battleUI(c, sendAction) {
   const fx = createFx(arena, field);
   $app.replaceChildren(
     h('div', { class: 'status-line' }, els.turn, els.vs, els.field, els.timer),
-    h('div', { class: 'stage' }, arena),
+    h('div', { class: 'stage battle-stage' }, els.team.me, arena, els.team.foe),
     h('div', { class: 'battle-layout' }, els.controls, els.log),
     els.info,
   );
@@ -3118,9 +3127,10 @@ function battleUI(c, sendAction) {
     resultShown();
   }
 
-  function openInfo(side) {
+  function openInfo(side, index = view?.sides[side].active) {
     if (!view) return;
-    const f = activeOf(side);
+    const f = view.sides[side].team[index];
+    if (!f || f.hidden) return;
     const own = isYou(side) || view.status === 'finished';
     els.info.replaceChildren(infoCard(f, { own, owner: trainerShort(view.sides[side].name), close: () => els.info.close() }));
     if (!els.info.open) els.info.showModal();
@@ -3188,7 +3198,6 @@ function battleUI(c, sendAction) {
       ...[
         typeChips(f.types),
         f.status && f.hp > 0 ? h('span', { class: `cond ${f.status}`, tabindex: 0, 'data-tip': STATUS_INFO[f.status].name, 'data-tip-note': STATUS_INFO[f.status].desc }, statusLabel(f.status)) : null,
-        h('span', { class: 'owner' }, isYou(side) ? `${trainerShort(sd.name)} (tú)` : trainerShort(sd.name)),
         h('span', { class: 'dots', 'aria-label': `Equipo: ${sd.team.filter((t) => t.hp > 0).length} de ${sd.team.length} en pie`, 'data-tip': `${sd.team.filter((t) => t.hp > 0).length} de ${sd.team.length} en pie` }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
       ].filter(Boolean),
     );
@@ -3200,6 +3209,7 @@ function battleUI(c, sendAction) {
     ];
     r.conds.replaceChildren(...condChips);
     r.conds.hidden = !condChips.length;
+    paintTeams();
     return ms;
   }
 
@@ -3225,6 +3235,108 @@ function battleUI(c, sendAction) {
     els.ground.className = `terrain-glow${fl.terrain ? ` ${fl.terrain}` : ''}`;
   }
 
+  const switchOptions = () => (frame?.you == null || playing || sent || frame.state?.status !== 'active' ? [] : (frame.actions ?? []).filter((a) => a.type === 'switch'));
+  function switchTo(i) {
+    const action = switchOptions().find((a) => a.to === i);
+    if (!action) return false;
+    sent = `cambiar a ${frame.state.sides[frame.you].team[i].name}`;
+    sendAction(action);
+    renderControls();
+    return true;
+  }
+
+  function switchBlockReason(i) {
+    if (switchOptions().some((a) => a.to === i)) return null;
+    const st = frame?.state;
+    const mine = st?.sides[frame.you];
+    if (!mine) return 'No puedes cambiar ahora.';
+    const f = mine.team[i];
+    if (st.status !== 'active') return 'La batalla terminó.';
+    if (playing) return 'Espera a que termine de verse el turno.';
+    if (sent) return `Ya elegiste: ${sent}.`;
+    if (f.hp <= 0) return `${f.name} está debilitado.`;
+    if (i === mine.active) return `${f.name} ya está en combate.`;
+    if (!frame.actions?.length) return st.sides[1 - frame.you].mustSwitch ? 'Espera a que tu rival elija quién entra.' : 'Espera a que tu rival elija.';
+    const active = mine.team[mine.active];
+    if (active?.volatiles?.bound || active?.volatiles?.trapped) return `${active.name} está atrapado y no puede cambiar.`;
+    return 'No puedes cambiar ahora.';
+  }
+
+  function closeTeamChoice() {
+    arena.closest('.battle-stage')?.querySelector('.team-choice')?.remove();
+    document.removeEventListener('pointerdown', onOutsideChoice, true);
+  }
+  function onOutsideChoice(e) {
+    if (!e.target.closest?.('.team-choice')) closeTeamChoice();
+  }
+  function openTeamChoice(card, side, i) {
+    closeTeamChoice();
+    const f = view.sides[side].team[i];
+    const blocked = switchBlockReason(i);
+    const switchBtn = blocked
+      ? h('button', { type: 'button', class: 'btn sm is-disabled', role: 'menuitem', 'aria-disabled': 'true', 'data-tip': blocked, onclick: () => toast(blocked) }, '⇄ Cambiar')
+      : h('button', { type: 'button', class: 'btn primary sm', role: 'menuitem', onclick: () => { closeTeamChoice(); switchTo(i); } }, '⇄ Cambiar');
+    const menu = h(
+      'div',
+      { class: 'team-choice', role: 'menu', 'aria-label': `Opciones de ${f.name}` },
+      switchBtn,
+      h('button', { type: 'button', class: 'btn sm', role: 'menuitem', onclick: () => { closeTeamChoice(); openInfo(side, i); } }, 'Ver info'),
+    );
+    card.append(menu);
+    menu.querySelector('button').focus();
+    setTimeout(() => document.addEventListener('pointerdown', onOutsideChoice, true));
+  }
+
+  const teamSigs = { me: '', foe: '' };
+  function paintTeams() {
+    if (!view) return;
+    const watching = frame?.you == null;
+    for (const p of ['me', 'foe']) {
+      const side = sideAt(p);
+      const sd = view.sides[side];
+      const showHp = watching || isYou(side);
+      const switchable = new Set(isYou(side) ? switchOptions().map((a) => a.to) : []);
+      els.team[p].classList.toggle('must-pick', switchable.size > 0 && frame?.state?.phase !== 'choose');
+      const sig = JSON.stringify([sd.name, sd.active, showHp, [...switchable], sd.team.map((f) => (f?.hidden ? 0 : [f.uid, f.sprite, f.shiny, f.hp, f.stats?.hp, f.level, f.name]))]);
+      if (sig === teamSigs[p]) continue;
+      teamSigs[p] = sig;
+      const cards = sd.team.map((f, i) => {
+        if (!f || f.hidden) return h('div', { class: 'team-mon unknown', 'aria-label': 'Pokémon sin revelar' }, h('span', { class: 'team-q', 'aria-hidden': 'true' }, '?'), h('div', { class: 'team-info' }, h('b', null, '???'), h('small', { class: 'muted' }, 'Sin ver')));
+        const pct = Math.max(0, Math.min(100, (f.hp / f.stats.hp) * 100));
+        const fainted = f.hp <= 0;
+        const canSwitch = switchable.has(i);
+        const card = h(
+          'div',
+          { class: `team-mon${fainted ? ' fainted' : ''}${i === sd.active && !fainted ? ' active' : ''}${canSwitch ? ' can-switch' : ''}` },
+          h(
+            'button',
+            { type: 'button', class: 'team-main', 'aria-label': isYou(side) ? `Opciones de ${f.name}` : `Ver info de ${f.name}`, 'aria-haspopup': isYou(side) ? 'menu' : null, onclick: () => (isYou(side) ? openTeamChoice(card, side, i) : openInfo(side, i)) },
+            h('div', { class: 'team-sprite', html: creatureHTML(f) }),
+            h(
+              'div',
+              { class: 'team-info' },
+              h('b', null, f.name, genderMark(f.gender) ?? ''),
+              h('small', { class: 'muted' }, fainted ? 'Debilitado' : `Nv ${f.level}`),
+              showHp ? h('div', { class: 'team-hp', 'aria-label': `${Math.round(pct)}% de PV` }, h('i', { class: pct < 20 ? 'low' : pct < 50 ? 'mid' : null, style: { width: `${pct}%` } })) : null,
+              canSwitch ? h('span', { class: 'switch-chip' }, '⇄ Puede entrar') : null,
+            ),
+          ),
+        );
+        return card;
+      });
+      const alive = sd.team.filter((f) => f && !f.hidden && f.hp > 0).length + sd.team.filter((f) => !f || f.hidden).length;
+      const role = isYou(side) ? 'Tú' : watching ? `Jugador ${side + 1}` : 'Rival';
+      const head = h(
+        'header',
+        { class: 'team-panel-head' },
+        h('span', { class: 'team-role' }, role),
+        trainerName(sd.name, { class: 'team-owner' }),
+        h('span', { class: 'team-alive', 'aria-label': `${alive} de ${sd.team.length} en pie` }, sd.team.map((f, i) => h('i', { class: f && !f.hidden && f.hp <= 0 ? 'out' : i === sd.active ? 'on' : null }))),
+      );
+      els.team[p].replaceChildren(head, ...cards);
+    }
+  }
+
   function paintAll() {
     paint(0);
     paint(1);
@@ -3235,6 +3347,7 @@ function battleUI(c, sendAction) {
   }
 
   function renderControls() {
+    paintTeams();
     const st = frame.state;
     const you = frame.you;
     const foeName = trainerShort(st.sides[1 - mine].name);
@@ -3335,16 +3448,9 @@ function battleUI(c, sendAction) {
         ),
       );
     }
-    const sw = acts.filter((a) => a.type === 'switch');
-    if (sw.length) {
-      box.append(
-        h('p', { class: 'muted small' }, st.phase !== 'choose' ? '' : 'Cambiar (gasta el turno):'),
-        h('div', { class: 'bench' }, sw.map((a) => {
-          const t = meSide.team[a.to];
-          return h('button', { class: 'btn', onclick: () => act(a, `cambiar a ${t.name}`) }, h('span', { html: creatureHTML(t) }), `${t.name} · ${t.hp}/${t.stats.hp}`);
-        })),
-      );
-    }
+    const canSwitch = acts.some((a) => a.type === 'switch');
+    const forced = st.phase !== 'choose';
+    if (canSwitch) box.append(h('p', { class: `switch-hint${forced ? ' forced' : ''}` }, forced ? '👉 Elige en el panel de tu equipo quién entra.' : '⇄ Para cambiar (gasta el turno), toca un Pokémon en el panel de tu equipo.'));
     if (foeReady && st.phase === 'choose') box.append(h('p', { class: 'muted small' }, `${foeName} ya eligió.`));
   }
 
@@ -3900,6 +4006,7 @@ function battleUI(c, sendAction) {
       backlog += 1;
       queue = queue
         .then(() => apply(msg))
+        .then(() => msg.state && !dead && sendSeen(msg.state.turn))
         .catch((e) => console.error(e))
         .finally(() => (backlog -= 1));
     },

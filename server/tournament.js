@@ -16,6 +16,15 @@ export const humanCount = (t) => t.seats.filter((s) => !s.ai).length;
 const ROUND_NAMES = { 1: 'Final', 2: 'Semifinal', 4: 'Cuartos de final', 8: 'Octavos de final' };
 
 export const isAiSeat = (seat) => !!seat?.ai;
+
+export function pendingArrivals({ players = [], followers = [], present = [] }) {
+  const here = new Set(present);
+  return [...new Set([...players, ...followers])].filter((id) => !here.has(id));
+}
+
+export function viewersBehind(seenTurns, turn) {
+  return seenTurns.some((seen) => (seen ?? 0) < turn);
+}
 export const isFull = (t) => t.seats.length >= t.size;
 export const allReady = (t) => isFull(t) && t.seats.every((s) => s.ready);
 export const seatOf = (t, trainerId) => t.seats.findIndex((s) => s.id === trainerId);
