@@ -25,7 +25,7 @@ const DATA_DIR = process.env.DATA_DIR || fileURLToPath(new URL('../data', import
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || '';
 const TRUST_CF = process.env.TRUST_CF_CONNECTING_IP === '1';
 const TURN_MS = Number(process.env.TURN_MS || 60_000);
-const PREVIEW_MS = Number(process.env.PREVIEW_MS || 70_000);
+const PREVIEW_MS = Number(process.env.PREVIEW_MS || 80_000);
 const ROLL_MS = Number(process.env.ROLL_MS ?? 6_000);
 const MATCH_MS = Number(process.env.MATCH_MS ?? 5_000);
 const REVEAL_MS = Number(process.env.REVEAL_MS ?? 4_000);
@@ -840,7 +840,7 @@ function tournamentMatchDone(c, winnerSide) {
 }
 
 // ---------- HTTP ----------
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.gif': 'image/gif', '.json': 'application/json; charset=utf-8', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain; charset=utf-8' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.gif': 'image/gif', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.json': 'application/json; charset=utf-8', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain; charset=utf-8' };
 
 async function serveStatic(req, res, path) {
   const rel = normalize(path).replace(/^([/\\])+/, '');
@@ -852,7 +852,7 @@ async function serveStatic(req, res, path) {
     const type = MIME[extname(file)] || 'application/octet-stream';
     // Code revalidates on every load so a deploy shows up at once (Cloudflare would stretch a short
     // max-age to hours). Sprites never change under the same name, so they can be cached.
-    const cache = ['.png', '.gif', '.ico'].includes(extname(file)) ? 'public, max-age=86400' : 'no-cache';
+    const cache = ['.png', '.gif', '.ogg', '.mp3', '.wav', '.m4a', '.ico'].includes(extname(file)) ? 'public, max-age=86400' : 'no-cache';
     send(res, 200, body, { 'Content-Type': type, 'Cache-Control': cache });
   } catch {
     send(res, 404, 'not found');

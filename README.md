@@ -32,7 +32,7 @@ En vivo: **https://clash.mirrordev.xyz**
      - **Privada:** no aparece en Salas abiertas; solo entra quien tenga el link.
      - Una sala pública deja de aparecer si el anfitrión cierra la página. Cuando alguien entra, los dos se ven en
        la sala y cada uno aprieta **¡Estoy listo!**; con los dos listos parte una cuenta regresiva de 5 s antes de
-       elegir sus Pokémon (70 s para elegir). Ningún jugador ve qué eligió el rival ni en qué orden; cuando los dos
+       elegir sus Pokémon (80 s para elegir). Ningún jugador ve qué eligió el rival ni en qué orden; cuando los dos
        eligen, pasan 4 s y parte la pelea en vivo (60 s por turno; si alguien no elige, su Pokémon ataca solo).
        Cualquiera más con el link puede mirar: en la preparación ve los dos equipos completos, lo que cada uno va
        marcando mientras elige, los 3 elegidos de cada lado durante esos 4 s y, en cada
@@ -90,8 +90,24 @@ defecto, cada Pokémon usa los últimos movimientos que aprendió hasta su nivel
 Pokémon evolucionado también puede usar lo que aprendían sus preevoluciones hasta ese nivel (Raichu tiene los de
 Pichu, Pikachu y Raichu).
 
-Los datos viven en `server/pokeapi.json`, `server/movedex.json` y `server/abilities.json`. Los sprites no se
-versionan: `npm install` los descarga en `public/sprites/` (o `npm run sprites`). El servidor nunca llama a la
+Los datos viven en `server/pokeapi.json`, `server/movedex.json` y `server/abilities.json`. Los sprites y los gritos no
+se versionan: `npm install` descarga los sprites en `public/sprites/` (o `npm run sprites`) y los gritos reales
+de [PokeAPI/cries](https://github.com/PokeAPI/cries) en `public/cries/` (o `npm run cries`).
+Las animaciones de batalla y sus sonidos vienen de [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets):
+`npm install` (o `npm run anims`; `-- --refresh` para bajar todo de nuevo) descarga la animación de cada movimiento
+de `server/movedex.json`, las de estados, ataduras, protección, clima, campos y cargas, sus hojas de sprites y
+fondos (`public/anims/`), sus sonidos y los efectos de Poké Ball, golpes, debilitado y stats (`public/sfx/`).
+El mismo script baja la música de PokeRogue a `public/music/` con sus puntos de loop: cada escena de batalla toca
+un tema de combate contra entrenadores acorde a lo que muestra (Alola en la playa, el gimnasio de Sinnoh en la cueva,
+el Team Aqua en el océano, la campeona de Sinnoh en la nieve, etc.; la lista está en `public/music.js`), los menús
+tocan las pistas tranquilas de bioma (`town`, `tall_grass`, `laboratory`, `plains`), la preparación
+`menu` y al ganar suena `bw/victory_trainer` (o `bw/victory_champion` en un torneo). No hay
+música sintética. `public/battle-anims.js` las reproduce cuadro a cuadro sobre el campo; lo que no tenga animación usa los efectos
+sintéticos de `public/fx.js` y `public/music.js`. El campo de batalla replica el de PokeRogue: un escenario lógico de
+320×180 escalado al ancho disponible, con nuestros fondos (`public/backgrounds/`) escalados al ancho del campo y
+sus plataformas, los Pokémon anclados en (106, 142) y (236, 84) a tamaño de sprite real, cajas y cuadro de texto con el
+estilo del resto de la app, y los mismos tiempos de golpe
+(parpadeo), barra de PS (5 ms por punto), debilitado, retirada y entrada con Poké Ball. El servidor nunca llama a la
 PokeAPI (en producción no tiene salida a internet). Para refrescar los datos, con Node 22 o más:
 
 ```sh
@@ -107,6 +123,21 @@ Del save se guarda solo eso (más el total de tokens para las stats); el nombre 
 nombres de especies se descartan. Saves importados antes de esta versión: "Actualizar save" para tomar la etapa
 evolutiva exacta.
 
+## Créditos
+
+Proyecto sin fines comerciales, para jugar entre amigos. Pokémon y sus nombres son de Nintendo, Creatures Inc. y
+GAME FREAK inc.
+
+- Datos y sprites: [PokeAPI](https://pokeapi.co/); gritos: [PokeAPI/cries](https://github.com/PokeAPI/cries).
+- Movimientos y su texto: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) (MIT).
+- Música: las pistas de [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (las
+  composiciones de la comunidad, como `cave`, `tall_grass`, `snowy_forest`, `lake`, `sea` o `plains`, son de Bird_Obsession,
+  Lmz, Andr06 y Firel con CC BY-NC-SA 4.0; el resto lo marcan como material de Nintendo). Se descargan al instalar.
+- Animaciones de batalla, sus sonidos, la Poké Ball y los efectos de sonido: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets), de
+  Pagefault Games y sus colaboradores. Las animaciones y los sonidos `PRSFX-` son de
+  [Pokémon Reborn](https://www.rebornevo.com/); las animaciones `GEN8-` son del Gen 8 Animation Project
+  (CC BY-NC-SA 4.0). Los audios se descargan al instalar y no se versionan.
+
 ## Desarrollo
 
 ```sh
@@ -119,6 +150,9 @@ npm test        # parser, motor de batalla, IA, stats y flujo completo con WebSo
 - `server/creatures.js`: especie → datos de PokeAPI (nombre, stats, tipos, género) y sus movimientos.
 - `scripts/import-pokeapi.mjs`: genera `server/pokeapi.json`, `server/movedex.json` y `server/abilities.json`.
 - `scripts/sprites.mjs`: descarga los sprites a `public/sprites/` (corre solo en `npm install`).
+- `scripts/sync-battle-anims.js`: compacta las animaciones de PokeRogue en `public/anims/<clave>.json` (versión del jugador y del rival cuando difieren), baja sus imágenes y sonidos y arma `public/sfx/moves/moves.json` con los tiempos de cada sonido (corre solo en `npm install`).
+- `public/battle-anims.js`: intérprete propio del formato de animación de PokeRogue (cuadros de 50 ms, focos en atacante, objetivo o pantalla, fondos).
+- `scripts/sync-cries.js`: descarga los gritos (`latest` y `legacy`) a `public/cries/` y escribe `cries.json`, que el navegador usa para elegir el archivo según el sprite (corre solo en `npm install`).
 - `public/types.js`: tipos y tabla de efectividad.
 - `server/battle.js`: motor puro de batalla (aleatoriedad inyectada).
 - `server/moves.js` y `server/abilities.js`: reglas especiales de movimientos y habilidades.

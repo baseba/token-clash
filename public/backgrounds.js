@@ -27,5 +27,5 @@ const SCENES = [
 export function sceneFor(battleId) {
   const hash = [...String(battleId)].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7);
   const scene = SCENES[hash % SCENES.length];
-  return { image: `/backgrounds/${scene.file}.png`, me: scene.me, foe: scene.foe };
+  return { file: scene.file, image: `/backgrounds/${scene.file}.png`, me: scene.me, foe: scene.foe };
 }

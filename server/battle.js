@@ -1243,7 +1243,7 @@ function runCalled(b, me, key, opts = {}) {
   adaptMove(b, me, move);
   run(b, me, 'onModifyMove', move);
   const status = move.kind === 'status' ? statusEffectOf(move) : {};
-  emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind, key: base.key, category: move.category, flags: move.flags, called: true, ...status, ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}) });
+  emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind, key: base.key, category: move.category, target: shownTarget(me, base.key, move.target), flags: move.flags, called: true, ...status, ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}) });
   perform(b, s, me, foeOf(b, me), base, move, null, false, { called: true });
 }
 
@@ -1293,7 +1293,7 @@ function useMove(b, s, moveIdx, priority, why = null) {
     emit(b, { t: 'charging', side: s, name: nameOf(me), move: move.name, key: base.key, hidden: !!HIDDEN_BY[base.id] });
     return;
   }
-  emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind, key: base.key, category: move.category, flags: move.flags, ...status, ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}), ...(why ? { why } : {}) });
+  emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind, key: base.key, category: move.category, target: shownTarget(me, base.key, move.target), flags: move.flags, ...status, ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}), ...(why ? { why } : {}) });
 
   const foe = foeOf(b, me);
   delete me.vol.charging;
@@ -2114,6 +2114,10 @@ function fighterView(b, s, i, own) {
     moves: publicMoves(f, own ? null : f.revealedMoves),
     ...(disguise ?? {}),
   };
+}
+
+export function shownTarget(me, key, target) {
+  return key === 'curse' && !me.types.includes('ghost') ? 'self' : target;
 }
 
 export function publicState(b, viewer = null) {
