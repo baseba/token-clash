@@ -5,7 +5,6 @@ import { ABILITIES, abilityInfo } from './abilities.js';
 
 export const TEAM_SIZE = 3;
 export const TURN_LIMIT = 100;
-const STAGE_MAX = 3;
 const STAGE_LIMIT = 6;
 const FIELD_TURNS = 5;
 const PRIMAL = new Set(['heavyrain', 'harshsun', 'winds']);
@@ -175,7 +174,6 @@ function engine(b) {
 }
 
 const moveApis = new WeakMap();
-const PROTECT_STALL = ['protect', 'detect', 'kings-shield', 'spiky-shield', 'baneful-bunker', 'obstruct', 'silk-trap', 'burning-bulwark', 'endure'];
 const HAZARD_MAX = { spikes: 3, toxicspikes: 2 };
 
 function moveApi(b) {
@@ -1115,10 +1113,6 @@ function basePower(b, me, target, move) {
     default:
       return p;
   }
-}
-
-function startEcho(b) {
-  b.echo = b.echo?.turn === b.turn - 1 || b.echo?.turn === b.turn ? { turn: b.turn, count: Math.min(5, (b.echo.turn === b.turn ? b.echo.count : b.echo.count + 1)) } : { turn: b.turn, count: 1 };
 }
 
 function afterHit(b, me, target, move, total) {
@@ -2086,10 +2080,10 @@ export function viewEvents(events, viewer = null) {
   return events.map((e) => viewEvent(e, viewer));
 }
 
-function fighterView(b, s, i, own) {
+function fighterView(b, s, i, own, spectator = false) {
   const side = b.sides[s];
   const f = side.team[i];
-  if (!own && !f.seen) return { uid: `hidden-${s}-${i}`, hidden: true };
+  if (!own && !spectator && !f.seen) return { uid: `hidden-${s}-${i}`, hidden: true };
   const disguise = i === side.active && f.hp > 0 && f.vol.illusion ? f.vol.illusion : own ? null : f.seenAs;
   const abilityKnown = own || f.revealedAbilities.has(f.ability);
   return {
@@ -2142,7 +2136,7 @@ export function publicState(b, viewer = null) {
       conds: Object.fromEntries(Object.entries(side.conds).filter(([k]) => ['tailwind', 'safeguard', 'mist', 'luckychant'].includes(k))),
       ...(side.wish ? { wish: true } : {}),
       ...(side.future ? { future: side.future.name } : {}),
-      team: side.team.map((f, i) => fighterView(b, s, i, viewer === s || b.status === 'finished')),
+      team: side.team.map((f, i) => fighterView(b, s, i, viewer === s || b.status === 'finished', viewer === null)),
     })),
   };
 }
