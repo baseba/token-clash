@@ -32,8 +32,12 @@ En vivo: **https://clash.mirrordev.xyz**
      - **Privada:** no aparece en Salas abiertas; solo entra quien tenga el link.
      - Una sala pública deja de aparecer si el anfitrión cierra la página. Cuando alguien entra, los dos se ven en
        la sala y cada uno aprieta **¡Estoy listo!**; con los dos listos parte una cuenta regresiva de 5 s antes de
-       elegir sus Pokémon. Después pelean en vivo (60 s por turno; si alguien no elige, su Pokémon ataca solo).
-       Cualquiera más con el link puede mirar.
+       elegir sus Pokémon (70 s para elegir). Ningún jugador ve qué eligió el rival ni en qué orden; cuando los dos
+       eligen, pasan 4 s y parte la pelea en vivo (60 s por turno; si alguien no elige, su Pokémon ataca solo).
+       Cualquiera más con el link puede mirar: en la preparación ve los dos equipos completos, lo que cada uno va
+       marcando mientras elige, los 3 elegidos de cada lado durante esos 4 s y, en cada
+       Pokémon, contra cuántos rivales tiene ventaja de tipo (⚔️) y cuántos lo amenazan (⚠️). Las IAs esperan a que
+       terminen los dados, marcan sus 3 de a uno y confirman 5 s después.
    - **Torneo:** con tu equipo o aleatorio, de 4, 8 o 16 jugadores, en sala pública o privada.
      - El dueño puede rellenar los asientos libres con IAs de cualquier dificultad y quitar a quien quiera.
      - Parte cuando la sala está llena y todos aprietan ¡Estoy listo! (las IAs siempre están listas).
