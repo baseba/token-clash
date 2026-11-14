@@ -1,3 +1,5 @@
+import { causeAnim, chargeAnim, conditionAnim, createAnimPlayer, statusAnim, terrainAnim, weatherAnim } from './battle-anims.js?v=dev';
+
 const PALETTE = {
   normal: ['#fffbe0', '#ffd84a', '#e88a12'],
   fire: ['#fff3a0', '#ff8a1e', '#d42a0c'],
@@ -105,29 +107,38 @@ export function moveShape(ev) {
   return 'projectile';
 }
 
-export function createFx(arena) {
+export function createFx(arena, field = arena) {
   const layer = document.createElement('div');
   layer.className = 'fx-layer';
   arena.append(layer);
   const reduced = () => document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const unit = () => (arena.clientHeight / 100) * 1.4;
+  const anims = createAnimPlayer(field);
+  const isMe = (spot) => spot.classList.contains('me');
+  const mySpot = () => arena.querySelector('.spot.me');
+  const playOr = async (key, spots, fallback) => {
+    const played = key ? await anims.play(key, { byPlayer: isMe(spots.userSpot), ...spots }) : false;
+    return played ? undefined : fallback();
+  };
+  const fieldScale = () => arena.clientHeight / 180;
 
   function center(spot, dy = 0.55) {
     const a = arena.getBoundingClientRect();
-    const r = spot.getBoundingClientRect();
+    const r = (spot.querySelector('.creature img') ?? spot).getBoundingClientRect();
     return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height * dy, w: r.width };
   }
 
   function node(css = {}, cls = '') {
     const d = document.createElement('div');
     d.className = `fx ${cls}`;
+    if (!('transform' in css) && !('inset' in css)) d.style.transform = 'translate(-9999px, -9999px)';
     Object.assign(d.style, css);
     layer.append(d);
     return d;
   }
 
   function play(el, frames, opts) {
-    const a = el.animate(frames, { fill: 'forwards', easing: 'ease-out', ...opts });
+    const a = el.animate(frames, { fill: 'both', easing: 'ease-out', ...opts });
     return a.finished.then(
       () => el.remove(),
       () => el.remove(),
@@ -511,6 +522,25 @@ export function createFx(arena) {
     await Promise.all(jobs);
   }
 
+  async function aura(on, type) {
+    const u = unit();
+    const [light, mid] = PALETTE[type] || PALETTE.normal;
+    const feet = { x: on.x, y: on.y + u * 9 };
+    const jobs = [];
+    const glow = particle(type, u * 26, 'orb');
+    jobs.push(play(glow, [{ transform: at(on, 'scale(0.5)'), opacity: 0 }, { transform: at(on, 'scale(1)'), opacity: 0.5, offset: 0.35 }, { transform: at(on, 'scale(1.15)'), opacity: 0 }], { duration: 900 }));
+    for (let i = 0; i < 3; i++) {
+      const ring = node({ width: `${u * 22}px`, height: `${u * 7}px`, marginLeft: `${-u * 11}px`, marginTop: `${-u * 3.5}px`, borderRadius: '50%', border: `${u * 0.6}px solid ${light}`, boxShadow: `0 0 ${u * 2}px ${mid}` });
+      jobs.push(wait(i * 170).then(() => play(ring, [{ transform: at(feet, 'scale(0.4)'), opacity: 0 }, { opacity: 0.95, offset: 0.25 }, { transform: at({ x: feet.x, y: feet.y - u * 10 }, 'scale(1.25)'), opacity: 0 }], { duration: 760 })));
+    }
+    for (let i = 0; i < 10; i++) {
+      const spark = particle(type, u * rnd(1.6, 2.8), i % 2 ? 'star' : 'orb');
+      const p = { x: on.x + rnd(-u * 10, u * 10), y: on.y + u * rnd(2, 9) };
+      jobs.push(wait(120 + i * 55).then(() => play(spark, [{ transform: at(p, 'scale(0.6)'), opacity: 0 }, { opacity: 1, offset: 0.3 }, { transform: at({ x: p.x, y: p.y - u * 15 }, 'scale(1)'), opacity: 0 }], { duration: 700 })));
+    }
+    await Promise.all(jobs);
+  }
+
   async function heal(on) {
     const u = unit();
     const jobs = [];
@@ -626,63 +656,284 @@ export function createFx(arena) {
     slash: (f, t, ty) => slash(t, ty),
   };
 
+  function synthMove(ev, fromSpot, toSpot) {
+    if (reduced()) return Promise.resolve();
+    const from = center(fromSpot);
+    const to = center(toSpot);
+    const type = ev.type || 'normal';
+    const shape = moveShape(ev);
+    if (shape === 'weather') return storm({ x: arena.clientWidth / 2, y: arena.clientHeight * 0.4 }, type);
+    if (shape === 'heal') return heal(from);
+    if (ev.kind === 'status' && ev.target === 'self') return shape === 'boost' ? Promise.all([aura(from, type), boost(from, ev.stat)]) : aura(from, type);
+    if (shape === 'boost') return boost(from, ev.stat);
+    if (ev.kind === 'status' && shape === 'psywave') return psywave(to, type);
+    return (SHAPES[shape] || SHAPES.projectile)(from, to, type);
+  }
+
+  function synthStatus(status, spot) {
+    if (reduced()) return Promise.resolve();
+    const on = center(spot);
+    const type = STATUS_TYPE[status] || 'normal';
+    if (status === 'slp') return sleepy(on);
+    return burstAt(on, type, { count: 12, spread: 10, size: 3, ms: 700 });
+  }
+
+  function synthHurt(cause, spot, otherSpot) {
+    if (reduced()) return Promise.resolve();
+    const on = center(spot);
+    switch (cause) {
+      case 'sand':
+        return Promise.all([storm(on, 'ground'), burstAt(on, 'rock', { count: 10, spread: 9, size: 2.4 })]);
+      case 'hail':
+        return rainOn(on, 'ice', { count: 12, shape: 'shard', size: 4, height: 50 });
+      case 'brn':
+        return burstAt(on, 'fire', { count: 14, spread: 8, size: 3.4, ms: 700 });
+      case 'psn':
+      case 'tox':
+      case 'ooze':
+        return burstAt(on, 'poison', { count: 14, spread: 8, size: 3.4, ms: 700 });
+      case 'leechseed':
+        return otherSpot ? drain(center(otherSpot), on, 'grass') : burstAt(on, 'grass');
+      case 'bound':
+        return squeeze(on, 'ground');
+      case 'saltcure':
+        return burstAt(on, 'ice', { count: 12, spread: 8, size: 3 });
+      case 'curse':
+      case 'nightmare':
+        return Promise.all([psywave(on, 'ghost'), burstAt(on, 'ghost', { count: 10, spread: 9, size: 4, ms: 800 })]);
+      case 'stealthrock':
+        return rainOn(on, 'rock', { count: 6, size: 6, height: 40 });
+      case 'spikes':
+        return rise(on, 'ground');
+      case 'spikyshield':
+        return burstAt(on, 'grass', { count: 10, spread: 7, size: 2.6 });
+      case 'future':
+        return Promise.all([psywave(on, 'psychic'), burstAt(on, 'psychic', { count: 12, spread: 10 })]);
+      default:
+        return burstAt(on, 'normal', { count: 8, spread: 7, size: 3 });
+    }
+  }
+
+  function synthCondition(kind, spot, otherSpot) {
+    if (reduced()) return Promise.resolve();
+    const on = center(spot);
+    switch (kind) {
+      case 'protect':
+        return shield(on);
+      case 'confusion':
+        return orbit(on, 'electric');
+      case 'attract':
+        return hearts(on);
+      case 'leechseed':
+        return burstAt(on, 'grass', { count: 10, spread: 7, size: 3 });
+      case 'leechdrain':
+        return otherSpot ? drain(center(otherSpot), on, 'grass') : burstAt(on, 'grass');
+      case 'bound':
+        return squeeze(on, 'ground');
+      case 'trapped':
+        return squeeze(on, 'steel');
+      case 'saltcure':
+        return burstAt(on, 'ice', { count: 12, spread: 8, size: 3 });
+      case 'smackdown':
+        return rainOn(on, 'rock', { count: 4, size: 8, height: 40 });
+      case 'perish':
+        return notes(on);
+      case 'charge':
+        return burstAt(on, 'electric', { count: 14, spread: 8 });
+      case 'disable':
+        return burstAt(on, 'dark', { count: 8, spread: 6 });
+      case 'flinch':
+        return burstAt(on, 'normal', { count: 5, spread: 5, size: 2.4, ms: 380 });
+      default:
+        return Promise.resolve();
+    }
+  }
+
+  function uiSprite(file, size) {
+    return node({ width: `${size.w}px`, height: `${size.h}px`, marginLeft: `${-size.w / 2}px`, marginTop: `${-size.h * 0.625}px`, background: `url("/anims/ui/${file}") 0 0 / 100% 100% no-repeat`, imageRendering: 'pixelated' });
+  }
+
+  function openParticles(p, k) {
+    const jobs = [];
+    for (let i = 0; i < 12; i++) {
+      const ang = (Math.PI * 2 * i) / 12;
+      const dist = k * rnd(18, 28);
+      const frame = Math.floor(rnd(0, 10));
+      const el = node({ width: `${8 * k}px`, height: `${8 * k}px`, marginLeft: `${-4 * k}px`, marginTop: `${-4 * k}px`, background: `url("/anims/ui/pb_particles.png") ${-frame * 8 * k}px 0 / ${80 * k}px ${8 * k}px no-repeat`, imageRendering: 'pixelated' });
+      const to = { x: p.x + Math.cos(ang) * dist, y: p.y + Math.sin(ang) * dist };
+      jobs.push(play(el, [{ transform: at(p), opacity: 1 }, { transform: at(to), opacity: 1, offset: 0.7 }, { transform: at(to), opacity: 0 }], { duration: 420, easing: 'ease-out' }));
+    }
+    return Promise.all(jobs);
+  }
+
+  async function throwBall(spot, mine, onOpen) {
+    const k = fieldScale();
+    const a = arena.getBoundingClientRect();
+    const anchor = spot.getBoundingClientRect();
+    const land = { x: anchor.left - a.left, y: anchor.top - a.top + (mine ? -16 : 2) * k };
+    const offset = mine ? { x: -64, y: -52, peak: -62 } : { x: 12, y: -42, peak: -52 };
+    const start = { x: land.x + offset.x * k, y: land.y + offset.y * k };
+    const peakY = land.y + offset.peak * k;
+    const track = node({ transform: `translateX(${start.x}px)` });
+    const ball = document.createElement('div');
+    Object.assign(ball.style, { position: 'absolute', left: `${-6 * k}px`, top: `${-10 * k}px`, width: `${12 * k}px`, height: `${16 * k}px`, transformOrigin: '50% 62.5%', background: 'url("/anims/ui/pb.png") 0 0 / 100% 100% no-repeat', imageRendering: 'pixelated' });
+    track.append(ball);
+    const riseShare = 150 / 650;
+    await Promise.all([
+      track.animate([{ transform: `translateX(${start.x}px)` }, { transform: `translateX(${land.x}px)` }], { duration: 650, easing: 'linear', fill: 'forwards' }).finished,
+      ball.animate([
+        { transform: `translateY(${start.y}px) rotate(0deg)`, offset: 0, easing: 'cubic-bezier(0.33, 1, 0.68, 1)' },
+        { transform: `translateY(${peakY}px) rotate(0deg)`, offset: riseShare, easing: 'cubic-bezier(0.32, 0, 0.67, 0)' },
+        { transform: `translateY(${land.y}px) rotate(1440deg)`, offset: 1 },
+      ], { duration: 650, fill: 'forwards' }).finished,
+    ]).catch(() => {});
+    track.remove();
+    onOpen();
+    const open = uiSprite('pb_open.png', { w: 12 * k, h: 16 * k });
+    const img = spot.querySelector('.creature img');
+    const grow = img?.animate([
+      { transform: 'scale(0.5)', transformOrigin: '50% 100%', filter: 'brightness(0) invert(1)' },
+      { transform: 'scale(1)', transformOrigin: '50% 100%', filter: 'none' },
+    ], { duration: 250, easing: 'cubic-bezier(0.12, 0, 0.39, 0)' });
+    await Promise.all([
+      play(open, [{ transform: at(land), opacity: 1 }, { transform: at(land), opacity: 0 }], { duration: 200 }),
+      openParticles(land, k),
+      grow?.finished.catch(() => {}),
+    ]);
+  }
+
+  const STAT_FADE_MS = 250;
+  const STAT_SCROLL_MS = 1500;
+  const STAT_ALPHA = 0.8375;
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  let statDefs = null;
+  let statFilterCount = 0;
+
+  function svg(tag, attrs = {}, children = []) {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+    el.append(...children);
+    return el;
+  }
+
+  function statFilter(tileUrl) {
+    if (!statDefs) {
+      statDefs = svg('defs');
+      arena.append(svg('svg', { class: 'fx-defs', width: 0, height: 0, 'aria-hidden': 'true' }, [statDefs]));
+    }
+    const id = `stat-fx-${++statFilterCount}`;
+    const image = svg('feImage', { href: tileUrl, x: 0, y: 0, width: 32, height: 32, preserveAspectRatio: 'none', result: 'tile' });
+    const fade = svg('feFuncA', { type: 'linear', slope: 0 });
+    const filter = svg('filter', { id, x: 0, y: 0, width: '100%', height: '100%', 'color-interpolation-filters': 'sRGB' }, [
+      image,
+      svg('feTile', { in: 'tile', result: 'tiled' }),
+      svg('feComposite', { in: 'tiled', in2: 'SourceAlpha', operator: 'in', result: 'clipped' }),
+      svg('feComponentTransfer', { in: 'clipped', result: 'faded' }, [fade]),
+      svg('feMerge', {}, [svg('feMergeNode', { in: 'SourceGraphic' }), svg('feMergeNode', { in: 'faded' })]),
+    ]);
+    statDefs.append(filter);
+    return { id, filter, image, fade };
+  }
+
+  async function statChange(up, spot) {
+    if (reduced()) return;
+    const holder = spot.querySelector('.creature');
+    if (!holder) return;
+    const tile = await statTile(up);
+    if (!tile || !holder.isConnected) return;
+    const { id, filter, image, fade } = statFilter(tile);
+    holder.style.filter = `url(#${id})`;
+    const total = STAT_FADE_MS * 2 + STAT_SCROLL_MS;
+    const t0 = performance.now();
+    await new Promise((resolve) => {
+      const step = (now) => {
+        const t = now - t0;
+        if (t >= total || !holder.isConnected) return resolve();
+        const alpha = t < STAT_FADE_MS ? (t / STAT_FADE_MS) * STAT_ALPHA : t > total - STAT_FADE_MS ? ((total - t) / STAT_FADE_MS) * STAT_ALPHA : STAT_ALPHA;
+        const scroll = Math.min(1, Math.max(0, (t - STAT_FADE_MS) / STAT_SCROLL_MS)) * 160 * (up ? -1 : 1);
+        image.setAttribute('y', String(((scroll % 32) + 32) % 32));
+        fade.setAttribute('slope', alpha.toFixed(3));
+        requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+    if (holder.style.filter === `url("#${id}")` || holder.style.filter === `url(#${id})`) holder.style.filter = '';
+    filter.remove();
+  }
+
+  const statTiles = new Map();
+  function statTile(up) {
+    const key = up ? 'up' : 'down';
+    if (!statTiles.has(key)) {
+      statTiles.set(key, new Promise((resolve) => {
+        const sheet = new Image();
+        sheet.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 32;
+          canvas.height = 32;
+          canvas.getContext('2d').drawImage(sheet, 0, up ? 64 : 192, 32, 32, 0, 0, 32, 32);
+          resolve(canvas.toDataURL());
+        };
+        sheet.onerror = () => resolve(null);
+        sheet.src = '/anims/ui/battle_stats.png';
+      }));
+    }
+    return statTiles.get(key);
+  }
+
   return {
     move(ev, fromSpot, toSpot) {
-      if (reduced()) return Promise.resolve();
-      const from = center(fromSpot);
-      const to = center(toSpot);
-      const type = ev.type || 'normal';
-      const shape = moveShape(ev);
-      if (shape === 'boost') return boost(from, ev.stat);
-      if (shape === 'heal') return heal(from);
-      if (shape === 'weather') return storm({ x: arena.clientWidth / 2, y: arena.clientHeight * 0.4 }, type);
-      if (ev.kind === 'status' && shape === 'psywave') return psywave(to, type);
-      return (SHAPES[shape] || SHAPES.projectile)(from, to, type);
+      const targetSpot = ev.target === 'self' ? fromSpot : toSpot;
+      return playOr(ev.key, { userSpot: fromSpot, targetSpot }, () => synthMove(ev, fromSpot, toSpot));
+    },
+    charge(key, spot, otherSpot) {
+      return playOr(chargeAnim(key), { userSpot: spot, targetSpot: otherSpot }, () => Promise.resolve());
+    },
+    weather(weather, type) {
+      const spot = mySpot();
+      return playOr(weatherAnim(weather), { userSpot: spot, targetSpot: spot }, () => synthMove({ kind: 'status', effect: 'weather', type, key: 'weather', flags: [] }, spot, spot));
+    },
+    terrain(terrain) {
+      const spot = mySpot();
+      return playOr(terrainAnim(terrain), { userSpot: spot, targetSpot: spot }, () => Promise.resolve());
     },
     status(status, spot) {
-      if (reduced()) return Promise.resolve();
-      const on = center(spot);
-      const type = STATUS_TYPE[status] || 'normal';
-      if (status === 'slp') return sleepy(on);
-      return burstAt(on, type, { count: 12, spread: 10, size: 3, ms: 700 });
+      return playOr(statusAnim(status), { userSpot: spot, targetSpot: spot }, () => synthStatus(status, spot));
+    },
+    hurt(cause, spot, otherSpot = null) {
+      const spots = cause === 'leechseed' && otherSpot ? { userSpot: otherSpot, targetSpot: spot } : { userSpot: spot, targetSpot: spot };
+      return playOr(causeAnim(cause), spots, () => synthHurt(cause, spot, otherSpot));
     },
     condition(kind, spot, otherSpot = null) {
-      if (reduced()) return Promise.resolve();
-      const on = center(spot);
-      switch (kind) {
-        case 'protect':
-          return shield(on);
-        case 'confusion':
-          return orbit(on, 'electric');
-        case 'attract':
-          return hearts(on);
-        case 'leechseed':
-          return burstAt(on, 'grass', { count: 10, spread: 7, size: 3 });
-        case 'leechdrain':
-          return otherSpot ? drain(center(otherSpot), on, 'grass') : burstAt(on, 'grass');
-        case 'bound':
-          return squeeze(on, 'ground');
-        case 'trapped':
-          return squeeze(on, 'steel');
-        case 'saltcure':
-          return burstAt(on, 'ice', { count: 12, spread: 8, size: 3 });
-        case 'smackdown':
-          return rainOn(on, 'rock', { count: 4, size: 8, height: 40 });
-        case 'perish':
-          return notes(on);
-        case 'charge':
-          return burstAt(on, 'electric', { count: 14, spread: 8 });
-        case 'disable':
-          return burstAt(on, 'dark', { count: 8, spread: 6 });
-        case 'flinch':
-          return burstAt(on, 'normal', { count: 5, spread: 5, size: 2.4, ms: 380 });
-        default:
-          return Promise.resolve();
+      const spots = kind === 'leechdrain' && otherSpot ? { userSpot: otherSpot, targetSpot: spot } : { userSpot: spot, targetSpot: spot };
+      return playOr(conditionAnim(kind), spots, () => synthCondition(kind, spot, otherSpot));
+    },
+    stat(up, spot) {
+      return statChange(up, spot);
+    },
+    async sendOut(spot, mine, onOpen = () => {}) {
+      if (reduced()) {
+        onOpen();
+        return;
       }
+      await throwBall(spot, mine, onOpen);
+    },
+    async recall(spot) {
+      const img = spot.querySelector('.creature img');
+      if (reduced() || !img) return;
+      await img.animate([
+        { transform: 'scale(1)', transformOrigin: '50% 100%', filter: 'none' },
+        { transform: 'scale(0.5)', transformOrigin: '50% 100%', filter: 'brightness(0) invert(1)' },
+      ], { duration: 250, easing: 'cubic-bezier(0.12, 0, 0.39, 0)', fill: 'forwards' }).finished.catch(() => {});
+      img.style.visibility = 'hidden';
     },
     impact(type, spot) {
       if (reduced()) return Promise.resolve();
       return burstAt(center(spot), type || 'normal', { count: 6, spread: 6, size: 2.6, ms: 400 });
+    },
+    preload(keys) {
+      anims.preload(keys);
     },
   };
 }
