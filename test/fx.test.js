@@ -26,7 +26,7 @@ test('the effect follows the move: id first, then its flags', () => {
   assert.equal(shape('swords-dance'), 'boost');
   assert.equal(shape('recover'), 'heal');
   assert.equal(shape('rain-dance'), 'weather');
-  assert.equal(shape('thunder-wave'), 'bolt');
+  assert.equal(shape('thunder-wave'), 'psywave');
   assert.equal(shape('toxic'), 'psywave');
   assert.equal(shape('growl'), 'sound');
 });

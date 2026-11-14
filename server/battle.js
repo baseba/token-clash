@@ -1286,15 +1286,16 @@ function useMove(b, s, moveIdx, priority, why = null) {
   me.vol.prevMove = me.vol.lastMove;
   me.vol.lastMove = base.key;
   const status = move.kind === 'status' ? statusEffectOf(move) : {};
+  const startsCharge = move.flags.includes('charge') && !charged && !(isSun(weather(b)) && (base.id === 'solar-beam' || base.id === 'solar-blade'));
+  if (startsCharge) {
+    spendPP(b, me, move);
+    me.vol.charging = moveIdx;
+    emit(b, { t: 'charging', side: s, name: nameOf(me), move: move.name, key: base.key, hidden: !!HIDDEN_BY[base.id] });
+    return;
+  }
   emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind, key: base.key, category: move.category, flags: move.flags, ...status, ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}), ...(why ? { why } : {}) });
 
   const foe = foeOf(b, me);
-  if (move.flags.includes('charge') && !charged && !(isSun(weather(b)) && (base.id === 'solar-beam' || base.id === 'solar-blade'))) {
-    spendPP(b, me, move);
-    me.vol.charging = moveIdx;
-    emit(b, { t: 'charging', side: s, name: nameOf(me), move: move.name });
-    return;
-  }
   delete me.vol.charging;
   if (!charged && !continuing) spendPP(b, me, move);
 
@@ -1389,7 +1390,7 @@ function statusMove(b, me, foe, move) {
       emit(b, { t: 'immune', side: 1 - s });
       return;
     }
-    if (move.accuracy != null && !hits(b, me, foe, move)) {
+    if ((move.accuracy != null || hiddenFrom(foe, move)) && !hits(b, me, foe, move)) {
       emit(b, { t: 'miss', side: s });
       return;
     }
@@ -1439,7 +1440,17 @@ function rollHits(b, me, move) {
   return flag(b, me, 'parentalBond') ? 2 : 1;
 }
 
+const HIDDEN_BY = { fly: 'air', bounce: 'air', 'sky-drop': 'air', dig: 'ground', dive: 'water', 'phantom-force': 'vanished', 'shadow-force': 'vanished' };
+const REACHES_HIDDEN = { air: ['gust', 'twister', 'thunder', 'sky-uppercut', 'hurricane', 'smack-down', 'thousand-arrows'], ground: ['earthquake', 'magnitude', 'fissure'], water: ['surf', 'whirlpool'], vanished: [] };
+
+export function hiddenFrom(target, move) {
+  if (target.vol.charging == null) return false;
+  const place = HIDDEN_BY[target.moves[target.vol.charging]?.id];
+  return !!place && !REACHES_HIDDEN[place].includes(move.id);
+}
+
 function hits(b, me, target, move) {
+  if (hiddenFrom(target, move)) return flag(b, me, 'alwaysHits') || flag(b, target, 'alwaysHits');
   if (move.ohko) return b.random() * 100 < 30 + me.level - target.level;
   if (move.accuracy == null || flag(b, me, 'alwaysHits') || flag(b, target, 'alwaysHits')) return true;
   if (target.vol.telekinesis || me.vol.lockOn === target) return true;

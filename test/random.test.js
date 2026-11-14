@@ -90,8 +90,8 @@ test('a saved move that does not work is swapped for another learned one at rand
 });
 
 test('with no other move to learn it is left with fewer moves', () => {
-  const e = pikachu({ level: 1, learned: ['fling'], moveset: ['growl', 'fling', 'thunder-shock'] });
-  assert.deepEqual(movesetFor(e), ['growl', 'thunder-shock']);
+  const e = pikachu({ level: 1, learned: ['fling'], moveset: ['growl', 'fling', 'thunder-shock', 'charm'] });
+  assert.deepEqual(movesetFor(e), ['growl', 'thunder-shock', 'charm']);
 });
 
 test('valid saved moves are kept as they are', () => {

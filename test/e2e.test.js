@@ -36,7 +36,7 @@ before(async () => {
   jevProxy = createJevProxy({ apiKey: FAKE_JEV_KEY, upstream: `http://127.0.0.1:${fakeJev.address().port}/v1/systemone` });
   await new Promise((r) => jevProxy.listen(0, '127.0.0.1', r));
   proc = spawn(process.execPath, ['server/index.js'], {
-    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'tc-')), TURN_MS: '1500', PREVIEW_MS: '1500', ROLL_MS: '0', MATCH_MS: '300', DRAW_MS: '100', BETWEEN_MS: '100', AI_PACE_MS: '20', ABSENT_MS: '1500', SEAT_GRACE_MS: '60000', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${jevProxy.address().port}/v1/systemone` },
+    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'tc-')), TURN_MS: '1500', PREVIEW_MS: '1500', ROLL_MS: '0', MATCH_MS: '300', REVEAL_MS: '200', DICE_ANIM_MS: '0', AI_PICK_MS: '60', DRAW_MS: '100', BETWEEN_MS: '100', AI_PACE_MS: '20', ABSENT_MS: '1500', SEAT_GRACE_MS: '60000', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${jevProxy.address().port}/v1/systemone` },
     stdio: 'inherit',
   });
   for (let i = 0; i < 50; i++) {
@@ -190,11 +190,12 @@ test('a battle against the AI starts at once and stays out of the ranking and th
     assert.equal(ch.status, 200);
     assert.equal(ch.data.challenge.status, 'active');
     assert.equal(ch.data.challenge.ai, 'veryhard');
-    assert.match(ch.data.challenge.guest.name, / ai - ai muy difícil$/);
+    assert.match(ch.data.challenge.guest.name, / ai - muy difícil$/);
     const host = player(ch.data.challenge.id, a.data.token);
     const preview = await new Promise((r) => host.ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.preview) r(m.preview); }));
-    assert.equal(preview.sides[1].ready, true);
+    assert.equal(preview.sides[1].ready, false, 'the AI takes its time to pick');
     assert.ok(preview.sides[1].party.length === 6);
+    await new Promise((r) => host.ws.on('message', (raw) => { const m = JSON.parse(raw); if (m.preview?.sides[1].ready) r(); }));
     const end = await host.ended;
     assert.ok(end.state.winner === 0 || end.state.winner === 1 || end.state.winner === null);
     host.ws.close();
@@ -210,7 +211,7 @@ test('against Skynet, Jev picks the AI\'s actions and the battle ends', async ()
   assert.ok(a.data.me.aiLevels.includes('skynet'));
   const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode: 'team', ai: 'skynet', levelCap: 50 } });
   assert.equal(ch.status, 200);
-  assert.match(ch.data.challenge.guest.name, / ai - ai skynet$/);
+  assert.match(ch.data.challenge.guest.name, / ai - skynet$/);
   const first = jevCalls.length;
   const host = player(ch.data.challenge.id, a.data.token);
   const end = await host.ended;
@@ -277,7 +278,7 @@ test('a 4-player tournament filled with AIs plays every match in order until a c
   assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: b.data.token, body: { level: 'easy' } })).status, 403);
   const filled = (await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: a.data.token, body: { level: 'easy', count: 5 } })).data.tournament;
   assert.deepEqual(filled.seats.map((s) => s.ready), [false, false, true, true]);
-  assert.ok(filled.seats.slice(2).every((s) => / ai - ai fácil$/.test(s.name)));
+  assert.ok(filled.seats.slice(2).every((s) => / ai - fácil$/.test(s.name)));
   assert.notEqual(filled.seats[2].name, filled.seats[3].name);
   const kicked = (await call(`/api/tournaments/${T.id}/seats/1`, { method: 'DELETE', token: a.data.token })).data.tournament;
   assert.equal(kicked.seats.length, 3);
@@ -347,6 +348,12 @@ test('public rooms are listed and a matching search joins them; private ones sta
   assert.equal(late.status, 409);
   assert.match(late.data.error, /Llegaste tarde/);
   await call(`/api/challenges/${priv.id}`, { method: 'DELETE', token: a.data.token });
+  const page1 = (await call('/api/me/challenges?offset=0&limit=1', { token: a.data.token })).data;
+  const page2 = (await call('/api/me/challenges?offset=1&limit=1', { token: a.data.token })).data;
+  assert.equal(page1.challenges.length, 1);
+  assert.equal(page1.hasMore, true);
+  assert.equal(page2.hasMore, false);
+  assert.notEqual(page1.challenges[0].id, page2.challenges[0].id);
 });
 
 test('bad uploads get a clear error', async () => {

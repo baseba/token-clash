@@ -161,3 +161,23 @@ test('Campana Cura cura a todo el equipo', () => {
   assert.equal(b.sides[0].team[0].status, null);
   assert.equal(b.sides[0].team[1].status, null);
 });
+
+test('Rayo Solar carga un turno sin atacar y golpea al siguiente', () => {
+  const b = battle(mon(3, ['solar-beam', 'tackle'], { abilityChoice: 'overgrow' }), snorlax(['growl']));
+  const first = turn(b, 'solar-beam', 'growl');
+  assert.ok(has(first, (e) => e.t === 'charging' && e.side === 0 && e.key === 'solar-beam'));
+  assert.ok(!has(first, (e) => e.t === 'move' && e.side === 0));
+  assert.equal(dmgOn(first, 1), 0);
+  assert.deepEqual(validActions(b, 0), [{ type: 'move', move: idx(b, 0, 'solar-beam') }]);
+  assert.ok(dmgOn(turn(b, 'solar-beam', 'growl'), 1) > 0);
+});
+
+test('Excavar esquiva los golpes mientras carga, salvo Terremoto', () => {
+  const b = battle(mon(50, ['dig'], { abilityChoice: 'sand-veil' }), snorlax(['tackle']));
+  const ev = turn(b, 'dig', 'tackle');
+  assert.ok(has(ev, (e) => e.t === 'charging' && e.hidden));
+  assert.ok(has(ev, (e) => e.t === 'miss' && e.side === 1));
+  assert.equal(dmgOn(ev, 0), 0);
+  const c = battle(mon(50, ['dig'], { abilityChoice: 'sand-veil' }), snorlax(['earthquake']));
+  assert.ok(dmgOn(turn(c, 'dig', 'earthquake'), 0) > 0);
+});

@@ -49,7 +49,7 @@ const MORE_SHAPE_IDS = {
   beam: ['dynamax-cannon', 'moongeist-beam', 'photon-geyser', 'fleur-cannon', 'armor-cannon', 'core-enforcer', 'roar-of-time', 'techno-blast', 'dragon-energy', 'electro-shot', 'freeze-dry', 'confuse-ray'],
   blast: ['mind-blown', 'blue-flare', 'fusion-flare', 'sacred-fire', 'seed-flare', 'shell-trap', 'burn-up'],
   storm: ['sheer-cold', 'glaciate', 'sand-tomb', 'flower-trick', 'fiery-dance'],
-  bolt: ['thunder-cage', 'thunderclap', 'rising-voltage', 'volt-switch', 'fusion-bolt', 'aura-wheel', 'thunder-wave', 'eerie-impulse'],
+  bolt: ['thunder-cage', 'thunderclap', 'rising-voltage', 'volt-switch', 'fusion-bolt', 'aura-wheel', 'eerie-impulse'],
   psywave: ['psystrike', 'psycho-boost', 'expanding-force', 'hyperspace-hole', 'lumina-crash', 'last-respects'],
   pulse: ['synchronoise', 'night-daze', 'sonic-boom'],
   rain: ['make-it-rain', 'pay-day', 'thousand-arrows', 'judgment', 'salt-cure'],

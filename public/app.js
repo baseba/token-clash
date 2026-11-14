@@ -1,4 +1,4 @@
-import { creatureHTML, loadAnimatedSprites, preloadSprites } from './creature.js?v=dev';
+import { creatureHTML, loadAnimatedSprites, preloadSprites, spriteURL } from './creature.js?v=dev';
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
 import { createFx } from './fx.js?v=dev';
@@ -100,6 +100,26 @@ function typeChip(t) {
 function typeChips(types) {
   return h('span', { class: 'els' }, ...(types || []).map(typeChip));
 }
+
+const CHARGE_TEXT = {
+  'solar-beam': 'absorbe luz solar.',
+  'solar-blade': 'absorbe luz solar.',
+  fly: 'vuela muy alto.',
+  bounce: 'da un gran salto.',
+  'sky-drop': 'se eleva por los aires.',
+  dig: 'se esconde bajo tierra.',
+  dive: 'se sumerge en el agua.',
+  'phantom-force': 'desaparece de la vista.',
+  'shadow-force': 'desaparece de la vista.',
+  'skull-bash': 'agacha la cabeza.',
+  'sky-attack': 'se envuelve en una luz intensa.',
+  'razor-wind': 'crea un torbellino.',
+  geomancy: 'absorbe energía del entorno.',
+  'electro-shot': 'acumula electricidad.',
+  'meteor-beam': 'concentra energía cósmica.',
+  'freeze-shock': 'se rodea de un aire gélido.',
+  'ice-burn': 'se rodea de un aire gélido.',
+};
 
 const STATUS_INFO = {
   brn: { icon: '🔥', name: 'Quemado', desc: 'Pierde 1/16 de sus PS al final de cada turno y sus ataques físicos hacen la mitad de daño.' },
@@ -327,6 +347,18 @@ const stageMult = (k, s) => {
   return s >= 0 ? (base + s) / base : base / (base - s);
 };
 
+const multText = (k, stage) => `×${stageMult(k, stage).toFixed(2).replace(/\.?0+$/, '')}`;
+function boostChips(boosts, { long = false } = {}) {
+  return Object.entries(STAT)
+    .filter(([k]) => boosts?.[k])
+    .map(([k, [label, word]]) => {
+      const stage = boosts[k];
+      const up = stage > 0;
+      const tip = `${word.charAt(0).toUpperCase()}${word.slice(1)} ${signed(stage)}: ${up ? 'sube' : 'baja'} a ${multText(k, stage)}`;
+      return h('span', { class: `boost ${up ? 'up' : 'down'}`, tabindex: 0, 'data-tip': tip }, h('i', { 'aria-hidden': 'true' }, up ? '▲' : '▼'), long ? `${word} ${signed(stage)} (${multText(k, stage)})` : `${label} ${signed(stage)}`);
+    });
+}
+
 function moveEffects(m) {
   const out = [];
   if (m.kind && m.kind !== 'attack') out.push(m.desc);
@@ -385,12 +417,14 @@ function infoCard(f, { own, owner, close }) {
       'section',
       null,
       h('h3', null, 'Cambios de características'),
-      boosts.length
-        ? h('p', null, boosts.map(([k, [label]]) => `${label} ${signed(f.boosts[k])} (×${stageMult(k, f.boosts[k]).toFixed(2).replace(/\.?0+$/, '')})`).join(' · '))
-        : h('p', { class: 'muted' }, 'Sin cambios.'),
+      boosts.length ? h('div', { class: 'boost-list' }, boostChips(f.boosts, { long: true })) : h('p', { class: 'muted' }, 'Sin cambios.'),
     ),
     own
-      ? h('section', null, h('h3', null, 'Características'), h('div', { class: 'info-stats' }, [['PS', 'hp'], ['Ataque', 'atk'], ['Defensa', 'def'], ['At. Esp.', 'satk'], ['Def. Esp.', 'sdef'], ['Velocidad', 'spd']].map(([l, k]) => h('span', null, h('b', null, f.stats[k]), l))))
+      ? h('section', null, h('h3', null, 'Características'), h('div', { class: 'info-stats' }, [['PS', 'hp'], ['Ataque', 'atk'], ['Defensa', 'def'], ['At. Esp.', 'satk'], ['Def. Esp.', 'sdef'], ['Velocidad', 'spd']].map(([l, k]) => {
+          const stage = k === 'hp' ? 0 : f.boosts?.[k] ?? 0;
+          const now = Math.floor(f.stats[k] * stageMult(k, stage));
+          return h('span', { class: stage > 0 ? 'up' : stage < 0 ? 'down' : null, 'data-tip': stage ? `${f.stats[k]} sin cambios · ${multText(k, stage)}` : null }, h('b', null, now, stage ? h('i', { 'aria-hidden': 'true' }, stage > 0 ? ' ▲' : ' ▼') : null), l);
+        })))
       : null,
     h(
       'section',
@@ -499,8 +533,28 @@ function nav(path) {
   unsaved = null;
   history.pushState(null, '', path);
   route();
-  window.scrollTo(0, 0);
+  if (!$app.classList.contains('page-leave')) window.scrollTo(0, 0);
 }
+
+const PAGE_FADE_MS = 320;
+async function smoothNav(path) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return nav(path);
+  $app.classList.remove('page-enter');
+  $app.classList.add('page-leave');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  await sleep(PAGE_FADE_MS);
+  nav(path);
+  setTimeout(() => $app.classList.contains('page-leave') && revealPage(), 4000);
+}
+
+function revealPage() {
+  $app.classList.remove('page-leave');
+  playClass($app, 'page-enter', 500);
+}
+
+new MutationObserver(() => {
+  if ($app.classList.contains('page-leave') && !$app.querySelector('.pad')) revealPage();
+}).observe($app, { childList: true });
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[data-link]');
   if (!a || a.origin !== location.origin || e.metaKey || e.ctrlKey || e.shiftKey) return;
@@ -574,7 +628,7 @@ document.addEventListener(
 );
 
 function markNav() {
-  const current = location.pathname === '/stats' ? 'stats' : location.pathname === '/' || location.pathname === '/equipo' ? 'home' : null;
+  const current = { '/stats': 'stats', '/': 'home', '/coleccion': 'collection', '/pokedex': 'pokedex' }[location.pathname] ?? null;
   for (const a of document.querySelectorAll('[data-nav]')) {
     if (a.dataset.nav === current) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -592,7 +646,12 @@ function route() {
   markNav();
   const m = /^\/b\/([A-Za-z0-9_-]{4,20})$/.exec(location.pathname);
   if (m) return battlePage(m[1], seq);
-  if (location.pathname === '/equipo') return teamPage(seq);
+  if (location.pathname === '/equipo') {
+    history.replaceState(null, '', `/coleccion${location.search}`);
+    return route();
+  }
+  if (location.pathname === '/coleccion') return teamPage(seq);
+  if (location.pathname === '/pokedex') return pokedexPage(seq);
   if (location.pathname === '/stats') return statsPage(seq);
   const t = /^\/t\/([A-Za-z0-9_-]{4,20})$/.exec(location.pathname);
   if (t) return tournamentPage(t[1], seq);
@@ -719,7 +778,6 @@ function renderLanding() {
       ),
       importCard({ onDone: renderHome }),
     ),
-    feedbackButton(),
   );
 }
 
@@ -733,37 +791,6 @@ function renderHome() {
   let size = 8;
   let aiLevel = 'mid';
 
-  async function saveTeam(next) {
-    try {
-      me = (await api('/api/me', { method: 'PUT', body: { team: next } })).me;
-      renderHome();
-    } catch (e) {
-      toast(e.message);
-    }
-  }
-  function toggle(f) {
-    const ids = me.team.slice();
-    const i = ids.indexOf(f.uid);
-    if (i >= 0) {
-      if (ids.length === 1) return toast('Tu equipo necesita al menos un Pokémon');
-      ids.splice(i, 1);
-      return saveTeam(ids);
-    }
-    const added = addToParty(ids, f.uid);
-    if (!added.swapped && ids.length >= PARTY_SIZE) return toast(`Tu equipo ya tiene ${PARTY_SIZE}: quita uno primero`);
-    if (added.swapped) toast(swapNote(added.swapped, f));
-    saveTeam(added.ids);
-  }
-  async function rename(f) {
-    const n = window.prompt(`Apodo para ${f.speciesName} (vacío para quitarlo)`, f.nickname || '');
-    if (n === null) return;
-    try {
-      me = (await api('/api/me', { method: 'PUT', body: { nickname: { id: f.uid, name: n } } })).me;
-      renderHome();
-    } catch (e) {
-      toast(e.message);
-    }
-  }
   async function createChallenge(btn) {
     btn.disabled = true;
     try {
@@ -831,21 +858,6 @@ function renderHome() {
   );
   paint();
 
-  const reimport = h('div', { class: 'reimport', hidden: true }, importCard({ onDone: renderHome }));
-  const reimportBtn = toolButton({ icon: '↻', label: 'Actualizar save', note: 'Sube uno más nuevo', 'aria-expanded': 'false', onclick: () => {
-    reimport.hidden = !reimport.hidden;
-    reimportBtn.setAttribute('aria-expanded', String(!reimport.hidden));
-  } });
-  const grid = h('div', { class: 'mons' });
-  const countEl = h('span', { class: 'coll-count' });
-  const filters = rosterFilters(paintCollection);
-  function paintCollection() {
-    const list = me.roster.filter(filters.match);
-    shownCount(countEl, list.length, me.roster.length);
-    grid.replaceChildren(...(list.length ? list.map((f) => monCard(f, { picked: me.team.includes(f.uid), stats: true, badge: f.active ? 'Criando' : null, onclick: () => nav(`/equipo?p=${f.uid}`), onEdit: () => rename(f) })) : [h('p', { class: 'muted' }, 'Ningún Pokémon coincide con el filtro.')]));
-  }
-  paintCollection();
-
   $app.replaceChildren(
     h(
       'section',
@@ -855,10 +867,9 @@ function renderHome() {
     h(
       'section',
       null,
-      h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', h('span', { class: 'party-count' }, `${team.length}/${PARTY_SIZE}`)), h('a', { class: 'btn sm primary', href: '/equipo', 'data-link': true }, '✎ Editar equipo')),
-      h('div', { class: 'party-board' }, partyRow(team), h('p', { class: 'hint' }, `En cada pelea eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}. Toca uno para editar sus movimientos y su habilidad.`)),
+      h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', h('span', { class: 'party-count' }, `${team.length}/${PARTY_SIZE}`)), h('a', { class: 'btn sm primary', href: '/coleccion', 'data-link': true }, '✎ Editar en Colección')),
+      h('div', { class: 'party-board' }, partyRow(team), h('p', { class: 'hint' }, `En cada pelea eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}. Toca uno para editar sus movimientos y su habilidad en Colección.`)),
     ),
-    h('section', null, openRoomsCard()),
     h(
       'section',
       null,
@@ -869,21 +880,7 @@ function renderHome() {
         battleForm,
       ),
     ),
-    h(
-      'section',
-      null,
-      h('div', { class: 'coll-head' }, h('h2', null, 'Tu colección'), h('div', { class: 'tools' }, toolButton({ icon: '⬇', label: 'Descargar save editado', note: 'Para importarlo en PokeTokenBar', tip: 'Baja tu save con los movimientos y habilidades que cambiaste', onclick: downloadEditedSave }), reimportBtn)),
-      reimport,
-      collectionBar(filters, countEl),
-      grid,
-    ),
-    h('section', null, myChallengesCard()),
-    h(
-      'section',
-      null,
-      h('p', { class: 'muted small' }, 'Tu sesión vive en este navegador. Para entrar desde otro: ', h('a', { href: '#', onclick: (e) => { e.preventDefault(); copy(`${location.origin}/#key=${token}`, 'Link de acceso copiado. No lo compartas: entra como tú.'); } }, 'copiar link de acceso'), '.'),
-    ),
-    feedbackButton(),
+    h('section', null, openRoomsCard()),
   );
 }
 
@@ -985,29 +982,55 @@ function openRoomsCard() {
   return card;
 }
 
+const HISTORY_PAGE = 6;
 function myChallengesCard() {
-  const list = h('div', { class: 'list' }, h('p', { class: 'muted' }, 'Cargando…'));
-  api('/api/me/challenges')
-    .then(({ challenges, tournaments = [] }) => {
-      if (tournaments.length) tourList.replaceChildren(...tournaments.map(tournamentItem));
-      tourBox.hidden = !tournaments.length;
-      if (!challenges.length) return list.replaceChildren(h('p', { class: 'muted' }, 'Todavía no hay batallas. ¡Busca rival!'));
-      list.replaceChildren(
-        ...challenges.map((c) => {
-          const label = c.opponent ? `vs ${c.opponent}` : c.visibility === 'public' ? 'Sala pública · esperando rival' : 'Sala privada · esperando rival';
-          const st =
-            c.status === 'finished' ? (c.won ? h('span', { class: 'w' }, 'Ganaste') : h('span', { class: 'l' }, 'Perdiste'))
-            : c.status === 'active' ? h('span', { class: 'pulse' }, 'En curso')
-            : c.status === 'open' ? h('span', { class: 'muted' }, 'Abierta')
-            : h('span', { class: 'muted' }, c.status === 'cancelled' ? 'Cancelado' : 'Cortado');
-          return h('a', { class: 'item', href: `/b/${c.id}`, 'data-link': true }, h('span', null, label, h('span', { class: 'muted small' }, ` · ${MODE_ICON[c.mode] ?? MODE_ICON.team}`), c.levelCap ? h('span', { class: 'muted small' }, ' · Nv 50') : null), st);
-        }),
-      );
-    })
-    .catch(() => list.replaceChildren(h('p', { class: 'muted' }, 'No pude cargar tus batallas.')));
+  const list = h('div', { class: 'list history-list' }, h('p', { class: 'muted' }, 'Cargando…'));
+  const sentinel = h('div', { class: 'history-more', 'aria-hidden': 'true' });
+  let offset = 0;
+  let loading = false;
+  let done = false;
+  const observer = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && loadMore(), { root: list, rootMargin: '0px 0px 120px 0px' });
+  async function loadMore() {
+    if (loading || done) return;
+    if (!list.isConnected && offset) return observer.disconnect();
+    loading = true;
+    sentinel.textContent = 'Cargando…';
+    try {
+      const { challenges, hasMore, tournaments = [] } = await api(`/api/me/challenges?offset=${offset}&limit=${HISTORY_PAGE}`);
+      if (!offset) {
+        if (tournaments.length) tourList.replaceChildren(...tournaments.map(tournamentItem));
+        tourBox.hidden = !tournaments.length;
+        list.replaceChildren();
+        if (!challenges.length) list.append(h('p', { class: 'muted' }, 'Todavía no hay batallas. ¡Busca rival!'));
+      }
+      offset += challenges.length;
+      done = !hasMore;
+      list.append(...challenges.map(challengeItem));
+      sentinel.textContent = '';
+      if (!done) list.append(sentinel);
+      else sentinel.remove();
+      if (!done) observer.observe(sentinel);
+    } catch {
+      if (!offset) list.replaceChildren(h('p', { class: 'muted' }, 'No pude cargar tus batallas.'));
+      sentinel.textContent = '';
+    } finally {
+      loading = false;
+    }
+  }
+  loadMore();
   const tourList = h('div', { class: 'list' });
   const tourBox = h('div', { class: 'my-tours', hidden: true }, h('h3', null, '🏆 Tus torneos'), tourList);
   return h('div', { class: 'card' }, h('h2', null, 'Tus batallas'), list, tourBox);
+}
+
+function challengeItem(c) {
+  const label = c.opponent ? `vs ${c.opponent}` : c.visibility === 'public' ? 'Sala pública · esperando rival' : 'Sala privada · esperando rival';
+  const st =
+    c.status === 'finished' ? (c.won ? h('span', { class: 'w' }, 'Ganaste') : h('span', { class: 'l' }, 'Perdiste'))
+    : c.status === 'active' ? h('span', { class: 'pulse' }, 'En curso')
+    : c.status === 'open' ? h('span', { class: 'muted' }, 'Abierta')
+    : h('span', { class: 'muted' }, c.status === 'cancelled' ? 'Cancelado' : 'Cortado');
+  return h('a', { class: 'item', href: `/b/${c.id}`, 'data-link': true }, h('span', null, label, h('span', { class: 'muted small' }, ` · ${MODE_ICON[c.mode] ?? MODE_ICON.team}`), c.levelCap ? h('span', { class: 'muted small' }, ' · Nv 50') : null), st);
 }
 
 function tournamentItem(t) {
@@ -1195,13 +1218,194 @@ async function statsPage(seq) {
         ),
       ),
     ),
+    me ? h('section', null, myChallengesCard()) : '',
     h('section', null, rankingCard(ranking)),
     h('section', { class: 'grid2' }, recentCard(recent), numbersCard(totals)),
-    tournaments ? tournamentStatsSection(tournaments) : null,
+    tournaments ? tournamentStatsSection(tournaments) : '',
     topMonsSection(topMons),
     h('section', null, h('p', { class: 'muted small center' }, `Versión ${live.version} · servidor encendido ${ago(live.startedAt)}`)),
-    feedbackButton(),
   );
+}
+
+// ---------- pokedex ----------
+const GEN_LABELS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
+const DEX_STATS = ['PS', 'Ataque', 'Defensa', 'At. esp.', 'Def. esp.', 'Velocidad'];
+function genderText(rate) {
+  if (rate == null) return '—';
+  if (rate === -1) return 'Sin género';
+  const female = (rate / 8) * 100;
+  return `♂ ${(100 - female).toLocaleString('es')}% · ♀ ${female.toLocaleString('es')}%`;
+}
+const dexNumber = (id) => `N.º ${String(id).padStart(4, '0')}`;
+const dexShiny = (() => {
+  let set = new Set();
+  try {
+    set = new Set(JSON.parse(ls.get('tc_dex_shiny') || '[]'));
+  } catch {}
+  return {
+    has: (id) => set.has(id),
+    toggle(id, on) {
+      if (on) set.add(id);
+      else set.delete(id);
+      ls.set('tc_dex_shiny', JSON.stringify([...set]));
+    },
+  };
+})();
+
+function shinySwitch(entry, onChange) {
+  const can = entry.shiny;
+  const input = h('input', { type: 'checkbox', role: 'switch', checked: can && dexShiny.has(entry.id) ? true : null, disabled: !can || null, 'aria-label': `Ver a ${entry.name} shiny`, onclick: (e) => e.stopPropagation(), onchange: (e) => { dexShiny.toggle(entry.id, e.target.checked); onChange(e.target.checked); } });
+  return h('label', { class: `dex-switch${can ? '' : ' is-off'}`, 'data-tip': can ? 'Ver shiny' : 'Aún no tienes este shiny', onclick: (e) => e.stopPropagation() }, input, h('span', { class: 'dex-track', 'aria-hidden': 'true' }, h('i')), h('span', { class: 'dex-switch-label' }, '✨'));
+}
+
+async function pokedexPage(seq) {
+  document.title = 'Pokédex · Token Clash';
+  await loadMe();
+  if (stale(seq)) return;
+  renderWho();
+  if (!me) {
+    $app.replaceChildren(h('section', { class: 'card banner' }, h('h2', null, 'Tu Pokédex'), h('p', { class: 'muted' }, 'Importa tu save para ver qué Pokémon tienes registrados.')), importCard({ onDone: () => route() }));
+    return;
+  }
+  $app.replaceChildren(h('p', { class: 'muted center pad' }, 'Abriendo la Pokédex…'));
+  let dex;
+  try {
+    dex = (await api('/api/pokedex')).pokedex;
+  } catch (e) {
+    if (stale(seq)) return;
+    $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No pude abrir la Pokédex'), h('p', { class: 'muted' }, e.message)));
+    return;
+  }
+  if (stale(seq)) return;
+  const byId = new Map(dex.entries.map((e) => [e.id, e]));
+  const genOf = (id) => dex.generations.findIndex(([a, b]) => id >= a && id <= b);
+  const firstGen = Math.max(0, genOf(dex.entries[0]?.id ?? 1));
+  let gen = Number(ls.get('tc_dex_gen') ?? firstGen);
+  if (!(gen >= -1 && gen < dex.generations.length)) gen = 0;
+  let show = 'all';
+  let query = '';
+  const grid = h('div', { class: 'dex-grid' });
+  const countEl = h('span', { class: 'muted small' });
+  const dialog = h('dialog', { class: 'dex-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() });
+
+  const sprite = (id, shiny, cls = 'dex-sprite') => h('img', { class: cls, src: spriteURL({ sprite: String(id), shiny }), alt: '', loading: 'lazy', draggable: 'false' });
+
+  function tile(id) {
+    const e = byId.get(id);
+    if (!e) return h('div', { class: 'dex-tile is-unknown', 'aria-label': `${dexNumber(id)}: sin registrar` }, h('span', { class: 'dex-num' }, dexNumber(id)), h('div', { class: 'dex-ball', 'aria-hidden': 'true' }), h('b', { class: 'dex-name' }, '???'));
+    const img = sprite(id, e.shiny && dexShiny.has(id));
+    const el = h(
+      'button',
+      { type: 'button', class: `dex-tile is-known${e.owned ? '' : ' by-evolution'}${e.shiny && dexShiny.has(id) ? ' is-shiny' : ''}`, onclick: () => openEntry(id), 'aria-label': `${dexNumber(id)} ${e.name}` },
+      h('span', { class: 'dex-num' }, dexNumber(id)),
+      e.shiny ? h('span', { class: 'dex-shiny-badge', 'data-tip': 'Lo tienes shiny' }, '✨') : null,
+      h('div', { class: 'dex-pic' }, img),
+      h('b', { class: 'dex-name' }, e.name),
+      h('span', { class: 'dex-types' }, e.types.map((t) => h('i', { class: 'dex-type', style: { background: TYPES[t]?.color ?? '#9099a1' }, 'data-tip': typeLabel(t) }))),
+      h('div', { class: 'dex-foot' }, h('small', { class: 'muted dex-have', 'data-tip': e.owned ? `Tienes ${e.owned}` : 'Registrado porque uno de tus Pokémon evolucionó de esta especie' }, e.owned ? `×${e.owned}` : 'Evolución'), shinySwitch(e, (on) => {
+        img.src = spriteURL({ sprite: String(id), shiny: on });
+        el.classList.toggle('is-shiny', on);
+      })),
+    );
+    return el;
+  }
+
+  function openEntry(id) {
+    const e = byId.get(id);
+    if (!e) return;
+    const big = sprite(id, e.shiny && dexShiny.has(id), 'dex-big');
+    const stage = h('div', { class: `dex-stage${e.shiny && dexShiny.has(id) ? ' is-shiny' : ''}` }, big);
+    const total = e.stats.reduce((a, b) => a + b, 0);
+    dialog.replaceChildren(
+      h(
+        'div',
+        { class: 'dex-detail' },
+        h('button', { class: 'dex-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => dialog.close() }, '✕'),
+        h('div', { class: 'dex-detail-top' }, h('span', { class: 'dex-num' }, dexNumber(id)), h('h2', null, e.name), e.genus ? h('span', { class: 'dex-genus' }, e.genus) : null, typeChips(e.types)),
+        stage,
+        h('div', { class: 'row center' }, shinySwitch(e, (on) => {
+          big.src = spriteURL({ sprite: String(id), shiny: on });
+          stage.classList.toggle('is-shiny', on);
+          paintGrid();
+        }), h('span', { class: 'muted small' }, e.shiny ? 'Ver shiny' : 'Aún no lo tienes shiny')),
+        e.entry ? h('blockquote', { class: 'dex-entry' }, e.entry) : null,
+        h(
+          'dl',
+          { class: 'dex-facts' },
+          h('div', null, h('dt', null, 'Altura'), h('dd', null, e.height != null ? `${e.height.toLocaleString('es')} m` : '—')),
+          h('div', null, h('dt', null, 'Peso'), h('dd', null, e.weight != null ? `${e.weight.toLocaleString('es')} kg` : '—')),
+          h('div', null, h('dt', null, 'Género'), h('dd', null, genderText(e.genderRate))),
+          h('div', { class: 'wide' }, h('dt', null, 'Habilidades'), h('dd', null, e.abilities.map((a, i) => [i ? ' · ' : '', a.name, a.hidden ? h('small', { class: 'muted' }, ' (oculta)') : null]))),
+        ),
+        h('p', { class: 'dex-owned' }, e.owned ? `Tienes ${plural(e.owned, 'ejemplar', 'ejemplares')} · ${e.levels.map((l) => `Nv ${l}`).join(', ')}` : 'Registrado porque uno de tus Pokémon evolucionó de esta especie.'),
+        h('h3', null, 'Stats base'),
+        h('div', { class: 'stat-bars' }, e.stats.map((v, i) => h('div', { class: 'stat-row' }, h('span', null, DEX_STATS[i]), h('b', null, v), h('i', { style: { width: `${Math.min(100, (v / 200) * 100)}%` } }))), h('div', { class: 'stat-row total' }, h('span', null, 'Total'), h('b', null, total), h('span'))),
+        e.family.length > 1
+          ? [
+              h('h3', null, 'Línea evolutiva'),
+              h('div', { class: 'dex-family' }, [...new Set(e.family.map((f) => f.stage))].map((stage, i) => [
+                i ? h('span', { class: 'dex-arrow', 'aria-hidden': 'true' }, '→') : null,
+                h('div', { class: 'dex-stage-group' }, e.family.filter((f) => f.stage === stage).map((f) => h(f.name ? 'button' : 'div', { type: f.name ? 'button' : null, class: `dex-fam${f.name ? '' : ' is-unknown'}${f.id === id ? ' is-current' : ''}`, onclick: f.name && f.id !== id ? () => openEntry(f.id) : null }, f.name ? sprite(f.id, byId.get(f.id)?.shiny && dexShiny.has(f.id), 'dex-fam-pic') : h('div', { class: 'dex-ball small' }), h('small', null, f.name ?? '???')))),
+              ])),
+            ]
+          : null,
+      ),
+    );
+    if (!dialog.open) dialog.showModal();
+  }
+
+  function paintGrid() {
+    const ids = (gen === -1 ? [[1, dex.total]] : [dex.generations[gen]]).flatMap(([a, b]) => Array.from({ length: Math.min(b, dex.total) - a + 1 }, (_, i) => a + i));
+    const q = query.trim().toLowerCase();
+    const list = ids.filter((id) => {
+      const e = byId.get(id);
+      if (show === 'have' && !e) return false;
+      if (show === 'missing' && e) return false;
+      if (show === 'shiny' && !e?.shiny) return false;
+      if (q && !(String(id).includes(q.replace(/^#|^n\.?º?\s*/i, '')) || e?.name.toLowerCase().includes(q))) return false;
+      return true;
+    });
+    const have = ids.filter((id) => byId.has(id)).length;
+    countEl.textContent = `${have} de ${ids.length} registrados en ${gen === -1 ? 'total' : `la generación ${GEN_LABELS[gen]}`}`;
+    grid.replaceChildren(...(list.length ? list.map(tile) : [h('p', { class: 'muted' }, 'Nada coincide con el filtro.')]));
+  }
+
+  const genTabs = h(
+    'div',
+    { class: 'dex-gens', role: 'tablist', 'aria-label': 'Generación' },
+    [...dex.generations.map((range, i) => ({ i, range })), { i: -1, range: [1, dex.total] }].map(({ i, range: [a, b] }) => {
+      const have = dex.entries.filter((e) => e.id >= a && e.id <= b).length;
+      const size = Math.min(b, dex.total) - a + 1;
+      return h(
+        'button',
+        { type: 'button', role: 'tab', class: 'dex-gen', 'aria-selected': String(i === gen), onclick: (e) => { gen = i; ls.set('tc_dex_gen', String(i)); genTabs.querySelectorAll('.dex-gen').forEach((b) => b.setAttribute('aria-selected', 'false')); e.currentTarget.setAttribute('aria-selected', 'true'); paintGrid(); } },
+        h('b', null, i === -1 ? 'Todas' : `Gen ${GEN_LABELS[i]}`),
+        h('small', null, `${have}/${size}`),
+        h('i', { class: 'dex-gen-bar', style: { width: `${(have / size) * 100}%` } }),
+      );
+    }),
+  );
+  const pct = Math.round((dex.registered / dex.total) * 1000) / 10;
+  $app.replaceChildren(
+    h(
+      'section',
+      { class: 'dex-shell' },
+      h('div', { class: 'dex-lights', 'aria-hidden': 'true' }, h('i', { class: 'big' }), h('i', { class: 'r' }), h('i', { class: 'y' }), h('i', { class: 'g' })),
+      h('div', { class: 'dex-head' }, h('h1', null, 'Pokédex'), h('p', null, h('b', null, dex.registered), ` de ${dex.total} registrados · ${pct}%`, h('span', { class: 'dex-sep' }, '·'), `✨ ${plural(dex.shinies, 'shiny', 'shinies')}`)),
+      h('div', { class: 'dex-progress', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': dex.total, 'aria-valuenow': dex.registered }, h('i', { style: { width: `${Math.max(pct, 0.5)}%` } })),
+    ),
+    h('section', null, genTabs),
+    h(
+      'div',
+      { class: 'coll-bar dex-bar' },
+      h('input', { type: 'search', placeholder: 'Buscar por nombre o número…', 'aria-label': 'Buscar en la Pokédex', oninput: (e) => { query = e.target.value; paintGrid(); } }),
+      h('select', { 'aria-label': 'Mostrar', onchange: (e) => { show = e.target.value; paintGrid(); } }, h('option', { value: 'all' }, 'Todos'), h('option', { value: 'have' }, 'Registrados'), h('option', { value: 'missing' }, 'Me faltan'), h('option', { value: 'shiny' }, 'Shiny')),
+      countEl,
+    ),
+    grid,
+    dialog,
+  );
+  paintGrid();
 }
 
 // ---------- team ----------
@@ -1287,10 +1491,10 @@ function partyRow(team) {
     { class: 'party-row' },
     Array.from({ length: PARTY_SIZE }, (_, i) => {
       const f = team[i];
-      if (!f) return h('a', { class: 'party-cell empty', href: '/equipo', 'data-link': true, 'aria-label': 'Agregar un Pokémon' }, ballFrame(null), h('div', { class: 'name-plate' }, h('b', null, '???')));
+      if (!f) return h('a', { class: 'party-cell empty', href: '/coleccion', 'data-link': true, 'aria-label': 'Agregar un Pokémon' }, ballFrame(null), h('div', { class: 'name-plate' }, h('b', null, '???')));
       return h(
         'a',
-        { class: 'party-cell', href: `/equipo?p=${f.uid}`, 'aria-label': `Editar a ${f.name}`, onclick: (e) => { e.preventDefault(); nav(`/equipo?p=${f.uid}`); } },
+        { class: 'party-cell', href: `/coleccion?p=${f.uid}`, 'aria-label': `Editar a ${f.name}`, onclick: (e) => { e.preventDefault(); nav(`/coleccion?p=${f.uid}`); } },
         h('span', { class: 'slot-num' }, i + 1),
         i === 0 ? h('span', { class: 'lead-tag' }, 'Líder') : null,
         ballFrame(f),
@@ -1314,7 +1518,7 @@ async function teamPage(seq) {
   if (stale(seq)) return;
   renderWho();
   if (!me) return nav('/');
-  document.title = 'Tu equipo · Token Clash';
+  document.title = 'Colección · Token Clash';
   const params = new URLSearchParams(location.search);
   let selected = params.get('p') || me.team[0] || me.roster[0]?.uid;
   let dragFrom = null;
@@ -1357,8 +1561,8 @@ async function teamPage(seq) {
   function select(uid) {
     if (editor?.dirty() && !window.confirm(UNSAVED_MSG)) return;
     selected = uid;
-    history.replaceState(null, '', `/equipo?p=${uid}`);
-    shownPath = `/equipo?p=${uid}`;
+    history.replaceState(null, '', `/coleccion?p=${uid}`);
+    shownPath = `/coleccion?p=${uid}`;
     paintParty();
     paintCollection();
     openEditor();
@@ -1408,6 +1612,18 @@ async function teamPage(seq) {
     setParty(ids);
   }
 
+  async function rename(f) {
+    const n = window.prompt(`Apodo para ${f.speciesName} (vacío para quitarlo)`, f.nickname || '');
+    if (n === null) return;
+    try {
+      me = (await api('/api/me', { method: 'PUT', body: { nickname: { id: f.uid, name: n } } })).me;
+      paintParty();
+      paintCollection();
+    } catch (e) {
+      toast(e.message);
+    }
+  }
+
   function paintCollection() {
     const list = me.roster.filter(filters.match);
     shownCount(collCount, list.length, me.roster.length);
@@ -1421,6 +1637,7 @@ async function teamPage(seq) {
               cls: `coll-card${inParty ? ' in-party' : ''}${f.uid === selected ? ' selected' : ''}`,
               label: `Editar a ${f.name}`,
               onclick: () => select(f.uid),
+              onEdit: () => rename(f),
               extra: h('button', { class: `col-add${inParty ? ' on' : ''}`, type: 'button', 'data-tip': inParty ? 'Quitar del equipo' : 'Agregar al equipo', 'aria-label': inParty ? `Quitar a ${f.name} del equipo` : `Agregar a ${f.name} al equipo`, onclick: (e) => { e.stopPropagation(); toggle(f.uid); }, onkeydown: (e) => e.stopPropagation() }, inParty ? '✓' : '+'),
             });
           })
@@ -1446,11 +1663,19 @@ async function teamPage(seq) {
 
   const filters = rosterFilters(() => paintCollection());
   const collCount = h('span', { class: 'coll-count' });
+  const reimport = h('div', { class: 'reimport', hidden: true }, importCard({ onDone: () => route() }));
+  const reimportBtn = toolButton({ icon: '↻', label: 'Actualizar save', note: 'Sube uno más nuevo', 'aria-expanded': 'false', onclick: () => {
+    reimport.hidden = !reimport.hidden;
+    reimportBtn.setAttribute('aria-expanded', String(!reimport.hidden));
+  } });
   $app.replaceChildren(
-    h('div', { class: 'team-head' }, h('h1', null, 'Tu equipo ', countEl), h('div', { class: 'tools' }, toolButton({ icon: '⬇', label: 'Descargar save editado', note: 'Para importarlo en PokeTokenBar', tip: 'Baja tu save con los movimientos y habilidades que cambiaste', onclick: downloadEditedSave }), toolButton({ icon: '←', label: 'Volver al inicio', href: '/', 'data-link': true }))),
+    h('div', { class: 'coll-page-head' }, h('div', null, h('h1', null, 'Colección'), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))), h('div', { class: 'tools' }, toolButton({ icon: '⬇', label: 'Descargar save editado', note: 'Para importarlo en PokeTokenBar', tip: 'Baja tu save con los movimientos y habilidades que cambiaste', onclick: downloadEditedSave }), reimportBtn)),
+    reimport,
+    h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', countEl)),
     h('section', { class: 'party-board' }, partyEl, h('p', { class: 'hint' }, `Arrastra para ordenar · el líder abre la pelea · antes de cada combate eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}`)),
     panel,
-    h('section', { class: 'collection-board' }, h('div', { class: 'coll-head' }, h('h2', null, 'Colección')), collectionBar(filters, collCount), grid),
+    h('section', { class: 'collection-board' }, h('div', { class: 'coll-head' }, h('h2', null, 'Tus Pokémon')), collectionBar(filters, collCount), grid),
+    h('section', null, h('p', { class: 'muted small' }, 'Tu sesión vive en este navegador. Para entrar desde otro: ', h('a', { href: '#', onclick: (e) => { e.preventDefault(); copy(`${location.origin}/#key=${token}`, 'Link de acceso copiado. No lo compartas: entra como tú.'); } }, 'copiar link de acceso'), '.')),
   );
   unsaved = () => !!editor?.dirty();
   paintParty();
@@ -1680,7 +1905,7 @@ async function battlePage(id, seq) {
       match?.destroy();
       match = null;
       if (msg.preview) {
-        prep ??= previewUI(c, (picks) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'pick', picks })));
+        prep ??= previewUI(c, (picks) => send({ t: 'pick', picks }), (picks) => send({ t: 'choosing', picks }));
         prep.update(msg);
         return;
       }
@@ -1844,7 +2069,17 @@ function confettiOn(host) {
   }
 }
 
-const avatar = (p) => h('div', { class: `match-avatar${p.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true' }, p.ai ? '🤖' : (p.name.trim()[0] ?? '?').toUpperCase());
+const AI_COLORS = { 'crubio ai': '#ef476f', 'andy ai': '#f78c6b', 'bryan ai': '#e9b949', 'esteban ai': '#06d6a0', 'ferlo ai': '#118ab2', 'gon ai': '#8338ec', 'joa ai': '#ff006e', 'nacho juan ai': '#3a86ff', 'nico santi ai': '#fb5607', 'nora ai': '#8ac926', 'valde ai': '#1982c4', 'mirror ai': '#9b5de5', 'tom ai': '#e76f51', 'yuwen ai': '#2a9d8f', 'alvaro ai': '#c77dff' };
+const aiBase = (name) => name.replace(/ - [^-]+$/, '');
+function aiColor(name) {
+  const base = aiBase(name);
+  if (AI_COLORS[base]) return AI_COLORS[base];
+  let n = 0;
+  for (const ch of base) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
+  return `hsl(${n % 360} 70% 55%)`;
+}
+
+const avatar = (p) => h('div', { class: `match-avatar${p.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true', style: p.ai ? { background: aiColor(p.name) } : null }, p.ai ? '🤖' : (p.name.trim()[0] ?? '?').toUpperCase());
 
 function seatCard(p, { you = false, host = false, onRemove = null } = {}) {
   const status = p.ready ? h('span', { class: 'seat-state ok' }, '✅ Listo') : h('span', { class: 'seat-state' }, '⏳ Esperando');
@@ -1959,7 +2194,7 @@ function followTournament(c, seq, getBattle) {
     await sleep(RESULT_HOLD_MS);
     if (stale(seq)) return;
     cameFromMatch = { tournamentId: T.id, challengeId: c.id };
-    nav(`/t/${T.id}`);
+    smoothNav(`/t/${T.id}`);
   };
   return tournamentFeed(c.tournament.id, (T) => {
     const cur = T.current?.challengeId ?? null;
@@ -1967,7 +2202,7 @@ function followTournament(c, seq, getBattle) {
     prev = { cur, status: T.status };
     if (!was || stale(seq)) return;
     if (was.cur === c.id && cur !== c.id) return void leave(T);
-    if (cur && cur !== c.id && cur !== was.cur && !leaving) nav(`/b/${cur}`);
+    if (cur && cur !== c.id && cur !== was.cur && !leaving) smoothNav(`/b/${cur}`);
   });
 }
 
@@ -1993,7 +2228,7 @@ async function tournamentPage(id, seq) {
   let timer = null;
   const follow = (cur) => {
     clearTimeout(timer);
-    timer = setTimeout(() => !stale(seq) && nav(`/b/${cur}`), Math.max(0, shownAt + BRACKET_HOLD_MS - Date.now()));
+    timer = setTimeout(() => !stale(seq) && smoothNav(`/b/${cur}`), Math.max(0, (arrived ? shownAt + BRACKET_HOLD_MS : 0) - Date.now(), ui.busyUntil() - Date.now()));
   };
   ui.update(T);
   const stop = tournamentFeed(id, (next) => {
@@ -2011,11 +2246,15 @@ async function tournamentPage(id, seq) {
 }
 
 const BRACKET_HOLD_MS = 4000;
+const DRAW_SPIN_MS = 1200;
+const DRAW_STEP_MS = 220;
 
 function tournamentUI(id, justPlayed = null) {
   let T = null;
   let celebrated = false;
   let partied = false;
+  let drawingUntil = 0;
+  const timers = [];
   let painted = '';
   const celebrateUntil = Date.now() + BRACKET_HOLD_MS;
   let offset = 0;
@@ -2084,7 +2323,8 @@ function tournamentUI(id, justPlayed = null) {
     return pos === undefined || pos === -1 ? null : pos + 1;
   }
 
-  function slot(i, m, side, round) {
+  function slot(i, m, side, round, hide = false) {
+    if (hide) return h('div', { class: 'bk-slot is-drawing', 'data-round': round, 'data-side': side }, h('span', { class: 'bk-seed' }, ''), h('span', { class: 'bk-av is-empty', 'aria-hidden': 'true' }, '?'), h('span', { class: 'bk-who' }, h('span', { class: 'bk-name' }, '…'), h('small', { class: 'bk-sub' }, 'Sorteando')), h('span', { class: 'bk-mark' }));
     const seat = i === null ? null : T.seats[i];
     const done = m.winner !== null;
     const won = done && m.winner === i;
@@ -2094,13 +2334,13 @@ function tournamentUI(id, justPlayed = null) {
       'div',
       { class: cls, 'data-round': round, 'data-side': side },
       h('span', { class: 'bk-seed' }, seat ? seedOf(i) : ''),
-      h('span', { class: `bk-av${seat?.ai ? ' is-ai' : ''}${!seat ? ' is-empty' : ''}`, 'aria-hidden': 'true' }, !seat ? '?' : seat.ai ? '🤖' : (seat.name.trim()[0] ?? '?').toUpperCase()),
-      h('span', { class: 'bk-who', title: seat?.name ?? null }, h('span', { class: 'bk-name' }, seat ? (seat.ai ? seat.name.replace(/ - ai .*$/, '') : seat.name) : 'Por definir'), h('small', { class: 'bk-sub' }, sub)),
+      h('span', { class: `bk-av${seat?.ai ? ' is-ai' : ''}${!seat ? ' is-empty' : ''}`, 'aria-hidden': 'true', style: seat?.ai ? { background: aiColor(seat.name) } : null }, !seat ? '?' : seat.ai ? '🤖' : (seat.name.trim()[0] ?? '?').toUpperCase()),
+      h('span', { class: 'bk-who', title: seat?.name ?? null }, h('span', { class: 'bk-name' }, seat ? (seat.ai ? seat.name.replace(/ - [^-]+$/, '') : seat.name) : 'Por definir'), h('small', { class: 'bk-sub' }, sub)),
       h('span', { class: 'bk-mark', 'aria-label': won ? 'Ganó' : done && seat ? 'Perdió' : null }, won ? (m.coinFlip ? h('span', { 'data-tip': 'Empate: avanzó por sorteo' }, '🪙') : '✔') : done && seat ? '✕' : ''),
     );
   }
 
-  function bracket() {
+  function bracket(drawing = false) {
     const champion = T.champion !== null ? T.seats[T.champion] : null;
     const final = T.rounds.at(-1)?.matches[0];
     const runnerUp = final && final.winner !== null ? T.seats[final.winner === final.a ? final.b : final.a] : null;
@@ -2116,7 +2356,8 @@ function tournamentUI(id, justPlayed = null) {
         h('div', { class: 'bk-matches' }, round.matches.map((m, i) => {
           const live = T.current && T.current.round === r && T.current.index === i;
           const next = upcoming && upcoming.r === r && upcoming.i === i;
-          const mineMatch = T.you !== null && (m.a === T.you || m.b === T.you);
+          const hide = drawing && r === 0;
+          const mineMatch = !hide && T.you !== null && (m.a === T.you || m.b === T.you);
           const yourPath = m.winner !== null && m.winner === T.you;
           const number = T.rounds.slice(0, r).reduce((n, x) => n + x.matches.length, 0) + i + 1;
           const status = live
@@ -2125,7 +2366,7 @@ function tournamentUI(id, justPlayed = null) {
             ? h('a', { class: 'bk-status is-done', href: `/b/${m.challengeId}`, 'data-link': true }, 'Ver pelea')
             : next
             ? h('span', { class: 'bk-status is-next' }, 'Próxima')
-            : h('span', { class: 'bk-status' }, m.a !== null && m.b !== null ? 'En espera' : '—');
+            : h('span', { class: 'bk-status' }, hide ? 'Sorteando' : m.a !== null && m.b !== null ? 'En espera' : '—');
           return h(
             'div',
             { class: ['bk-cell', r === last ? 'is-solo' : i % 2 ? 'is-bottom' : 'is-top', m.winner !== null ? 'is-decided' : '', yourPath ? 'is-your-path' : ''].filter(Boolean).join(' ') },
@@ -2133,8 +2374,8 @@ function tournamentUI(id, justPlayed = null) {
               'div',
               { class: ['bk-match', live ? 'is-live' : '', next ? 'is-next' : '', mineMatch ? 'is-mine' : '', m.winner !== null ? 'is-done' : ''].filter(Boolean).join(' ') },
               h('div', { class: 'bk-head' }, h('span', null, `Pelea ${number}`), status),
-              slot(m.a, m, 'a', r),
-              slot(m.b, m, 'b', r),
+              slot(m.a, m, 'a', r, hide),
+              slot(m.b, m, 'b', r, hide),
             ),
           );
         })),
@@ -2155,7 +2396,7 @@ function tournamentUI(id, justPlayed = null) {
               'div',
               { class: `bk-trophy${champion ? ' has-champ' : ''}${T.champion !== null && T.champion === T.you ? ' is-you' : ''}` },
               h('span', { class: 'bk-cup', 'aria-hidden': 'true' }, '🏆'),
-              champion ? h('span', { class: `bk-av big${champion.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true' }, champion.ai ? '🤖' : (champion.name.trim()[0] ?? '?').toUpperCase()) : null,
+              champion ? h('span', { class: `bk-av big${champion.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true', style: champion.ai ? { background: aiColor(champion.name) } : null }, champion.ai ? '🤖' : (champion.name.trim()[0] ?? '?').toUpperCase()) : null,
               h('b', { class: 'bk-champ-name' }, champion?.name ?? '¿Quién será?'),
               runnerUp ? h('small', { class: 'muted' }, `🥈 ${runnerUp.name}`) : h('small', { class: 'muted' }, `${T.size} jugadores · ${T.total} peleas`),
             ),
@@ -2197,23 +2438,25 @@ function tournamentUI(id, justPlayed = null) {
     match?.classList.add('just-played');
     const next = r + 1 < T.rounds.length ? root.querySelectorAll('.bk-col')[r + 1]?.querySelectorAll('.bk-match')[Math.floor(i / 2)]?.querySelectorAll('.bk-slot')[i % 2] : root.querySelector('.bk-trophy');
     next?.classList.add('just-advanced');
-    if (scroll) match?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    const wrap = root.querySelector('.bracket-wrap') ?? root;
+    if (scroll && match && wrap.scrollWidth > wrap.clientWidth) wrap.scrollTo({ left: Math.max(0, match.getBoundingClientRect().left - wrap.getBoundingClientRect().left + wrap.scrollLeft - wrap.clientWidth / 2 + match.offsetWidth / 2), behavior: 'smooth' });
   }
 
   function animateDraw(root) {
     const names = T.seats.map((s) => s.name);
-    const slots = [...root.querySelectorAll('.bk-slot[data-round="0"] .bk-name')];
+    const order = T.rounds[0].matches.flatMap((m) => [[m.a, m], [m.b, m]]);
+    const slots = [...root.querySelectorAll('.bk-slot[data-round="0"]')];
     slots.forEach((el, i) => {
-      const final = el.textContent;
-      el.parentElement.classList.add('is-drawing');
-      el.parentElement.style.setProperty('--d', `${i * 140}ms`);
-      const spin = setInterval(() => (el.textContent = names[Math.floor(Math.random() * names.length)]), 70);
-      setTimeout(() => {
+      const label = el.querySelector('.bk-name');
+      const spin = setInterval(() => (label.textContent = names[Math.floor(Math.random() * names.length)]), 70);
+      timers.push(spin);
+      timers.push(setTimeout(() => {
         clearInterval(spin);
-        el.textContent = final;
-        el.parentElement.classList.remove('is-drawing');
-        playClass(el.parentElement, 'is-landed', 700);
-      }, 1200 + i * 220);
+        const [seat, m] = order[i];
+        const real = slot(seat, m, i % 2 ? 'b' : 'a', 0);
+        el.replaceWith(real);
+        playClass(real, 'is-landed', 700);
+      }, DRAW_SPIN_MS + i * DRAW_STEP_MS));
     });
   }
 
@@ -2227,11 +2470,16 @@ function tournamentUI(id, justPlayed = null) {
       $app.replaceChildren(header(), ...lobby().filter(Boolean));
       return;
     }
-    const board = bracket();
+    const startDraw = !drew && T.drawAt && nowServer() - T.drawAt < 4000;
+    if (startDraw) {
+      drawingUntil = Date.now() + DRAW_SPIN_MS + T.size * DRAW_STEP_MS + 400;
+      timers.push(setTimeout(paint, drawingUntil - Date.now()));
+    }
+    drew = true;
+    const board = bracket(Date.now() < drawingUntil);
     const live = liveCard();
     $app.replaceChildren(...[header(), live, h('section', { class: 'card' }, h('h2', null, 'Llaves'), board)].filter(Boolean));
-    if (!drew && T.drawAt && nowServer() - T.drawAt < 4000) animateDraw(board);
-    drew = true;
+    if (startDraw) animateDraw(board);
     if (justPlayed && Date.now() < celebrateUntil) animateAdvance(board, justPlayed, !celebrated);
     celebrated = true;
     if (T.status === 'finished' && live && !partied) {
@@ -2247,6 +2495,7 @@ function tournamentUI(id, justPlayed = null) {
       if (key === painted) return;
       painted = key;
       T = next;
+      if (Date.now() < drawingUntil) return;
       document.body.dataset.watching = String(T.you === null && T.status === 'running');
       paint();
       clearInterval(tick);
@@ -2257,8 +2506,10 @@ function tournamentUI(id, justPlayed = null) {
         el.textContent = drawing ? '🎲 Sorteando las llaves…' : `Siguiente pelea en ${Math.max(0, Math.ceil((T.nextAt - nowServer()) / 1000))}s`;
       }, 250);
     },
+    busyUntil: () => Math.max(drawingUntil, justPlayed ? celebrateUntil : 0),
     destroy() {
       clearInterval(tick);
+      timers.forEach((t) => (clearTimeout(t), clearInterval(t)));
       delete document.body.dataset.watching;
     },
   };
@@ -2334,8 +2585,28 @@ function preloadFor(you, parties) {
   parties.forEach((party, s) => preloadSprites([...(party ?? []), { sprite: 'substitute' }], { back: s === you }));
 }
 
-function previewUI(c, sendPick) {
+function matchupOf(f, foes) {
+  const attacking = f.moves?.length ? [...new Set(f.moves.filter((m) => m.category !== 'status' && m.power).map((m) => m.type))] : f.types ?? [];
+  const strong = foes.filter((o) => attacking.some((t) => effectiveness(t, o.types) >= 2));
+  const weak = foes.filter((o) => (o.types ?? []).some((t) => effectiveness(t, f.types) >= 2));
+  return { strong, weak, byMoves: !!f.moves?.length };
+}
+
+function matchupBadges(f, foes) {
+  if (!foes?.length) return null;
+  const { strong, weak, byMoves } = matchupOf(f, foes);
+  const names = (list) => list.map((o) => o.name).join(', ');
+  return h(
+    'span',
+    { class: 'matchup' },
+    h('span', { class: `mu up${strong.length ? '' : ' none'}`, tabindex: 0, 'data-tip': strong.length ? `${byMoves ? 'Sus movimientos' : 'Sus tipos'} pegan súper eficaz a: ${names(strong)}` : 'No tiene ventaja de tipo contra el rival' }, `⚔️ ${strong.length}`),
+    h('span', { class: `mu down${weak.length ? '' : ' none'}`, tabindex: 0, 'data-tip': weak.length ? `Lo amenazan por tipo: ${names(weak)}` : 'Ningún rival le pega súper eficaz por tipo' }, `⚠️ ${weak.length}`),
+  );
+}
+
+function previewUI(c, sendPick, sendDraft = () => {}) {
   let last = null;
+  let revealSeen = false;
   let total = 0;
   let picks = [];
   let sent = false;
@@ -2349,7 +2620,8 @@ function previewUI(c, sendPick) {
   const bar = h('i');
   const timerText = h('span', { class: 'timer' });
   const root = h('div', { class: 'prep' });
-  $app.replaceChildren(h('div', { class: 'status-line' }, h('b', null, '⚔︎ Preparación de batalla'), timerText), h('div', { class: 'prep-timer' }, bar), root);
+  const title = h('b', null, '⚔︎ Preparación de batalla');
+  $app.replaceChildren(h('div', { class: 'status-line' }, title, timerText), h('div', { class: 'prep-timer' }, bar), root);
   const tick = setInterval(() => {
     if (!last?.deadline) return;
     const left = Math.max(0, last.deadline - Date.now());
@@ -2393,6 +2665,7 @@ function previewUI(c, sendPick) {
     if (at >= 0) picks.splice(at, 1);
     else if (picks.length < needed) picks.push(i);
     else return toast(`Ya elegiste ${needed}: toca uno para sacarlo.`);
+    sendDraft(picks.slice());
     render();
   }
 
@@ -2407,7 +2680,23 @@ function previewUI(c, sendPick) {
     });
   }
 
-  const seenCard = (f, s, i) => ({ el: h('div', { class: `prep-card seen${cardAnim(s, i)}`, style: { animationDelay: `${i * 70}ms` } }, h('div', { html: creatureHTML(f) }), h('b', null, f.name, genderMark(f.gender)), typeChips(f.types ?? [])) });
+  function seenCard(f, s, i) {
+    const badge = h('span', { class: 'badge', hidden: true });
+    const full = !!f.moves;
+    const el = h(
+      'div',
+      { class: `prep-card seen${full ? ' full' : ''}${cardAnim(s, i)}`, style: { animationDelay: `${i * 70}ms` } },
+      badge,
+      h('div', { html: creatureHTML(f) }),
+      h('b', null, f.name, genderMark(f.gender)),
+      full ? h('small', { class: 'muted' }, `Nv ${f.level}`) : null,
+      typeChips(f.types ?? []),
+      full && f.abilityInfo ? abilityChip(f.abilityInfo) : null,
+      full ? h('small', { class: 'prep-moves muted' }, f.moves.map((m) => m.name).join(' · ')) : null,
+      matchupBadges(f, last.preview.sides[1 - s].party),
+    );
+    return { el, badge };
+  }
 
   function ownCard(f, i, own, random) {
     const badge = h('span', { class: 'badge', hidden: true });
@@ -2421,6 +2710,7 @@ function previewUI(c, sendPick) {
       typeChips(f.types),
       random && f.abilityInfo ? abilityChip(f.abilityInfo) : null,
       h('small', { class: 'prep-moves muted' }, f.moves.map((m) => m.name).join(' · ')),
+      matchupBadges(f, last.preview.sides[1 - last.you].party),
     );
     return { el, badge };
   }
@@ -2433,10 +2723,21 @@ function previewUI(c, sendPick) {
 
   function paintSide(v, side) {
     syncGrid(v.grid, v.slots, side.party, v.s, (f, i) => seenCard(f, v.s, i));
-    const key = rollingOn(v.s) ? 'roll' : side.ready ? 'ready' : 'picking';
+    const shown = side.picks ?? side.locked ?? side.draft ?? null;
+    const drafting = !side.picks && !side.locked && !!side.draft;
+    v.slots.forEach((slot, i) => {
+      if (slot.kind !== 'card' || !slot.badge) return;
+      const order = shown ? shown.indexOf(i) : -1;
+      slot.el.classList.toggle('chosen', order >= 0 && !drafting);
+      slot.el.classList.toggle('drafting', order >= 0 && drafting);
+      slot.el.classList.toggle('benched', !!side.picks && order < 0);
+      slot.badge.hidden = order < 0;
+      slot.badge.textContent = order >= 0 ? String(order + 1) : '';
+    });
+    const key = rollingOn(v.s) ? 'roll' : side.picks ? 'revealed' : side.ready ? 'ready' : side.draft ? `picking:${side.draft.length}` : 'picking';
     if (key === v.statusKey) return;
     v.statusKey = key;
-    v.status.replaceChildren(key === 'roll' ? h('span', { class: 'muted small pulse' }, '🎲 Sorteando…') : key === 'ready' ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, 'Eligiendo…'));
+    v.status.replaceChildren(key === 'roll' ? h('span', { class: 'muted small pulse' }, '🎲 Sorteando…') : key === 'revealed' ? h('span', { class: 'chip ready-chip' }, '👁 Eligió estos 3') : key === 'ready' ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, side.draft ? `Eligiendo… ${side.draft.length}/${side.needed}` : 'Eligiendo…'));
   }
 
   function build(p, you) {
@@ -2475,7 +2776,7 @@ function previewUI(c, sendPick) {
       m.footMode = mode;
       m.foot.replaceChildren(mode === 'pick' ? m.pickBtn : m.footNote);
     }
-    m.footNote.textContent = rollingMe ? '🎲 Los dados están rodando…' : foe.ready ? '¡Comienza la batalla!' : `Esperando a ${foe.name}…`;
+    m.footNote.textContent = rollingMe ? '🎲 Los dados están rodando…' : last.preview.revealed || foe.ready ? '¡Los dos eligieron! La batalla parte en segundos.' : `Esperando a ${foe.name}…`;
     m.pickBtn.disabled = picks.length !== own.needed || rolling;
     m.pickBtn.textContent = `Continuar (${picks.length}/${own.needed})`;
   }
@@ -2484,6 +2785,8 @@ function previewUI(c, sendPick) {
     const p = last.preview;
     const you = last.you;
     view ??= build(p, you);
+    root.classList.toggle('is-revealed', !!p.revealed);
+    title.textContent = you == null ? (p.revealed ? '👁 Elecciones reveladas' : '👁 Preparación de batalla · eligiendo') : p.revealed ? '⚔︎ ¡Todo listo!' : '⚔︎ Preparación de batalla';
     for (const v of view.sides) paintSide(v, p.sides[v.s]);
     if (view.mine) paintMine(view.mine, p.sides[you], p.sides[1 - you], p.mode === 'random');
     entered = true;
@@ -2494,6 +2797,10 @@ function previewUI(c, sendPick) {
       const first = !last;
       last = msg;
       preloadFor(msg.you, msg.preview.sides.map((side) => side.party));
+      if (msg.preview.revealed && !revealSeen) {
+        revealSeen = true;
+        total = Math.max(1, (msg.deadline ?? Date.now()) - Date.now());
+      }
       if (!total && msg.deadline) total = Math.max(1, msg.deadline - Date.now());
       if (first && !rolledRooms.has(c.id)) {
         const sides = msg.preview.sides;
@@ -2525,9 +2832,9 @@ function battleUI(c, sendAction) {
 
   const sideAt = (p) => (p === 'me' ? mine : 1 - mine);
   const hud = (p) => {
-    const r = { name: h('span'), lvl: h('span'), sub: h('div', { class: 'sub' }), bar: h('i'), num: h('div', { class: 'hpnum' }) };
+    const r = { name: h('span'), lvl: h('span'), sub: h('div', { class: 'sub' }), bar: h('i'), num: h('div', { class: 'hpnum' }), conds: h('div', { class: 'conds' }) };
     const info = h('button', { class: 'info-btn', type: 'button', 'data-tip': 'Ver info', 'aria-label': 'Ver info del Pokémon', onclick: () => openInfo(sideAt(p)) }, 'i');
-    r.el = h('div', { class: `hud ${p}` }, h('div', { class: 'nm' }, r.name, h('span', { class: 'nm-end' }, r.lvl, info)), r.sub, h('div', { class: 'hp' }, r.bar), r.num);
+    r.el = h('div', { class: `hud ${p}` }, h('div', { class: 'nm' }, r.name, h('span', { class: 'nm-end' }, r.lvl, info)), r.sub, h('div', { class: 'hp' }, r.bar), r.num, r.conds);
     return r;
   };
   const els = {
@@ -2730,23 +3037,23 @@ function battleUI(c, sendAction) {
 
     r.name.replaceChildren(f.shiny ? `✨ ${f.name}` : f.name, genderMark(f.gender) ?? '');
     r.lvl.textContent = `Nv ${f.level}`;
-    const boosts = Object.entries(STAT)
-      .filter(([k]) => f.boosts[k])
-      .map(([k, [label]]) => `${label} ${signed(f.boosts[k])}`)
-      .join(' · ');
     const volatiles = conditionsOf({ volatiles: f.volatiles }).filter((c) => !['flashFire', 'disabled', 'slowStart', 'smackdown', 'noRetreat', 'foresight', 'miracleeye', 'focusenergy', 'gastroacid', 'imprison'].includes(c.key));
     r.sub.replaceChildren(
       ...[
         typeChips(f.types),
-        f.status ? h('span', { class: `cond ${f.status}`, tabindex: 0, 'data-tip': STATUS_INFO[f.status].name, 'data-tip-note': STATUS_INFO[f.status].desc }, statusLabel(f.status)) : null,
+        f.status && f.hp > 0 ? h('span', { class: `cond ${f.status}`, tabindex: 0, 'data-tip': STATUS_INFO[f.status].name, 'data-tip-note': STATUS_INFO[f.status].desc }, statusLabel(f.status)) : null,
         h('span', { class: 'owner' }, isYou(side) ? `${sd.name} (tú)` : sd.name),
-        boosts ? h('span', { class: 'boosts' }, boosts) : null,
-        ...volatiles.map((c) => h('span', { class: 'vol-chip', tabindex: 0, 'data-tip': c.name, 'data-tip-note': c.desc }, `${c.icon} ${c.name}`)),
-        ...Object.entries(sd.screens || {}).map(([kind, turns]) => h('span', { class: `screen-chip ${kind}`, tabindex: 0, 'data-tip': `Reduce a la mitad el daño de ${SCREEN_GUARDS[kind]} contra este equipo. Quedan ${turns} turnos.` }, `🛡️ ${SCREEN[kind]} ${turns}`)),
-        ...sideChips(sd),
-        h('span', { class: 'dots', 'aria-label': 'Equipo' }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
+        h('span', { class: 'dots', 'aria-label': `Equipo: ${sd.team.filter((t) => t.hp > 0).length} de ${sd.team.length} en pie`, 'data-tip': `${sd.team.filter((t) => t.hp > 0).length} de ${sd.team.length} en pie` }, sd.team.map((t) => h('i', { class: t.hp <= 0 ? 'out' : null }))),
       ].filter(Boolean),
     );
+    const condChips = [
+      ...(f.hp > 0 ? boostChips(f.boosts) : []),
+      ...(f.hp > 0 ? volatiles : []).map((c) => h('span', { class: 'vol-chip', tabindex: 0, 'data-tip': c.name, 'data-tip-note': c.desc }, `${c.icon} ${c.name}`)),
+      ...Object.entries(sd.screens || {}).map(([kind, turns]) => h('span', { class: `screen-chip ${kind}`, tabindex: 0, 'data-tip': `Reduce a la mitad el daño de ${SCREEN_GUARDS[kind]} contra este equipo. Quedan ${turns} turnos.` }, `🛡️ ${SCREEN[kind]} ${turns}`)),
+      ...sideChips(sd),
+    ];
+    r.conds.replaceChildren(...condChips);
+    r.conds.hidden = !condChips.length;
   }
 
   function sideChips(sd) {
@@ -2937,6 +3244,7 @@ function battleUI(c, sendAction) {
         log(`Turno ${ev.turn}`, 'turn');
         return 350;
       case 'move': {
+        els.spot[pos(ev.side)].classList.remove('is-hidden-move');
         setActing(ev.side);
         currentMove = ev.kind === 'attack' ? { ev, hits: 0 } : null;
         if (ev.kind === 'attack' && (ev.flags || []).includes('contact')) anim(els.spot[pos(ev.side)], `lunge-${pos(ev.side)}`, 500);
@@ -2982,18 +3290,23 @@ function battleUI(c, sendAction) {
         tell(['Se anulan los cambios de características de ', ...mon(ev.side, ev.name), '.'], { side: ev.side, sub: true });
         return 800;
       }
-      case 'charging':
-        anim(els.spot[pos(ev.side)], 'power', 600);
-        tell([...mon(ev.side, ev.name), ` se prepara para usar ${ev.move}…`], { side: ev.side, sub: true });
-        return 900;
+      case 'charging': {
+        const spot = els.spot[pos(ev.side)];
+        anim(spot, 'power', 700);
+        if (ev.hidden) spot.classList.add('is-hidden-move');
+        const text = CHARGE_TEXT[ev.key];
+        tell([...capFirst(mon(ev.side, ev.name)), text ? ` ${text}` : ` se prepara para usar ${ev.move}…`], { side: ev.side });
+        log([...capFirst(mon(ev.side, ev.name)), ` carga ${ev.move}: atacará el próximo turno.`], 'weak');
+        return 1300;
+      }
       case 'boost': {
         const f = activeOf(ev.side);
         const [label, word] = STAT[ev.stat] ?? [ev.stat, ev.stat];
         const up = (ev.by ?? 1) > 0;
         f.boosts[ev.stat] = ev.stage;
         paint(ev.side);
-        float(ev.side, `${label} ${up ? '▲' : '▼'}`, up ? 'up' : 'miss');
-        tell([...mon(ev.side, f.name), ` ${up ? 'sube' : 'baja'} su ${word}${Math.abs(ev.by ?? 1) >= 2 ? ' mucho' : ''} (${signed(ev.stage)}).`], { side: ev.side, sub: true, cls: up ? null : 'weak' });
+        float(ev.side, `${label} ${up ? '▲' : '▼'}${Math.abs(ev.by ?? 1) >= 2 ? (up ? '▲' : '▼') : ''}`, up ? 'up' : 'down');
+        tell([...mon(ev.side, f.name), ` ${up ? 'sube' : 'baja'} su ${word}${Math.abs(ev.by ?? 1) >= 2 ? ' mucho' : ''} `, h('span', { class: `stat-delta ${up ? 'up' : 'down'}` }, `${up ? '▲' : '▼'} ${signed(ev.stage)}`), '.'], { side: ev.side, sub: true });
         return 900;
       }
       case 'ability': {
@@ -3194,6 +3507,7 @@ function battleUI(c, sendAction) {
         return 1000;
       }
       case 'faint': {
+        els.spot[pos(ev.side)].classList.remove('is-hidden-move');
         const f = activeOf(ev.side);
         f.hp = 0;
         setActing(null);
@@ -3202,6 +3516,7 @@ function battleUI(c, sendAction) {
         return 1200;
       }
       case 'switch': {
+        els.spot[pos(ev.side)].classList.remove('is-hidden-move');
         const s = ev.side;
         const from = ev.from || activeOf(s).name;
         sd(s).active = ev.to;
@@ -3427,4 +3742,5 @@ function battleUI(c, sendAction) {
   };
 }
 
+document.querySelector('footer.credits')?.append(feedbackButton());
 loadAnimatedSprites().finally(route);
