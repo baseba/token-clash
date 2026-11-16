@@ -6,7 +6,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { parseSave, SaveError, uniqueSpecies, uniqueVariants, carryTeam } from './save.js';
-import { buildFighter, movepool, validMoveset, abilityOptions, usableAbility, movesetFor, speciesData, lineageLearnset, MOVES_PER_FIGHTER } from './creatures.js';
+import { buildFighter, movepool, validMoveset, abilityOptions, usableAbility, movesetFor, speciesData, lineageLearnset, moveOrigins, MOVES_PER_FIGHTER } from './creatures.js';
 import { abilityInfo } from './abilities.js';
 import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents } from './battle.js';
 import { createPreview, pick, fillMissing, previewReady, chosenEntries, previewView, picksNeeded, PARTY_SIZE } from './preview.js';
@@ -179,11 +179,11 @@ function saveEdit(e) {
 
 function monDetail(e) {
   const chosen = new Set(movesetFor(e));
-  const learnedAt = lineageLearnset(e.finalID);
+  const origins = moveOrigins(e);
   return {
     ...buildFighter(e),
     nickname: e.nickname || null,
-    movepool: movepool(e).map((m) => ({ level: learnedAt.get(m.key)?.level ?? null, key: m.key, name: m.name, desc: m.desc, type: m.type, category: m.category, power: m.power, accuracy: m.accuracy, pp: m.pp, priority: m.priority, contact: m.flags.includes('contact'), supported: m.supported, chosen: chosen.has(m.key) })),
+    movepool: movepool(e).map((m) => ({ ...origins.get(m.key), key: m.key, name: m.name, desc: m.desc, type: m.type, category: m.category, power: m.power, accuracy: m.accuracy, pp: m.pp, priority: m.priority, contact: m.flags.includes('contact'), supported: m.supported, chosen: chosen.has(m.key) })),
     abilityOptions: abilityOptions(e).map((a) => ({ ...abilityInfo(a.key), hidden: a.hidden })),
     maxMoves: MOVES_PER_FIGHTER,
   };

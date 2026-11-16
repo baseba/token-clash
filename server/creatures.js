@@ -174,13 +174,24 @@ export function lineageLearnset(id) {
   return best;
 }
 
+const TEACH_ORIGINS = ['machine', 'tutor', 'egg', 'other'];
+
+export function moveOrigins(entry) {
+  const out = new Map();
+  const byLevel = [...lineageLearnset(entry.finalID)].sort((a, b) => a[1].level - b[1].level || a[0].localeCompare(b[0]));
+  for (const [id, m] of byLevel) out.set(id, { origin: 'level', level: m.level });
+  const line = lineage(entry.finalID);
+  for (const origin of TEACH_ORIGINS) {
+    const ids = new Set(line.flatMap((speciesId) => POKEAPI[speciesId].teachable?.[origin] ?? []));
+    for (const id of [...ids].sort()) if (!out.has(id)) out.set(id, { origin, level: null });
+  }
+  for (const id of entry.learned ?? []) if (!out.has(id)) out.set(id, { origin: 'other', level: null });
+  for (const id of out.keys()) if (!MOVEDEX[id]) out.delete(id);
+  return out;
+}
+
 export function learnedMoves(entry) {
-  const byLevel = new Map([...lineageLearnset(entry.finalID)].filter(([, m]) => m.level <= entry.level).map(([id, m]) => [id, m.level]));
-  for (const id of entry.learned ?? []) if (!byLevel.has(id)) byLevel.set(id, 0);
-  return [...byLevel.entries()]
-    .filter(([id]) => MOVEDEX[id])
-    .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
-    .map(([id]) => id);
+  return [...moveOrigins(entry).keys()];
 }
 
 export function movepool(entry) {
@@ -192,8 +203,11 @@ export function usableMovepool(entry) {
 }
 
 export function defaultMoveset(entry) {
+  const origins = moveOrigins(entry);
   const usable = usableMovepool(entry);
-  if (usable.length) return usable.slice(-MOVES_PER_FIGHTER);
+  const reached = usable.filter((id) => origins.get(id).origin === 'level' && origins.get(id).level <= entry.level);
+  if (reached.length) return reached.slice(-MOVES_PER_FIGHTER);
+  if (usable.length) return usable.slice(0, MOVES_PER_FIGHTER);
   return MOVEDEX.tackle ? ['tackle'] : [];
 }
 
