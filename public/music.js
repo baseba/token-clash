@@ -138,7 +138,8 @@ export function createPlayer({ storage = null } = {}) {
       storage?.setItem(k, JSON.stringify(v));
     } catch {}
   };
-  const volumes = { music: read('tc_music_volume', 0.5), sfx: read('tc_sfx_volume', 0.15) };
+  const VOLUME_KEYS = { music: 'tc_music_level', sfx: 'tc_sfx_level' };
+  const volumes = { music: read(VOLUME_KEYS.music, 0.5), sfx: read(VOLUME_KEYS.sfx, 0.15) };
   let muted = read('tc_music_muted', false);
   let musicGain = null;
   const LEVEL = { music: 1.6, sfx: 2.8 };
@@ -491,7 +492,7 @@ export function createPlayer({ storage = null } = {}) {
     setVolume(kind, v) {
       if (!(kind in volumes)) return;
       volumes[kind] = clamp(v, 0, 1);
-      write(kind === 'music' ? 'tc_music_volume' : 'tc_sfx_volume', volumes[kind]);
+      write(VOLUME_KEYS[kind], volumes[kind]);
       const node = kind === 'music' ? musicGain : sfxGain;
       if (node) node.gain.setTargetAtTime(volumes[kind] * LEVEL[kind], ctx.currentTime, 0.05);
     },
