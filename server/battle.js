@@ -871,8 +871,21 @@ function moveBlocked(b, f, m) {
   return null;
 }
 
+function userCantUse(b, f, m) {
+  if (m.id === 'last-resort') {
+    const others = f.moves.filter((o) => o.key !== 'last-resort');
+    return !others.length || others.some((o) => !f.vol.usedMoves?.has(o.key));
+  }
+  if (m.id === 'snore' || m.id === 'sleep-talk') return !asleep(b, f);
+  if (m.id === 'spit-up' || m.id === 'swallow') return !f.vol.stockpile?.count;
+  if (m.firstTurnOnly) return !!f.vol.acted;
+  if (m.losesType) return !f.types.includes(m.losesType);
+  if (m.selfCost) return f.hp <= Math.floor(f.stats.hp * m.selfCost);
+  return false;
+}
+
 function usableMoves(b, f) {
-  const ok = f.moves.map((m, i) => ({ m, i })).filter(({ m }) => (f.pp[m.key] ?? 0) > 0 && f.vol.disabled?.key !== m.key && !moveBlocked(b, f, m));
+  const ok = f.moves.map((m, i) => ({ m, i })).filter(({ m }) => (f.pp[m.key] ?? 0) > 0 && f.vol.disabled?.key !== m.key && !moveBlocked(b, f, m) && !userCantUse(b, f, m));
   const lock = f.vol.lockedMove;
   if (lock != null && abilityKey(b, f) === 'gorilla-tactics') {
     const locked = ok.filter(({ m }) => m.key === lock);
@@ -885,6 +898,13 @@ function encoreMove(f) {
   if (!f.vol.encore) return undefined;
   const i = f.moves.findIndex((m) => m.key === f.vol.encore.key);
   return i >= 0 && (f.pp[f.vol.encore.key] ?? 0) > 0 ? i : undefined;
+}
+
+export function forcedAction(b, s) {
+  if (!needsAction(b, s) || b.phase !== 'choose') return null;
+  const f = activeOf(b, s);
+  const forced = f.vol.mustRecharge ?? f.vol.charging ?? f.vol.rampage?.move ?? f.vol.locked?.move;
+  return forced == null ? null : { type: 'move', move: forced };
 }
 
 export function validActions(b, s) {

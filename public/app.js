@@ -1980,6 +1980,8 @@ async function battlePage(id, seq) {
   let match = null;
   let duel = null;
   const bar = roomBar(c);
+  const chat = chatPanel((msg) => send(msg));
+  let dock = null;
   const stopFollow = c.tournament ? followTournament(c, seq, () => battle) : null;
   cleanup = () => {
     closed = true;
@@ -1987,6 +1989,7 @@ async function battlePage(id, seq) {
     battle?.destroy();
     prep?.destroy();
     match?.destroy();
+    dock?.destroy();
     bar.destroy();
     stopFollow?.();
   };
@@ -2003,6 +2006,9 @@ async function battlePage(id, seq) {
       if (closed) return;
       const msg = JSON.parse(e.data);
       if (msg.t === 'error') return toast(msg.error);
+      if (msg.t === 'chatLog') return chat.load(msg.messages);
+      if (msg.t === 'chat') return chat.add(msg.message);
+      dock ??= chatDock(chat);
       if (msg.t === 'closed') {
         cleanup?.();
         cleanup = null;
@@ -2038,7 +2044,7 @@ async function battlePage(id, seq) {
         prep = null;
       }
       if (!battle) {
-        battle = battleUI(c, (action) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'act', action })), (turn) => send({ t: 'seen', turn }));
+        battle = battleUI(c, (action) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'act', action })), (turn) => send({ t: 'seen', turn }), chat, bar);
         music.play(`scene:${sceneFor(c.id).file}`);
       }
       battle.push(msg);
@@ -2062,7 +2068,7 @@ async function battlePage(id, seq) {
   if (c.status === 'finished') {
     const you = me ? c.final.sides.findIndex((s) => s.trainerId === me.id) : -1;
     bar.update(you === -1 ? null : you, c.final.sides.map((side) => side.name));
-    battle = battleUI(c, () => {});
+    battle = battleUI(c, () => {}, undefined, null, bar);
     music.play(`scene:${sceneFor(c.id).file}`);
     battle.push({ state: c.final, you: you === -1 ? null : you, actions: [], deadline: null });
     return;
@@ -2251,29 +2257,62 @@ function duelLobbyUI(c, send) {
 
 function roomBar(c) {
   const el = h('div', { class: 'room-bar', hidden: true });
+  const header = document.querySelector('header.top');
+  const menuBtn = h('button', { class: 'menu-btn', type: 'button', 'aria-label': 'Menú', 'aria-expanded': 'false', onclick: () => setMenu(!document.body.classList.contains('menu-open')) }, '☰');
+  let status = null;
+  let last = null;
+  const setMenu = (open) => {
+    document.body.classList.toggle('menu-open', open);
+    menuBtn.setAttribute('aria-expanded', String(open));
+  };
+  const onClick = (e) => {
+    if (!document.body.classList.contains('menu-open') || menuBtn.contains(e.target)) return;
+    if (!header.contains(e.target) || e.target.closest('a[href]')) setMenu(false);
+  };
+  const onKey = (e) => e.key === 'Escape' && setMenu(false);
+  document.addEventListener('click', onClick);
+  document.addEventListener('keydown', onKey);
   $app.before(el);
+  function render() {
+    if (!last) return;
+    const { you, names } = last;
+    const watching = you === null;
+    document.body.dataset.watching = String(watching);
+    const vs = !status && names?.length === 2 ? `${trainerShort(names[0])} vs ${trainerShort(names[1])}` : '';
+    const tour = c.tournament;
+    el.hidden = false;
+    document.body.classList.add('in-room');
+    el.className = `room-bar ${watching ? 'is-watching' : 'is-playing'}${status ? ' is-battle' : ''}`;
+    el.replaceChildren(
+      menuBtn,
+      h('span', { class: 'room-bar-tag' }, watching ? '👁 Estás mirando' : '⚔︎ Tu pelea'),
+      ...(status ? [status.turn, status.vs] : []),
+      h('span', { class: 'room-bar-text' }, [tour ? `🏆 ${tour.round} · Pelea ${tour.number} de ${tour.total}` : null, vs].filter(Boolean).join(' · ')),
+      ...(status ? [status.field, status.timer] : []),
+      ...(tour ? [h('a', { class: 'btn sm', href: `/t/${tour.id}`, 'data-link': true }, 'Ver llaves')] : []),
+    );
+  }
   return {
     update(you, names = null) {
-      const watching = you === null;
-      document.body.dataset.watching = String(watching);
-      const vs = names?.length === 2 ? `${trainerShort(names[0])} vs ${trainerShort(names[1])}` : '';
-      const tour = c.tournament;
-      el.hidden = false;
-      el.className = `room-bar ${watching ? 'is-watching' : 'is-playing'}`;
-      el.replaceChildren(
-        h('span', { class: 'room-bar-tag' }, watching ? '👁 Estás mirando' : '⚔︎ Tu pelea'),
-        h('span', { class: 'room-bar-text' }, [tour ? `🏆 ${tour.round} · Pelea ${tour.number} de ${tour.total}` : null, vs].filter(Boolean).join(' · ')),
-        ...(tour ? [h('a', { class: 'btn sm', href: `/t/${tour.id}`, 'data-link': true }, 'Ver llaves')] : []),
-      );
+      last = { you, names };
+      render();
+    },
+    setStatus(parts) {
+      status = parts;
+      render();
     },
     destroy() {
       el.remove();
+      setMenu(false);
+      document.removeEventListener('click', onClick);
+      document.removeEventListener('keydown', onKey);
+      document.body.classList.remove('in-room');
       delete document.body.dataset.watching;
     },
   };
 }
 
-function tournamentFeed(id, onFrame) {
+function tournamentFeed(id, onFrame, chat = null) {
   let ws = null;
   let closed = false;
   let retry = 0;
@@ -2287,6 +2326,8 @@ function tournamentFeed(id, onFrame) {
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.t === 'tour') onFrame(msg.tournament);
+      else if (msg.t === 'chatLog') chat?.load(msg.messages);
+      else if (msg.t === 'chat') chat?.add(msg.message);
       else if (msg.t === 'error') toast(msg.error);
     };
     ws.onclose = () => {
@@ -2296,13 +2337,15 @@ function tournamentFeed(id, onFrame) {
     };
   }
   connect();
-  return () => {
+  const stop = () => {
     closed = true;
     if (ws) {
       ws.onclose = null;
       ws.close();
     }
   };
+  stop.send = (msg) => ws?.readyState === 1 && ws.send(JSON.stringify(msg));
+  return stop;
 }
 
 const RESULT_HOLD_MS = 4500;
@@ -2356,16 +2399,19 @@ async function tournamentPage(id, seq) {
     timer = setTimeout(() => !stale(seq) && smoothNav(`/b/${cur}`), Math.max(0, (arrived ? shownAt + BRACKET_HOLD_MS : 0) - Date.now(), ui.busyUntil() - Date.now()));
   };
   ui.update(T);
+  const chat = chatPanel((msg) => stop.send(msg));
+  const dock = chatDock(chat);
   const stop = tournamentFeed(id, (next) => {
     if (stale(seq)) return;
     const cur = next.current?.challengeId ?? null;
     ui.update(next);
     if (cur && cur !== lastCurrent) follow(cur);
     lastCurrent = cur;
-  });
+  }, chat);
   cleanup = () => {
     clearTimeout(timer);
     stop();
+    dock.destroy();
     ui.destroy();
   };
 }
@@ -2976,7 +3022,121 @@ function moveSound(ev, byPlayer) {
   music.sfx('move', { key: ev.key, byPlayer, shape: self ? (shape === 'boost' ? 'boost' : 'aura') : shape, type: ev.type });
 }
 
-function battleUI(c, sendAction, sendSeen = () => {}) {
+function chatPanel(send) {
+  const COOLDOWN_MS = 800;
+  let lastSent = 0;
+  const seen = new Set();
+  const listeners = new Set();
+  const list = h('div', { class: 'chat-list', role: 'log', 'aria-live': 'polite', 'aria-label': 'Mensajes del chat' });
+  const empty = h('p', { class: 'chat-empty muted small' }, 'Nadie ha escrito todavía.');
+  const input = h('input', { type: 'text', maxlength: 200, placeholder: 'Escribe algo…', 'aria-label': 'Mensaje para el chat', autocomplete: 'off' });
+  const form = me
+    ? h('form', { class: 'chat-form', onsubmit: (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text || Date.now() - lastSent < COOLDOWN_MS) return;
+        if (send({ t: 'chat', text }) === false) return toast('Sin conexión: espera un momento y vuelve a enviar.');
+        lastSent = Date.now();
+        input.value = '';
+      } }, input, h('button', { class: 'btn sm', type: 'submit' }, 'Enviar'))
+    : h('p', { class: 'chat-login muted small' }, 'Importa tu save para escribir en el chat.');
+  const isMine = (m) => !!me && m.trainerId === me.id;
+  const line = (m) => {
+    const watcher = (m.role ?? (m.side == null ? 'watcher' : 'player')) === 'watcher';
+    return h(
+      'p',
+      { class: `chat-msg${watcher ? ' watcher' : ''}${m.side != null ? ` side-${m.side}` : ''}${isMine(m) ? ' mine' : ''}` },
+      h('b', { class: 'chat-name', title: watcher ? 'Espectador' : 'Jugador' }, watcher ? `👁 ${m.name}:` : `${m.name}:`),
+      ' ',
+      h('span', { class: 'chat-text' }, m.text),
+    );
+  };
+  list.append(empty);
+  const el = h('section', { class: 'card chat', 'aria-label': 'Chat' }, h('h3', { class: 'chat-title' }, '💬 Chat'), list, form);
+  const show = (messages) => {
+    const fresh = messages.filter((m) => !seen.has(m.id));
+    if (!fresh.length) return [];
+    fresh.forEach((m) => seen.add(m.id));
+    const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
+    empty.remove();
+    list.append(...fresh.map(line));
+    if (atBottom || fresh.some(isMine)) list.scrollTop = list.scrollHeight;
+    return fresh;
+  };
+  return {
+    el,
+    setLeftSide(side) {
+      el.dataset.left = String(side);
+    },
+    load(messages) {
+      show(messages);
+    },
+    add(message) {
+      const fresh = show([message]);
+      if (fresh.length && !isMine(message)) listeners.forEach((fn) => fn(message));
+    },
+    render: line,
+    onNew(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    scrollToEnd() {
+      list.scrollTop = list.scrollHeight;
+    },
+  };
+}
+
+function chatDock(chat) {
+  const KEY = 'tc_chat_open';
+  const saved = ls.get(KEY);
+  let open = saved === '1';
+  let unread = 0;
+  const badge = h('span', { class: 'chat-badge', hidden: true });
+  const toggle = h('button', { class: 'chat-dock-toggle', type: 'button', 'aria-expanded': String(open), onclick: () => setOpen(!open) }, '💬 Chat', badge);
+  const dock = h('div', { class: 'chat-dock' }, chat.el, toggle);
+  const paint = () => {
+    dock.classList.toggle('collapsed', !open);
+    toggle.setAttribute('aria-expanded', String(open));
+    badge.hidden = open || !unread;
+    badge.textContent = String(unread);
+  };
+  const setOpen = (value) => {
+    open = value;
+    if (open) peeks.replaceChildren();
+    ls.set(KEY, open ? '1' : '0');
+    if (open) {
+      unread = 0;
+      chat.scrollToEnd();
+    }
+    paint();
+  };
+  const PEEK_LIMIT = 4;
+  const peeks = h('div', { class: 'chat-peeks', 'aria-hidden': 'true' });
+  const showPeek = (message) => {
+    const line = chat.render(message);
+    const peek = h('button', { class: 'chat-peek', type: 'button', tabindex: -1, 'data-left': chat.el.dataset.left ?? null, onclick: () => setOpen(true) }, line);
+    line.addEventListener('animationend', (e) => e.animationName === 'chat-peek-life' && peek.remove());
+    peeks.append(peek);
+    while (peeks.childElementCount > PEEK_LIMIT) peeks.firstElementChild.remove();
+  };
+  dock.insertBefore(peeks, toggle);
+  const off = chat.onNew((message) => {
+    if (open || !dock.isConnected) return;
+    unread += 1;
+    paint();
+    showPeek(message);
+  });
+  document.body.append(dock);
+  paint();
+  return {
+    destroy() {
+      off();
+      dock.remove();
+    },
+  };
+}
+
+function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null) {
   let frame = null; // last frame from the server
   let view = null; // what is on screen (lags behind frame while events play)
   let playing = false;
@@ -3032,12 +3192,13 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
   resize.observe(arena);
   const fx = createFx(arena, field);
   $app.replaceChildren(
-    h('div', { class: 'status-line' }, els.turn, els.vs, els.field, els.timer),
+    ...(bar ? [] : [h('div', { class: 'status-line' }, els.turn, els.vs, els.field, els.timer)]),
     h('div', { class: 'stage battle-stage' }, els.team.me, arena, els.team.foe),
-    h('div', { class: 'battle-layout' }, els.controls, els.log),
+    h('div', { class: 'battle-layout wide' }, els.controls, h('div', { class: 'fixed-slot' }, els.log)),
     els.info,
   );
   fitField();
+  bar?.setStatus({ turn: els.turn, vs: els.vs, field: els.field, timer: els.timer });
 
   const tick = setInterval(() => {
     if (!frame?.deadline || frame.state.status !== 'active') {
@@ -3444,6 +3605,7 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
     if (!acts.length || sent) {
       const waitingFor = st.phase !== 'choose' && st.sides[1 - you].mustSwitch ? `Esperando a que ${foeName} elija quién entra…` : `Esperando a ${foeName}…`;
       if (sent) box.append(h('p', null, 'Elegiste: ', h('b', null, sent), '.'));
+      else if (frame.forced) box.append(h('p', null, 'Tu Pokémon está obligado a seguir con su movimiento este turno.'));
       box.append(h('p', { class: 'pulse' }, waitingFor));
       return;
     }
@@ -3476,10 +3638,10 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
             const info =
               m.kind === 'attack'
                 ? [h('span', null, `${CATEGORY_ICON[m.category] ?? ''} ${m.power ? `Poder ${m.power}` : 'Especial'}`), h('span', null, m.accuracy ? `${m.accuracy}%` : '∞'), m.priority > 0 ? h('span', null, 'Va primero') : null, effTag]
-                : [h('span', { class: 'mv-desc' }, m.desc)];
+                : [h('span', null, `${CATEGORY_ICON.status} Estado`)];
             return h(
               'button',
-              { class: `move${pp === 0 ? ' no-pp' : ''}`, 'data-tip': m.kind === 'attack' ? m.desc : null, 'data-tip-note': pp === 0 ? 'Sin PP: no se puede usar.' : flinchNote(m), disabled: !moveSet.has(i), onclick: () => act({ type: 'move', move: i }, m.name) },
+              { class: `move${pp === 0 ? ' no-pp' : ''}`, 'data-tip': m.desc, 'data-tip-note': pp === 0 ? 'Sin PP: no se puede usar.' : flinchNote(m), disabled: !moveSet.has(i), onclick: () => act({ type: 'move', move: i }, m.name) },
               h('span', { class: 'mv' }, m.name, h('small', { class: `pp${pp <= Math.ceil(m.pp / 4) ? ' low' : ''}` }, `PP ${pp}/${m.pp}`)),
               h('span', { class: 'mi' }, typeChip(m.type), info),
             );
@@ -3490,7 +3652,7 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
     }
     const canSwitch = acts.some((a) => a.type === 'switch');
     const forced = st.phase !== 'choose';
-    if (canSwitch) box.append(h('p', { class: `switch-hint${forced ? ' forced' : ''}` }, forced ? '👉 Elige en el panel de tu equipo quién entra.' : '⇄ Para cambiar (gasta el turno), toca un Pokémon en el panel de tu equipo.'));
+    if (canSwitch && forced) box.append(h('p', { class: 'switch-hint forced' }, '👉 Elige en el panel de tu equipo quién entra.'));
     if (foeReady && st.phase === 'choose') box.append(h('p', { class: 'muted small' }, `${foeName} ya eligió.`));
   }
 
@@ -3975,6 +4137,7 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
     frame = msg;
     if (first) {
       mine = msg.you ?? 0;
+      chat?.setLeftSide(mine);
       view = clone(msg.state);
       const fighters = view.sides.flatMap((side) => side.team.filter(Boolean));
       const moveKeys = fighters.flatMap((f) => (f.moves ?? []).map((m) => m.key)).filter(Boolean);

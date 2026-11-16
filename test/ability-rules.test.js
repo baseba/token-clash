@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBattle, submit } from '../server/battle.js';
+import { createBattle, submit, validActions, forcedAction } from '../server/battle.js';
 import { rng, buildFighter } from '../server/creatures.js';
 
 const IV = { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 };
@@ -65,4 +65,27 @@ test('Herbívoro también absorbe los movimientos de estado de tipo Planta', () 
   turn(b, 'spore', 'growl');
   assert.equal(active(b, 1).status, null);
   assert.equal(active(b, 1).boosts.atk, 1);
+});
+
+const moveOptions = (b, s) => validActions(b, s).filter((a) => a.type === 'move').map((a) => active(b, s).moves[a.move]?.key);
+
+test('Último Recurso no se puede elegir hasta usar los demás movimientos', () => {
+  const b = battle(mon(133, 'run-away', ['last-resort', 'tackle']), mon(143, 'thick-fat', ['splash']));
+  assert.deepEqual(moveOptions(b, 0), ['tackle']);
+  turn(b, 'tackle', 'splash');
+  assert.deepEqual(moveOptions(b, 0), ['last-resort', 'tackle']);
+});
+
+test('Ronquido solo se puede elegir dormido', () => {
+  const b = battle(mon(143, 'thick-fat', ['snore', 'tackle']), mon(133, 'run-away', ['splash']));
+  assert.deepEqual(moveOptions(b, 0), ['tackle']);
+  active(b, 0).status = 'slp';
+  assert.deepEqual(moveOptions(b, 0), ['snore', 'tackle']);
+});
+
+test('un Pokémon atrapado en Enfado no tiene nada que elegir: el movimiento se juega solo', () => {
+  const b = battle(mon(149, 'inner-focus', ['outrage', 'tackle']), mon(143, 'thick-fat', ['splash']));
+  turn(b, 'outrage', 'splash');
+  assert.deepEqual(forcedAction(b, 0), { type: 'move', move: 0 });
+  assert.equal(forcedAction(b, 1), null);
 });
