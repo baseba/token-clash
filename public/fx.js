@@ -1,4 +1,4 @@
-import { causeAnim, chargeAnim, conditionAnim, createAnimPlayer, statusAnim, terrainAnim, weatherAnim } from './battle-anims.js?v=dev';
+import { causeAnim, chargeAnim, conditionAnim, createAnimPlayer, shownSprite, statusAnim, terrainAnim, weatherAnim } from './battle-anims.js?v=dev';
 
 const PALETTE = {
   normal: ['#fffbe0', '#ffd84a', '#e88a12'],
@@ -124,7 +124,7 @@ export function createFx(arena, field = arena) {
 
   function center(spot, dy = 0.55) {
     const a = arena.getBoundingClientRect();
-    const r = (spot.querySelector('.creature img') ?? spot).getBoundingClientRect();
+    const r = (shownSprite(spot) ?? spot).getBoundingClientRect();
     return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height * dy, w: r.width };
   }
 

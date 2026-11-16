@@ -3,7 +3,7 @@ import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
 import { createFx, moveShape } from './fx.js?v=dev';
-import { chargeAnim, COMMON_PRELOAD, hpTweenMs } from './battle-anims.js?v=dev';
+import { chargeAnim, COMMON_PRELOAD, hpTweenMs, moveLands } from './battle-anims.js?v=dev';
 import { patchSave } from './savepatch.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
 
@@ -3495,7 +3495,7 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
     await showDamage(ev, hit > 1 ? 200 : 300);
   }
 
-  function play(ev) {
+  function play(ev, lands = true) {
     const sd = (s) => view.sides[s];
     switch (ev.t) {
       case 'turn':
@@ -3509,7 +3509,7 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
         setActing(ev.side);
         currentMove = ev.kind === 'attack' ? { ev, hits: 0 } : null;
         tell([...mon(ev.side, ev.name), ' usa ', h('b', { class: 'mvname' }, ev.move), ev.type ? ' ' : '', ev.type ? typeChip(ev.type) : '', ev.why ? h('small', { class: 'why' }, ` · ${WHY[ev.why]}`) : ''], { side: ev.side });
-        if (ev.multihit) return sleep(350);
+        if (ev.multihit || !lands) return sleep(350);
         return Promise.all([sleep(450), wait(250).then(() => {
           moveSound(ev, ev.side === mine);
           return fx.move(ev, els.spot[pos(ev.side)], els.spot[pos(1 - ev.side)]);
@@ -3989,13 +3989,13 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
       renderControls();
       if (msg.timedOut) log('⏱ Se acabó el tiempo: la máquina eligió por quien no alcanzó.', 'weak');
       let acted = false;
-      for (const ev of msg.events) {
+      for (const [i, ev] of msg.events.entries()) {
         if (dead) return;
         if (ev.t === 'move' || ev.t === 'switch' || ev.t === 'charging') {
           if (acted) await wait(ACTION_GAP_MS);
           acted = true;
         }
-        await settle(play(ev));
+        await settle(play(ev, ev.t !== 'move' || moveLands(msg.events, i)));
       }
       setActing(null);
       playing = false;

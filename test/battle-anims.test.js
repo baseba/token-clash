@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assetName, compactAnim, compactFrame, pngSize, resourcesOf } from '../scripts/sync-battle-anims.js';
-import { animLength, causeAnim, hpTweenMs, chargeAnim, conditionAnim, pickVariant, placeEntry, statusAnim, TARGET_GRAPHIC, TARGET_TARGET, TARGET_USER, terrainAnim, weatherAnim } from '../public/battle-anims.js';
+import { animLength, causeAnim, hpTweenMs, chargeAnim, conditionAnim, moveLands, pickVariant, placeEntry, statusAnim, TARGET_GRAPHIC, TARGET_TARGET, TARGET_USER, terrainAnim, weatherAnim } from '../public/battle-anims.js';
 import { animSoundFor, moveSfxCues, sampleFor } from '../public/music.js';
 
 const sound = (frameIndex, resourceName, volume = 100, pitch = 100) => ({ frameIndex, resourceName, volume, pitch, eventType: 'AnimTimedSoundEvent' });
@@ -117,4 +117,22 @@ test('a non-ghost Curse is shown on its user, a ghost Curse on the foe', async (
   assert.equal(shownTarget({ types: ['normal'] }, 'curse', 'foe'), 'self');
   assert.equal(shownTarget({ types: ['ghost', 'poison'] }, 'curse', 'foe'), 'foe');
   assert.equal(shownTarget({ types: ['normal'] }, 'tackle', 'foe'), 'foe');
+});
+
+test('a move lands when the foe takes damage, or its substitute does', () => {
+  const move = { t: 'move', side: 0, kind: 'attack', target: 'foe' };
+  assert.equal(moveLands([move, { t: 'damage', side: 1, amount: 10 }], 0), true);
+  assert.equal(moveLands([move, { t: 'subDamage', side: 1, amount: 10 }], 0), true);
+  assert.equal(moveLands([move, { t: 'ability', side: 1, note: 'disguise' }, { t: 'damage', side: 1 }], 0), true);
+});
+
+test('a move does not land when it misses, is blocked or gets absorbed', () => {
+  const move = { t: 'move', side: 0, kind: 'attack', target: 'foe' };
+  for (const t of ['miss', 'immune', 'protected', 'nothing', 'notarget', 'fizzle']) assert.equal(moveLands([move, { t, side: 0 }], 0), false, t);
+  assert.equal(moveLands([move, { t: 'ability', side: 1, ability: 'Absorbe Electricidad' }, { t: 'heal', side: 1 }], 0), false);
+});
+
+test('a move aimed at its user always plays, and the outcome stops at the next action', () => {
+  assert.equal(moveLands([{ t: 'move', side: 0, target: 'self' }, { t: 'nothing', side: 0 }], 0), true);
+  assert.equal(moveLands([{ t: 'move', side: 0, target: 'foe' }, { t: 'move', side: 1, target: 'foe' }, { t: 'miss', side: 1 }], 0), true);
 });
