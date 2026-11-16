@@ -33,7 +33,8 @@ const CHARGE_ANIMS = [
 ].map((move) => `${move}-charging`);
 
 const UI_IMAGES = ['pokeball/pb.png', 'pokeball/pb_open.png', 'effects/pb_particles.png', 'effects/battle_stats.png'];
-const SE_SOUNDS = ['pb_throw', 'pb_rel', 'hit', 'hit_strong', 'hit_weak', 'faint', 'stat_up', 'stat_down', 'restore', 'pb_tray_ball'];
+const SE_SOUNDS = ['pb_throw', 'pb_rel', 'hit', 'hit_strong', 'hit_weak', 'faint', 'stat_up', 'stat_down', 'restore', 'pb_tray_ball', 'pb_lock', 'flee', 'pb_tray_enter', 'pb_tray_empty', 'save'];
+const UI_SOUNDS = ['select', 'menu_open'];
 
 async function fetchRetry(url, tries = 4) {
   for (let i = 1; ; i++) {
@@ -175,6 +176,13 @@ export async function syncBattleAnims({ refresh = false, log = (msg) => process.
   await mapLimit(SE_SOUNDS, async (name) => {
     try {
       await download(`${RAW}/audio/se/${name}.wav`, new URL(`${name}.wav`, SE));
+    } catch (err) {
+      failed.push(`${name}.wav (${err.message})`);
+    }
+  });
+  await mapLimit(UI_SOUNDS, async (name) => {
+    try {
+      await download(`${RAW}/audio/ui/${name}.wav`, new URL(`${name}.wav`, SE));
     } catch (err) {
       failed.push(`${name}.wav (${err.message})`);
     }
