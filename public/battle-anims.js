@@ -26,6 +26,24 @@ export const terrainAnim = (terrain) => TERRAIN_ANIMS[terrain] ?? null;
 export const chargeAnim = (key) => (key ? `${key}-charging` : null);
 export const COMMON_PRELOAD = [...new Set([...Object.values(CAUSE_ANIMS), ...Object.values(CONDITION_ANIMS), ...Object.values(WEATHER_ANIMS), ...Object.values(TERRAIN_ANIMS)])];
 
+export const shownSprite = (spot) => spot.querySelector(spot.classList.contains('has-sub') ? '.sub-doll img' : '.creature img');
+
+const ACTION_EVENTS = new Set(['move', 'switch', 'charging', 'turn', 'dragged']);
+const MISSED_EVENTS = new Set(['miss', 'immune', 'protected', 'nothing', 'notarget', 'fizzle']);
+
+export function moveLands(events, index) {
+  const move = events[index];
+  if (move.target === 'self') return true;
+  const foe = 1 - move.side;
+  for (const ev of events.slice(index + 1)) {
+    if (ACTION_EVENTS.has(ev.t)) return true;
+    if ((ev.t === 'damage' || ev.t === 'subDamage') && ev.side === foe) return true;
+    if (MISSED_EVENTS.has(ev.t)) return false;
+    if (ev.t === 'ability' && ev.side === foe && !ev.note) return false;
+  }
+  return true;
+}
+
 export function hpTweenMs(from, to) {
   return Math.min(5000, Math.max(250, Math.abs(from - to) * 5));
 }
@@ -116,7 +134,7 @@ export function createAnimPlayer(field) {
   function center(spot) {
     const f = field.getBoundingClientRect();
     const scale = f.width / FIELD.width || 1;
-    const img = spot.querySelector('.creature img') ?? spot;
+    const img = shownSprite(spot) ?? spot;
     const r = img.getBoundingClientRect();
     return { x: (r.left - f.left + r.width / 2) / scale, y: (r.top - f.top + r.height / 2) / scale };
   }
@@ -167,7 +185,7 @@ export function createAnimPlayer(field) {
     const cell = CELL * geo.scale;
     const sheet = config.graphic ? await loadImage(config.graphic.url) : null;
     const columns = config.graphic?.columns ?? 5;
-    const mons = [userEl, targetEl].map((spot) => spot.querySelector('.creature img'));
+    const mons = [userEl, targetEl].map(shownSprite);
     const graphics = [];
     let bg = null;
 

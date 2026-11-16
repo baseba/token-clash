@@ -70,7 +70,7 @@ const blockStatus = (blocked) => ({
 const absorb = (type, effect) => ({
   breakable: true,
   onTryHit(E, me, move) {
-    if (move.type !== type || !isAttack(move)) return false;
+    if (move.type !== type) return false;
     E.show(me);
     if (effect.heal && !E.heal(me, fraction(me, effect.heal))) E.note(me, 'immune');
     if (effect.boost) E.boost(me, effect.boost, me);

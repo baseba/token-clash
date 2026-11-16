@@ -69,6 +69,24 @@ export function trackFor(id) {
 
 const SE_FILES = { throw: 'pb_throw', switch: 'pb_rel', faint: 'faint', up: 'stat_up', down: 'stat_down', heal: 'restore', reveal: 'pb_tray_ball' };
 
+const UI_SOUNDS = {
+  select: { file: 'select' },
+  back: { file: 'select', rate: 0.8 },
+  open: { file: 'menu_open' },
+  confirm: { file: 'pb_lock' },
+  danger: { file: 'flee' },
+  add: { file: 'pb_tray_enter' },
+  remove: { file: 'pb_tray_empty' },
+  save: { file: 'save' },
+};
+export const UI_SOUND_KINDS = Object.keys(UI_SOUNDS);
+const UI_QUIET_AFTER_SFX_S = 0.6;
+
+export function uiSampleFor(kind) {
+  const sound = UI_SOUNDS[kind];
+  return sound ? { url: `/sfx/se/${sound.file}.wav`, rate: sound.rate ?? 1 } : null;
+}
+
 export function sampleFor(kind, opts = {}) {
   if (kind === 'hit') {
     const eff = opts.eff ?? 1;
@@ -106,6 +124,7 @@ export function createPlayer({ storage = null } = {}) {
   let waves = {};
   let current = null;
   let wanted = null;
+  let lastSfxAt = -Infinity;
   const read = (k, d) => {
     try {
       const v = storage?.getItem(k);
@@ -119,7 +138,8 @@ export function createPlayer({ storage = null } = {}) {
       storage?.setItem(k, JSON.stringify(v));
     } catch {}
   };
-  const volumes = { music: read('tc_music_volume', 0.4), sfx: read('tc_sfx_volume', 0.8) };
+  const VOLUME_KEYS = { music: 'tc_music_level', sfx: 'tc_sfx_level' };
+  const volumes = { music: read(VOLUME_KEYS.music, 0.5), sfx: read(VOLUME_KEYS.sfx, 0.15) };
   let muted = read('tc_music_muted', false);
   let musicGain = null;
   const LEVEL = { music: 1.6, sfx: 2.8 };
@@ -405,6 +425,7 @@ export function createPlayer({ storage = null } = {}) {
     },
     unlock() {
       if (!ensure()) return;
+      for (const kind of UI_SOUND_KINDS) loadBuffer(uiSampleFor(kind).url);
       if (ctx.state === 'suspended') ctx.resume().then(() => wanted && start(wanted));
       else if (wanted) start(wanted);
     },
@@ -433,9 +454,16 @@ export function createPlayer({ storage = null } = {}) {
         for (const byPlayer of [true, false]) moveCues(key, byPlayer).then((cues) => cues.forEach((cue) => loadBuffer(cue.url)));
       }
     },
+    ui(kind) {
+      const sample = uiSampleFor(kind);
+      const out = sample && sfxBus();
+      if (!out || ctx.currentTime - lastSfxAt < UI_QUIET_AFTER_SFX_S) return;
+      return playSampleOr(out, sample.url, () => sweep(out, ctx.currentTime + 0.01, { wave: 0.5, from: 1200 * sample.rate, to: 1200 * sample.rate, dur: 0.05, gain: 0.12 }), sample.rate);
+    },
     sfx(kind, opts = {}) {
       const out = sfxBus();
       if (!out) return;
+      lastSfxAt = ctx.currentTime;
       if (kind === 'move') return playMove(out, opts);
       const sample = sampleFor(kind, opts);
       if (sample) return playSampleOr(out, sample, () => synthSfx(out, kind, opts), opts.rate ?? 1);
@@ -464,7 +492,7 @@ export function createPlayer({ storage = null } = {}) {
     setVolume(kind, v) {
       if (!(kind in volumes)) return;
       volumes[kind] = clamp(v, 0, 1);
-      write(kind === 'music' ? 'tc_music_volume' : 'tc_sfx_volume', volumes[kind]);
+      write(VOLUME_KEYS[kind], volumes[kind]);
       const node = kind === 'music' ? musicGain : sfxGain;
       if (node) node.gain.setTargetAtTime(volumes[kind] * LEVEL[kind], ctx.currentTime, 0.05);
     },

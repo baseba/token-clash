@@ -3,7 +3,7 @@ import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
 import { createFx, moveShape } from './fx.js?v=dev';
-import { chargeAnim, COMMON_PRELOAD, hpTweenMs } from './battle-anims.js?v=dev';
+import { chargeAnim, COMMON_PRELOAD, hpTweenMs, moveLands } from './battle-anims.js?v=dev';
 import { patchSave } from './savepatch.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
 
@@ -479,6 +479,7 @@ function monCard(f, opts = {}) {
       tabindex: clickable ? 0 : null,
       role: clickable ? 'button' : null,
       'aria-pressed': clickable ? String(!!opts.picked) : null,
+      'data-sfx': opts.sfx ?? null,
       onclick: opts.onclick,
       onkeydown: clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opts.onclick(); } } : null,
     },
@@ -652,12 +653,32 @@ const music = createPlayer({
 });
 ['pointerdown', 'keydown'].forEach((type) => document.addEventListener(type, () => music.unlock(), { capture: true }));
 
+const CLICKABLE = 'button, a[href], [role="button"], [role="tab"], summary';
+const CLOSES = '.info-close, .dex-close, .seat-x, .cell-remove';
+
+function clickSound(el) {
+  if (el.dataset.sfx) return el.dataset.sfx === 'none' ? null : el.dataset.sfx;
+  if (el.disabled || el.getAttribute('aria-disabled') === 'true') return null;
+  if (el.matches('.danger')) return 'danger';
+  if (el.matches(CLOSES)) return 'back';
+  if (el.hasAttribute('aria-expanded')) return el.getAttribute('aria-expanded') === 'true' ? 'back' : 'open';
+  if (el.hasAttribute('aria-haspopup')) return 'open';
+  if (el.matches('.primary')) return 'confirm';
+  return 'select';
+}
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest?.(CLICKABLE);
+  const kind = el && clickSound(el);
+  if (kind) music.ui(kind);
+}, { capture: true });
+
 function renderSound() {
   const host = document.getElementById('sound');
   if (!host) return;
   const silent = () => music.muted || (music.volume('music') === 0 && music.volume('sfx') === 0);
   const icon = () => (silent() ? '🔇' : '🔊');
-  const btn = h('button', { class: 'sound-btn', type: 'button', 'aria-label': 'Mezclador de sonido', 'aria-haspopup': 'true', 'aria-expanded': 'false' }, icon());
+  const btn = h('button', { class: 'sound-btn', type: 'button', 'data-sfx': 'none', 'aria-label': 'Mezclador de sonido', 'aria-haspopup': 'true', 'aria-expanded': 'false' }, icon());
   const muteBox = h('input', { type: 'checkbox', checked: music.muted ? true : null });
   const sliders = [];
   const channel = (kind, label, icon) => {
@@ -680,7 +701,7 @@ function renderSound() {
     { class: 'mixer', hidden: true, role: 'group', 'aria-label': 'Mezclador de sonido' },
     h('b', { class: 'mix-title' }, 'Sonido'),
     channel('music', 'Música de fondo', '🎵'),
-    channel('sfx', 'Movimientos', '💥'),
+    channel('sfx', 'Combate', '💥'),
     h('label', { class: 'mix-mute' }, muteBox, ' Silenciar todo'),
   );
   const paint = () => {
@@ -1578,7 +1599,7 @@ function partyRow(team) {
       if (!f) return h('a', { class: 'party-cell empty', href: '/coleccion', 'data-link': true, 'aria-label': 'Agregar un Pokémon' }, ballFrame(null), h('div', { class: 'name-plate' }, h('b', null, '???')));
       return h(
         'a',
-        { class: 'party-cell', href: `/coleccion?p=${f.uid}`, 'aria-label': `Editar a ${f.name}`, onclick: (e) => { e.preventDefault(); nav(`/coleccion?p=${f.uid}`); } },
+        { class: 'party-cell', href: `/coleccion?p=${f.uid}`, 'data-sfx': 'none', 'aria-label': `Editar a ${f.name}`, onclick: (e) => { e.preventDefault(); nav(`/coleccion?p=${f.uid}`); } },
         h('span', { class: 'slot-num' }, i + 1),
         i === 0 ? h('span', { class: 'lead-tag' }, 'Líder') : null,
         ballFrame(f),
@@ -1642,8 +1663,13 @@ async function teamPage(seq) {
     }
     return setParty(added.ids, { pop: uid });
   }
+  function cry(uid) {
+    const picked = me.roster.find((f) => f.uid === uid);
+    if (picked) music.sfx('cry', { sprite: picked.sprite });
+  }
   function select(uid) {
     if (editor?.dirty() && !window.confirm(UNSAVED_MSG)) return;
+    cry(uid);
     selected = uid;
     history.replaceState(null, '', `/coleccion?p=${uid}`);
     shownPath = `/coleccion?p=${uid}`;
@@ -1666,6 +1692,7 @@ async function teamPage(seq) {
             draggable: 'true',
             tabindex: 0,
             role: 'button',
+            'data-sfx': 'none',
             'aria-label': `${f.name}, puesto ${i + 1}. Enter para editar.`,
             onclick: () => select(f.uid),
             onkeydown: (e) => {
@@ -1683,7 +1710,7 @@ async function teamPage(seq) {
           i === 0 ? h('span', { class: 'lead-tag' }, 'Líder') : null,
           ballFrame(f),
           h('div', { class: 'name-plate' }, h('b', null, f.shiny ? `✨ ${f.name}` : f.name, genderMark(f.gender)), h('small', null, `Nv ${f.level}`), typeChips(f.types)),
-          h('button', { class: 'cell-remove', type: 'button', 'data-tip': 'Quitar del equipo', 'aria-label': `Quitar a ${f.name}`, onclick: (e) => { e.stopPropagation(); toggle(f.uid); } }, '✕'),
+          h('button', { class: 'cell-remove', type: 'button', 'data-sfx': 'remove', 'data-tip': 'Quitar del equipo', 'aria-label': `Quitar a ${f.name}`, onclick: (e) => { e.stopPropagation(); toggle(f.uid); } }, '✕'),
         );
         return cell;
       }),
@@ -1720,9 +1747,10 @@ async function teamPage(seq) {
               badge: `#${f.speciesId}`,
               cls: `coll-card${inParty ? ' in-party' : ''}${f.uid === selected ? ' selected' : ''}`,
               label: `Editar a ${f.name}`,
+              sfx: 'none',
               onclick: () => select(f.uid),
               onEdit: () => rename(f),
-              extra: h('button', { class: `col-add${inParty ? ' on' : ''}`, type: 'button', 'data-tip': inParty ? 'Quitar del equipo' : 'Agregar al equipo', 'aria-label': inParty ? `Quitar a ${f.name} del equipo` : `Agregar a ${f.name} al equipo`, onclick: (e) => { e.stopPropagation(); toggle(f.uid); }, onkeydown: (e) => e.stopPropagation() }, inParty ? '✓' : '+'),
+              extra: h('button', { class: `col-add${inParty ? ' on' : ''}`, type: 'button', 'data-sfx': inParty ? 'remove' : 'add', 'data-tip': inParty ? 'Quitar del equipo' : 'Agregar al equipo', 'aria-label': inParty ? `Quitar a ${f.name} del equipo` : `Agregar a ${f.name} al equipo`, onclick: (e) => { e.stopPropagation(); toggle(f.uid); }, onkeydown: (e) => e.stopPropagation() }, inParty ? '✓' : '+'),
             });
           })
         : [h('p', { class: 'muted' }, 'Ningún Pokémon coincide con el filtro.')]),
@@ -1753,7 +1781,7 @@ async function teamPage(seq) {
     reimportBtn.setAttribute('aria-expanded', String(!reimport.hidden));
   } });
   $app.replaceChildren(
-    h('div', { class: 'coll-page-head' }, h('div', null, h('h1', null, 'Colección'), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))), h('div', { class: 'tools' }, toolButton({ icon: '⬇', label: 'Descargar save editado', note: 'Para importarlo en PokeTokenBar', tip: 'Baja tu save con los movimientos y habilidades que cambiaste', onclick: downloadEditedSave }), reimportBtn)),
+    h('div', { class: 'coll-page-head' }, h('div', null, h('h1', null, 'Colección'), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))), h('div', { class: 'tools' }, toolButton({ icon: '⬇', label: 'Descargar save editado', note: 'Para importarlo en PokeTokenBar', tip: 'Baja tu save con los movimientos y habilidades que cambiaste', 'data-sfx': 'save', onclick: downloadEditedSave }), reimportBtn)),
     reimport,
     h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', countEl)),
     h('section', { class: 'party-board' }, partyEl, h('p', { class: 'hint' }, `Arrastra para ordenar · el líder abre la pelea · antes de cada combate eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}`)),
@@ -1765,6 +1793,7 @@ async function teamPage(seq) {
   paintParty();
   paintCollection();
   openEditor();
+  if (params.get('p')) cry(selected);
 }
 
 async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }) {
@@ -3495,7 +3524,7 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
     await showDamage(ev, hit > 1 ? 200 : 300);
   }
 
-  function play(ev) {
+  function play(ev, lands = true) {
     const sd = (s) => view.sides[s];
     switch (ev.t) {
       case 'turn':
@@ -3509,7 +3538,7 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
         setActing(ev.side);
         currentMove = ev.kind === 'attack' ? { ev, hits: 0 } : null;
         tell([...mon(ev.side, ev.name), ' usa ', h('b', { class: 'mvname' }, ev.move), ev.type ? ' ' : '', ev.type ? typeChip(ev.type) : '', ev.why ? h('small', { class: 'why' }, ` · ${WHY[ev.why]}`) : ''], { side: ev.side });
-        if (ev.multihit) return sleep(350);
+        if (ev.multihit || !lands) return sleep(350);
         return Promise.all([sleep(450), wait(250).then(() => {
           moveSound(ev, ev.side === mine);
           return fx.move(ev, els.spot[pos(ev.side)], els.spot[pos(1 - ev.side)]);
@@ -3989,13 +4018,13 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
       renderControls();
       if (msg.timedOut) log('⏱ Se acabó el tiempo: la máquina eligió por quien no alcanzó.', 'weak');
       let acted = false;
-      for (const ev of msg.events) {
+      for (const [i, ev] of msg.events.entries()) {
         if (dead) return;
         if (ev.t === 'move' || ev.t === 'switch' || ev.t === 'charging') {
           if (acted) await wait(ACTION_GAP_MS);
           acted = true;
         }
-        await settle(play(ev));
+        await settle(play(ev, ev.t !== 'move' || moveLands(msg.events, i)));
       }
       setActing(null);
       playing = false;
