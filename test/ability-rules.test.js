@@ -59,3 +59,10 @@ test('Ventosas impide que lo arrastren fuera del combate', () => {
   }
   assert.fail('Cola Dragón nunca conectó');
 });
+
+test('Herbívoro también absorbe los movimientos de estado de tipo Planta', () => {
+  const b = battle(mon(286, 'effect-spore', ['spore']), mon(626, 'sap-sipper', ['growl']));
+  turn(b, 'spore', 'growl');
+  assert.equal(active(b, 1).status, null);
+  assert.equal(active(b, 1).boosts.atk, 1);
+});
