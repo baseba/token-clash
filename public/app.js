@@ -346,6 +346,8 @@ const ABILITY_NOTE = {
 };
 const signed = (n) => `${n > 0 ? '+' : ''}${n}`;
 const CATEGORY = { physical: 'Físico', special: 'Especial', status: 'Estado' };
+const MOVE_ORIGIN = { machine: 'MT/MO', tutor: 'Tutor', egg: 'Huevo', other: 'Otro' };
+const MOVE_ORIGIN_FILTER = { level: 'Por nivel', machine: 'MT / MO', tutor: 'Tutor', egg: 'Huevo', other: 'Otros' };
 const INFLICT = { brn: 'quemar', par: 'paralizar', psn: 'envenenar', tox: 'envenenar gravemente', frz: 'congelar', slp: 'dormir' };
 const STAT_THE = { atk: 'el ataque', def: 'la defensa', satk: 'el ataque especial', sdef: 'la defensa especial', spd: 'la velocidad', acc: 'la precisión', eva: 'la evasión' };
 const stageMult = (k, s) => {
@@ -1780,6 +1782,7 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
   let ability = original.ability;
   let filter = '';
   let onlyUsable = true;
+  let origin = 'all';
   const byKey = new Map(mon.movepool.map((m) => [m.key, m]));
   const dirty = () => ability !== original.ability || moves.join() !== original.moves.join();
   const partyBtn = h('button', { type: 'button', class: 'btn', onclick: async () => { await toggleParty(); refreshPartyButton(); } });
@@ -1848,7 +1851,7 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
       ),
     );
     const q = filter.toLowerCase();
-    const rows = mon.movepool.filter((m) => (!onlyUsable || m.supported) && (!q || m.name.toLowerCase().includes(q) || typeLabel(m.type).toLowerCase().includes(q)));
+    const rows = mon.movepool.filter((m) => (!onlyUsable || m.supported) && (origin === 'all' || m.origin === origin) && (!q || m.name.toLowerCase().includes(q) || typeLabel(m.type).toLowerCase().includes(q)));
     tbody.replaceChildren(
       ...(rows.length
         ? rows.map((m) => {
@@ -1856,7 +1859,7 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
             return h(
               'tr',
               { class: `${on ? 'on' : ''}${m.supported ? '' : ' unsupported'}`, tabindex: m.supported ? 0 : -1, 'aria-disabled': m.supported ? null : 'true', onclick: () => m.supported && toggleMove(m.key), onkeydown: (e) => e.key === 'Enter' && m.supported && toggleMove(m.key) },
-              h('td', { class: 'num' }, m.level ?? '—'),
+              h('td', { class: 'origin' }, m.origin === 'level' ? `Nv ${m.level}` : MOVE_ORIGIN[m.origin]),
               h('td', { class: 'mv-cell' }, h('span', { class: 'check' }, on ? '✓' : ''), h('b', null, m.name), h('small', null, m.supported ? m.desc : 'Sin efecto en Token Clash todavía')),
               h('td', null, h('span', { class: 'type-badge', style: typeTint(m.type) }, typeLabel(m.type))),
               h('td', { class: 'cat' }, h('span', { class: `cat-badge ${m.category}` }, CATEGORY[m.category])),
@@ -1899,9 +1902,17 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
           'div',
           { class: 'table-tools' },
           h('input', { type: 'search', placeholder: 'Buscar movimiento o tipo…', 'aria-label': 'Buscar movimiento', oninput: (e) => { filter = e.target.value.trim(); paint(); } }),
+          h(
+            'select',
+            { 'aria-label': 'Origen del movimiento', onchange: (e) => { origin = e.target.value; paint(); } },
+            h('option', { value: 'all' }, 'Todos los orígenes'),
+            ...Object.entries(MOVE_ORIGIN_FILTER)
+              .filter(([key]) => mon.movepool.some((m) => m.origin === key))
+              .map(([key, label]) => h('option', { value: key }, label)),
+          ),
           h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: true, onchange: (e) => { onlyUsable = e.target.checked; paint(); } }), ' Solo los que funcionan en Token Clash'),
         ),
-        h('div', { class: 'move-table-wrap' }, h('table', { class: 'move-table' }, h('thead', null, h('tr', null, ['Nv', 'Movimiento', 'Tipo', 'Cat.', 'Poder', 'Prec.', 'PP'].map((t) => h('th', null, t)))), tbody)),
+        h('div', { class: 'move-table-wrap' }, h('table', { class: 'move-table' }, h('thead', null, h('tr', null, ['Origen', 'Movimiento', 'Tipo', 'Cat.', 'Poder', 'Prec.', 'PP'].map((t) => h('th', null, t)))), tbody)),
       ),
     ),
     saveBar,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents } from '../server/battle.js';
 import { ABILITIES, INERT, abilityInfo } from '../server/abilities.js';
-import { abilityFor, floats, rng, species, movepool, buildFighter } from '../server/creatures.js';
+import { abilityFor, floats, rng, species, movepool, moveOrigins, buildFighter } from '../server/creatures.js';
 
 const CATALOG = JSON.parse(readFileSync(new URL('../server/abilities.json', import.meta.url), 'utf8'));
 const SPECIES = JSON.parse(readFileSync(new URL('../server/pokeapi.json', import.meta.url), 'utf8')).species;
@@ -13,7 +13,10 @@ const plainAttack = (m) => m.kind === 'attack' && m.power > 0 && !m.flags.includ
 const selfBoost = (m) => m.kind === 'status' && m.target === 'self' && !!m.boosts;
 
 function pickMoves(entry, wants = []) {
-  const pool = movepool(entry).filter((m) => m.supported).reverse();
+  const origins = moveOrigins(entry);
+  const reached = (m) => origins.get(m.key).origin === 'level' && origins.get(m.key).level <= entry.level;
+  const supported = movepool(entry).filter((m) => m.supported);
+  const pool = [...supported.filter(reached).reverse(), ...supported.filter((m) => !reached(m))];
   const out = [];
   const add = (pred) => {
     const m = pool.find((x) => pred(x) && !out.includes(x.key));

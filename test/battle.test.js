@@ -98,25 +98,28 @@ test('events say who acts first and why, and whom a switch replaces', () => {
   assert.equal(sw[1].name, c.sides[1].team[2].name);
 });
 
-test('moves come from what the Pokémon has learned: the latest four by default, any four the player picks', () => {
+test('moves come from every way the Pokémon can learn them: the latest four by level by default, any four the player picks', () => {
   const charmander = { id: 'c', finalID: 4, level: 30, rarity: 'common', ivs: { hp: 31, atk: 31, def: 31, satk: 31, sdef: 31, spd: 31 } };
   const pool = learnedMoves(charmander);
-  const learnset = speciesData(4).learnset.filter(([, lvl]) => lvl <= 30).map(([id]) => id);
-  assert.deepEqual(new Set(pool), new Set(learnset));
-  assert.ok(!pool.includes('flamethrower'));
+  const data = speciesData(4);
+  for (const id of [...data.learnset.map(([key]) => key), ...Object.values(data.teachable).flat()]) assert.ok(pool.includes(id), id);
+  assert.ok(pool.includes('flamethrower'));
+  assert.ok(!pool.includes('hydro-pump'));
+  const reached = data.learnset.filter(([, lvl]) => lvl <= 30).map(([id]) => id).filter((id) => moveData(id).supported);
   const def = defaultMoveset(charmander);
   assert.equal(def.length, 4);
-  assert.deepEqual(def, pool.filter((id) => moveData(id).supported).slice(-4));
+  assert.deepEqual(def, reached.slice(-4));
 
   assert.ok(validMoveset(charmander, ['ember', 'scratch']));
-  assert.ok(!validMoveset(charmander, ['flamethrower']));
+  assert.ok(validMoveset(charmander, ['flamethrower']));
+  assert.ok(!validMoveset(charmander, ['hydro-pump']));
   assert.ok(!validMoveset(charmander, ['ember', 'ember']));
   assert.ok(!validMoveset(charmander, ['ember', 'scratch', 'growl', 'smokescreen', 'dragon-rage']));
   assert.deepEqual(movesetFor({ ...charmander, moveset: ['ember', 'scratch'] }), ['ember', 'scratch']);
-  const swapped = movesetFor({ ...charmander, moveset: ['flamethrower'] });
+  const swapped = movesetFor({ ...charmander, moveset: ['hydro-pump'] });
   assert.equal(swapped.length, 1);
   assert.ok(validMoveset(charmander, swapped));
-  assert.ok(learnedMoves({ ...charmander, learned: ['flamethrower'] }).includes('flamethrower'));
+  assert.ok(learnedMoves({ ...charmander, learned: ['hydro-pump'] }).includes('hydro-pump'));
 
   const f = buildFighter({ ...charmander, moveset: ['ember', 'growl'] });
   assert.deepEqual(f.moves.map((m) => [m.key, m.name, m.pp]), [['ember', 'Ascuas', 25], ['growl', 'Gruñido', 40]]);

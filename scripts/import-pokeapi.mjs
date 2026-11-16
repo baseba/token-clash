@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Downloads every species from PokeAPI (https://pokeapi.co) into the game's data:
-// - server/pokeapi.json: name, base stats, real types, abilities and where each species sits in
-//   its evolution chain.
+// - server/pokeapi.json: name, base stats, real types, abilities, every move it can learn (by level,
+//   TM/HM, tutor, egg or other means) and where it sits in its evolution chain.
 // - server/abilities.json: Spanish name and description of every main-series ability.
 // - server/movedex.json: every learnable move, with its Spanish name and description from PokeAPI and
 //   its battle data from Pokémon Showdown's MIT-licensed server data.
@@ -52,15 +52,31 @@ async function mapLimit(items, fn) {
   return out;
 }
 
-function levelUpMoves(moves) {
+const TEACH_ORIGIN = { machine: 'machine', tutor: 'tutor', egg: 'egg' };
+
+function learnsets(moves) {
   for (const group of LEARNSET_GROUPS) {
-    const learned = moves
-      .map((m) => ({ id: m.move.name, details: m.version_group_details.filter((d) => d.version_group.name === group && d.move_learn_method.name === 'level-up') }))
-      .filter((m) => m.details.length)
-      .map((m) => [m.id, Math.min(...m.details.map((d) => d.level_learned_at))]);
-    if (learned.length) return learned.sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
+    const levelUp = new Map();
+    const teach = {};
+    for (const m of moves) {
+      for (const d of m.version_group_details) {
+        if (d.version_group.name !== group) continue;
+        const method = d.move_learn_method.name;
+        if (method === 'level-up') levelUp.set(m.move.name, Math.min(levelUp.get(m.move.name) ?? Infinity, d.level_learned_at));
+        else (teach[TEACH_ORIGIN[method] ?? 'other'] ??= new Set()).add(m.move.name);
+      }
+    }
+    if (!levelUp.size) continue;
+    return {
+      learnset: [...levelUp].sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])),
+      teachable: Object.fromEntries(
+        Object.entries(teach)
+          .map(([origin, ids]) => [origin, [...ids].filter((id) => !levelUp.has(id)).sort()])
+          .filter(([, ids]) => ids.length),
+      ),
+    };
   }
-  return [];
+  return { learnset: [], teachable: {} };
 }
 
 const idFromUrl = (url) => Number(url.match(/\/(\d+)\/?$/)[1]);
@@ -94,7 +110,7 @@ await mapLimit(ids, async (id) => {
     stats: [stat.hp, stat.attack, stat.defense, stat['special-attack'], stat['special-defense'], stat.speed],
     abilities: bySlot.filter((a) => !a.is_hidden).map((a) => a.ability.name),
     hiddenAbility: bySlot.find((a) => a.is_hidden)?.ability.name ?? null,
-    learnset: levelUpMoves(mon.moves),
+    ...learnsets(mon.moves),
     genderRate: sp.gender_rate,
     weight: mon.weight / 10,
     height: mon.height / 10,
@@ -228,7 +244,7 @@ await mapLimit(BATTLE_FORMS, async (name) => {
   };
 });
 
-const learnable = [...new Set(Object.values(species).flatMap((s) => s.learnset.map(([moveId]) => moveId)))];
+const learnable = [...new Set(Object.values(species).flatMap((s) => [...s.learnset.map(([moveId]) => moveId), ...Object.values(s.teachable).flat()]))];
 console.error(`${learnable.length} movimientos (Showdown + PokeAPI)…`);
 const showdown = await get(SHOWDOWN_MOVES);
 const movedex = {};

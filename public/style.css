@@ -503,6 +503,7 @@ button.prep-card:hover:not(:disabled) { transform: translateY(-3px); border-colo
 
 .table-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; margin: 1rem 0 .6rem; }
 .table-tools input[type=search] { flex: 1; min-width: 200px; }
+.move-table td.origin { white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
 .toggle { display: inline-flex; align-items: center; gap: .4rem; font-size: .82rem; color: var(--muted); cursor: pointer; }
 .move-table-wrap { max-height: 46vh; overflow: auto; border-radius: 14px; border: 1px solid var(--line); }
 .move-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
