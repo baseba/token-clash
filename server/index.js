@@ -18,6 +18,7 @@ import { TOURNAMENT_SIZES, aiName, humanCount, pendingArrivals, viewersBehind, r
 import { randomParty } from './random.js';
 import { AI_LEVELS, JEV_LEVEL, aiTrainerId, aiLevelOf, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
 import { chooseJevAction, jevConfigured } from './jev.js';
+import { chatChannel, chatText, createChatStore, tournamentChannel, CHAT_COOLDOWN_MS } from './chat.js';
 
 const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -1237,6 +1238,31 @@ const server = createServer(async (req, res) => {
   }
 });
 
+// ---------- chat ----------
+const chats = createChatStore();
+
+function chatSender(ws, trainerId) {
+  if (ws.roomId) {
+    const c = db.challenges[ws.roomId];
+    const r = rooms.get(ws.roomId);
+    if (!c) return null;
+    const side = r?.battle ? sideOf(r.battle, trainerId) : r?.preview ? sideIn(r.preview.sides, trainerId) : null;
+    const T = c.tournamentId ? db.tournaments[c.tournamentId] : null;
+    const player = T ? seatOf(T, trainerId) !== -1 : trainerId === c.hostId || trainerId === c.guestId;
+    return { channel: chatChannel(c), role: player ? 'player' : 'watcher', side };
+  }
+  const T = db.tournaments[ws.tourId];
+  if (!T) return null;
+  return { channel: tournamentChannel(T.id), role: seatOf(T, trainerId) !== -1 ? 'player' : 'watcher', side: null };
+}
+
+function sendToChannel(channel, frame) {
+  const sockets = [];
+  for (const [id, r] of rooms) if (db.challenges[id] && chatChannel(db.challenges[id]) === channel) sockets.push(...r.sockets);
+  if (channel.startsWith('t:')) sockets.push(...(tourSockets.get(channel.slice(2)) ?? []));
+  for (const ws of sockets) if (ws.readyState === 1) ws.send(frame);
+}
+
 // ---------- WebSocket ----------
 const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
 const wsPerIp = new Map();
@@ -1291,6 +1317,7 @@ function onSocket(ws) {
         }
       });
       broadcastTournament(T);
+      ws.send(JSON.stringify({ t: 'chatLog', messages: chats.log(tournamentChannel(T.id)) }));
       return;
     }
     if (msg.t === 'set-ready' && ws.roomId) {
@@ -1333,6 +1360,19 @@ function onSocket(ws) {
       if (r.battle || r.preview || r.readyCheck) broadcast(r, { t: 'presence' });
       else if (r.countdown) ws.send(JSON.stringify(frameFor(r, ws)));
       else ws.send(JSON.stringify({ t: 'waiting', watchers: r.sockets.size }));
+      ws.send(JSON.stringify({ t: 'chatLog', messages: chats.log(chatChannel(c)) }));
+      return;
+    }
+    if (msg.t === 'chat' && (ws.roomId || ws.tourId)) {
+      const trainer = ws.trainerId && db.trainers[ws.trainerId];
+      const text = chatText(msg.text);
+      const now = Date.now();
+      if (!trainer || !text || now - (ws.lastChatAt ?? 0) < CHAT_COOLDOWN_MS) return;
+      const from = chatSender(ws, trainer.id);
+      if (!from) return;
+      ws.lastChatAt = now;
+      const message = chats.post(from.channel, { trainerId: trainer.id, name: trainer.name, role: from.role, side: from.side, text, at: now });
+      sendToChannel(from.channel, JSON.stringify({ t: 'chat', message }));
       return;
     }
     if (msg.t === 'seen' && ws.roomId) {

@@ -202,6 +202,27 @@ input[type=text]:focus, .btn:focus-visible, .mon:focus-visible { outline: 3px so
 
 .battle-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 1rem; margin-top: 1rem; }
 @media (max-width: 860px) { .battle-layout { grid-template-columns: minmax(0, 1fr); } }
+.battle-layout.wide { width: min(1480px, calc(100vw - 32px)); margin-left: 50%; translate: -50% 0; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.fixed-slot { position: relative; min-height: 260px; }
+.fixed-slot > .card { position: absolute; inset: 0; height: auto; min-height: 0; max-height: none; }
+@media (max-width: 1280px) { .battle-layout.wide { width: auto; margin-left: 0; translate: none; } }
+@media (max-width: 860px) { .battle-layout.wide { grid-template-columns: minmax(0, 1fr); } .fixed-slot { min-height: 0; } .fixed-slot > .card { position: static; height: 260px; } }
+.chat { display: flex; flex-direction: column; gap: .5rem; margin: 0; padding: 1rem 1.1rem; }
+.battle-layout > .card h2, .chat-title { margin: 0 0 .75rem; font-size: .8rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.chat-title { margin: 0; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.chat-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: .3rem; font-size: .92rem; }
+.chat-msg { margin: 0; max-width: 85%; align-self: flex-end; padding: .3rem .65rem; border-radius: 12px 12px 4px 12px; background: var(--card-2); text-align: right; overflow-wrap: anywhere; }
+.chat-msg.mine { align-self: flex-start; border-radius: 12px 12px 12px 4px; background: rgb(255 207 74 / .14); text-align: left; }
+.chat-name { color: var(--text); }
+:is(.chat, .chat-peek)[data-left="0"] .chat-msg.side-0 .chat-name, :is(.chat, .chat-peek)[data-left="1"] .chat-msg.side-1 .chat-name { color: var(--side-me); }
+:is(.chat, .chat-peek)[data-left="0"] .chat-msg.side-1 .chat-name, :is(.chat, .chat-peek)[data-left="1"] .chat-msg.side-0 .chat-name { color: var(--side-foe); }
+:is(.chat, .chat-peek) .chat-msg.mine .chat-name, :is(.chat, .chat-peek)[data-left] .chat-msg.mine .chat-name { color: var(--accent); }
+.chat-msg.watcher { background: rgb(255 255 255 / .04); color: #b9b4d4; }
+.chat-msg.watcher .chat-name { color: var(--muted); }
+.chat-empty { margin: auto 0; text-align: center; }
+.chat-form { display: flex; gap: .5rem; }
+.chat-form input { flex: 1; min-width: 0; }
+.chat-login { margin: 0; }
 .log { height: 100%; min-height: 220px; max-height: 420px; overflow-y: auto; font-size: .92rem; display: flex; flex-direction: column; gap: .2rem; }
 .log p { margin: 0; padding-left: .55rem; border-left: 3px solid transparent; }
 .log p.by-me { border-left-color: var(--side-me); }
@@ -836,18 +857,22 @@ a.party-cell, a.party-cell.empty { cursor: pointer; }
 
 .room-bar { position: sticky; top: 0; z-index: 20; width: calc(100% - 32px); max-width: 1068px; margin: 0 auto 8px; border-radius: 0 0 12px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; padding: .55rem 16px; font-weight: 700; }
 .room-bar[hidden] { display: none; }
+.room-bar.is-battle { max-width: 1480px; }
+.room-bar .vs-line { white-space: nowrap; }
+.room-bar .field { color: var(--muted); font-size: .85rem; }
+.room-bar .timer { margin-left: auto; }
+.menu-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 1px solid var(--line); background: var(--card-2); font-size: 1.1rem; cursor: pointer; }
+.menu-btn:hover, .menu-btn[aria-expanded="true"] { border-color: var(--accent); }
+body.in-room .top { display: none; }
+body.in-room.menu-open .top { display: flex; flex-wrap: wrap; position: fixed; z-index: 30; top: 56px; left: 50%; translate: -50% 0; width: calc(100% - 32px); max-width: 1068px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
 .room-bar-tag { padding: .2rem .7rem; border-radius: 999px; font-size: .85rem; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
 .room-bar-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room-bar.is-playing { background: linear-gradient(90deg, rgb(255 207 74 / .22), rgb(255 207 74 / .04)); border-bottom: 2px solid var(--accent); }
 .room-bar.is-playing .room-bar-tag { background: var(--accent); color: var(--accent-ink); }
 .room-bar.is-watching { background: linear-gradient(90deg, rgb(94 200 255 / .25), rgb(94 200 255 / .05)); border-bottom: 2px solid #5ec8ff; }
 .room-bar.is-watching .room-bar-tag { background: #5ec8ff; color: #04202e; }
-body[data-watching="true"] .stage { position: relative; outline: 3px solid #5ec8ff; outline-offset: 4px; border-radius: 18px; }
-body[data-watching="true"] .stage::before { content: '👁 Modo espectador'; position: absolute; z-index: 5; top: .6rem; left: 50%; transform: translateX(-50%); padding: .25rem .8rem; border-radius: 999px; background: rgb(4 32 46 / .85); color: #5ec8ff; font-size: .8rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; pointer-events: none; }
-body[data-watching="true"] .arena { filter: saturate(.8) brightness(.95); }
 body[data-watching="true"] .match { border-color: #5ec8ff; }
 body[data-watching="true"] .match-count { color: #5ec8ff; }
-body[data-watching="false"] .stage { outline: 3px solid rgb(255 207 74 / .7); outline-offset: 4px; border-radius: 18px; }
 @media (max-width: 560px) {
   .seats-2 { grid-template-columns: 1fr; }
 }
@@ -1125,8 +1150,9 @@ body[data-watching="false"] .stage { outline: 3px solid rgb(255 207 74 / .7); ou
 @keyframes reveal-flash { 0% { filter: brightness(0) invert(1); scale: 1.12; } 45% { filter: brightness(1.6); scale: 1; } 100% { filter: none; scale: 1; } }
 @media (prefers-reduced-motion: reduce) { .creature.revealed-flash img { animation: none; } }
 .battle-stage {
+  --arena-w: min(880px, calc(60vh * 320 / 180));
   width: min(1480px, calc(100vw - 32px)); margin-left: 50%; translate: -50% 0;
-  grid-template-columns: minmax(0, 1fr) minmax(0, min(880px, calc(60vh * 320 / 180))) minmax(0, 1fr); grid-template-areas: "me arena foe"; gap: .75rem; align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--arena-w)) minmax(0, 1fr); grid-template-areas: "me arena foe"; gap: .75rem; align-items: start;
 }
 .battle-stage > .arena { grid-area: arena; max-width: none; }
 .team-panel { display: grid; grid-template-rows: auto; grid-auto-rows: minmax(0, 1fr); gap: .5rem; align-self: stretch; width: 100%; max-width: 240px; }
@@ -1150,7 +1176,6 @@ body[data-watching="false"] .stage { outline: 3px solid rgb(255 207 74 / .7); ou
 .team-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 10px; }
 .team-mon { transition: border-color .15s, transform .15s; }
 .team-mon:has(.team-main:hover) { border-color: var(--muted); }
-.team-mon.can-switch { border-style: dashed; border-color: var(--accent); }
 .team-mon.can-switch:has(.team-main:hover) { border-style: solid; transform: translateY(-1px); box-shadow: 0 0 0 1px var(--accent); }
 .switch-chip { justify-self: start; margin-top: .35rem; padding: .1rem .5rem; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: .72rem; font-weight: 900; }
 .team-mon { position: relative; }
@@ -1173,7 +1198,7 @@ body[data-watching="false"] .stage { outline: 3px solid rgb(255 207 74 / .7); ou
 .team-hp i.low { background: var(--hp-low); }
 @media (max-width: 1280px) {
   .battle-stage { width: auto; margin-left: 0; translate: none; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "arena arena" "me foe"; }
-  .battle-stage > .arena { width: 100%; max-width: min(880px, calc(60vh * 320 / 180)); justify-self: center; }
+  .battle-stage > .arena { width: 100%; max-width: var(--arena-w); justify-self: center; }
   .team-panel { max-width: none; align-self: start; grid-auto-rows: auto; }
   .team-panel.me, .team-panel.foe { justify-self: stretch; }
 }
@@ -1184,3 +1209,23 @@ body[data-watching="false"] .stage { outline: 3px solid rgb(255 207 74 / .7); ou
 @keyframes pick-glow { 50% { box-shadow: 0 0 0 2px var(--accent), 0 0 16px rgb(255 207 74 / .45); } }
 @media (prefers-reduced-motion: reduce) { .team-panel.must-pick .team-mon.can-switch { animation: none; box-shadow: 0 0 0 2px var(--accent); } }
 .team-choice .btn.is-disabled { opacity: .45; cursor: not-allowed; filter: grayscale(1); }
+
+.chat-dock { position: fixed; z-index: 25; right: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; width: min(340px, calc(100vw - 32px)); pointer-events: none; }
+.chat-dock > * { pointer-events: auto; }
+.chat-dock .chat { width: 100%; height: min(380px, 60vh); box-shadow: 0 12px 40px rgb(0 0 0 / .45); }
+.chat-dock.collapsed .chat { display: none; }
+.chat-dock-toggle { display: inline-flex; align-items: center; gap: .45rem; padding: .5rem .95rem; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-weight: 800; box-shadow: var(--shadow); cursor: pointer; }
+.chat-dock-toggle:hover, .chat-dock-toggle[aria-expanded="true"] { border-color: var(--accent); }
+.chat-badge { min-width: 1.3rem; padding: 0 .35rem; border-radius: 999px; background: var(--bad); color: #fff; font-size: .75rem; text-align: center; }
+.chat-badge[hidden] { display: none; }
+.chat-peeks { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; max-width: 100%; }
+.chat-dock:not(.collapsed) .chat-peeks { display: none; }
+.chat-peek { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: .92rem; text-align: right; cursor: pointer; transition: opacity .35s ease; animation: chat-peek-in .25s ease-out; }
+.chat-peek:nth-last-child(2) { opacity: .7; }
+.chat-peek:nth-last-child(3) { opacity: .4; }
+.chat-peek:nth-last-child(4) { opacity: .15; }
+.chat-peek .chat-msg { max-width: none; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); animation: chat-peek-life 8s linear forwards; }
+.chat-peek .chat-msg.watcher { background: var(--card); }
+@keyframes chat-peek-in { from { opacity: 0; transform: translateY(12px); } }
+@keyframes chat-peek-life { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .chat-peek { animation: none; } }
