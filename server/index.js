@@ -8,7 +8,7 @@ import { WebSocketServer } from 'ws';
 import { parseSave, SaveError, uniqueSpecies, uniqueVariants, carryTeam } from './save.js';
 import { buildFighter, movepool, validMoveset, abilityOptions, usableAbility, movesetFor, speciesData, lineageLearnset, moveOrigins, MOVES_PER_FIGHTER } from './creatures.js';
 import { abilityInfo } from './abilities.js';
-import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents } from './battle.js';
+import { createBattle, submit, autoAction, forcedAction, needsAction, validActions, publicState, viewEvents } from './battle.js';
 import { createPreview, pick, fillMissing, previewReady, chosenEntries, previewView, picksNeeded, PARTY_SIZE } from './preview.js';
 import { openStore } from './store.js';
 import { serverStats } from './stats.js';
@@ -406,6 +406,7 @@ function frameFor(r, ws, extra = {}) {
     state: publicState(r.battle, you),
     you,
     actions: you === null ? [] : validActions(r.battle, you),
+    forced: you !== null && !!r.battle.sides[you].action?.auto,
     deadline: r.deadline,
     watchers: r.sockets.size,
   };
@@ -440,7 +441,23 @@ function afterResolve(id, r, events, timedOut = false) {
   if (r.battle.status === 'finished') finishBattle(id, r);
   else armTimer(id, r);
   broadcast(r, { t: 'events', events, timedOut });
+  if (!aiOnly(r.battle) && playForcedMoves(id, r)) return;
   nextAiTurn(id, r);
+}
+
+function playForcedMoves(id, r) {
+  let events = null;
+  let submitted = false;
+  r.battle.sides.forEach((_, s) => {
+    const action = forcedAction(r.battle, s);
+    if (!action) return;
+    submitted = true;
+    events = submit(r.battle, s, action) || events;
+    if (r.battle.sides[s].action) r.battle.sides[s].action.auto = true;
+  });
+  if (events) afterResolve(id, r, events);
+  else if (submitted) broadcast(r, { t: 'ready' });
+  return !!events;
 }
 
 function finishBattle(id, r) {

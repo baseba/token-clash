@@ -7,6 +7,7 @@ const IV = { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 };
 const mon = (id, finalID, moves, extra = {}) => ({ id, finalID, baseID: finalID, rarity: 'rare', level: 50, ivs: IV, learned: moves, moveset: moves, ...extra });
 const battle = (a, b, seed = 1) => createBattle({ id: 'x', random: rng(seed), sides: [{ trainerId: 'a', name: 'A', entries: [a].flat() }, { trainerId: 'b', name: 'B', entries: [b].flat() }] });
 const idx = (b, s, key) => b.sides[s].team[b.sides[s].active].moves.findIndex((m) => m.key === key);
+const canPick = (b, s, key) => validActions(b, s).some((a) => a.type === 'move' && a.move === idx(b, s, key));
 const turn = (b, k0, k1) => {
   const a0 = typeof k0 === 'string' ? { type: 'move', move: idx(b, 0, k0) } : k0;
   const a1 = typeof k1 === 'string' ? { type: 'move', move: idx(b, 1, k1) } : k1;
@@ -29,13 +30,14 @@ test('Sorpresa and Escaramuza only work on the first action after entering', () 
   const first = turn(b, 'fake-out', 'growl');
   assert.equal(hitOn(first, 1).length, 1);
   assert.ok(first.some((e) => e.t === 'cant' && e.reason === 'flinch' && e.side === 1));
-  assert.ok(failed(turn(b, 'fake-out', 'growl'), 0, 'notFirstTurn'));
+  assert.ok(!canPick(b, 0, 'fake-out'));
+  turn(b, 'karate-chop', 'growl');
   turn(b, { type: 'switch', to: 1 }, 'growl');
   turn(b, { type: 'switch', to: 0 }, 'growl');
   assert.equal(hitOn(turn(b, 'fake-out', 'growl'), 1).length, 1);
   const fi = battle(mon('v', 127, ['first-impression']), wall());
   assert.equal(hitOn(turn(fi, 'first-impression', 'growl'), 1).length, 1);
-  assert.ok(failed(turn(fi, 'first-impression', 'growl'), 0, 'notFirstTurn'));
+  assert.ok(!canPick(fi, 0, 'first-impression'));
 });
 
 test('Golpe Bajo only works if the rival is about to attack', () => {
@@ -55,7 +57,7 @@ test('Puño Certero fails if the user is hit first', () => {
 test('Comesueños needs a sleeping rival and Ronquido a sleeping user', () => {
   const b = battle(mon('g', 94, ['dream-eater', 'snore']), wall());
   assert.ok(failed(turn(b, 'dream-eater', 'growl'), 0, 'notAsleep'));
-  assert.ok(failed(turn(b, 'snore', 'growl'), 0, 'notAsleepSelf'));
+  assert.ok(!canPick(b, 0, 'snore'));
   b.sides[1].team[0].status = 'slp';
   b.sides[1].team[0].statusTurns = 3;
   assert.equal(hitOn(turn(b, 'dream-eater', 'growl'), 1).length, 1);
@@ -66,7 +68,7 @@ test('Comesueños needs a sleeping rival and Ronquido a sleeping user', () => {
 
 test('Último Recurso needs every other move used first', () => {
   const b = battle(mon('e', 133, ['last-resort', 'tackle']), wall());
-  assert.ok(failed(turn(b, 'last-resort', 'growl'), 0, 'lastResort'));
+  assert.ok(!canPick(b, 0, 'last-resort'));
   turn(b, 'tackle', 'growl');
   assert.equal(hitOn(turn(b, 'last-resort', 'growl'), 1).length, 1);
 });
@@ -179,7 +181,7 @@ test('Meteorobola takes the type of the weather, Plancha uses the Defense, Llama
   const fire = battle(mon('f', 6, ['burn-up'], { level: 30 }), wall(undefined, { level: 100 }));
   turn(fire, 'burn-up', 'growl');
   assert.ok(!fire.sides[0].team[0].types.includes('fire'));
-  assert.ok(failed(turn(fire, 'burn-up', 'growl'), 0, 'noType'));
+  assert.ok(!canPick(fire, 0, 'burn-up'));
 });
 
 test('the AI does not pick a move that is sure to fail', async () => {

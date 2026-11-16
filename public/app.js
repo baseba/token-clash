@@ -3444,6 +3444,7 @@ function battleUI(c, sendAction, sendSeen = () => {}) {
     if (!acts.length || sent) {
       const waitingFor = st.phase !== 'choose' && st.sides[1 - you].mustSwitch ? `Esperando a que ${foeName} elija quién entra…` : `Esperando a ${foeName}…`;
       if (sent) box.append(h('p', null, 'Elegiste: ', h('b', null, sent), '.'));
+      else if (frame.forced) box.append(h('p', null, 'Tu Pokémon está obligado a seguir con su movimiento este turno.'));
       box.append(h('p', { class: 'pulse' }, waitingFor));
       return;
     }
