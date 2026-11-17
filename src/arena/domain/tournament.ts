@@ -308,9 +308,9 @@ export class Tournament implements TournamentState {
     return { ...at, a: this.seats[match.a!], b: this.seats[match.b!] };
   }
 
-  matchStarted(at: MatchRef, challengeId: string): void {
-    this.bracket![at.round][at.index].challengeId = challengeId;
-    this.current = { ...at, challengeId };
+  matchStarted({ round, index }: MatchRef, challengeId: string): void {
+    this.bracket![round][index].challengeId = challengeId;
+    this.current = { round, index, challengeId };
     this.nextAt = null;
   }
 

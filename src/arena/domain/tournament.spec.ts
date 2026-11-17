@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AI_NAMES, aiName, reachedRound, addSeat, removeSeat, setReady, allReady, nextAiId, shuffledOrder, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor } from './tournament.js';
+import { AI_NAMES, aiName, reachedRound, addSeat, removeSeat, setReady, allReady, nextAiId, shuffledOrder, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor, Tournament } from './tournament.js';
 import { aiLevelOf } from '../../combat/domain/ai.js';
 
 const tournament = (size = 4, extra = {}): any => ({ id: 't', hostId: 'h', mode: 'team', levelCap: null, size, seats: [{ id: 'h', name: 'Host', ai: null, ready: false }], ...extra });
@@ -94,4 +94,14 @@ test('an AI-only battle waits for viewers still playing the previous turn', asyn
   assert.equal(viewersBehind([3, undefined], 3), true);
   assert.equal(viewersBehind([3, 4], 3), false);
   assert.equal(viewersBehind([], 3), false);
+});
+
+test('the match being played is named by its place in the bracket and its room, without the seats', () => {
+  const t = Tournament.create({ id: 't', host: { id: 'h', name: 'Host' }, mode: 'team', levelCap: null, size: 4, visibility: 'private', at: 0 });
+  t.addAis('easy', 3);
+  t.start({ at: 0, order: [0, 1, 2, 3], aiLevel: 50, firstMatchAt: 0 });
+  const next = t.nextMatch()!;
+  assert.equal(next.a.id, 'h');
+  t.matchStarted(next, 'room1');
+  assert.deepEqual(t.current, { round: 0, index: 0, challengeId: 'room1' });
 });
