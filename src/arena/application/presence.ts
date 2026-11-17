@@ -2,8 +2,10 @@
 // tournament followers and the lobby. This is runtime state, not domain data: it is lost on restart
 // on purpose (a battle can't be resumed), and it is never stored.
 import { Injectable } from '@nestjs/common';
+import { aiLevelOf } from '../../combat/domain/ai.js';
 import type { BattleState } from '../../combat/domain/battle.js';
 import type { PreviewState } from '../../combat/domain/team-preview.js';
+import type { Challenge } from '../domain/challenge.js';
 import type { TournamentLabel } from '../domain/tournament.js';
 import type { ClientConnection } from './connection.js';
 
@@ -17,24 +19,69 @@ export interface CountdownPlayer {
   shinies: number;
 }
 
+/** The countdown before choosing teams. `waiting`: who a tournament match still waits for. */
+export interface CountdownPhase {
+  kind: 'countdown';
+  startedAt: number;
+  endsAt: number;
+  players: CountdownPlayer[];
+  tournament: TournamentLabel | null;
+  waiting: string[] | null;
+}
+
+/** Each side picks 3 of its 6. `short`: a tournament player is away, so the clock runs short. */
+export interface PreviewPhase {
+  kind: 'preview';
+  preview: PreviewState;
+  deadline: number | null;
+  short: boolean;
+}
+
+/** The battle, while it is played and afterwards for late viewers. */
+export interface BattlePhase {
+  kind: 'battle';
+  battle: BattleState;
+  deadline: number | null;
+  /** Skynet questions in flight, by `turn:phase`. */
+  jevAsked: Set<string>;
+}
+
+/**
+ * Which step of the match a live room is in. It only moves forward:
+ * waiting → readyCheck → countdown → preview → battle, and back to waiting when the ready check
+ * breaks up. Rooms against the AI start at the preview; tournament matches at the countdown.
+ */
+export type RoomPhase =
+  /** Nothing to play: an open room, or a closed one with no battle in memory. */
+  | { kind: 'waiting' }
+  /** Both players are in the room and press "ready". */
+  | { kind: 'readyCheck'; ready: Set<string>; players: CountdownPlayer[] }
+  | CountdownPhase
+  | PreviewPhase
+  | BattlePhase;
+
 /** The live side of a challenge: its sockets and which step of the match it is in. */
 export interface Room {
-  sockets: Set<ClientConnection>;
-  /** Both players are in the room and press "ready". */
-  readyCheck?: { ready: Set<string>; players: CountdownPlayer[] } | null;
-  /** The countdown before choosing teams. */
-  countdown?: { startedAt: number; endsAt: number; players: CountdownPlayer[]; tournament: TournamentLabel | null; waiting?: string[] } | null;
-  /** Each side picks 3 of its 6. */
-  preview?: PreviewState | null;
-  /** The preview timer was shortened because a tournament player is away. */
-  previewShort?: boolean;
-  battle: BattleState | null;
-  /** When the current step times out (shown to the clients). */
-  deadline: number | null;
+  readonly challenge: Challenge;
+  readonly sockets: Set<ClientConnection>;
+  phase: RoomPhase;
+  /** The clock of the current step: preview, reveal or turn. */
   timer: NodeJS.Timeout | null;
-  /** Skynet questions in flight, by `turn:phase`. */
-  jevAsked?: Set<string>;
 }
+
+export function inRoom(room: Room, trainerId: string | null | undefined): boolean {
+  return [...room.sockets].some((ws) => ws.trainerId === trainerId && ws.open);
+}
+
+/** Is a tournament player missing from the room? Then clocks run short so nobody waits forever. */
+export function someoneAbsent(room: Room, sides: { trainerId: string }[]): boolean {
+  if (!room.challenge.tournamentId) return false;
+  return sides.some((side) => !aiLevelOf(side.trainerId) && !inRoom(room, side.trainerId));
+}
+
+/** A match is under way: from the countdown until the battle ends. */
+const playing = (phase: RoomPhase) =>
+  phase.kind === 'countdown' || phase.kind === 'preview' || (phase.kind === 'battle' && phase.battle.status === 'active');
 
 @Injectable()
 export class Presence {
@@ -43,23 +90,24 @@ export class Presence {
   private readonly tours = new Map<string, Set<ClientConnection>>();
 
   /** The live room of a challenge, created on first use. */
-  room(id: string): Room {
-    let room = this.rooms.get(id);
+  room(challenge: Challenge): Room {
+    let room = this.rooms.get(challenge.id);
     if (!room) {
-      room = { battle: null, sockets: new Set(), deadline: null, timer: null };
-      this.rooms.set(id, room);
+      room = { challenge, sockets: new Set(), phase: { kind: 'waiting' }, timer: null };
+      this.rooms.set(challenge.id, room);
     }
     return room;
   }
 
-  inRoom(room: Room, trainerId: string | null | undefined): boolean {
-    return [...room.sockets].some((ws) => ws.trainerId === trainerId && ws.open);
+  /** The room a connection is in, if it is in one. */
+  roomOf(ws: ClientConnection): Room | undefined {
+    return ws.roomId ? this.rooms.get(ws.roomId) : undefined;
   }
 
   /** Is the host of this challenge connected to its room? */
   hostWaiting = (challenge: { id: string; hostId: string }): boolean => {
     const room = this.rooms.get(challenge.id);
-    return !!room && this.inRoom(room, challenge.hostId);
+    return !!room && inRoom(room, challenge.hostId);
   };
 
   followTournament(id: string, ws: ClientConnection): void {
@@ -77,17 +125,23 @@ export class Presence {
     return this.tours.get(id) ?? new Set();
   }
 
+  /** Everyone following a tournament: on its page or in the room of one of its matches. */
+  tournamentAudience(id: string): ClientConnection[] {
+    const inMatches = [...this.rooms.values()].filter((room) => room.challenge.tournamentId === id).flatMap((room) => [...room.sockets]);
+    return [...inMatches, ...this.tournamentSockets(id)];
+  }
+
   inTournament(id: string, trainerId: string | null | undefined): boolean {
     return [...this.tournamentSockets(id)].some((ws) => ws.trainerId === trainerId && ws.open);
   }
 
   /** Rooms with a match going on (someone watching it). Shown in /stats. */
   liveBattles(): number {
-    return [...this.rooms.values()].filter((r) => r.sockets.size > 0 && (r.countdown || r.preview || r.battle?.status === 'active')).length;
+    return [...this.rooms.values()].filter((room) => room.sockets.size > 0 && playing(room.phase)).length;
   }
 
   /** Rooms a restart would cut, watched or not. deploy/deploy.sh waits for this to be 0. */
   busyRooms(): number {
-    return [...this.rooms.values()].filter((r) => r.readyCheck || r.countdown || r.preview || r.battle?.status === 'active').length;
+    return [...this.rooms.values()].filter((room) => room.phase.kind === 'readyCheck' || playing(room.phase)).length;
   }
 }

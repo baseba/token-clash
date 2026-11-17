@@ -53,6 +53,12 @@ function syntheticLegacy() {
   };
 }
 
+/** What reading the import back must give: a room older than modes or visibility is a private team battle. */
+function expected(legacy: any) {
+  const challenges = Object.entries(legacy.challenges ?? {}).map(([id, c]: [string, any]) => [id, { ...c, mode: c.mode ?? 'team', visibility: c.visibility ?? 'private' }]);
+  return { trainers: legacy.trainers ?? {}, challenges: Object.fromEntries(challenges), tournaments: legacy.tournaments ?? {} };
+}
+
 function roundTrip(legacy: any) {
   const dir = mkdtempSync(join(tmpdir(), 'tc-legacy-'));
   writeFileSync(join(dir, 'db.json'), JSON.stringify(legacy));
@@ -74,7 +80,8 @@ test('importing db.json and reading it back gives exactly the same data', () => 
   const legacy = syntheticLegacy();
   const { result, read } = roundTrip(legacy);
   assert.deepEqual(result, { imported: true, reason: 'imported', trainers: 2, pokemon: roster.length + 1, challenges: 4, tournaments: 2 });
-  assert.deepEqual(normalize(read), normalize(legacy));
+  assert.deepEqual(normalize(read), normalize(expected(legacy)));
+  assert.deepEqual([read.challenges.c2.mode, read.challenges.c2.visibility], ['team', 'private']);
 });
 
 test('a fresh install with no db.json just starts empty', () => {
@@ -91,5 +98,5 @@ const REAL = process.env.LEGACY_DB;
 test('a real db.json (LEGACY_DB) survives the import intact', { skip: !REAL || !existsSync(REAL) ? 'set LEGACY_DB=/path/to/db.json to run it' : false }, () => {
   const legacy = JSON.parse(readFileSync(REAL!, 'utf8'));
   const { read } = roundTrip(legacy);
-  assert.deepEqual(normalize(read), normalize({ trainers: legacy.trainers ?? {}, challenges: legacy.challenges ?? {}, tournaments: legacy.tournaments ?? {} }));
+  assert.deepEqual(normalize(read), normalize(expected(legacy)));
 });

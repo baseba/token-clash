@@ -1,20 +1,15 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import WebSocket from 'ws';
 import { createJevProxy } from '../src/combat/infrastructure/jev/jev-proxy.js';
 import { PROJECT_ROOT } from '../src/shared/paths.js';
+import { appProcess, FAST_TIMINGS, type AppProcess } from './app-process.js';
 
 const save = readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8');
-const PORT = 18000 + Math.floor(Math.random() * 1000);
-const base = `http://127.0.0.1:${PORT}`;
-const DATA_DIR = mkdtempSync(join(tmpdir(), 'tc-'));
-let proc: ChildProcess;
 
 // Same topology as production: the app has no key and talks to the egress proxy, which adds it
 // and forwards to a stand-in for Jev that always picks the last option it is offered.
@@ -33,39 +28,21 @@ const fakeJev = createServer((req, res) => {
 });
 
 let jevProxy: Server;
-
-// Starts the compiled app (dist/src/main.js, built by `npm test`) as a separate process, like
-// production does, and waits until it answers.
-async function startServer() {
-  const proxyPort = (jevProxy.address() as AddressInfo).port;
-  proc = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'dist/src/main.js'], {
-    cwd: PROJECT_ROOT,
-    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR, TURN_MS: '1500', PREVIEW_MS: '1500', ROLL_MS: '0', MATCH_MS: '300', REVEAL_MS: '200', DICE_ANIM_MS: '0', AI_PICK_MS: '60', DRAW_MS: '100', BETWEEN_MS: '100', AI_PACE_MS: '20', AI_WATCH_MS: '0', ARRIVAL_MS: '0', ABSENT_MS: '1500', SEAT_GRACE_MS: '60000', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${proxyPort}/v1/systemone` },
-    stdio: ['ignore', 'ignore', 'inherit'],
-  });
-  for (let i = 0; i < 100; i++) {
-    try {
-      if ((await fetch(`${base}/healthz`)).ok) return;
-    } catch {}
-    await new Promise<any>((r) => setTimeout(r, 100));
-  }
-  throw new Error('server did not start');
-}
-
-async function stopServer() {
-  const exited = new Promise<any>((r) => proc.once('exit', r));
-  proc.kill('SIGTERM');
-  await exited;
-}
+let app: AppProcess;
+let base: string;
+let PORT: number;
 
 before(async () => {
   await new Promise<void>((r) => fakeJev.listen(0, '127.0.0.1', r));
   jevProxy = createJevProxy({ apiKey: FAKE_JEV_KEY, upstream: `http://127.0.0.1:${(fakeJev.address() as AddressInfo).port}/v1/systemone` });
   await new Promise<void>((r) => jevProxy.listen(0, '127.0.0.1', r));
-  await startServer();
+  const proxyPort = (jevProxy.address() as AddressInfo).port;
+  app = appProcess({ ...FAST_TIMINGS, SEAT_GRACE_MS: '60000', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${proxyPort}/v1/systemone` }, 18000);
+  ({ base, port: PORT } = app);
+  await app.start();
 });
 after(() => {
-  proc.kill();
+  app.kill();
   jevProxy.close();
   fakeJev.close();
 });
@@ -436,8 +413,8 @@ test('everything survives a restart: sessions, collections, results and tourname
     return { me: (await call('/api/me', { token })).data, leaderboard: (await call('/api/leaderboard')).data, stats };
   };
   const before = await snapshot();
-  await stopServer();
-  await startServer();
+  await app.stop();
+  await app.start();
   const afterRestart = await snapshot();
 
   assert.deepEqual(afterRestart, before);

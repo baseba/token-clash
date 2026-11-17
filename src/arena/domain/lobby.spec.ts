@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openRooms, matchFor, visibilityOf, joinBlocker, HOST_GRACE_MS } from './lobby.js';
+import { Challenge } from './challenge.js';
+import { openRooms, matchFor, joinBlocker, HOST_GRACE_MS } from './lobby.js';
 
 const now = 1_000_000;
 const room = (id, extra = {}): any => ({ id, hostId: `h-${id}`, status: 'open', mode: 'team', levelCap: null, visibility: 'public', createdAt: now - HOST_GRACE_MS - 1, ...extra });
@@ -20,10 +21,6 @@ test('only public open rooms with a host still waiting are listed, oldest first'
   assert.deepEqual(list.map((c) => c.id), ['g', 'a', 'b']);
 });
 
-test('rooms made before visibility existed stay private', () => {
-  assert.equal(visibilityOf({}), 'private');
-});
-
 test('a public search joins a rival room with the same mode and level, never its own', () => {
   const rooms = [room('mine', { hostId: 'me' }), room('nv50', { levelCap: 50 }), room('dice', { mode: 'random' }), room('match')];
   const found = matchFor(rooms, { trainerId: 'me', mode: 'team', levelCap: null });
@@ -33,7 +30,7 @@ test('a public search joins a rival room with the same mode and level, never its
 });
 
 test('joining explains why a room is no longer available', () => {
-  const why = (c, extra = {}) => joinBlocker(c, { trainerId: 'me', now, ...extra })?.message ?? null;
+  const why = (c, extra = {}) => joinBlocker(c && Challenge.restore(c), { trainerId: 'me', now, ...extra })?.message ?? null;
   assert.match(why(undefined), /ya no existe/);
   assert.match(why(room('a', { hostId: 'me' })), /tu propia sala/);
   assert.match(why(room('a', { status: 'active', guestId: 'otro' })), /Llegaste tarde/);
@@ -45,5 +42,5 @@ test('joining explains why a room is no longer available', () => {
   assert.equal(why(room('a'), { hostWaiting: () => true }), null);
   assert.equal(why(room('a', { visibility: 'private' })), null);
   // The domain says which kind of "no" it is; the HTTP layer turns 'conflict' into a 409.
-  assert.equal(joinBlocker(room('a', { status: 'active' }), { trainerId: 'x', now }).kind, 'conflict');
+  assert.equal(joinBlocker(Challenge.restore(room('a', { status: 'active' })), { trainerId: 'x', now }).kind, 'conflict');
 });

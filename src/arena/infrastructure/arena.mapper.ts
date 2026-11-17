@@ -10,8 +10,9 @@ export function challengeToDomain(row: ChallengeRow): Challenge {
     ...compact({
       id: row.id,
       status: row.status as ChallengeStatus,
-      mode: (row.mode as BattleMode | null) ?? undefined,
-      visibility: (row.visibility as Visibility | null) ?? undefined,
+      // NULL only if the previous image wrote this row after a rollback (see the backfill migration).
+      mode: (row.mode ?? 'team') as BattleMode,
+      visibility: (row.visibility ?? 'private') as Visibility,
       ai: row.ai ?? undefined,
       aiOnly: row.aiOnly ?? undefined,
       hostId: row.hostId,
@@ -37,9 +38,9 @@ export function challengeToRow(challenge: Challenge): typeof challenges.$inferIn
   return {
     id: challenge.id,
     status: challenge.status,
-    mode: challenge.mode ?? null,
+    mode: challenge.mode,
     levelCap: challenge.levelCap ?? null,
-    visibility: challenge.visibility ?? null,
+    visibility: challenge.visibility,
     ai: challenge.ai ?? null,
     aiOnly: challenge.aiOnly ?? null,
     hostId: challenge.hostId,

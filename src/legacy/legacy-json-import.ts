@@ -22,11 +22,17 @@ import { rosterEntries, trainers } from '../trainers/infrastructure/trainer.sche
 export const LEGACY_FILE = 'db.json';
 const META_KEY = 'legacy_json_import';
 
+/** Rooms older than modes or visibility have neither. */
+type LegacyChallenge = Omit<ChallengeState, 'mode' | 'visibility'> & Partial<Pick<ChallengeState, 'mode' | 'visibility'>>;
+
 interface LegacyDb {
   trainers?: Record<string, TrainerState>;
-  challenges?: Record<string, ChallengeState>;
+  challenges?: Record<string, LegacyChallenge>;
   tournaments?: Record<string, TournamentState>;
 }
+
+/** Those rooms were team battles, and private (link only). */
+const withDefaults = (challenge: LegacyChallenge): ChallengeState => ({ ...challenge, mode: challenge.mode ?? 'team', visibility: challenge.visibility ?? 'private' });
 
 export interface LegacyImportResult {
   imported: boolean;
@@ -60,7 +66,7 @@ export function importLegacyJson(db: Database, dataDir: string, log?: Pick<Logge
 
   const legacy = JSON.parse(readFileSync(file, 'utf8')) as LegacyDb;
   const ts = Object.values(legacy.trainers ?? {}).map((t) => Trainer.restore(t));
-  const cs = Object.values(legacy.challenges ?? {}).map((c) => Challenge.restore(c));
+  const cs = Object.values(legacy.challenges ?? {}).map((c) => Challenge.restore(withDefaults(c)));
   const tours = Object.values(legacy.tournaments ?? {}).map((t) => Tournament.restore(t));
   const entries = ts.flatMap((t) => (t.roster ?? []).map((e, i) => entryToRow(t.id, e, i)));
 

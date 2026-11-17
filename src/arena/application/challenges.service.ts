@@ -4,10 +4,10 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { uniqueSpecies } from '../../catalog/domain/roster-entry.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { newId, now } from '../../shared/domain/clock.js';
-import { forbidden, notFound } from '../../shared/domain/errors.js';
+import { notFound } from '../../shared/domain/errors.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
-import { Challenge, type BattleMode, type Visibility } from '../domain/challenge.js';
+import { Challenge, isHumanDuel, type BattleMode, type Visibility } from '../domain/challenge.js';
 import { joinBlocker, matchFor } from '../domain/lobby.js';
 import { humanCount } from '../domain/tournament.js';
 import { ArenaViews } from './arena-views.js';
@@ -66,7 +66,7 @@ export class ChallengesService implements OnModuleInit {
       const { own, rival } = matchFor(this.lobby.publicRooms(), { trainerId: trainer.id, mode: input.mode, levelCap: input.levelCap });
       if (rival && this.duels.joinable(rival)) {
         this.duels.join(rival, trainer);
-        if (own) this.duels.close(own);
+        if (own) this.duels.close(own, trainer.id);
         return { challenge: rival, joined: true };
       }
       if (own) return { challenge: own };
@@ -91,16 +91,13 @@ export class ChallengesService implements OnModuleInit {
   /** The host closes their room (while it waits, or during the ready check). */
   close(trainer: Trainer | undefined, id: string): Challenge {
     const challenge = this.find(id);
-    const checking = challenge.status === 'active' && !!this.presence.rooms.get(challenge.id)?.readyCheck;
-    if (!trainer || challenge.hostId !== trainer.id || (challenge.status !== 'open' && !checking) || challenge.tournamentId)
-      throw forbidden('No puedes cerrar esta sala.');
-    this.duels.close(challenge);
+    this.duels.close(challenge, trainer?.id);
     return challenge;
   }
 
   accept(trainer: Trainer, id: string): Challenge {
     const challenge = this.challenges.findById(id);
-    const blocked = joinBlocker<Challenge>(challenge, { trainerId: trainer.id, hostWaiting: this.presence.hostWaiting });
+    const blocked = joinBlocker(challenge, { trainerId: trainer.id, hostWaiting: this.presence.hostWaiting });
     if (blocked) throw blocked;
     this.duels.join(challenge!, trainer);
     return challenge!;
@@ -110,7 +107,7 @@ export class ChallengesService implements OnModuleInit {
   history(trainer: Trainer, { offset, limit }: { offset: number; limit: number }) {
     const mine = this.challenges
       .all()
-      .filter((c) => !c.ai && !c.tournamentId && (c.hostId === trainer.id || c.guestId === trainer.id))
+      .filter((c) => isHumanDuel(c) && c.isPlayer(trainer.id))
       .sort((a, b) => b.createdAt - a.createdAt);
     const tournaments = this.tournaments
       .all()

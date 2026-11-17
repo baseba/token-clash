@@ -1,7 +1,7 @@
 // The /stats page: ranking, recent battles, most used Pokémon, tournaments and server totals.
 // It is a read model: it only reads (from the other contexts' public queries) and computes.
 import { humanCount, type TournamentState } from '../../arena/domain/tournament.js';
-import type { ChallengeState } from '../../arena/domain/challenge.js';
+import { isHumanDuel, type ChallengeState } from '../../arena/domain/challenge.js';
 import { TURN_LIMIT } from '../../combat/domain/battle.js';
 import { byRanking } from '../../trainers/domain/ranking.js';
 import type { TrainerState } from '../../trainers/domain/trainer.js';
@@ -89,7 +89,7 @@ export function serverStats(source: StatsSource, now = Date.now()) {
   const players = playersOf(trainers);
   const entries = uniqueEntries(trainers);
   const challenges = Object.values(source.challenges);
-  const pvp = challenges.filter((c) => !c.ai && !c.tournamentId && c.status === 'finished' && c.final);
+  const pvp = challenges.filter((c) => isHumanDuel(c) && c.status === 'finished' && c.final);
   const vsAi = challenges.filter((c) => c.ai && !c.aiOnly && c.status === 'finished');
   const turns = pvp.reduce((sum, c) => sum + Math.min(c.turns ?? 0, TURN_LIMIT), 0);
   return {
@@ -118,7 +118,7 @@ export function serverStats(source: StatsSource, now = Date.now()) {
         host: nameOf(source, c.hostId, c.hostName),
         guest: nameOf(source, c.guestId, c.guestName),
         winner: c.winnerId === c.hostId ? 'host' : c.winnerId === c.guestId ? 'guest' : null,
-        mode: c.mode ?? 'team',
+        mode: c.mode,
         levelCap: c.levelCap ?? null,
         turns: c.turns ?? null,
         finishedAt: c.finishedAt ?? c.createdAt,
@@ -161,7 +161,7 @@ export function tournamentStats(source: StatsSource) {
       return {
         id: tournament.id,
         size: tournament.size,
-        mode: tournament.mode ?? 'team',
+        mode: tournament.mode,
         levelCap: tournament.levelCap ?? null,
         humans: humanCount(tournament),
         champion: champ ? nameOf(source, champ.ai ? null : champ.id, champ.name) : '¿?',

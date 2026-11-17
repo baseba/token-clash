@@ -10,10 +10,10 @@ export const challenges = sqliteTable(
   {
     id: text().primaryKey(),
     status: text().notNull(),
-    /** NULL in rooms older than modes (they were team battles). */
+    /** Always written now. NULL only in rows from before the backfill migration; NOT NULL comes once no image writes NULL. */
     mode: text(),
     levelCap: integer('level_cap'),
-    /** NULL in rooms older than visibility (they were private). */
+    /** Same as mode. */
     visibility: text(),
     ai: text(),
     aiOnly: integer('ai_only', { mode: 'boolean' }),
