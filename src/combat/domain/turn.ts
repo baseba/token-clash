@@ -90,7 +90,7 @@ function continueTurn(battle: BattleState, events: BattleEvent[], movers: Mover[
   for (let i = from; i < movers.length; i++) {
     const mover = movers[i];
     if (activeOf(battle, mover.sideIndex) !== mover.fighter) continue;
-    useMove(battle, mover.sideIndex, mover.move, mover.prio, mover.why);
+    useMove(battle, mover.sideIndex, mover.move, mover.prio, mover.why, mover.target ?? null);
     settle(battle);
     if (checkEnd(battle)) return done(battle, events);
     if (pauseForSwitch(battle, [mover.sideIndex, 1 - mover.sideIndex], movers, i + 1)) return done(battle, events);

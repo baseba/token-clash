@@ -27,6 +27,7 @@ export interface Fighter {
 }
 
 export const MOVES_PER_FIGHTER = 4;
+export const BATTLE_LEVEL = 100;
 
 export function movepool(entry: EntryLike): MoveData[] {
   return learnedMoves(entry).map((id) => moveData(id) as MoveData);
@@ -39,7 +40,7 @@ export function usableMovepool(entry: EntryLike): string[] {
 export function defaultMoveset(entry: EntryLike): string[] {
   const origins = moveOrigins(entry);
   const usable = usableMovepool(entry);
-  const reached = usable.filter((id) => origins.get(id)!.origin === 'level' && origins.get(id)!.level! <= (entry.level as number));
+  const reached = usable.filter((id) => origins.get(id)!.origin === 'level' && origins.get(id)!.level! <= BATTLE_LEVEL);
   if (reached.length) return reached.slice(-MOVES_PER_FIGHTER);
   if (usable.length) return usable.slice(0, MOVES_PER_FIGHTER);
   return moveEntry('tackle') ? ['tackle'] : [];
@@ -60,9 +61,9 @@ export function movesetFor(entry: EntryLike): string[] {
   return moves.length ? moves : defaultMoveset(entry);
 }
 
-export function buildFighter(entry: RosterEntry, { levelCap }: { levelCap?: number | null } = {}): Fighter {
+export function buildFighter(entry: RosterEntry): Fighter {
   const sp = species(entry);
-  const level = levelCap ? levelCap : entry.level;
+  const level = BATTLE_LEVEL;
   const iv = entry.ivs;
   const ability = abilityFor(entry);
   const { hp, atk, def, satk, sdef, spd } = sp.stats;

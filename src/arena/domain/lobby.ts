@@ -7,7 +7,7 @@ import type { BattleMode, Challenge } from './challenge.js';
 /** A public room stays listed this long after creation even if its host hasn't connected yet. */
 export const HOST_GRACE_MS = 20_000;
 
-type RoomLike = Pick<Challenge, 'status' | 'createdAt' | 'hostId' | 'ai' | 'visibility' | 'mode' | 'levelCap'>;
+type RoomLike = Pick<Challenge, 'status' | 'createdAt' | 'hostId' | 'ai' | 'visibility' | 'mode'>;
 type HostWaiting<T> = (room: T) => boolean;
 
 const hostPresent = <T extends RoomLike>(room: T, now: number, hostWaiting: HostWaiting<T>) =>
@@ -19,8 +19,8 @@ export function openRooms<T extends RoomLike>(challenges: Record<string, T> | T[
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 
-export function matchFor<T extends RoomLike>(rooms: T[], { trainerId, mode, levelCap }: { trainerId: string; mode: BattleMode; levelCap: number | null }): { own: T | null; rival: T | null } {
-  const same = rooms.filter((c) => c.mode === mode && c.levelCap === levelCap);
+export function matchFor<T extends RoomLike>(rooms: T[], { trainerId, mode }: { trainerId: string; mode: BattleMode }): { own: T | null; rival: T | null } {
+  const same = rooms.filter((c) => c.mode === mode);
   return { own: same.find((c) => c.hostId === trainerId) ?? null, rival: same.find((c) => c.hostId !== trainerId) ?? null };
 }
 

@@ -5,6 +5,8 @@
 import { moveEntry, type MoveEntry } from '../../catalog/domain/creatures.js';
 import { IMPOSSIBLE_MOVES, MOVE_RULES } from './move-rules.js';
 
+export type MoveTarget = 'foe' | 'self';
+
 /** A move as the engine reads it: its movedex.json row, plus what the engine derives from it. */
 export interface MoveData extends MoveEntry {
   key: string;
@@ -37,6 +39,7 @@ export interface MoveData extends MoveEntry {
   hitsAirborne?: boolean;
   curls?: boolean;
   thaws?: boolean;
+  aimable?: MoveTarget;
 }
 
 const SUPPORTED_VOLATILES = new Set(['confusion', 'attract', 'leechseed']);
@@ -55,7 +58,10 @@ const CRASHES = new Set(['high-jump-kick', 'jump-kick', 'axe-kick', 'supercell-s
 const IGNORES_DEF_BOOSTS = new Set(['sacred-sword', 'darkest-lariat', 'chip-away']);
 const HITS_PHYSICAL_DEF = new Set(['psyshock', 'psystrike', 'secret-sword']);
 const LOSES_TYPE: Record<string, string> = { 'burn-up': 'fire', 'double-shock': 'electric' };
-const SELF_COST: Record<string, number> = { 'fillet-away': 1 / 2, 'clangorous-soul': 1 / 3 };
+const AIMABLE: Record<string, MoveTarget> = {
+  'heal-pulse': 'self', 'floral-healing': 'self', purify: 'self', decorate: 'self', 'aromatic-mist': 'self', coaching: 'self', acupressure: 'self', 'pollen-puff': 'foe',
+};
+const SELF_COST: Record<string, number> = { 'fillet-away': 1 / 2, 'clangorous-soul': 33 / 100 };
 
 /** What a fighter uses when it has no move left to use. STRUGGLE_MOVE stands for it in an action. */
 export const STRUGGLE_MOVE = -1;
@@ -63,6 +69,8 @@ export const STRUGGLE: MoveData = {
   key: 'struggle', id: 'struggle', name: 'Forcejeo', desc: 'Ataque desesperado que solo se usa cuando no quedan PP; daña también al usuario.',
   type: null, category: 'physical', power: 50, accuracy: null, pp: 1, priority: 0, target: 'foe', flags: ['contact'], kind: 'attack', recoilMaxHp: 1 / 4, supported: true,
 };
+
+export const aimedTarget = (move: MoveData, aim: MoveTarget | null | undefined): string => (move.aimable ? aim ?? move.aimable : move.target);
 
 /** The move in a fighter's slot, or Struggle. */
 export const moveAt = (fighter: { moves: MoveData[] }, slot: number): MoveData => (slot === STRUGGLE_MOVE ? STRUGGLE : fighter.moves[slot]);
@@ -105,6 +113,7 @@ export function moveData(id: string): MoveData | null {
   if (HITS_PHYSICAL_DEF.has(id)) move.hitsPhysicalDef = true;
   if (LOSES_TYPE[id]) move.losesType = LOSES_TYPE[id];
   if (SELF_COST[id]) move.selfCost = SELF_COST[id];
+  if (AIMABLE[id]) move.aimable = AIMABLE[id];
   if (id === 'body-press') move.usesDefense = true;
   if (id === 'flying-press') move.extraType = 'flying';
   if (id === 'clanging-scales') move.self = { def: -1 };

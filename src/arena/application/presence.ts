@@ -12,6 +12,7 @@ import type { ClientConnection } from './connection.js';
 export interface CountdownPlayer {
   id: string;
   name: string;
+  avatar: string;
   ai: string | null;
   wins: number;
   losses: number;
@@ -41,6 +42,7 @@ export interface PreviewPhase {
 export interface BattlePhase {
   kind: 'battle';
   battle: BattleState;
+  startedAt: number;
   deadline: number | null;
   /** Skynet questions in flight, by `turn:phase`. */
   jevAsked: Set<string>;

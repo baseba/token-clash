@@ -90,11 +90,11 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   const team = [a.data.me.roster[3].uid];
   assert.deepEqual((await call('/api/me', { method: 'PUT', token: a.data.token, body: { team } })).data.me.team, team);
 
-  const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { levelCap: 50 } });
+  const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { visibility: 'private' } });
   assert.equal(ch.status, 200);
   const id = ch.data.challenge.id;
   assert.equal(ch.data.challenge.hostTeam.length, 1);
-  assert.equal(ch.data.challenge.hostTeam[0].level, 50);
+  assert.equal(ch.data.challenge.hostTeam[0].level, 100);
 
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: a.data.token })).status, 400);
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST' })).status, 401);
@@ -180,7 +180,7 @@ test('random battle rolls a party from each collection', async () => {
 test('a battle against the AI starts at once and stays out of the ranking and the history', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Solo', save } });
   for (const mode of ['team', 'random']) {
-    const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode, ai: 'veryhard', levelCap: 50 } });
+    const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode, ai: 'veryhard' } });
     assert.equal(ch.status, 200);
     assert.equal(ch.data.challenge.status, 'active');
     assert.equal(ch.data.challenge.ai, 'veryhard');
@@ -203,7 +203,7 @@ test('a battle against the AI starts at once and stays out of the ranking and th
 test('against Skynet, Jev picks the AI\'s actions and the battle ends', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Sarah', save } });
   assert.ok(a.data.me.aiLevels.includes('skynet'));
-  const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode: 'team', ai: 'skynet', levelCap: 50 } });
+  const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode: 'team', ai: 'skynet' } });
   assert.equal(ch.status, 200);
   assert.match(ch.data.challenge.guest.name, / ai - skynet$/);
   const first = jevCalls.length;
@@ -265,7 +265,7 @@ test('a 1v1 room waits until both press ready, and the guest can leave to reopen
 test('a 4-player tournament filled with AIs plays every match in order until a champion', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Campeona', save } });
   const b = await call('/api/import', { method: 'POST', body: { name: 'Intrusa', save } });
-  const T = (await call('/api/tournaments', { method: 'POST', token: a.data.token, body: { size: 4, mode: 'random', levelCap: 50, visibility: 'private' } })).data.tournament;
+  const T = (await call('/api/tournaments', { method: 'POST', token: a.data.token, body: { size: 4, mode: 'random', visibility: 'private' } })).data.tournament;
   assert.equal(T.status, 'open');
   assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', body: { level: 'easy' } })).status, 401);
   assert.equal((await call(`/api/tournaments/${T.id}/join`, { method: 'POST', token: b.data.token })).status, 200);
@@ -313,7 +313,7 @@ test('a 4-player tournament filled with AIs plays every match in order until a c
 test('public rooms are listed and a matching search joins them; private ones stay hidden', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Anfitrión', save } });
   const b = await call('/api/import', { method: 'POST', body: { name: 'Buscador', save } });
-  const body = { mode: 'random', levelCap: 50 };
+  const body = { mode: 'random' };
   const priv = (await call('/api/challenges', { method: 'POST', token: a.data.token, body: { ...body, visibility: 'private' } })).data.challenge;
   assert.equal(priv.visibility, 'private');
   const pub = (await call('/api/challenges', { method: 'POST', token: a.data.token, body })).data.challenge;

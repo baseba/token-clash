@@ -9,6 +9,7 @@ export const PARTY_SIZE = 6;
 export interface PreviewSide {
   trainerId: string;
   name: string;
+  avatar?: string;
   entries: RosterEntry[];
   /** Indexes into entries, once confirmed. */
   picks: number[] | null;
@@ -17,18 +18,16 @@ export interface PreviewSide {
 }
 
 export interface PreviewState {
-  levelCap: number | null;
   mode: string;
   sides: PreviewSide[];
   /** Both picked: everyone sees the picks for a moment before the battle. */
   revealed?: boolean;
 }
 
-export function createPreview({ sides, levelCap = null, mode = 'team' }: { sides: { trainerId: string; name: string; entries: RosterEntry[] }[]; levelCap?: number | null; mode?: string }): PreviewState {
+export function createPreview({ sides, mode = 'team' }: { sides: { trainerId: string; name: string; avatar?: string; entries: RosterEntry[] }[]; mode?: string }): PreviewState {
   return {
-    levelCap,
     mode,
-    sides: sides.map((s) => ({ trainerId: s.trainerId, name: s.name, entries: s.entries.slice(0, PARTY_SIZE), picks: null })),
+    sides: sides.map((s) => ({ trainerId: s.trainerId, name: s.name, ...(s.avatar ? { avatar: s.avatar } : {}), entries: s.entries.slice(0, PARTY_SIZE), picks: null })),
   };
 }
 
@@ -86,6 +85,7 @@ function seenCard(fighter: Fighter): SeenCard {
 export interface PreviewSideView {
   trainerId: string;
   name: string;
+  avatar: string | null;
   ready: boolean;
   needed: number;
   party: (Fighter | SeenCard)[];
@@ -95,7 +95,6 @@ export interface PreviewSideView {
 }
 
 export interface PreviewView {
-  levelCap: number | null;
   mode: string;
   sides: PreviewSideView[];
   revealed: boolean;
@@ -104,15 +103,15 @@ export interface PreviewView {
 /** The preview as `viewer` (a side index, or null for a spectator) may see it. */
 export function previewView(preview: PreviewState, viewer: number | null = null): PreviewView {
   return {
-    levelCap: preview.levelCap,
     mode: preview.mode ?? 'team',
     sides: preview.sides.map((side, sideIndex) => {
-      const fighters = side.entries.map((e) => buildFighter(e, { levelCap: preview.levelCap }));
+      const fighters = side.entries.map((e) => buildFighter(e));
       const own = viewer === sideIndex;
       const watching = viewer === null;
       return {
         trainerId: side.trainerId,
         name: side.name,
+        avatar: side.avatar ?? null,
         ready: !!side.picks,
         needed: picksNeeded(preview, sideIndex),
         party: own || watching ? fighters : fighters.map(seenCard),

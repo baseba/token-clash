@@ -2,7 +2,7 @@
 // can be used, its PP, the announcement, calling rules (Metronome…), and the whole effect of a status move.
 // Attacks go on in damage.ts.
 import type { Weather } from '../../catalog/domain/creatures.js';
-import { moveAt, moveData, type MoveData, STRUGGLE, STRUGGLE_MOVE } from './moves.js';
+import { aimedTarget, moveAt, moveData, type MoveData, type MoveTarget, STRUGGLE, STRUGGLE_MOVE } from './moves.js';
 import { MOVE_RULES } from './move-rules.js';
 import { isSun, stageMult } from './conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState, MoveEvent, OrderReason } from './battle-types.js';
@@ -174,11 +174,14 @@ function perform(
   if (!move.flags.includes('failcopycat')) battle.lastMove = base.key;
   if (move.curls) me.volatiles.defenseCurl = true;
   let dealt = 0;
-  if (move.kind === 'status') statusMove(battle, me, foe, move);
-  else {
+  let landed = true;
+  if (move.kind === 'status') landed = statusMove(battle, me, foe, move);
+  else if (move.aimable && move.target === 'self') {
+    if (!heal(battle, me, me.stats.hp / 2)) emit(battle, { t: 'nothing', side: sideIndex });
+  } else {
     dealt = attack(battle, me, foe, move) || 0;
     if (dealt && move.flags.includes('recharge') && me.hp > 0 && moveIdx != null) me.volatiles.mustRecharge = moveIdx;
-    if (move.recoilMaxHp && me.hp > 0) hurt(battle, me, me.stats.hp * move.recoilMaxHp, 'recoil');
+    if (move.recoilMaxHp && me.hp > 0) hurt(battle, me, Math.round(me.stats.hp * move.recoilMaxHp), 'recoil');
     me.volatiles.lastFailed = !dealt;
   }
   rules?.after?.(moveApi(battle), me, foe, move, dealt);
@@ -192,7 +195,7 @@ function perform(
       addVolatile(battle, me, 'confusion', me);
     }
   }
-  if (move.selfDestruct && me.hp > 0) {
+  if (move.selfDestruct && landed && me.hp > 0) {
     me.hp = 0;
     faint(battle, me);
   }
@@ -221,7 +224,7 @@ export function runCalled(battle: BattleState, me: BattleFighter, key: string, o
   const base = moveData(key);
   if (!base || me.hp <= 0) return;
   const sideIndex = sideIndexOf(battle, me);
-  const move = { ...base, flags: [...base.flags], effectivePriority: base.priority, slot: null };
+  const move = { ...base, flags: [...base.flags], effectivePriority: base.priority, slot: null, target: aimedTarget(base, null) };
   if (opts.powerMult && move.power) move.power = Math.floor(move.power * opts.powerMult);
   adaptMove(battle, me, move);
   run(battle, me, 'onModifyMove', move);
@@ -229,7 +232,7 @@ export function runCalled(battle: BattleState, me: BattleFighter, key: string, o
   perform(battle, sideIndex, me, foeOf(battle, me), base, move, null, false, { called: true });
 }
 
-export function useMove(battle: BattleState, sideIndex: number, moveIdx: number, priority: number, why: OrderReason | null = null): void {
+export function useMove(battle: BattleState, sideIndex: number, moveIdx: number, priority: number, why: OrderReason | null = null, aim: MoveTarget | null = null): void {
   const me = activeOf(battle, sideIndex);
   if (me.hp <= 0) return;
   battle.moved.add(me);
@@ -239,7 +242,7 @@ export function useMove(battle: BattleState, sideIndex: number, moveIdx: number,
     return;
   }
   const base = moveAt(me, moveIdx);
-  const move = { ...base, flags: [...base.flags], effectivePriority: priority, slot: moveIdx };
+  const move = { ...base, flags: [...base.flags], effectivePriority: priority, slot: moveIdx, target: aimedTarget(base, aim) };
   const charged = me.volatiles.charging === moveIdx;
   const continuing = me.volatiles.rampage?.move === moveIdx || me.volatiles.locked?.move === moveIdx;
   const firstAction = !me.volatiles.acted;
@@ -282,7 +285,7 @@ export function useMove(battle: BattleState, sideIndex: number, moveIdx: number,
   delete me.volatiles.charging;
   if (!charged && !continuing) spendPP(battle, me, move);
 
-  if (move.selfDestruct && move.kind !== 'status' && anyActiveHas(battle, 'damp')) {
+  if (((move.selfDestruct && move.kind !== 'status') || base.id === 'mind-blown') && anyActiveHas(battle, 'damp')) {
     emit(battle, { t: 'nothing', side: sideIndex });
     return;
   }
@@ -308,8 +311,19 @@ function selfStatus(battle: BattleState, me: BattleFighter, move: BattleMove): v
     rules.use(moveApi(battle), me, foeOf(battle, me), move);
     return;
   }
+  if (rules?.useOn) {
+    rules.useOn(moveApi(battle), me, me, move);
+    return;
+  }
   let did = false;
-  if (move.selfCost) hurt(battle, me, me.stats.hp * move.selfCost, 'cost');
+  if (move.selfCost) {
+    if (!Object.keys(boost(battle, me, move.boosts ?? {}, me)).length) {
+      emit(battle, { t: 'nothing', side: sideIndexOf(battle, me) });
+      return;
+    }
+    hurt(battle, me, me.stats.hp * move.selfCost, 'cost');
+    return;
+  }
   if (move.id === 'no-retreat') {
     if (me.volatiles.noRetreat) {
       emit(battle, { t: 'nothing', side: sideIndexOf(battle, me) });
@@ -348,38 +362,41 @@ function selfStatus(battle: BattleState, me: BattleFighter, move: BattleMove): v
   if (!did) emit(battle, { t: 'nothing', side: sideIndexOf(battle, me) });
 }
 
-function statusMove(battle: BattleState, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): void {
-  if (move.target !== 'foe') return selfStatus(battle, me, move);
+function statusMove(battle: BattleState, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): boolean {
+  if (move.target !== 'foe') {
+    selfStatus(battle, me, move);
+    return true;
+  }
   const sideIndex = sideIndexOf(battle, me);
   if (!foe) {
     emit(battle, { t: 'notarget', side: sideIndex });
-    return;
+    return false;
   }
-  if (blockedByProtection(battle, me, foe, move)) return;
+  if (blockedByProtection(battle, me, foe, move)) return false;
   if (foe.volatiles.substitute && !bypassesSub(battle, me, move)) {
     emit(battle, { t: 'nothing', side: sideIndex, reason: 'substitute' });
-    return;
+    return false;
   }
   let target = foe;
   battle.moldBreaker = flag(battle, me, 'moldBreaker') ? { target: foe } : null;
   try {
     if (move.effectivePriority > move.priority && foe.types.includes('dark')) {
       emit(battle, { t: 'immune', side: 1 - sideIndex });
-      return;
+      return false;
     }
     if (move.id === 'thunder-wave' && typeEffectiveness(battle, move, me, foe) === 0) {
       emit(battle, { t: 'immune', side: 1 - sideIndex });
-      return;
+      return false;
     }
-    if (run(battle, foe, 'onTryHit', move, me)) return;
+    if (run(battle, foe, 'onTryHit', move, me)) return false;
     if (flag(battle, foe, 'blocksStatusMoves')) {
       showAbility(battle, foe);
       emit(battle, { t: 'immune', side: 1 - sideIndex });
-      return;
+      return false;
     }
     if ((move.accuracy != null || hiddenFrom(foe, move)) && !hits(battle, me, foe, move)) {
       emit(battle, { t: 'miss', side: sideIndex });
-      return;
+      return false;
     }
     if (flag(battle, foe, 'bouncesStatus') && move.flags.includes('reflectable')) {
       showAbility(battle, foe, 'bounce');
@@ -395,7 +412,7 @@ function statusMove(battle: BattleState, me: BattleFighter, foe: BattleFighter |
   const rules = MOVE_RULES[move.id];
   if (rules?.useOn) {
     rules.useOn(moveApi(battle), source, target, move);
-    return;
+    return true;
   }
   let did = false;
   if (move.boosts) did = Object.keys(boost(battle, target, move.boosts, source)).length > 0 || did;
@@ -406,11 +423,12 @@ function statusMove(battle: BattleState, me: BattleFighter, foe: BattleFighter |
   if (move.self) did = Object.keys(boost(battle, source, move.self, source)).length > 0 || did;
   if (!did && move.volatile === 'attract' && (!target.gender || !source.gender || target.gender === source.gender)) {
     emit(battle, { t: 'nothing', side: sideIndex, reason: !target.gender || !source.gender ? 'genderless' : 'sameGender' });
-    return;
+    return true;
   }
   if (move.clearsScreens) {
     did = clearScreens(battle, sideIndexOf(battle, target), 'defog') || did;
     for (const side of [0, 1]) did = clearHazards(battle, side) || did;
   }
   if (!did) emit(battle, { t: 'nothing', side: sideIndex });
+  return true;
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { AI_NAMES, aiName, reachedRound, addSeat, removeSeat, setReady, allReady, nextAiId, shuffledOrder, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor, Tournament } from './tournament.js';
 import { aiLevelOf } from '../../combat/domain/ai.js';
 
-const tournament = (size = 4, extra = {}): any => ({ id: 't', hostId: 'h', mode: 'team', levelCap: null, size, seats: [{ id: 'h', name: 'Host', ai: null, ready: false }], ...extra });
+const tournament = (size = 4, extra = {}): any => ({ id: 't', hostId: 'h', mode: 'team', size, seats: [{ id: 'h', name: 'Host', ai: null, ready: false }], ...extra });
 
 test('AIs sit down ready, humans have to press ready, and the room starts only when full', () => {
   const t = tournament();
@@ -54,7 +54,7 @@ test('a public tournament search joins one with the same settings and free seats
   const other = tournament(8, { id: 'eight', hostId: 'b', seats: [{ id: 'b' }] });
   const fit = tournament(4, { id: 'fit', hostId: 'c', seats: [{ id: 'c' }] });
   const mine = tournament(4, { id: 'mine', hostId: 'me', seats: [{ id: 'me' }] });
-  const found = tournamentMatchFor([full, other, fit, mine], { trainerId: 'me', mode: 'team', levelCap: null, size: 4 });
+  const found = tournamentMatchFor([full, other, fit, mine], { trainerId: 'me', mode: 'team', size: 4 });
   assert.equal(found.rival.id, 'fit');
   assert.equal(found.own.id, 'mine');
   assert.equal(found.seated, null);
@@ -97,9 +97,9 @@ test('an AI-only battle waits for viewers still playing the previous turn', asyn
 });
 
 test('the match being played is named by its place in the bracket and its room, without the seats', () => {
-  const t = Tournament.create({ id: 't', host: { id: 'h', name: 'Host' }, mode: 'team', levelCap: null, size: 4, visibility: 'private', at: 0 });
+  const t = Tournament.create({ id: 't', host: { id: 'h', name: 'Host' }, mode: 'team', size: 4, visibility: 'private', at: 0 });
   t.addAis('easy', 3);
-  t.start({ at: 0, order: [0, 1, 2, 3], aiLevel: 50, firstMatchAt: 0 });
+  t.start({ at: 0, order: [0, 1, 2, 3], firstMatchAt: 0 });
   const next = t.nextMatch()!;
   assert.equal(next.a.id, 'h');
   t.matchStarted(next, 'room1');

@@ -43,6 +43,7 @@ export interface BoostOptions {
 }
 
 const MAX_TOXIC_SPIKES = 2;
+const DIRECT_DAMAGE = new Set(['confusion', 'cost', 'painsplit']);
 
 export function boost(battle: BattleState, fighter: BattleFighter, changes: Boosts, source: BattleFighter | null = null, opts: BoostOptions = {}): Boosts {
   if (fighter.hp <= 0) return {};
@@ -158,7 +159,7 @@ export function addVolatile(
 
 export function hurt(battle: BattleState, fighter: BattleFighter, amount: number, cause?: string | null): number {
   if (fighter.hp <= 0) return 0;
-  if (cause !== 'confusion' && flag(battle, fighter, 'noIndirectDamage')) return 0;
+  if (!DIRECT_DAMAGE.has(cause ?? '') && flag(battle, fighter, 'noIndirectDamage')) return 0;
   const dealt = Math.min(fighter.hp, Math.max(1, Math.floor(amount)));
   fighter.hp -= dealt;
   emit(battle, { t: 'hurt', side: sideIndexOf(battle, fighter), amount: dealt, hp: fighter.hp, max: fighter.stats.hp, cause });

@@ -76,7 +76,8 @@ test('a critical hit goes through the barrier', () => {
 });
 
 test('a barrier lasts five turns, counting the one it went up, and cannot be stacked', () => {
-  const b = battle(7, attacker(), defender({ level: 100 }));
+  const b = battle(7, attacker(), defender());
+  b.sides[1].team[0].stats.hp = b.sides[1].team[0].hp = 10_000;
   const first = play(b, 'body-slam', 'reflect');
   assert.ok(first.some((e) => e.t === 'screen' && e.side === 1 && e.screen === 'reflect'));
   assert.equal(publicState(b).sides[1].screens.reflect, 4);

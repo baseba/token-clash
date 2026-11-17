@@ -19,6 +19,7 @@ export const trainers = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at'),
     lastSeen: integer('last_seen'),
+    avatar: text(),
   },
 );
 

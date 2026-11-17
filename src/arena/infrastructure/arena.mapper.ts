@@ -29,7 +29,6 @@ export function challengeToDomain(row: ChallengeRow): Challenge {
       createdAt: row.createdAt,
       finishedAt: row.finishedAt ?? undefined,
     }),
-    levelCap: row.levelCap ?? null,
   });
 }
 
@@ -38,7 +37,6 @@ export function challengeToRow(challenge: Challenge): typeof challenges.$inferIn
     id: challenge.id,
     status: challenge.status,
     mode: challenge.mode,
-    levelCap: challenge.levelCap ?? null,
     visibility: challenge.visibility,
     ai: challenge.ai ?? null,
     aiOnly: challenge.aiOnly ?? null,
@@ -85,13 +83,11 @@ export function tournamentToDomain(row: TournamentRow, seats: SeatRow[], matches
       startedAt: row.startedAt ?? undefined,
       bracket,
       drawAt: row.drawAt ?? undefined,
-      aiLevel: row.aiLevel ?? undefined,
       nextAt: row.nextAt ?? undefined,
       current: row.current ?? undefined,
       champion: row.champion ?? undefined,
       finishedAt: row.finishedAt ?? undefined,
     }),
-    levelCap: row.levelCap ?? null,
     seats: [...seats].sort((a, b) => a.position - b.position).map((s) => ({ id: s.seatId, name: s.name, ai: s.ai ?? null, ...(s.aiBase ? { aiBase: s.aiBase } : {}), ready: s.ready })),
   });
 }
@@ -106,14 +102,12 @@ export function tournamentToRows(tournament: Tournament): {
       id: tournament.id,
       hostId: tournament.hostId,
       mode: tournament.mode,
-      levelCap: tournament.levelCap ?? null,
       size: tournament.size,
       visibility: tournament.visibility,
       status: tournament.status,
       createdAt: tournament.createdAt,
       startedAt: tournament.startedAt ?? null,
       drawAt: tournament.drawAt ?? null,
-      aiLevel: tournament.aiLevel ?? null,
       nextAt: tournament.nextAt ?? null,
       current: tournament.current ?? null,
       champion: tournament.champion ?? null,

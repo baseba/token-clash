@@ -1,40 +1,40 @@
-1 30237172e6578d8367ee30e882a39266f43661c155d92f8bd89b01d7b28491b6 battle 1: mid vs veryhard, level cap 50
-2 9f18ce1b59e36586e895a418782d9fbd1dcdc4cda6bf98cbb79bbc4f3b906c87 battle 2: hard vs skynet, level cap 100
-3 94b1ba326002ce9b5fbe312cdc8c3e5efde911e77633f3496ee7eb7378a2abe4 battle 3: veryhard vs easy, level cap 30
-4 56c4a506b2ec0fa4e28d53242b9bcce4b0d7284b2dddb0f83af1929c2eabeb2e battle 4: skynet vs mid, level cap null
-5 b423989806834b0100156c2677fdcdf8b0a57dcf612aaa6c2c1c6ac782264fe6 battle 5: easy vs hard, level cap 50
-6 edaa81c21d3cdeb10c932e11568847e8097d08421c3505c871dc2931822a53ad battle 6: mid vs veryhard, level cap 100
-7 b9c057ffcffc4b2bd4032ee7f8bf22f9346e83d10699a3ab05d2cc60dadd36d9 battle 7: hard vs skynet, level cap 30
-8 c0e0999dce522cbfdf21f1e091aa212cd7718db43b324f0587d572c80c1a03ef battle 8: veryhard vs easy, level cap null
-9 ee538743c3f6f4112bd78f5533974a9217d80f23611f6b50bd3ef849ffc02857 battle 9: skynet vs mid, level cap 50
-10 4e34aef199cd07581e476c8059c134d7bc682afe6f01ea6704ef04b7b76f3c42 battle 10: easy vs hard, level cap 100
-11 30555dc2a5654ca419bb18b23d5c187a9f29b8abc9b6df352b5b5a657ea180f9 battle 11: mid vs veryhard, level cap 30
-12 07ab5bf63dea619c5c8434df3cf215bbe78530114621adcb1cb522063ef73fec battle 12: hard vs skynet, level cap null
-13 31030442145d5bf958bbbdfa8614678428e078bced1a1873453eb54b231fabde battle 13: veryhard vs easy, level cap 50
-14 d568dd68e2e527f9b7b1f2f74d07eaa52bdc5cbfc90cc0c6282ada4c99cf22e0 battle 14: skynet vs mid, level cap 100
-15 016b01b6529e182fc3b4d3b3703c5f7b83b50c2bfa99c853395871b74a458f2c battle 15: easy vs hard, level cap 30
-16 9389147add85aa9a59ec8962ab917b69afa48f6f3ce6ba7b1168c49667009fff battle 16: mid vs veryhard, level cap null
-17 0f0b2644dc53ef117af67aace35ff7de458f9f9769b8276a84a3aecf532296f9 battle 17: hard vs skynet, level cap 50
-18 c9af6582626bd5b44beb88284a40fbe1ceba70d69c1e2d2618878f6fa4ae384a battle 18: veryhard vs easy, level cap 100
-19 50002502e90b4083b3ae7ca363623b9b658716bbb97ef184553fe8a3ef2be65e battle 19: skynet vs mid, level cap 30
-20 ed6622a0989a3049c01fd458a02fda95013728b733333e2a771ef9f783b1e91b battle 20: easy vs hard, level cap null
-21 e718271f0c8944ffd1f6ff0d875bed80368bf1e2eba35a11f5277934a3487e8b battle 21: mid vs veryhard, level cap 50
-22 c2274903eb0bc6fb765fe562c735c3a0c720cae2b18e7aac7ba4fbe48bbb973b battle 22: hard vs skynet, level cap 100
-23 eb20aa387450641a174861edc656c80cf9954509239cc65afb829f582d315775 battle 23: veryhard vs easy, level cap 30
-24 5c74cab6a6fccd0498f8bee95ec6e2caa1c1004000ea65784313971c29b83159 battle 24: skynet vs mid, level cap null
-25 567c5afc3cca063ba1bb8a47279f15503b093e6acafe1a445302a29ab0953caa battle 25: easy vs hard, level cap 50
-26 689b21e55ec8fa7ebe7b1631062042d486de6ed0d95505eabe70b3ab41c155ff battle 26: mid vs veryhard, level cap 100
-27 18838701d70de2a9e2ec189516f355bd904ba89667a6ceccb048ab8cc389666e battle 27: hard vs skynet, level cap 30
-28 ded2cadeca4e45e75f2370675a394a0cf79b05d3271710e7404a2c50798af220 battle 28: veryhard vs easy, level cap null
-29 3b077d15c91d96b5a05e2858c80bfd745c76e32788570abe57753017bd8695a2 battle 29: skynet vs mid, level cap 50
-30 e0a26a0fc9acf5dd8a460c912758e266251730ae999fe0603cca0fd963a61ad6 battle 30: easy vs hard, level cap 100
-31 d3425707930f9774399aa65dcdc90fa4fa2a5bb54cf515ba401b6d832862749c battle 31: mid vs veryhard, level cap 30
-32 1149a1160d1a476fd8d370b749b01ce7d182ea34f37e116f713aa75a291f00c5 battle 32: hard vs skynet, level cap null
-33 f054404082ec39fd861cf6db5f30b97b1dc6c7c4fbe80f0c4062e5dc36c0fd44 battle 33: veryhard vs easy, level cap 50
-34 d1124161a90f9a4c2b9f4fc28b6976f86c9ce87935cb1aa48ef8431e63bf7d62 battle 34: skynet vs mid, level cap 100
-35 caefa866dea6fbf24040704a3153a9f2f0578cfd0f2b9c3451ae13db71392665 battle 35: easy vs hard, level cap 30
-36 09d0fdf2e845e39b0cb15bf148daaff072e9104ec87d3efcfcc9e192386a3fd8 battle 36: mid vs veryhard, level cap null
-37 eca972e42703b11e21c92b7ca0d9b17919c9abe27ee7c160a152a598283f5530 battle 37: hard vs skynet, level cap 50
-38 84b33f4956e925d478ce273bd1678937dae1bdd2aea4349f5b40967af3bfe995 battle 38: veryhard vs easy, level cap 100
-39 e07cff8f7cadf08abb0230ef62067a31450f1b95f99f7e341875421b3201743d battle 39: skynet vs mid, level cap 30
-40 5b4884d657c03d320dc769b30f5949b7c212ecef67a81b48a90a1b46464df2fc battle 40: easy vs hard, level cap null
+1 506afc54c9d8bd3b4f795c89a2ac6647bcc31854ead21ab9ea84b4714bf371e7 battle 1: mid vs veryhard
+2 ae1ae6214369d81a304de7442b683f77b8bb25b799cea27997848631f7e8003e battle 2: hard vs skynet
+3 9609a5b88a32e2ac3ec9a69ad079cc3e637e63c067327630c08c7e6ee6d9c9d3 battle 3: veryhard vs easy
+4 c5971a2c63007d6bfc7b1b4ad9094e3370a9673cdee7e93aa1736427c9174e2e battle 4: skynet vs mid
+5 646b317912d9fb6650b4a131b519565858365a10da4dcf8d9b8e293d039956fd battle 5: easy vs hard
+6 db0c7680feb8bb4cf5993e91a040c473fa5a61a480e609d5a47526fc5e9d294b battle 6: mid vs veryhard
+7 d9f9ed7ebd00c1f2c71d1914e5113b9b18db8d1267139a912154317502e46ca5 battle 7: hard vs skynet
+8 37000e742a8aafed175f782bf8a6b55a51b09fa19e5469777d2c5817217c74d2 battle 8: veryhard vs easy
+9 2c2407979ebc84b576b2222d1a666023d97a54f727868994a358da8a35bfacd7 battle 9: skynet vs mid
+10 6ead2a5676d441b5c4ccff51375ca0791bede8a5dc59c2c5bdf06016c4b54edc battle 10: easy vs hard
+11 535fd0e4b454d6756585f0655709e551aab4f3ca5e40c0998e53911ad45f6bcf battle 11: mid vs veryhard
+12 cdbe8b05f1f41701a60e810ded173fb13f88d2e22ea567ac172ba0779827fef2 battle 12: hard vs skynet
+13 7574258e2572d334e65e7dbebf93ddad6ff55aaab5adeb386861b6acd9715236 battle 13: veryhard vs easy
+14 3a2b31c88b1a16125f30c28a010d6eae31bbe350b6c9a4616ae2e9d35c8617f8 battle 14: skynet vs mid
+15 2b75563843253c955fa1b9d38367da4b4959e9cbab83a68f27c8e57aef5e2a19 battle 15: easy vs hard
+16 c3c0263d6d2afb193ae2e1712300777c637fdb692725320657c67fe2ff8abb96 battle 16: mid vs veryhard
+17 73a49e00bfa9aafe303774e476ffad753a8b63f1af38b2d160e7e9b627869c15 battle 17: hard vs skynet
+18 6f5c6f275ce63f267fa1b29aa4efd367ada78ddc75ba9dd69f6cf349d3d6e8a1 battle 18: veryhard vs easy
+19 a021b3c7095c6c4d1871a9090b6237747e7a572111c0dfca952a84c5022623cd battle 19: skynet vs mid
+20 ae24dfb8f232af494296c4da43624167fd2f9622e302641afc5d5745a7582238 battle 20: easy vs hard
+21 1c6f18f3121c9806e2db7278aaab0936c78785803ccc8046f577c92f44e2501f battle 21: mid vs veryhard
+22 8c61fa3d7ae079e66b2466792f4d1244e0b2fa9af6aed7db2b01e79183b8e67c battle 22: hard vs skynet
+23 54783531873024a3adb76258ea84faa9d173e5b6d956a3a4286a6a36a5365b40 battle 23: veryhard vs easy
+24 bf73344cdf066022f00307a59ff3049f6df900b9cd575129a2c8c8d24fb18766 battle 24: skynet vs mid
+25 a0ba3032a32e8dc7265f0016a58bf96f688fd0b49976347e597be0124292b603 battle 25: easy vs hard
+26 91668b022697e0e0d04c41227ae187f1ffec669ba5254b945db37a1315db7826 battle 26: mid vs veryhard
+27 328256bb4d99750b54a223c0e7fdb72a51ab5faff5716d09d4ced1e83f22a0ad battle 27: hard vs skynet
+28 b98100d9e96588587e7130098f86f8df77cf1f18450c60c0dab607545202218a battle 28: veryhard vs easy
+29 9be099b66f10f5967217df9df5cda014b41264be0c5ca32a75dce385ce8701f0 battle 29: skynet vs mid
+30 82c4f3177dcebc32398d447499e144bf09c05bb15ebc015f1ea7769572b996d7 battle 30: easy vs hard
+31 baf0355d70b935c8ec0cbc4ffe6d36ea120809f1beffd0d58d142058d2522eb0 battle 31: mid vs veryhard
+32 f868a3e5e53790f9c2f0fd3167f2389646834482a8be668621a9c7294e1cec04 battle 32: hard vs skynet
+33 06c22d990b6ec5792865adb1ba80bdfce8c454ee807ac532ced845466928f4b9 battle 33: veryhard vs easy
+34 e29ea6e1364a0b0b301bba484017ac2a1eb056565cd36e20c43f8ed0fdc34a27 battle 34: skynet vs mid
+35 3940ac9742de9dc650ceda78f9dbc6ded357343f27300c30ba230f3ea8f2641e battle 35: easy vs hard
+36 6ebdbc59c8ad1c0313a77439394f6235b856a5b73336e4547fca1cba6d9e9c30 battle 36: mid vs veryhard
+37 51aec80eda6a2cc0306eb628830fac37ef4a2ba4d1fa6085947f7ae62a139824 battle 37: hard vs skynet
+38 f751cc7f0cdd545c4712b6c521059e1080b6cb00e741fa14aba19c3e1a530235 battle 38: veryhard vs easy
+39 2dfd5184ae65ac01c8d66b0ef53c2a429cb05e984266227c1fba52e51c650401 battle 39: skynet vs mid
+40 eeaf0b23fb41ae83296413af17e2613971752e8fa91d0bd1dbaca00077e3f8ab battle 40: easy vs hard

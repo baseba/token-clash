@@ -1,5 +1,6 @@
-// The lobby: the live list of open rooms and tournaments anyone can join with one click. Clients
-// on the home page subscribe over the socket and get the list again whenever it changes.
+// The lobby: the live list of open rooms and tournaments anyone can join with one click, and of the
+// battles being played that anyone can watch. Clients on the home page subscribe over the socket and
+// get both lists again whenever they change.
 import { Injectable } from '@nestjs/common';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
@@ -8,7 +9,7 @@ import { HOST_GRACE_MS, openRooms } from '../domain/lobby.js';
 import type { Tournament } from '../domain/tournament.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
-import { Presence } from './presence.js';
+import { Presence, type BattlePhase, type Room } from './presence.js';
 
 const LISTED = 40;
 
@@ -43,6 +44,24 @@ export class LobbyService {
     return list.slice(0, LISTED);
   }
 
+  liveBattles() {
+    return [...this.presence.rooms.values()]
+      .filter((room): room is Room & { phase: BattlePhase } => room.phase.kind === 'battle' && room.phase.battle.status === 'active' && this.watchable(room))
+      .sort((a, b) => b.phase.startedAt - a.phase.startedAt)
+      .slice(0, LISTED)
+      .map((room) => this.views.liveBattle(room.challenge, room.phase, this.tournamentOf(room)));
+  }
+
+  private tournamentOf(room: Room): Tournament | undefined {
+    return room.challenge.tournamentId ? this.tournaments.findById(room.challenge.tournamentId) : undefined;
+  }
+
+  private watchable(room: Room): boolean {
+    const tournament = this.tournamentOf(room);
+    if (tournament) return tournament.visibility === 'public';
+    return !!room.challenge.ai || room.challenge.visibility === 'public';
+  }
+
   subscribe(ws: ClientConnection, token: string | undefined): void {
     ws.trainerId = this.trainers.peekToken(token)?.id ?? null;
     this.presence.lobby.add(ws);
@@ -69,7 +88,7 @@ export class LobbyService {
 
   private send(ws: ClientConnection, force = false): void {
     if (!ws.open) return;
-    const frame = JSON.stringify({ t: 'rooms', rooms: this.list(ws.trainerId) });
+    const frame = JSON.stringify({ t: 'rooms', rooms: this.list(ws.trainerId), live: this.liveBattles() });
     if (!force && this.sent.get(ws) === frame) return;
     this.sent.set(ws, frame);
     ws.send(frame);

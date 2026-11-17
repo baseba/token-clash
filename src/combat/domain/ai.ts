@@ -1,6 +1,6 @@
 // The AI: builds its team, picks its three, and chooses what to do each turn. Randomness is injected.
 import { speciesData, formData, statsFor, effectiveness, shuffled, rng, type Random, type SpeciesData } from '../../catalog/domain/creatures.js';
-import { buildFighter, usableMovepool, MOVES_PER_FIGHTER } from './fighter.js';
+import { BATTLE_LEVEL, buildFighter, usableMovepool, MOVES_PER_FIGHTER } from './fighter.js';
 import { moveAt, moveData, type MoveData } from './moves.js';
 import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
@@ -115,34 +115,34 @@ export function pickMoveset(entry: RosterEntry, difficulty: AiLevel, random: Ran
   return chosen.map((x) => x.id);
 }
 
-function usableAtLevel(id: number, level: number): boolean {
-  return usableMovepool({ id: 'probe', finalID: id, level, learned: [] }).some((k) => (moveData(k) as MoveData).kind === 'attack');
+function canAttack(id: number): boolean {
+  return usableMovepool({ id: 'probe', finalID: id, level: BATTLE_LEVEL, learned: [] }).some((k) => (moveData(k) as MoveData).kind === 'attack');
 }
 
 export const AI_POOL_SHARE: Record<AiLevel, number> = { easy: 1, mid: 0.8, hard: 0.6, veryhard: 0.5, skynet: 0.4 };
 
 const DICE_IVS = { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 };
 
-function diceEntry(id: number, { level, random, index }: { level: number; random: Random; index: number }): RosterEntry {
-  return randomize({ id: `ai-${index}-${id}`, finalID: id, baseID: id, rarity: rarityOf(speciesData(id) as SpeciesData), shiny: false, level, ivs: DICE_IVS, learned: [] }, random);
+function diceEntry(id: number, { random, index }: { random: Random; index: number }): RosterEntry {
+  return randomize({ id: `ai-${index}-${id}`, finalID: id, baseID: id, rarity: rarityOf(speciesData(id) as SpeciesData), shiny: false, level: BATTLE_LEVEL, ivs: DICE_IVS, learned: [] }, random);
 }
 
-export function aiTeamPool(difficulty: AiLevel, level: number): number[] {
+export function aiTeamPool(difficulty: AiLevel): number[] {
   const ranked = aiPool()
-    .filter((id) => fullyEvolved(speciesData(id) as SpeciesData) && usableAtLevel(id, level))
+    .filter((id) => fullyEvolved(speciesData(id) as SpeciesData) && canAttack(id))
     .sort((a, b) => bst(speciesData(b) as SpeciesData) - bst(speciesData(a) as SpeciesData) || a - b);
   const size = Math.max(PARTY_SIZE, Math.ceil(ranked.length * AI_POOL_SHARE[difficulty]));
   return ranked.slice(0, size);
 }
 
-export function buildAiTeam({ difficulty, level, random = Math.random }: { difficulty: AiLevel; level: number; random?: Random }): RosterEntry[] {
-  const ids = shuffled(aiTeamPool(difficulty, level), random).slice(0, PARTY_SIZE);
-  return ids.map((id, index) => diceEntry(id, { level, random, index }));
+export function buildAiTeam({ difficulty, random = Math.random }: { difficulty: AiLevel; random?: Random }): RosterEntry[] {
+  const ids = shuffled(aiTeamPool(difficulty), random).slice(0, PARTY_SIZE);
+  return ids.map((id, index) => diceEntry(id, { random, index }));
 }
 
-export function buildAiRandomParty({ level, random = Math.random }: { level: number; random?: Random }): RosterEntry[] {
-  const ids = shuffled(aiTeamPool('easy', level), random).slice(0, PARTY_SIZE);
-  return ids.map((id, index) => diceEntry(id, { level, random, index }));
+export function buildAiRandomParty({ random = Math.random }: { random?: Random } = {}): RosterEntry[] {
+  const ids = shuffled(aiTeamPool('easy'), random).slice(0, PARTY_SIZE);
+  return ids.map((id, index) => diceEntry(id, { random, index }));
 }
 
 // The three for the battle are picked on a hunch, without looking at the rival's party: easier

@@ -19,7 +19,7 @@ import { buildFighter } from './fighter.js';
 import { moveAt, type MoveData, STRUGGLE_MOVE } from './moves.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { invalid } from '../../shared/domain/errors.js';
-import type { Action, AnyMove, BattleEvent, BattleFighter, BattleSideInput, BattleState, SwitchAction } from './battle-types.js';
+import type { Action, AnyMove, BattleEvent, BattleFighter, BattleSideInput, BattleState, MoveAction, SwitchAction } from './battle-types.js';
 import { resolveReplacements, resolveSwitchOut, resolveTurn } from './turn.js';
 import { failReason, lastResortReady, moveBlocked } from './use-move.js';
 import { entryOrder, prepareEntry, runEntry, settle } from './switching.js';
@@ -34,8 +34,8 @@ export { type EventView, viewEvents, type PublicMove, type VisibleFighterView, t
 /** How many Pokémon fight on each side. */
 export const BATTLE_SIZE = 3;
 
-function prepare(entry: RosterEntry, levelCap: number | null): BattleFighter {
-  const fighter = buildFighter(entry, { levelCap });
+function prepare(entry: RosterEntry): BattleFighter {
+  const fighter = buildFighter(entry);
   return {
     ...fighter,
     hp: fighter.stats.hp,
@@ -59,11 +59,10 @@ function prepare(entry: RosterEntry, levelCap: number | null): BattleFighter {
   };
 }
 
-export function createBattle({ id, sides, levelCap = null, random = Math.random }: { id: string; sides: BattleSideInput[]; levelCap?: number | null; random?: () => number }): BattleState {
+export function createBattle({ id, sides, random = Math.random }: { id: string; sides: BattleSideInput[]; random?: () => number }): BattleState {
   // `intro` is filled right below, with the events of the leads coming out.
   const init: Omit<BattleState, 'intro'> = {
     id,
-    levelCap,
     random,
     status: 'active',
     phase: 'choose',
@@ -73,7 +72,8 @@ export function createBattle({ id, sides, levelCap = null, random = Math.random 
     sides: sides.map((s) => ({
       trainerId: s.trainerId,
       name: s.name,
-      team: s.entries.slice(0, BATTLE_SIZE).map((e) => prepare(e, levelCap)),
+      avatar: s.avatar ?? null,
+      team: s.entries.slice(0, BATTLE_SIZE).map((e) => prepare(e)),
       active: 0,
       action: null,
       mustSwitch: false,
@@ -183,10 +183,15 @@ export function validActions(battle: BattleState, sideIndex: number): Action[] {
 
 const sameAction = (a: Action, b: Action): boolean => (a.type === 'move' ? b.type === 'move' && a.move === b.move : b.type === 'switch' && a.to === b.to);
 
+function moveAction(battle: BattleState, sideIndex: number, action: MoveAction): MoveAction {
+  const aimable = moveAt(activeOf(battle, sideIndex), action.move).aimable;
+  return aimable && (action.target === 'self' || action.target === 'foe') ? { type: 'move', move: action.move, target: action.target } : { type: 'move', move: action.move };
+}
+
 // Returns the events of the resolved turn, or null if still waiting on the other side.
 export function submit(battle: BattleState, sideIndex: number, action: Action | null | undefined): BattleEvent[] | null {
   if (!action || !validActions(battle, sideIndex).some((v) => sameAction(v, action))) throw invalid('Acción inválida');
-  battle.sides[sideIndex].action = action.type === 'move' ? { type: 'move', move: action.move } : { type: 'switch', to: action.to };
+  battle.sides[sideIndex].action = action.type === 'move' ? moveAction(battle, sideIndex, action) : { type: 'switch', to: action.to };
   if (battle.sides.some((_, i) => needsAction(battle, i))) return null;
   if (battle.phase === 'switchout') return resolveSwitchOut(battle);
   return battle.phase === 'choose' ? resolveTurn(battle) : resolveReplacements(battle);

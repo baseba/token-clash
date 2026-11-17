@@ -7,6 +7,7 @@ import { validMoveset, MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js'
 import { uniqueSpecies, uniqueVariants, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
 import { invalid, notFound } from '../../shared/domain/errors.js';
+import { isTrainerSprite, STARTER_SPRITES, trainerSpriteFor } from '../../catalog/domain/trainer-sprites.js';
 import { carryTeam, type ParsedSave } from './save-file.js';
 
 export interface TrainerState {
@@ -23,6 +24,7 @@ export interface TrainerState {
   createdAt: number;
   updatedAt?: number;
   lastSeen?: number;
+  avatar?: string;
 }
 
 const RARITY_RANK = { legendary: 3, rare: 2, uncommon: 1, common: 0 } as const;
@@ -55,6 +57,7 @@ export class Trainer implements TrainerState {
   createdAt: number;
   updatedAt?: number;
   lastSeen?: number;
+  avatar?: string;
 
   private constructor(state: TrainerState) {
     Object.assign(this, state);
@@ -68,6 +71,16 @@ export class Trainer implements TrainerState {
   /** A new player: they get an id and a session token hash, and an empty roster until they import. */
   static register({ id, name, tokenHash, at }: { id: string; name: string; tokenHash: string; at: number }): Trainer {
     return new Trainer({ id, name, tokenHash, roster: [], team: [], wins: 0, losses: 0, totalTokens: 0, createdAt: at, lastSeen: at });
+  }
+
+  get look(): string {
+    return this.avatar ?? trainerSpriteFor(this.id, STARTER_SPRITES);
+  }
+
+  /** @throws {DomainError} the sprite is not one of the trainer sprites */
+  chooseAvatar(key: string): void {
+    if (!isTrainerSprite(key)) throw invalid('Ese entrenador no existe.');
+    this.avatar = key;
   }
 
   get shinies(): number {

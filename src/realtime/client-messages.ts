@@ -12,7 +12,7 @@ const token = z.string().optional().catch(undefined);
 const picks = z.array(z.int()).catch([]);
 
 const BattleAction = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('move'), move: z.int() }),
+  z.object({ type: z.literal('move'), move: z.int(), target: z.enum(['foe', 'self']).optional().catch(undefined) }),
   z.object({ type: z.literal('switch'), to: z.int() }),
 ]);
 

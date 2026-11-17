@@ -10,7 +10,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomParty } from '../../combat/domain/random-party.js';
 import { aiTrainerId, buildAiRandomParty, buildAiTeam, type AiLevel } from '../../combat/domain/ai.js';
-import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { newId, now } from '../../shared/domain/clock.js';
 import { conflict } from '../../shared/domain/errors.js';
@@ -25,12 +24,6 @@ import { LobbyService } from './lobby.service.js';
 import { inRoom, Presence, type Room } from './presence.js';
 import { broadcast, frameFor } from './room-frames.js';
 import { TeamPreviewService } from './team-preview.service.js';
-
-/** The level the AI plays at when nothing caps it: the average of the rival's team. */
-export function averageLevel(entries: RosterEntry[]): number {
-  if (!entries.length) return 50;
-  return Math.max(1, Math.min(100, Math.round(entries.reduce((sum, e) => sum + e.level, 0) / entries.length)));
-}
 
 @Injectable()
 export class DuelService {
@@ -49,17 +42,15 @@ export class DuelService {
   }
 
   /** A battle against the AI: no waiting room, straight to the preview. */
-  startAgainstAi(trainer: Trainer, { mode, levelCap, level }: { mode: BattleMode; levelCap: number | null; level: AiLevel }): Challenge {
+  startAgainstAi(trainer: Trainer, { mode, level }: { mode: BattleMode; level: AiLevel }): Challenge {
     const hostTeam = mode === 'random' ? randomParty(trainer.roster) : trainer.teamSnapshot();
-    const aiLevel = levelCap ?? averageLevel(hostTeam);
-    const aiTeam = mode === 'random' ? buildAiRandomParty({ level: aiLevel }) : buildAiTeam({ difficulty: level, level: aiLevel });
+    const aiTeam = mode === 'random' ? buildAiRandomParty() : buildAiTeam({ difficulty: level });
     const challenge = Challenge.againstAi({
       id: newId(),
       host: trainer,
       hostTeam,
       ai: { id: aiTrainerId(level), name: aiName(level).name, level },
       aiTeam,
-      levelCap,
       mode,
       at: now(),
     });
@@ -84,7 +75,7 @@ export class DuelService {
     room.phase = {
       kind: 'readyCheck',
       ready: new Set(),
-      players: [this.views.countdownPlayer(challenge.hostId, challenge.hostName), this.views.countdownPlayer(guest.id, guest.name)],
+      players: [this.views.countdownPlayer(challenge.hostId, challenge.hostName, challenge), this.views.countdownPlayer(guest.id, guest.name, challenge)],
     };
     broadcast(room, { t: 'lobby' });
     this.lobby.notify();

@@ -5,7 +5,7 @@ import { Challenge, isHumanDuel } from './challenge.js';
 
 const ana = { id: 'ana', name: 'Ana' };
 const beto = { id: 'beto', name: 'Beto' };
-const open = () => Challenge.open({ id: 'c1', host: ana, hostTeam: [], levelCap: null, mode: 'team', visibility: 'private', at: 1 });
+const open = () => Challenge.open({ id: 'c1', host: ana, hostTeam: [], mode: 'team', visibility: 'private', at: 1 });
 const seated = () => {
   const challenge = open();
   challenge.join(beto, { guestTeam: [] });
@@ -49,7 +49,6 @@ test('a tournament match is never closed by hand', () => {
     id: 'm1',
     host: { ...ana, team: [], ai: null },
     guest: { ...beto, team: [], ai: null },
-    levelCap: null,
     mode: 'team',
     tournamentId: 'T1',
     round: 0,
@@ -60,7 +59,7 @@ test('a tournament match is never closed by hand', () => {
 });
 
 test('a guest who leaves the ready check reopens the room; a random room forgets the rolled team', () => {
-  const challenge = Challenge.open({ id: 'c2', host: ana, hostTeam: [], levelCap: null, mode: 'random', visibility: 'public', at: 1 });
+  const challenge = Challenge.open({ id: 'c2', host: ana, hostTeam: [], mode: 'random', visibility: 'public', at: 1 });
   challenge.join(beto, { hostTeam: [{ id: 'x' } as any], guestTeam: [] });
   challenge.reopen();
   assert.deepEqual([challenge.status, challenge.guestId, challenge.hostTeam], ['open', undefined, []]);

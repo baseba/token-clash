@@ -77,7 +77,8 @@ test('Mofa impide los movimientos de estado y Otra Vez obliga a repetir', () => 
   const b = battle(mon(248, ['taunt', 'encore'], { abilityChoice: 'sand-stream' }), snorlax(['growl', 'tackle']));
   turn(b, 'taunt', 'growl');
   assert.ok(!validActions(b, 1).some((a) => a.type === 'move' && active(b, 1).moves[a.move].key === 'growl'));
-  const c = battle(mon(248, ['encore', 'crunch'], { abilityChoice: 'sand-stream', level: 30 }), snorlax(['growl', 'tackle'], { level: 60 }));
+  const c = battle(mon(248, ['encore', 'crunch'], { abilityChoice: 'sand-stream' }), snorlax(['growl', 'tackle']));
+  active(c, 0).stats.spd = 1;
   turn(c, 'crunch', 'growl');
   turn(c, 'encore', 'tackle');
   assert.deepEqual(validActions(c, 1).filter((a) => a.type === 'move'), [{ type: 'move', move: idx(c, 1, 'tackle') }]);

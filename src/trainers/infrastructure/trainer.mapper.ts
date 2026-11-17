@@ -18,6 +18,7 @@ export function toDomain(row: TrainerRow, roster: RosterEntryRow[]): Trainer {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt ?? undefined,
       lastSeen: row.lastSeen ?? undefined,
+      avatar: row.avatar ?? undefined,
       roster: roster.sort((a, b) => a.position - b.position).map(entryToDomain),
     }),
   );
@@ -58,6 +59,7 @@ export function toRow(trainer: Trainer): typeof trainers.$inferInsert {
     createdAt: trainer.createdAt,
     updatedAt: trainer.updatedAt ?? null,
     lastSeen: trainer.lastSeen ?? null,
+    avatar: trainer.avatar ?? null,
   };
 }
 

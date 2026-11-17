@@ -53,10 +53,11 @@ function syntheticLegacy() {
   };
 }
 
-/** What reading the import back must give: a room older than modes or visibility is a private team battle. */
+/** What reading the import back must give: a room older than modes or visibility is a private team battle, and levels are gone. */
 function expected(legacy: any) {
-  const challenges = Object.entries(legacy.challenges ?? {}).map(([id, c]: [string, any]) => [id, { ...c, mode: c.mode ?? 'team', visibility: c.visibility ?? 'private' }]);
-  return { trainers: legacy.trainers ?? {}, challenges: Object.fromEntries(challenges), tournaments: legacy.tournaments ?? {} };
+  const challenges = Object.entries(legacy.challenges ?? {}).map(([id, { levelCap, ...c }]: [string, any]) => [id, { ...c, mode: c.mode ?? 'team', visibility: c.visibility ?? 'private' }]);
+  const tournaments = Object.entries(legacy.tournaments ?? {}).map(([id, { levelCap, aiLevel, ...t }]: [string, any]) => [id, t]);
+  return { trainers: legacy.trainers ?? {}, challenges: Object.fromEntries(challenges), tournaments: Object.fromEntries(tournaments) };
 }
 
 function roundTrip(legacy: any) {

@@ -17,7 +17,6 @@ import { Presence } from './presence.js';
 
 export interface NewChallenge {
   mode: BattleMode;
-  levelCap: number | null;
   visibility: Visibility;
   /** AI difficulty, to play against the AI. */
   ai?: string;
@@ -55,15 +54,15 @@ export class ChallengesService implements OnModuleInit {
 
   /**
    * "New battle": against the AI it starts at once. A public search joins an open room with the
-   * same mode and level (or returns your own); otherwise a new room is opened.
+   * same mode (or returns your own); otherwise a new room is opened.
    */
   create(trainer: Trainer, input: NewChallenge): { challenge: Challenge; joined?: boolean } {
     if (input.ai !== undefined) {
       this.skynet.assertOffered(input.ai);
-      return { challenge: this.duels.startAgainstAi(trainer, { mode: input.mode, levelCap: input.levelCap, level: input.ai }) };
+      return { challenge: this.duels.startAgainstAi(trainer, { mode: input.mode, level: input.ai }) };
     }
     if (input.visibility === 'public') {
-      const { own, rival } = matchFor(this.lobby.publicRooms(), { trainerId: trainer.id, mode: input.mode, levelCap: input.levelCap });
+      const { own, rival } = matchFor(this.lobby.publicRooms(), { trainerId: trainer.id, mode: input.mode });
       if (rival && this.duels.joinable(rival)) {
         this.duels.join(rival, trainer);
         if (own) this.duels.close(own, trainer.id);
@@ -75,7 +74,6 @@ export class ChallengesService implements OnModuleInit {
       id: newId(),
       host: trainer,
       hostTeam: input.mode === 'random' ? [] : trainer.teamSnapshot(),
-      levelCap: input.levelCap,
       mode: input.mode,
       visibility: input.visibility,
       at: now(),

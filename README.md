@@ -18,6 +18,14 @@ En vivo: **https://clash.mirrordev.xyz**
      que tienes muestran sprite, stats base y línea evolutiva; una preevolución de algo que tienes también queda
      registrada. Cada una tiene un switch para verla shiny si la tienes shiny.
    - **Stats:** tus batallas y torneos, el ranking y las stats del servidor.
+   - **Perfil** (`/perfil`): cambias tu nombre y eliges tu entrenador entre los ~300 sprites de PokeRogue (con
+     buscador y filtros por categoría y género). Las clases de entrenador, protagonistas y soldados están libres;
+     el resto se desbloquea con logros (`src/stats/domain/achievements.ts`): líderes de gimnasio con 3, 6, 10 y 15
+     especies de su tipo (el último, además, con un shiny del tipo), el Alto Mando con 12 de su tipo y 10 victorias
+     contra jugadores, los campeones con la Pokédex regional, torneos, rachas y el ranking, los villanos ganándole a
+     la IA y los especiales con shinies, tokens y peleas sin bajas. Un bloqueado muestra en silueta qué te falta. Ese sprite, en chico, es tu foto de perfil; en las peleas tu entrenador y el
+     rival entran al campo, lanzan sus Pokémon y se retiran, y vuelven al terminar (el tuyo, en espejo y más grande).
+     Las IAs usan un entrenador al azar por pelea (el mismo durante todo un torneo), como sus nombres.
 3. En **Colección** armas tus 6, los ordenas arrastrando (el primero es el líder) y eliges los
    movimientos y la habilidad de cada uno. "Descargar save editado" baja tu save con esos cambios para
    importarlo de vuelta en PokeTokenBar, y "Actualizar save" sube uno más nuevo.
@@ -26,7 +34,7 @@ En vivo: **https://clash.mirrordev.xyz**
    - **🎲 Batalla aleatoria:** los dados sortean hasta 6 de la colección de cada uno, sin repetir especie, con
      movimientos y habilidad al azar.
    - **Contra otro jugador:** se abre una sala de espera, pública por defecto o privada.
-     - **Pública:** si ya hay una sala abierta con el mismo modo y nivel, entras a esa. Si no, se abre la tuya y
+     - **Pública:** si ya hay una sala abierta con el mismo modo, entras a esa. Si no, se abre la tuya y
        aparece en **Salas abiertas** del inicio, donde cualquiera puede entrar con un clic. La lista se
        actualiza en vivo: las salas nuevas aparecen y las que parten o se cierran desaparecen sin recargar.
      - **Privada:** no aparece en Salas abiertas; solo entra quien tenga el link.
@@ -60,8 +68,8 @@ En vivo: **https://clash.mirrordev.xyz**
      quién sacar; solo aparece si el servidor tiene cómo llegar a Jev (ver Deploy). Las peleas contra la IA no
      cuentan para el ranking ni quedan en tu historial.
 
-   En todos los modos, cada uno ve los 6 del otro (con sus tipos) y elige 3. La opción "Todos a nivel 50"
-   empareja la pelea para que gane la estrategia.
+   En todos los modos, cada uno ve los 6 del otro (con sus tipos) y elige 3. Todos los Pokémon pelean a nivel 100,
+   sin importar el nivel que tengan en el save: gana la estrategia, no quién quemó más tokens.
 5. **Stats** (`/stats`) muestra el ranking (solo quienes han peleado contra otro jugador), las batallas
    recientes, los Pokémon más usados y los totales del servidor. Quien importó el mismo save en varias cuentas
    cuenta como un solo entrenador, y sus Pokémon y tokens se suman una sola vez.
@@ -71,7 +79,13 @@ En vivo: **https://clash.mirrordev.xyz**
 El motor (`src/combat/domain/`, que se lee desde `battle.ts`) sigue las reglas de los juegos para combates individuales: daño con STAB,
 efectividad, críticos y variación; estados y volátiles (confusión, atracción, drenadoras, apresado…); clima,
 campos, barreras (Reflejo, Pantalla de Luz, Velo Aurora), trampas de campo, Protección, Sustituto, prioridad,
-golpes múltiples y movimientos de cambio, que cambian al Pokémon en el momento. Las habilidades están en
+golpes múltiples y movimientos de cambio, que cambian al Pokémon en el momento. Los que dañan al usuario siguen
+las mismas reglas: retroceso según el daño causado (Cabeza Roca y Muro Mágico lo evitan), Cabeza Sorpresa y
+Metaláser cuestan la mitad de los PS máximos, las patadas que fallan dañan al usuario, Explosión y Autodestrucción
+lo debilitan (Humedad las bloquea) y los costos de PS de Tambor, Sustituto o Maldición no los evita Muro Mágico.
+Los movimientos de apoyo pensados para un aliado (Pulso Cura, Cura Floral, Purificación, Decoración, Niebla
+Aromática, Entrenamiento, Acupresión y Poder Polen) dejan elegir sobre quién se usan: tu Pokémon o el rival.
+Las habilidades están en
 `src/combat/domain/ability-effects.ts` y las reglas especiales de cada movimiento en `src/combat/domain/move-rules.ts`.
 
 No hay objetos ni combates dobles: los movimientos y habilidades que dependen de eso no tienen efecto en Token
@@ -86,9 +100,9 @@ El save solo aporta números: especie, cadena evolutiva, rareza, nivel, IVs y si
 género, de qué especie evoluciona, los movimientos que aprende cada especie por nivel y los sprites (los animados de Negro/Blanco cuando
 existen, de frente, de espalda y shiny). Los datos de combate de cada movimiento (prioridad, banderas, efectos)
 salen de los datos con licencia MIT de [Pokémon Showdown](https://github.com/smogon/pokemon-showdown). Por
-defecto, cada Pokémon usa los últimos movimientos que aprendió hasta su nivel; en `/coleccion` se cambian. Un
-Pokémon evolucionado también puede usar lo que aprendían sus preevoluciones hasta ese nivel (Raichu tiene los de
-Pichu, Pikachu y Raichu).
+defecto, cada Pokémon usa los últimos cuatro movimientos que aprende por nivel; en `/coleccion` se cambian. Un
+Pokémon evolucionado también puede usar lo que aprendían sus preevoluciones (Raichu tiene los de Pichu, Pikachu
+y Raichu).
 
 Los datos viven en `src/catalog/data/` (`pokeapi.json`, `movedex.json` y `abilities.json`). Los sprites y los gritos no
 se versionan: `npm install` descarga los sprites en `public/sprites/` (o `npm run sprites`) y los gritos reales
@@ -133,6 +147,9 @@ GAME FREAK inc.
 - Música: las pistas de [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (las
   composiciones de la comunidad, como `cave`, `tall_grass`, `snowy_forest`, `lake`, `sea` o `plains`, son de Bird_Obsession,
   Lmz, Andr06 y Firel con CC BY-NC-SA 4.0; el resto lo marcan como material de Nintendo). Se descargan al instalar.
+- Sprites de entrenadores: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (material de Nintendo,
+  Creatures y GAME FREAK; `bug_type_superfan` es de Chani von Karpa y `aliana`, `celosia` y `mable` de Red, con
+  CC BY-NC-SA 4.0). Se descargan al instalar y no se versionan.
 - Animaciones de batalla, sus sonidos, la Poké Ball y los efectos de sonido: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets), de
   Pagefault Games y sus colaboradores. Las animaciones y los sonidos `PRSFX-` son de
   [Pokémon Reborn](https://www.rebornevo.com/); las animaciones `GEN8-` son del Gen 8 Animation Project
@@ -175,6 +192,8 @@ Datos externos:
 - `scripts/import-pokeapi.mjs`: genera `src/catalog/data/pokeapi.json`, `movedex.json` y `abilities.json`.
 - `scripts/sprites.mjs`: descarga los sprites a `public/sprites/` (corre solo en `npm install`).
 - `scripts/sync-battle-anims.js`: compacta las animaciones de PokeRogue en `public/anims/<clave>.json` (versión del jugador y del rival cuando difieren), baja sus imágenes y sonidos y arma `public/sfx/moves/moves.json` con los tiempos de cada sonido (corre solo en `npm install`).
+- `scripts/sync-trainers.js`: descarga los entrenadores de la lista de `public/trainer-sprites.js` a `public/trainers/`,
+  recortando el primer cuadro de cada hoja de sprites (corre solo en `npm install`, o `npm run trainers`).
 - `scripts/sync-cries.js`: descarga los gritos (`latest` y `legacy`) a `public/cries/` y escribe `cries.json`, que el navegador usa para elegir el archivo según el sprite (corre solo en `npm install`).
 - `public/battle-anims.js`: intérprete propio del formato de animación de PokeRogue (cuadros de 50 ms, focos en atacante, objetivo o pantalla, fondos).
 - `public/types.js`: tipos y tabla de efectividad, compartidos por el navegador y el servidor.

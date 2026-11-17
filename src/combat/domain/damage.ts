@@ -123,6 +123,8 @@ function basePower(battle: BattleState, me: BattleFighter, target: BattleFighter
       return battle.field.terrain === 'psychic' && grounded(battle, me) ? power * 1.5 : power;
     case 'psyblade':
       return battle.field.terrain === 'electric' ? power * 1.5 : power;
+    case 'misty-explosion':
+      return battle.field.terrain === 'misty' && grounded(battle, me) ? power * 1.5 : power;
     case 'smelling-salts':
       return target.status === 'par' ? power * 2 : power;
     case 'wake-up-slap':
@@ -429,7 +431,7 @@ export function attack(battle: BattleState, me: BattleFighter, target: BattleFig
 
     if (!toSub) applySecondaries(battle, me, target, move);
     if (move.self && me.hp > 0) boost(battle, me, move.self, me);
-    if (move.recoil && total > 0 && !flag(battle, me, 'noRecoil')) hurt(battle, me, total * move.recoil, 'recoil');
+    if (move.recoil && total > 0 && !flag(battle, me, 'noRecoil')) hurt(battle, me, Math.round(total * move.recoil), 'recoil');
     if (move.drain && total > 0 && me.hp > 0) {
       const amount = Math.max(1, Math.round(total * move.drain));
       if (flag(battle, target, 'oozes')) {

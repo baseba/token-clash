@@ -4,7 +4,7 @@
 import type { AbilityInfo } from '../../catalog/domain/abilities.js';
 import type { BoostKey, MajorStatus, MoveCategory, StatKey, Stats, Weather } from '../../catalog/domain/creatures.js';
 import type { Fighter } from './fighter.js';
-import type { MoveData } from './moves.js';
+import type { MoveData, MoveTarget } from './moves.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import type { FighterView, PublicMove } from './battle-view.js';
 
@@ -12,6 +12,7 @@ export interface MoveAction {
   type: 'move';
   /** Index in the active fighter's moves, or STRUGGLE_MOVE (-1). */
   move: number;
+  target?: MoveTarget;
 }
 
 export interface SwitchAction {
@@ -223,6 +224,7 @@ export type Guard = 'quickguard' | 'wideguard' | 'craftyshield' | 'matblock';
 export interface BattleSide {
   trainerId: string;
   name: string;
+  avatar: string | null;
   team: BattleFighter[];
   active: number;
   action: SideAction | null;
@@ -361,7 +363,6 @@ export interface Mover extends MoveAction {
 
 export interface BattleState {
   id: string;
-  levelCap: number | null;
   random: () => number;
   status: 'active' | 'finished';
   phase: 'choose' | 'replace' | 'switchout';
@@ -384,5 +385,6 @@ export interface BattleState {
 export interface BattleSideInput {
   trainerId: string;
   name: string;
+  avatar?: string;
   entries: RosterEntry[];
 }

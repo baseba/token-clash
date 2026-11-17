@@ -16,7 +16,8 @@
     "sprites": "node scripts/sprites.mjs",
     "cries": "node scripts/sync-cries.js",
     "anims": "node scripts/sync-battle-anims.js",
-    "postinstall": "(node scripts/sprites.mjs || echo 'No se pudieron descargar los sprites: corre npm run sprites cuando tengas conexión.') && (node scripts/sync-cries.js || echo 'No se pudieron descargar los gritos: corre npm run cries cuando tengas conexión.') && (node scripts/sync-battle-anims.js || echo 'No se pudieron descargar las animaciones: corre npm run anims cuando tengas conexión.')"
+    "trainers": "node scripts/sync-trainers.js",
+    "postinstall": "(node scripts/sprites.mjs || echo 'No se pudieron descargar los sprites: corre npm run sprites cuando tengas conexión.') && (node scripts/sync-cries.js || echo 'No se pudieron descargar los gritos: corre npm run cries cuando tengas conexión.') && (node scripts/sync-battle-anims.js || echo 'No se pudieron descargar las animaciones: corre npm run anims cuando tengas conexión.') && (node scripts/sync-trainers.js || echo 'No se pudieron descargar los entrenadores: corre npm run trainers cuando tengas conexión.')"
   },
   "dependencies": {
     "@nestjs/common": "12.3.2",

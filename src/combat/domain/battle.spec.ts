@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { parseSave } from '../../trainers/domain/save-file.js';
 import { createBattle, submit, autoAction, needsAction, validActions, shownTarget } from './battle.js';
 import { rng, species, speciesData, effectiveness, learnedMoves, statsFor } from '../../catalog/domain/creatures.js';
-import { defaultMoveset, validMoveset, movesetFor, buildFighter } from './fighter.js';
+import { BATTLE_LEVEL, defaultMoveset, validMoveset, movesetFor, buildFighter } from './fighter.js';
 import { moveData } from './moves.js';
 import { PROJECT_ROOT, catalogFile } from '../../shared/paths.js';
 import { join } from 'node:path';
@@ -46,10 +46,9 @@ test('name, sprite, types and stats come straight from PokeAPI', () => {
   assert.equal(unknown.sprite, '4999');
 });
 
-function play(seed, levelCap = null) {
+function play(seed) {
   const b = createBattle({
     id: 't',
-    levelCap,
     random: rng(seed),
     sides: [
       { trainerId: 'a', name: 'A', entries: roster.slice(0, 3) },
@@ -65,7 +64,7 @@ function play(seed, levelCap = null) {
 
 test('battles always finish, with a winner or a double knock out', () => {
   for (let seed = 1; seed <= 200; seed++) {
-    const b = play(seed, seed % 2 ? 50 : null);
+    const b = play(seed);
     assert.equal(b.status, 'finished', `seed ${seed}`);
     assert.ok([0, 1, null].includes(b.winner));
     assert.ok(b.turn < 60, `seed ${seed} took ${b.turn} turns`);
@@ -109,7 +108,7 @@ test('moves come from every way the Pokémon can learn them: the latest four by 
   for (const id of [...data.learnset.map(([key]) => key), ...Object.values(data.teachable).flat()]) assert.ok(pool.includes(id), id);
   assert.ok(pool.includes('flamethrower'));
   assert.ok(!pool.includes('hydro-pump'));
-  const reached = data.learnset.filter(([, lvl]) => lvl <= 30).map(([id]) => id).filter((id) => moveData(id).supported);
+  const reached = data.learnset.filter(([, lvl]) => lvl <= BATTLE_LEVEL).map(([id]) => id).filter((id) => moveData(id).supported);
   const def = defaultMoveset(charmander);
   assert.equal(def.length, 4);
   assert.deepEqual(def, reached.slice(-4));

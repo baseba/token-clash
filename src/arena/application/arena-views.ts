@@ -3,13 +3,14 @@
 import { Injectable } from '@nestjs/common';
 import { buildFighter } from '../../combat/domain/fighter.js';
 import { aiLevelOf } from '../../combat/domain/ai.js';
+import { STARTER_SPRITES, trainerSpriteFor } from '../../catalog/domain/trainer-sprites.js';
 import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import { TournamentRepository } from '../domain/arena.repositories.js';
 import type { Challenge } from '../domain/challenge.js';
 import { humanCount, reachedRound, roundName, type Tournament } from '../domain/tournament.js';
-import { Presence, type CountdownPlayer } from './presence.js';
+import { Presence, type BattlePhase, type CountdownPlayer } from './presence.js';
 
 @Injectable()
 export class ArenaViews {
@@ -29,19 +30,18 @@ export class ArenaViews {
     const host = this.trainers.byId(challenge.hostId);
     const hostTeam = (challenge.status === 'finished' || challenge.mode !== 'random'
       ? challenge.hostTeam
-      : []).map((e) => buildFighter(e, { levelCap: challenge.levelCap }));
+      : []).map((e) => buildFighter(e));
     const tournament = challenge.tournamentId ? this.tournaments.findById(challenge.tournamentId) : undefined;
     return {
       id: challenge.id,
       status: challenge.status,
-      levelCap: challenge.levelCap,
       mode: challenge.mode,
       ai: challenge.ai ?? null,
       visibility: challenge.visibility,
       tournament: tournament?.bracket ? tournament.label({ round: challenge.round!, index: challenge.match! }) : null,
       createdAt: challenge.createdAt,
-      host: { id: challenge.hostId, name: host?.name ?? challenge.hostName },
-      guest: challenge.guestId ? { id: challenge.guestId, name: this.nameOf(challenge.guestId, challenge.guestName) } : null,
+      host: { id: challenge.hostId, name: host?.name ?? challenge.hostName, avatar: this.avatarOf(challenge.hostId, challenge) },
+      guest: challenge.guestId ? { id: challenge.guestId, name: this.nameOf(challenge.guestId, challenge.guestName), avatar: this.avatarOf(challenge.guestId, challenge) } : null,
       hostTeam: viewerId === challenge.hostId || challenge.status === 'finished' ? hostTeam : [],
       hostTeamSize: challenge.mode === 'random' ? Math.min(PARTY_SIZE, host?.roster.length ?? 0) : hostTeam.length,
       winnerId: challenge.winnerId ?? null,
@@ -57,10 +57,20 @@ export class ArenaViews {
       id: challenge.id,
       kind: 'duel',
       mode: challenge.mode,
-      levelCap: challenge.levelCap ?? null,
       createdAt: challenge.createdAt,
-      host: { name: host?.name ?? challenge.hostName, wins: host?.wins ?? 0, losses: host?.losses ?? 0 },
+      host: { name: host?.name ?? challenge.hostName, avatar: this.avatarOf(challenge.hostId, challenge), wins: host?.wins ?? 0, losses: host?.losses ?? 0 },
       mine: challenge.hostId === viewerId,
+    };
+  }
+
+  /** A battle being played, in the "live battles" list. */
+  liveBattle(challenge: Challenge, phase: BattlePhase, tournament: Tournament | undefined) {
+    return {
+      id: challenge.id,
+      mode: challenge.mode,
+      startedAt: phase.startedAt,
+      sides: phase.battle.sides.map((side) => ({ name: side.name, avatar: side.avatar, ai: aiLevelOf(side.trainerId) ?? null })),
+      tournament: tournament ? { id: tournament.id, size: tournament.size } : null,
     };
   }
 
@@ -71,7 +81,6 @@ export class ArenaViews {
       id: tournament.id,
       kind: 'tournament',
       mode: tournament.mode,
-      levelCap: tournament.levelCap ?? null,
       size: tournament.size,
       filled: tournament.seats.length,
       createdAt: tournament.createdAt,
@@ -86,7 +95,6 @@ export class ArenaViews {
       id: tournament.id,
       status: tournament.status,
       mode: tournament.mode,
-      levelCap: tournament.levelCap ?? null,
       size: tournament.size,
       visibility: tournament.visibility,
       createdAt: tournament.createdAt,
@@ -97,6 +105,7 @@ export class ArenaViews {
         const trainer = seat.ai ? undefined : this.trainers.byId(seat.id);
         return {
           name: seat.name,
+          avatar: this.avatarOf(seat.id, { id: tournament.id, tournamentId: tournament.id }),
           ai: seat.ai ?? null,
           ready: seat.ready,
           online: seat.ai ? true : this.presence.inTournament(tournament.id, seat.id),
@@ -126,7 +135,6 @@ export class ArenaViews {
     return {
       id: challenge.id,
       status: challenge.status,
-      levelCap: challenge.levelCap,
       mode: challenge.mode,
       ai: challenge.ai ?? null,
       visibility: challenge.visibility,
@@ -147,7 +155,6 @@ export class ArenaViews {
       id: tournament.id,
       size: tournament.size,
       mode: tournament.mode,
-      levelCap: tournament.levelCap ?? null,
       status: tournament.status,
       humans: humanCount(tournament),
       createdAt: tournament.createdAt,
@@ -156,13 +163,20 @@ export class ArenaViews {
     };
   }
 
-  countdownPlayer(id: string, fallbackName: string): CountdownPlayer {
+  avatarOf(id: string, room: Pick<Challenge, 'id' | 'tournamentId'>): string {
+    if (aiLevelOf(id)) return trainerSpriteFor(`${room.tournamentId ?? room.id}:${id}`);
+    return this.trainers.byId(id)?.look ?? trainerSpriteFor(id, STARTER_SPRITES);
+  }
+
+  countdownPlayer(id: string, fallbackName: string, challenge: Challenge): CountdownPlayer {
+    const avatar = this.avatarOf(id, challenge);
     const level = aiLevelOf(id);
-    if (level) return { id, name: fallbackName, ai: level, wins: 0, losses: 0, rosterSize: 0, shinies: 0 };
+    if (level) return { id, name: fallbackName, avatar, ai: level, wins: 0, losses: 0, rosterSize: 0, shinies: 0 };
     const trainer = this.trainers.byId(id);
     return {
       id,
       name: trainer?.name ?? fallbackName,
+      avatar,
       ai: null,
       wins: trainer?.wins ?? 0,
       losses: trainer?.losses ?? 0,

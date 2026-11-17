@@ -152,11 +152,11 @@ export function totalMatches(bracket: Bracket): number {
   return bracket.reduce((n, r) => n + r.length, 0);
 }
 
-type Searchable = Seated & { hostId: string; mode: BattleMode; levelCap: number | null };
+type Searchable = Seated & { hostId: string; mode: BattleMode };
 
 /** For a public search: your own open tournament, one you already sit in, or someone else's to join. */
-export function tournamentMatchFor<T extends Searchable>(tournaments: T[], { trainerId, mode, levelCap, size }: { trainerId: string; mode: BattleMode; levelCap: number | null; size: number }) {
-  const same = tournaments.filter((t) => t.mode === mode && (t.levelCap ?? null) === levelCap && t.size === size && !isFull(t));
+export function tournamentMatchFor<T extends Searchable>(tournaments: T[], { trainerId, mode, size }: { trainerId: string; mode: BattleMode; size: number }) {
+  const same = tournaments.filter((t) => t.mode === mode && t.size === size && !isFull(t));
   return { own: same.find((t) => t.hostId === trainerId) ?? null, rival: same.find((t) => t.hostId !== trainerId && seatOf(t, trainerId) === -1) ?? null, seated: same.find((t) => seatOf(t, trainerId) > 0) ?? null };
 }
 
@@ -164,7 +164,6 @@ export interface TournamentState {
   id: string;
   hostId: string;
   mode: BattleMode;
-  levelCap: number | null;
   size: number;
   visibility: Visibility;
   status: TournamentStatus;
@@ -173,8 +172,6 @@ export interface TournamentState {
   startedAt?: number;
   bracket?: Bracket;
   drawAt?: number;
-  /** Level of the AIs' teams: the cap, or the average level of the people's teams. */
-  aiLevel?: number;
   /** When the next match starts (during the draw and between matches). */
   nextAt?: number | null;
   current?: (MatchRef & { challengeId: string }) | null;
@@ -187,7 +184,6 @@ export class Tournament implements TournamentState {
   id: string;
   hostId: string;
   mode: BattleMode;
-  levelCap: number | null;
   size: number;
   visibility: Visibility;
   status: TournamentStatus;
@@ -196,7 +192,6 @@ export class Tournament implements TournamentState {
   startedAt?: number;
   bracket?: Bracket;
   drawAt?: number;
-  aiLevel?: number;
   nextAt?: number | null;
   current?: (MatchRef & { challengeId: string }) | null;
   champion?: number;
@@ -211,12 +206,11 @@ export class Tournament implements TournamentState {
   }
 
   /** A new tournament, with its creator in the first seat (the host seat can't be removed). */
-  static create(input: { id: string; host: { id: string; name: string }; mode: BattleMode; levelCap: number | null; size: number; visibility: Visibility; at: number }): Tournament {
+  static create(input: { id: string; host: { id: string; name: string }; mode: BattleMode; size: number; visibility: Visibility; at: number }): Tournament {
     const tournament = new Tournament({
       id: input.id,
       hostId: input.host.id,
       mode: input.mode,
-      levelCap: input.levelCap,
       size: input.size,
       visibility: input.visibility,
       status: 'open',
@@ -290,12 +284,11 @@ export class Tournament implements TournamentState {
   }
 
   /** Draws the bracket. The first match starts after the draw animation (`nextAt`). */
-  start({ at, order, aiLevel, firstMatchAt }: { at: number; order: number[]; aiLevel: number; firstMatchAt: number }): void {
+  start({ at, order, firstMatchAt }: { at: number; order: number[]; firstMatchAt: number }): void {
     this.status = 'running';
     this.startedAt = at;
     this.bracket = createBracket(order);
     this.drawAt = at;
-    this.aiLevel = aiLevel;
     this.nextAt = firstMatchAt;
   }
 
