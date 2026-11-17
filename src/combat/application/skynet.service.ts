@@ -27,7 +27,7 @@ export class SkynetService {
     if (!this.aiLevels.includes(level)) throw invalid('Esa dificultad no está disponible.');
   }
 
-  /** Jev's pick for side `s`, or null when it doesn't answer in time (the caller falls back). */
+  /** Jev's pick for that side, or null when it doesn't answer in time (the caller falls back). */
   choose(battle: BattleState, sideIndex: number): Promise<Action | null> {
     const { apiKey, url, model } = this.config.jev;
     return chooseJevAction(battle, sideIndex, { apiKey, ...(url ? { url } : {}), ...(model ? { model } : {}) });

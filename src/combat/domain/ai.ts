@@ -174,7 +174,7 @@ function believedFoe(fighter: BattleFighter): BattleFighter {
   if (!fighter.seen) return fighter;
   const look = fighter.volatiles.illusion ?? fighter.seenAs;
   let moves = fighter.moves;
-  let vol = fighter.volatiles;
+  let volatiles = fighter.volatiles;
   if (!fighter.volatiles.transformed) {
     // Revealed moves keep their slot; the unknown ones become guesses (or go, if there are none).
     const known = (move: MoveData) => fighter.revealedMoves.has(move.key);
@@ -182,8 +182,8 @@ function believedFoe(fighter: BattleFighter): BattleFighter {
     const slots = fighter.moves.map((m) => (known(m) ? m : extra.shift()));
     moves = slots.filter(Boolean) as MoveData[];
     const slotOf = (slot: number | null | undefined) => (slot == null || !slots[slot] ? undefined : moves.indexOf(slots[slot]));
-    vol = { ...fighter.volatiles, charging: slotOf(fighter.volatiles.charging), mustRecharge: slotOf(fighter.volatiles.mustRecharge) };
-    for (const key of ['charging', 'mustRecharge']) if (vol[key] === undefined) delete vol[key];
+    volatiles = { ...fighter.volatiles, charging: slotOf(fighter.volatiles.charging), mustRecharge: slotOf(fighter.volatiles.mustRecharge) };
+    for (const key of ['charging', 'mustRecharge']) if (volatiles[key] === undefined) delete volatiles[key];
   }
   const base = fighter.form ? formData(fighter.form)?.base : speciesData(fighter.speciesId)?.stats;
   const stats = fighter.volatiles.transformed || !base ? { ...fighter.stats } : statsFor(base, GUESS_IVS, fighter.level);
@@ -195,7 +195,7 @@ function believedFoe(fighter: BattleFighter): BattleFighter {
     stats,
     hp: fighter.hp > 0 ? Math.max(1, Math.round(stats.hp * share)) : 0,
     moves,
-    volatiles: vol,
+    volatiles,
     pp: Object.fromEntries(moves.map((m) => [m.key, m.pp])),
     ability,
     baseAbility: ability,

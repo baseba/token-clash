@@ -104,7 +104,7 @@ function withEvents(battle: BattleState, fn: () => void): BattleEvent[] {
   return events;
 }
 
-const emit = (battle: BattleState, ev: BattleEvent): number => battle.events.push(ev);
+const emit = (battle: BattleState, event: BattleEvent): number => battle.events.push(event);
 const activeOf = (battle: BattleState, sideIndex: number): BattleFighter => battle.sides[sideIndex].team[battle.sides[sideIndex].active];
 const sideIndexOf = (battle: BattleState, fighter: BattleFighter): number => battle.sides.findIndex((side) => side.team.includes(fighter));
 const onField = (battle: BattleState, fighter: BattleFighter): boolean => fighter.hp > 0 && activeOf(battle, sideIndexOf(battle, fighter)) === fighter;
@@ -221,7 +221,7 @@ function makeMoveApi(battle: BattleState) {
     battle,
     random: () => battle.random(),
     turn: () => battle.turn,
-    emit: (ev: BattleEvent) => emit(battle, ev),
+    emit: (event: BattleEvent) => emit(battle, event),
     sideOf,
     side: (sideIndex: number) => battle.sides[sideIndex],
     actives: () => activeFighters(battle),

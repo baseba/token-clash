@@ -35,7 +35,7 @@ export interface MoveRule {
   power?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove): number;
   /** How many times it hits. */
   hits?(api: MoveRuleApi, me: BattleFighter): number;
-  /** Power of hit number i. */
+  /** Power of each hit, counted from 0. */
   hitPower?(api: MoveRuleApi, me: BattleFighter, hit: number): number;
   /** After all hits landed, with the total damage. */
   hit?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove, total: number): unknown;
