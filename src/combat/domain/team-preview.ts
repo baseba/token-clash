@@ -1,5 +1,5 @@
 // Team preview: each side sees the rival's party (up to 6) and secretly picks the 3 that fight.
-import { buildFighter, type Fighter } from '../../catalog/domain/creatures.js';
+import { buildFighter, type Fighter } from './fighter.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
 import { BATTLE_SIZE } from './battle.js';

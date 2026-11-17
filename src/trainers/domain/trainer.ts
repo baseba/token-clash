@@ -2,7 +2,8 @@
 // Every change to a trainer goes through these methods, which keep the rules in one place:
 // a team never repeats a species, has at most 6, and always points at Pokémon in the roster.
 
-import { abilityOptions, usableAbility, validMoveset, MOVES_PER_FIGHTER } from '../../catalog/domain/creatures.js';
+import { abilityOptions, usableAbility } from '../../catalog/domain/creatures.js';
+import { validMoveset, MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import { uniqueSpecies, uniqueVariants, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
 import { invalid, notFound } from '../../shared/domain/errors.js';

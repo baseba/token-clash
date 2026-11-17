@@ -9,8 +9,8 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 
 | Dominio | De qué se trata | Dueño de |
 | --- | --- | --- |
-| `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI) y la Pokédex | archivos `src/catalog/data/*.json` |
-| `combat` | Cómo se pelea: motor de batalla, elegir 3 de 6, sorteo aleatorio, IA, Skynet | nada (es puro) |
+| `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI y Pokémon Showdown) y la Pokédex | archivos `src/catalog/data/*.json` |
+| `combat` | Cómo se pelea: motor de batalla, qué movimientos se pueden usar, elegir 3 de 6, sorteo aleatorio, IA, Skynet | nada (es puro) |
 | `trainers` | Quién juega: entrenador, colección, equipo, sesión, importar el save | tablas `trainers`, `roster_entries` |
 | `arena` | Dónde se pelea: salas, emparejamiento, peleas en vivo, torneos | tablas `challenges`, `tournaments`, `tournament_seats`, `tournament_matches` |
 | `chat` | Mensajes en salas y torneos | memoria (se borra al reiniciar, a propósito) |
@@ -24,14 +24,15 @@ Más tres piezas que no son dominios sino entradas y plomería: `realtime` (el p
                 │            │                      │
                 ▼            ▼                      ▼
    stats ──▶  arena ──────▶ trainers ──────▶ combat ──────▶ catalog
-     │         │ │             ▲               (puro)         (puro)
+     │         │ │             ▲               (puro)        (solo datos)
      │         │ ▼             │
      │         │ chat          │
      └─────────┴───────────────┘
 ```
 
 Las flechas son "usa a". Nunca hay una flecha de vuelta: `trainers` no sabe que existen las salas, `combat` no
-sabe que existen los entrenadores, y `chat` guarda mensajes por canal sin saber qué es una sala.
+sabe que existen los entrenadores, `catalog` no sabe que existe el motor, y `chat` guarda mensajes por canal sin
+saber qué es una sala.
 
 ## 2. Las capas dentro de un dominio
 
@@ -229,10 +230,12 @@ build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de 
 - **Salas y torneos en un solo dominio (`arena`).** Un torneo es una serie de salas: separarlos obligaría a pasar
   eventos para casi todo. Si los torneos crecieran (temporadas, inscripciones), serían candidatos a su propio
   dominio.
-- **`catalog/domain/move-rules.ts` importa *tipos* de `combat`.** El catálogo marca qué movimientos funcionan en
-  Token Clash (`supported`), y eso depende de qué reglas especiales tiene el motor. Solo se importan tipos (no hay
-  dependencia en tiempo de ejecución), pero conceptualmente el catálogo conoce al motor. Lo correcto sería que
-  `combat` calculara `supported`; queda pendiente porque toca mucho código del motor.
+- **`combat` decide qué movimientos se pueden usar.** Un movimiento funciona en Token Clash (`supported`) si las
+  reglas generales del motor lo cubren o si tiene una regla propia en `combat/domain/move-rules.ts`. Por eso lo
+  calcula `combat/domain/moves.ts`, que lee cada fila de `movedex.json` (`moveEntry()`, en el catálogo) como la
+  necesita el motor. Quien necesita saberlo le pregunta a `combat`: los entrenadores al validar sus movimientos
+  (`validMoveset`), la IA, y el navegador en la colección. El catálogo sirve datos y no importa nada de otro
+  dominio; `src/architecture.spec.ts` lo revisa.
 - **El estado en vivo no se guarda.** Peleas, presencia y chat viven en memoria por diseño: es un juego entre
   amigos y retomar una pelea a medias tras un reinicio no vale la complejidad.
 

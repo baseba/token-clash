@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseSave } from '../../trainers/domain/save-file.js';
 import { createBattle, submit, autoAction, needsAction, validActions, shownTarget } from './battle.js';
-import { rng, species, speciesData, effectiveness, learnedMoves, defaultMoveset, validMoveset, movesetFor, buildFighter, moveData, statsFor } from '../../catalog/domain/creatures.js';
+import { rng, species, speciesData, effectiveness, learnedMoves, statsFor } from '../../catalog/domain/creatures.js';
+import { defaultMoveset, validMoveset, movesetFor, buildFighter } from './fighter.js';
+import { moveData } from './moves.js';
 import { PROJECT_ROOT, catalogFile } from '../../shared/paths.js';
 import { join } from 'node:path';
 
@@ -114,6 +116,7 @@ test('moves come from every way the Pokémon can learn them: the latest four by 
 
   assert.ok(validMoveset(charmander, ['ember', 'scratch']));
   assert.ok(validMoveset(charmander, ['flamethrower']));
+  assert.ok(validMoveset({ finalID: 26, level: 5 }, ['thunder', 'nasty-plot', 'charm', 'thunderbolt']), 'Raichu carries what Pichu and Pikachu learn');
   assert.ok(!validMoveset(charmander, ['hydro-pump']));
   assert.ok(!validMoveset(charmander, ['ember', 'ember']));
   assert.ok(!validMoveset(charmander, ['ember', 'scratch', 'growl', 'smokescreen', 'dragon-rage']));

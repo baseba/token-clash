@@ -1,7 +1,7 @@
 // What the clients see of rooms and tournaments (the JSON shapes the frontend reads). Presenters
 // only read: they never change an aggregate.
 import { Injectable } from '@nestjs/common';
-import { buildFighter } from '../../catalog/domain/creatures.js';
+import { buildFighter } from '../../combat/domain/fighter.js';
 import { aiLevelOf } from '../../combat/domain/ai.js';
 import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';

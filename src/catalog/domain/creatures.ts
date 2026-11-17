@@ -8,13 +8,10 @@
 import { readFileSync } from 'node:fs';
 import { catalogFile } from '../../shared/paths.js';
 import { effectiveness } from './type-chart.js';
-import { abilityInfo, knownAbility, INERT, type AbilityInfo } from './abilities.js';
-import { MOVE_RULES, IMPOSSIBLE_MOVES } from './move-rules.js';
-import type { Gender, Ivs, Rarity, RosterEntry } from './roster-entry.js';
+import { knownAbility, INERT } from './abilities.js';
+import type { Gender, Ivs, RosterEntry } from './roster-entry.js';
 
 export { effectiveness };
-
-// ---------- shapes ----------
 
 export type StatKey = 'hp' | 'atk' | 'def' | 'satk' | 'sdef' | 'spd';
 export type Stats = Record<StatKey, number>;
@@ -36,10 +33,8 @@ export interface MoveSecondary {
   confuse?: boolean;
 }
 
-/** A move as the catalog describes it (movedex.json plus the rules derived in moveData()). */
-export interface MoveData {
-  key: string;
-  id: string;
+/** A move as movedex.json has it: its Spanish name and description from PokeAPI, its battle data from Pokémon Showdown. */
+export interface MoveEntry {
   name: string;
   desc: string;
   type: string | null;
@@ -50,9 +45,6 @@ export interface MoveData {
   priority: number;
   target: string;
   flags: string[];
-  kind: 'attack' | 'status';
-  supported: boolean;
-  // From Pokémon Showdown's data (movedex.json):
   drain?: number;
   secondary?: MoveSecondary[];
   spread?: boolean;
@@ -76,35 +68,7 @@ export interface MoveData {
   weather?: Weather;
   heal?: number;
   sleepUsable?: boolean;
-  // Derived in moveData():
-  weakenedByGrassyTerrain?: boolean;
-  usesTargetAttack?: boolean;
-  screen?: string;
-  breaksScreens?: boolean;
-  clearsScreens?: boolean;
-  firstTurnOnly?: boolean;
-  rampage?: boolean;
-  binds?: boolean;
-  traps?: boolean;
-  selfSwitch?: boolean;
-  forceSwitch?: boolean;
-  leavesOne?: boolean;
-  crashes?: boolean;
-  ignoresDefBoosts?: boolean;
-  hitsPhysicalDef?: boolean;
-  losesType?: string;
-  selfCost?: number;
-  usesDefense?: boolean;
-  extraType?: string;
-  recoilMaxHp?: number;
-  usableAsleep?: boolean;
-  grounds?: boolean;
-  hitsAirborne?: boolean;
-  curls?: boolean;
-  thaws?: boolean;
 }
-
-type RawMove = Omit<MoveData, 'key' | 'id' | 'kind' | 'supported'>;
 
 interface RawSpecies {
   name: string;
@@ -153,27 +117,6 @@ export interface SpeciesView {
   floats: boolean;
 }
 
-/** A fighter as the battle and the browser see it. */
-export interface Fighter {
-  uid: string;
-  name: string;
-  speciesName: string;
-  speciesId: number;
-  types: string[];
-  rarity: Rarity;
-  shiny: boolean;
-  level: number;
-  stats: Stats;
-  moves: MoveData[];
-  sprite: string;
-  floats: boolean;
-  ability: string | null;
-  abilityInfo: AbilityInfo | null;
-  gender: Gender | null;
-  nature: string | null;
-  ivs: Ivs;
-}
-
 export interface MoveOrigin {
   origin: 'level' | 'machine' | 'tutor' | 'egg' | 'other';
   level: number | null;
@@ -183,8 +126,6 @@ export interface AbilityOption {
   key: string;
   hidden: boolean;
 }
-
-// ---------- data ----------
 
 const POKEAPI_FILE = JSON.parse(readFileSync(catalogFile('pokeapi.json'), 'utf8')) as { species: Record<string, RawSpecies>; forms?: Record<string, { types: string[]; stats: RawSpecies['stats']; sprite: string }> };
 const POKEAPI = POKEAPI_FILE.species;
@@ -246,84 +187,10 @@ export function shuffled<T>(items: Iterable<T>, random: Random = Math.random): T
   return out;
 }
 
-const MOVEDEX = JSON.parse(readFileSync(catalogFile('movedex.json'), 'utf8')) as Record<string, RawMove>;
-export const MOVES_PER_FIGHTER = 4;
-const SUPPORTED_VOLATILES = new Set(['confusion', 'attract', 'leechseed']);
-const SPECIAL_STATUS_MOVES = new Set(['rest', 'synthesis', 'morning-sun', 'moonlight', 'shore-up']);
-const GRASSY_HALVED = new Set(['earthquake', 'bulldoze', 'magnitude']);
-const SCREEN_MOVES: Record<string, string> = { reflect: 'reflect', 'light-screen': 'lightscreen', 'aurora-veil': 'auroraveil' };
-const SCREEN_BREAKERS = new Set(['brick-break', 'psychic-fangs', 'raging-bull']);
-const FIRST_TURN_ONLY = new Set(['fake-out', 'first-impression', 'mat-block']);
-const RAMPAGE = new Set(['outrage', 'thrash', 'petal-dance', 'raging-fury']);
-const BINDING = new Set(['bind', 'wrap', 'fire-spin', 'whirlpool', 'sand-tomb', 'clamp', 'infestation', 'magma-storm', 'thunder-cage', 'snap-trap']);
-const TRAPPING = new Set(['jaw-lock', 'anchor-shot', 'spirit-shackle', 'thousand-waves']);
-const SELF_SWITCH = new Set(['u-turn', 'volt-switch', 'flip-turn']);
-const FORCE_SWITCH = new Set(['dragon-tail', 'circle-throw']);
-const LEAVES_ONE = new Set(['false-swipe', 'hold-back']);
-const CRASHES = new Set(['high-jump-kick', 'jump-kick', 'axe-kick', 'supercell-slam']);
-const IGNORES_DEF_BOOSTS = new Set(['sacred-sword', 'darkest-lariat', 'chip-away']);
-const HITS_PHYSICAL_DEF = new Set(['psyshock', 'psystrike', 'secret-sword']);
-const LOSES_TYPE: Record<string, string> = { 'burn-up': 'fire', 'double-shock': 'electric' };
-const SELF_COST: Record<string, number> = { 'fillet-away': 1 / 2, 'clangorous-soul': 1 / 3 };
-
-export const STRUGGLE: MoveData = {
-  key: 'struggle', id: 'struggle', name: 'Forcejeo', desc: 'Ataque desesperado que solo se usa cuando no quedan PP; daña también al usuario.',
-  type: null, category: 'physical', power: 50, accuracy: null, pp: 1, priority: 0, target: 'foe', flags: ['contact'], kind: 'attack', recoilMaxHp: 1 / 4, supported: true,
-};
-
-function supportedMove(move: MoveData): boolean {
-  if (move.category !== 'status') return move.power > 0 || !!move.fixedDamage || !!move.ohko;
-  return !!(move.boosts
-    || move.self
-    || move.status
-    || move.screen
-    || SUPPORTED_VOLATILES.has(move.volatile as string)
-    || move.heal
-    || move.weather
-    || move.terrain
-    || SPECIAL_STATUS_MOVES.has(move.id));
-}
+const MOVEDEX = JSON.parse(readFileSync(catalogFile('movedex.json'), 'utf8')) as Record<string, MoveEntry>;
 
 export const ALL_MOVE_IDS = (): string[] => Object.keys(MOVEDEX);
-
-export function moveData(id: string): MoveData | null {
-  const raw = MOVEDEX[id];
-  if (!raw) return null;
-  const move: MoveData = { key: id, id, ...raw, flags: [...(raw.flags ?? [])], kind: raw.category === 'status' ? 'status' : 'attack', supported: false };
-  if (GRASSY_HALVED.has(id)) move.weakenedByGrassyTerrain = true;
-  if (id === 'foul-play') move.usesTargetAttack = true;
-  if (id === 'toxic') move.status = 'tox';
-  if (SCREEN_MOVES[id]) move.screen = SCREEN_MOVES[id];
-  if (SCREEN_BREAKERS.has(id)) move.breaksScreens = true;
-  if (id === 'defog') {
-    move.boosts = { eva: -1 };
-    move.clearsScreens = true;
-  }
-  if (FIRST_TURN_ONLY.has(id)) move.firstTurnOnly = true;
-  if (RAMPAGE.has(id)) move.rampage = true;
-  if (BINDING.has(id)) move.binds = true;
-  if (TRAPPING.has(id)) move.traps = true;
-  if (SELF_SWITCH.has(id)) move.selfSwitch = true;
-  if (FORCE_SWITCH.has(id)) move.forceSwitch = true;
-  if (LEAVES_ONE.has(id)) move.leavesOne = true;
-  if (CRASHES.has(id)) move.crashes = true;
-  if (IGNORES_DEF_BOOSTS.has(id)) move.ignoresDefBoosts = true;
-  if (HITS_PHYSICAL_DEF.has(id)) move.hitsPhysicalDef = true;
-  if (LOSES_TYPE[id]) move.losesType = LOSES_TYPE[id];
-  if (SELF_COST[id]) move.selfCost = SELF_COST[id];
-  if (id === 'body-press') move.usesDefense = true;
-  if (id === 'flying-press') move.extraType = 'flying';
-  if (id === 'clanging-scales') move.self = { def: -1 };
-  if (id === 'scale-shot') move.self = { def: -1, spd: 1 };
-  if (id === 'mind-blown' || id === 'steel-beam') move.recoilMaxHp = 1 / 2;
-  if (id === 'memento') move.selfDestruct = true;
-  if (id === 'snore') move.usableAsleep = true;
-  if (id === 'smack-down' || id === 'thousand-arrows') move.grounds = true;
-  if (id === 'thousand-arrows') move.hitsAirborne = true;
-  if (id === 'defense-curl') move.curls = true;
-  move.supported = !IMPOSSIBLE_MOVES.has(id) && (supportedMove(move) || !!MOVE_RULES[id]);
-  return move;
-}
+export const moveEntry = (id: string): MoveEntry | null => MOVEDEX[id] ?? null;
 
 export function lineage(id: number): number[] {
   const chain: number[] = [];
@@ -334,7 +201,6 @@ export function lineage(id: number): number[] {
 const CHILDREN = new Map<number, number[]>();
 for (const [id, species] of Object.entries(POKEAPI))
   if (species.evolvesFrom) CHILDREN.set(species.evolvesFrom, [...(CHILDREN.get(species.evolvesFrom) ?? []), Number(id)]);
-
 
 export function family(id: number): { id: number; stage: number }[] {
   const root = lineage(id).at(-1) ?? id;
@@ -362,7 +228,7 @@ export function lineageLearnset(id: number): Map<string, { level: number; from: 
 const TEACH_ORIGINS = ['machine', 'tutor', 'egg', 'other'] as const;
 
 /** Entry fields the move and ability rules read. */
-type EntryLike = Pick<RosterEntry, 'finalID'> & Partial<RosterEntry>;
+export type EntryLike = Pick<RosterEntry, 'finalID'> & Partial<RosterEntry>;
 
 export function moveOrigins(entry: EntryLike): Map<string, MoveOrigin> {
   const out = new Map<string, MoveOrigin>();
@@ -380,38 +246,6 @@ export function moveOrigins(entry: EntryLike): Map<string, MoveOrigin> {
 
 export function learnedMoves(entry: EntryLike): string[] {
   return [...moveOrigins(entry).keys()];
-}
-
-export function movepool(entry: EntryLike): MoveData[] {
-  return learnedMoves(entry).map((id) => moveData(id) as MoveData);
-}
-
-export function usableMovepool(entry: EntryLike): string[] {
-  return learnedMoves(entry).filter((id) => (moveData(id) as MoveData).supported);
-}
-
-export function defaultMoveset(entry: EntryLike): string[] {
-  const origins = moveOrigins(entry);
-  const usable = usableMovepool(entry);
-  const reached = usable.filter((id) => origins.get(id)!.origin === 'level' && origins.get(id)!.level! <= (entry.level as number));
-  if (reached.length) return reached.slice(-MOVES_PER_FIGHTER);
-  if (usable.length) return usable.slice(0, MOVES_PER_FIGHTER);
-  return MOVEDEX.tackle ? ['tackle'] : [];
-}
-
-export function validMoveset(entry: EntryLike, ids: unknown): ids is string[] {
-  if (!Array.isArray(ids) || ids.length < 1 || ids.length > MOVES_PER_FIGHTER || new Set(ids).size !== ids.length) return false;
-  const pool = new Set(learnedMoves(entry));
-  return ids.every((id) => typeof id === 'string' && pool.has(id) && (moveData(id) as MoveData).supported);
-}
-
-export function movesetFor(entry: EntryLike): string[] {
-  if (!Array.isArray(entry.moveset) || !entry.moveset.length) return defaultMoveset(entry);
-  const saved = [...new Set(entry.moveset)].slice(0, MOVES_PER_FIGHTER);
-  const pool = new Set(usableMovepool(entry));
-  const spares = shuffled([...pool].filter((id) => !saved.includes(id)), rng(`mv:${entry.id ?? entry.finalID}:${saved.join(',')}`));
-  const moves = saved.map((id) => (pool.has(id) ? id : spares.shift())).filter(Boolean) as string[];
-  return moves.length ? moves : defaultMoveset(entry);
 }
 
 export const usableAbility = (key: string | null | undefined): boolean => !!key && knownAbility(key) && !INERT[key];
@@ -507,31 +341,3 @@ export function statsFor([hp, attack, defense, spAttack, spDefense, speed]: read
   };
 }
 
-// A fighter as the battle and the browser see it.
-export function buildFighter(entry: RosterEntry, { levelCap }: { levelCap?: number | null } = {}): Fighter {
-  const sp = species(entry);
-  const level = levelCap ? levelCap : entry.level;
-  const iv = entry.ivs;
-  const ability = abilityFor(entry);
-  const { hp, atk, def, satk, sdef, spd } = sp.stats;
-  const stats = statsFor([hp, atk, def, satk, sdef, spd], iv, level, entry.nature);
-  return {
-    uid: entry.id,
-    name: entry.nickname || sp.name,
-    speciesName: sp.name,
-    speciesId: sp.id,
-    types: sp.types,
-    rarity: entry.rarity,
-    shiny: entry.shiny,
-    level,
-    stats,
-    moves: movesetFor(entry).map((id) => moveData(id) as MoveData),
-    sprite: sp.sprite,
-    floats: sp.floats,
-    ability,
-    abilityInfo: abilityInfo(ability),
-    gender: genderFor(entry),
-    nature: entry.nature ?? null,
-    ivs: iv,
-  };
-}

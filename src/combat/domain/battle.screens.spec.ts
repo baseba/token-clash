@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBattle, submit, publicState } from './battle.js';
-import { rng, moveData } from '../../catalog/domain/creatures.js';
+import { rng } from '../../catalog/domain/creatures.js';
+import { moveData } from './moves.js';
 
 const IV = { hp: 15, atk: 15, def: 15, spd: 15 };
 // Fixtures carry only the fields the rules read.

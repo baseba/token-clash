@@ -1,6 +1,8 @@
 // Turn-based battle engine. Pure: no I/O, randomness injected, so it can be tested and replayed.
-import { buildFighter, effectiveness, formData, statsFor, speciesData, moveData, ALL_MOVE_IDS, STRUGGLE, type BoostKey, type Boosts, type MajorStatus, type MoveData, type Stats, type Weather } from '../../catalog/domain/creatures.js';
-import { MOVE_RULES } from '../../catalog/domain/move-rules.js';
+import { effectiveness, formData, statsFor, speciesData, ALL_MOVE_IDS, type BoostKey, type Boosts, type MajorStatus, type Stats, type Weather } from '../../catalog/domain/creatures.js';
+import { buildFighter } from './fighter.js';
+import { moveData, STRUGGLE, type MoveData } from './moves.js';
+import { MOVE_RULES } from './move-rules.js';
 import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
 import { ABILITIES, type AbilityEffect, type AbilityHook, type BoostChanges } from './ability-effects.js';
 import { isRain, isSun, poisoned, stageMult } from './conditions.js';
@@ -180,7 +182,7 @@ function engine(battle: BattleState): AbilityEngine {
   return engine;
 }
 
-/** What ability rules may do to the battle (catalog/domain/abilities.ts). */
+/** What ability rules may do to the battle (ability-effects.ts). */
 export type AbilityEngine = ReturnType<typeof makeEngine>;
 
 function makeEngine(battle: BattleState) {
@@ -241,7 +243,7 @@ function moveApi(battle: BattleState): MoveRuleApi {
   return api;
 }
 
-/** What move rules may do to the battle (catalog/domain/move-rules.ts). */
+/** What move rules may do to the battle (move-rules.ts). */
 export type MoveRuleApi = ReturnType<typeof makeMoveApi>;
 
 function makeMoveApi(battle: BattleState) {
@@ -294,7 +296,6 @@ function makeMoveApi(battle: BattleState) {
     speed: (fighter: BattleFighter) => speedOf(battle, fighter),
     flag: (fighter: BattleFighter, name: keyof AbilityEffect) => flag(battle, fighter, name),
     abilityDef: (key: string | null): AbilityEffect | undefined => ABILITIES[key as string],
-    stageMult,
     weight: (fighter: BattleFighter): number => speciesData(fighter.speciesId)?.weight ?? 50,
     baseAttack: (fighter: BattleFighter): number | undefined => speciesData(fighter.speciesId)?.base.attack,
     moved: (fighter: BattleFighter) => battle.moved.has(fighter),

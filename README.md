@@ -72,7 +72,7 @@ El motor (`src/combat/domain/battle.ts`) sigue las reglas de los juegos para com
 efectividad, críticos y variación; estados y volátiles (confusión, atracción, drenadoras, apresado…); clima,
 campos, barreras (Reflejo, Pantalla de Luz, Velo Aurora), trampas de campo, Protección, Sustituto, prioridad,
 golpes múltiples y movimientos de cambio, que cambian al Pokémon en el momento. Las habilidades están en
-`src/combat/domain/ability-effects.ts` y las reglas especiales de cada movimiento en `src/catalog/domain/move-rules.ts`.
+`src/combat/domain/ability-effects.ts` y las reglas especiales de cada movimiento en `src/combat/domain/move-rules.ts`.
 
 No hay objetos ni combates dobles: los movimientos y habilidades que dependen de eso no tienen efecto en Token
 Clash y no se pueden elegir. Si un save trae uno, se reemplaza por otro al azar de los que sí funcionan; si no
