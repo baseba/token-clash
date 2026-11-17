@@ -633,7 +633,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   present: {
     before(api, me, foe, move) {
       const roll = api.random();
-      if (roll < 0.2) {
+      if (roll < 0.2 && foe) {
         api.heal(foe, foe.stats.hp / 4) || api.nothing(me);
         return 'skip';
       }
