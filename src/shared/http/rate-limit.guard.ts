@@ -1,5 +1,6 @@
 // @RateLimit(): per-route limits on top of the global one (imports, creating rooms…). Counted by
-// IP, or by trainer for routes that already have a session (put it after @Authenticated()).
+// IP, or by trainer. Counting by trainer needs the session guard to have run, so write @RateLimit
+// above @Authenticated() (Nest applies decorators bottom-up); otherwise every request fails.
 import { applyDecorators, CanActivate, ExecutionContext, Injectable, SetMetadata, UseGuards } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
@@ -30,8 +31,9 @@ export class RateLimitGuard implements CanActivate {
     const limit = this.reflector.get<Limit>(RATE_LIMIT, context.getHandler());
     if (!limit) return true;
     const req = context.switchToHttp().getRequest<Request & { trainer?: { id: string } }>();
-    const who = limit.by === 'trainer' ? req.trainer?.id : clientIp(req, this.config.trustCfConnectingIp);
-    if (who && this.limiter.limited(`${limit.bucket}:${who}`, limit.max, limit.windowMs)) throw new HttpError(429, limit.message);
+    if (limit.by === 'trainer' && !req.trainer) throw new Error(`@RateLimit({ by: 'trainer' }) on ${context.getClass().name}.${context.getHandler().name} ran without a session: put @Authenticated() below it.`);
+    const who = limit.by === 'trainer' ? req.trainer!.id : clientIp(req, this.config.trustCfConnectingIp);
+    if (this.limiter.limited(`${limit.bucket}:${who}`, limit.max, limit.windowMs)) throw new HttpError(429, limit.message);
     return true;
   }
 }
