@@ -7,6 +7,7 @@ import { chargeAnim, COMMON_PRELOAD, hpTweenMs, moveLands } from './battle-anims
 import { patchSave } from './savepatch.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
 import { TRAINER_SPRITES, trainerSpriteFor } from './trainer-sprites.js?v=dev';
+import { RADIO_KINDS, RADIO_REGIONS, RADIO_TRACKS, radioTrack } from './radio.js?v=dev';
 
 const $app = document.getElementById('app');
 const $who = document.getElementById('who');
@@ -676,7 +677,7 @@ function markNav() {
   }
 }
 
-const TAB_MUSIC = { '/': 'tab:home', '/coleccion': 'tab:collection', '/pokedex': 'tab:pokedex', '/stats': 'tab:stats', '/perfil': 'tab:home' };
+const TAB_MUSIC = { '/': 'tab:home', '/coleccion': 'tab:collection', '/pokedex': 'tab:pokedex', '/stats': 'tab:stats', '/perfil': 'tab:profile' };
 const music = createPlayer({
   storage: {
     getItem: (k) => ls.get(k),
@@ -704,6 +705,59 @@ document.addEventListener('click', (e) => {
   const kind = el && clickSound(el);
   if (kind) music.ui(kind);
 }, { capture: true });
+
+function radioButton() {
+  let kind = '';
+  let region = '';
+  let query = '';
+  const btn = h('button', { class: 'sound-btn radio-btn', type: 'button', 'aria-label': 'Radio', 'aria-haspopup': 'dialog', 'data-tip': 'Radio' }, '📻');
+  const now = h('div', { class: 'radio-now' });
+  const count = h('span', { class: 'muted small' });
+  const list = h('div', { class: 'radio-list', role: 'listbox', 'aria-label': 'Canciones' });
+  const dlg = h('dialog', { class: 'info-dlg radio-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() });
+  const shown = () => {
+    const words = query.toLowerCase();
+    return RADIO_TRACKS.filter((t) => (!kind || t.kind === kind) && (!region || t.region === region) && (!words || `${t.title} ${RADIO_REGIONS[t.region]}`.toLowerCase().includes(words)));
+  };
+  const tune = (id) => {
+    music.setRadio(id);
+    paint();
+  };
+  function paint() {
+    const on = radioTrack(music.radio);
+    btn.classList.toggle('on', !!on);
+    btn.dataset.tip = on ? `Radio: ${on.title}` : 'Radio';
+    now.replaceChildren(
+      on
+        ? h('p', null, h('span', { class: 'live-dot on' }), ' Sonando ', h('b', null, on.title), h('span', { class: 'muted' }, ` · ${RADIO_REGIONS[on.region]}`))
+        : h('p', { class: 'muted' }, 'Apagada: suena la música de cada pantalla. Elige una canción para que suene en todo el sitio.'),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn sm', type: 'button', onclick: () => { const pool = shown(); if (pool.length) tune(pool[Math.floor(Math.random() * pool.length)].id); } }, '🔀 Al azar'),
+        on ? h('button', { class: 'btn sm danger', type: 'button', onclick: () => tune(null) }, '⏹ Apagar radio') : null,
+      ),
+    );
+    const tracks = shown();
+    count.textContent = `${tracks.length} canciones`;
+    list.replaceChildren(...(tracks.length ? tracks.map((t) => h('button', { type: 'button', class: `radio-item${music.radio === t.id ? ' is-on' : ''}`, role: 'option', 'aria-selected': String(music.radio === t.id), onclick: () => tune(t.id) }, h('span', { class: 'radio-title' }, music.radio === t.id ? '▶ ' : '', t.title), h('span', { class: 'radio-tags' }, h('span', { class: `chip radio-kind ${t.kind}` }, RADIO_KINDS[t.kind]), h('span', { class: 'chip' }, RADIO_REGIONS[t.region])))) : [h('p', { class: 'muted' }, 'Ninguna canción coincide con el filtro.')]));
+  }
+  dlg.append(h('div', { class: 'radio-body' },
+    h('div', { class: 'row between' }, h('h2', null, '📻 Radio'), h('button', { class: 'btn sm ghost', type: 'button', 'aria-label': 'Cerrar', onclick: () => dlg.close() }, '✕')),
+    now,
+    h('div', { class: 'radio-filters' },
+      h('input', { type: 'search', placeholder: 'Buscar canción…', 'aria-label': 'Buscar canción', oninput: (e) => { query = e.target.value.trim(); paint(); } }),
+      h('select', { 'aria-label': 'Tipo de canción', onchange: (e) => { kind = e.target.value; paint(); } }, h('option', { value: '' }, 'Batalla y otras'), Object.entries(RADIO_KINDS).map(([value, label]) => h('option', { value }, label))),
+      h('select', { 'aria-label': 'Región o generación', onchange: (e) => { region = e.target.value; paint(); } }, h('option', { value: '' }, 'Todas las regiones'), Object.entries(RADIO_REGIONS).map(([value, label]) => h('option', { value }, label))),
+      count,
+    ),
+    list,
+  ));
+  btn.addEventListener('click', () => {
+    paint();
+    if (!dlg.open) dlg.showModal();
+  });
+  paint();
+  return [btn, dlg];
+}
 
 function renderSound() {
   const host = document.getElementById('sound');
@@ -757,7 +811,7 @@ function renderSound() {
   document.addEventListener('click', close);
   document.addEventListener('keydown', (e) => e.key === 'Escape' && close());
   paint();
-  host.replaceChildren(btn, panel);
+  host.replaceChildren(...radioButton(), btn, panel);
 }
 renderSound();
 
@@ -909,6 +963,14 @@ async function profilePage(seq) {
     );
   }
   const usable = (key) => key === me.avatar || progress.get(key)?.unlocked !== false;
+  const goalState = (g) => (g.need === 1 ? (g.have >= 1 ? 'listo' : 'pendiente') : `${g.have.toLocaleString('es')}/${g.need.toLocaleString('es')}`);
+  function unlockTip(key) {
+    const p = progress.get(key);
+    if (!p) return { tip: trainerLabel(key), note: null };
+    if (p.group === 'starter') return { tip: `${trainerLabel(key)} · disponible desde el inicio`, note: null };
+    if (p.unlocked) return { tip: `🔓 ${trainerLabel(key)} · ${p.title}`, note: `Lo desbloqueaste con: ${p.goals.map((g) => (g.need === 1 ? g.text : `${g.text} (${g.need.toLocaleString('es')})`)).join(' y ')}` };
+    return { tip: `🔒 ${trainerLabel(key)} · ${p.title}`, note: `Te falta: ${p.goals.filter((g) => g.have < g.need).map((g) => `${g.text} ${goalState(g)}`).join(' · ')}` };
+  }
   function showDetail(key) {
     const p = progress.get(key);
     if (!p || p.unlocked) {
@@ -950,7 +1012,8 @@ async function profilePage(seq) {
     count.textContent = `${shown.length === TRAINER_SPRITES.length ? '' : `${shown.length} de ${TRAINER_SPRITES.length} · `}${open} desbloqueados`;
     grid.replaceChildren(...(shown.length ? shown.map((key) => {
       const locked = !usable(key);
-      return h('button', { type: 'button', class: `trainer-cell${key === me.avatar ? ' is-picked' : ''}${locked ? ' is-locked' : ''}`, role: 'option', 'aria-selected': String(key === me.avatar), 'aria-label': locked ? `${trainerLabel(key)}, bloqueado` : trainerLabel(key), onclick: (e) => choose(key, e.currentTarget) }, h('span', { class: 'trainer-frame' }, trainerImg(key), locked ? h('span', { class: 'lock-badge', 'aria-hidden': 'true' }, '🔒') : null), h('small', null, trainerLabel(key)));
+      const { tip, note } = unlockTip(key);
+      return h('button', { type: 'button', class: `trainer-cell${key === me.avatar ? ' is-picked' : ''}${locked ? ' is-locked' : ''}`, 'data-tip': tip, 'data-tip-note': note, role: 'option', 'aria-selected': String(key === me.avatar), 'aria-label': locked ? `${trainerLabel(key)}, bloqueado` : trainerLabel(key), onclick: (e) => choose(key, e.currentTarget) }, h('span', { class: 'trainer-frame' }, trainerImg(key), locked ? h('span', { class: 'lock-badge', 'aria-hidden': 'true' }, '🔒') : null), h('small', null, trainerLabel(key)));
     }) : [h('p', { class: 'muted' }, 'Ningún entrenador coincide con el filtro.')]));
   }
   paintPreview();
