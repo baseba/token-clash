@@ -10,11 +10,9 @@ export const challenges = sqliteTable(
   {
     id: text().primaryKey(),
     status: text().notNull(),
-    /** Always written now. NULL only in rows from before the backfill migration; NOT NULL comes once no image writes NULL. */
-    mode: text(),
+    mode: text().notNull(),
     levelCap: integer('level_cap'),
-    /** Same as mode. */
-    visibility: text(),
+    visibility: text().notNull(),
     ai: text(),
     aiOnly: integer('ai_only', { mode: 'boolean' }),
     hostId: text('host_id').notNull(),
