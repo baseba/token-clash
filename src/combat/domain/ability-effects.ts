@@ -5,12 +5,6 @@ import type { Boosts, BoostKey, MoveData, StatKey } from '../../catalog/domain/c
 import type { AbilityEngine } from './battle.js';
 import type { BattleFighter, BattleMove } from './battle-types.js';
 
-
-type E = AbilityEngine;
-type F = BattleFighter;
-type M = BattleMove;
-
-
 /** Stat stage changes about to apply, which onTryBoost/onChangeBoost may edit in place. */
 export type BoostChanges = Record<string, number>;
 
@@ -61,47 +55,47 @@ export interface AbilityEffect {
   wonderSkin?: boolean;
   weatherImmune?: string[];
   // Hooks
-  onAccuracy?(engine: E, me: F, move: M, target: F, acc: number): unknown;
-  onAfterEachBoost?(engine: E, me: F, applied: Boosts, source: F | null, effect?: string): unknown;
-  onAfterMoveHit?(engine: E, me: F, move: M, target: F, total: number): unknown;
-  onAfterMove?(engine: E, me: F, move: M): unknown;
-  onAfterSetStatus?(engine: E, me: F, status: string, source: F | null): unknown;
-  onAnyFaint?(engine: E, me: F, fainted: F): unknown;
-  onAttackerFinal?(engine: E, me: F, move: M, target: F, info: { eff: number; crit: boolean }): unknown;
-  onAttack?(engine: E, me: F, move: M, target: F): unknown;
-  onBasePower?(engine: E, me: F, move: M, target: F): unknown;
-  onBeforeMoveForm?(engine: E, me: F, move: M): unknown;
-  onBeforeMove?(engine: E, me: F, move: M): unknown;
-  onChangeBoost?(engine: E, me: F, changes: BoostChanges): unknown;
-  onCritStage?(engine: E, me: F, move: M, target: F, stage: number): unknown;
-  onDamage?(engine: E, me: F, move: M, attacker: F, dmg: number): unknown;
-  onDamagingHit?(engine: E, me: F, move: M, attacker: F, info: HitInfo): unknown;
-  onDefenderFinal?(engine: E, me: F, move: M, attacker: F, info: { eff: number; crit: boolean }): unknown;
-  onDefense?(engine: E, me: F, move: M, attacker: F): unknown;
-  onEffectiveness?(engine: E, me: F, move: M, attacker: F, eff: number): unknown;
-  onEndTurn?(engine: E, me: F): unknown;
-  onEvasion?(engine: E, me: F, move: M, attacker: F, acc: number): unknown;
-  onFaint?(engine: E, me: F, by: F | null, move: M | null, lastHit: number): unknown;
-  onFlinch?(engine: E, me: F): unknown;
-  onFoeBoost?(engine: E, me: F, foe: F, ups: Boosts, effect?: string): unknown;
-  onFoeFaint?(engine: E, me: F, fainted: F): unknown;
-  onFoeMove?(engine: E, me: F, user: F, move: M): unknown;
-  onFractionalPriority?(engine: E, me: F, move: MoveData): unknown;
-  onIncoming?(engine: E, me: F, move: M, attacker: F): unknown;
-  onInflictStatus?(engine: E, me: F, target: F, status: string): unknown;
-  onModifyMove?(engine: E, me: F, move: M): unknown;
-  onModifyPriority?(engine: E, me: F, move: MoveData, priority: number): unknown;
-  onPrepareMove?(engine: E, me: F, move: M): unknown;
-  onSetStatus?(engine: E, me: F, status: string, source: F | null): unknown;
-  onSpeed?(engine: E, me: F, spd: number): unknown;
-  onStart?(engine: E, me: F): unknown;
-  onStatusDamage?(engine: E, me: F, status: string, amount: number): unknown;
-  onSwitchOut?(engine: E, me: F): unknown;
-  onTerrainChange?(engine: E, me: F): unknown;
-  onTrapFoe?(engine: E, me: F, foe: F): unknown;
-  onTryBoost?(engine: E, me: F, changes: BoostChanges, source: F | null, effect?: string): unknown;
-  onTryHit?(engine: E, me: F, move: M, attacker: F): unknown;
-  onWeatherChange?(engine: E, me: F): unknown;
+  onAccuracy?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, acc: number): unknown;
+  onAfterEachBoost?(engine: AbilityEngine, me: BattleFighter, applied: Boosts, source: BattleFighter | null, effect?: string): unknown;
+  onAfterMoveHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, total: number): unknown;
+  onAfterMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
+  onAfterSetStatus?(engine: AbilityEngine, me: BattleFighter, status: string, source: BattleFighter | null): unknown;
+  onAnyFaint?(engine: AbilityEngine, me: BattleFighter, fainted: BattleFighter): unknown;
+  onAttackerFinal?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, info: { eff: number; crit: boolean }): unknown;
+  onAttack?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter): unknown;
+  onBasePower?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter): unknown;
+  onBeforeMoveForm?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
+  onBeforeMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
+  onChangeBoost?(engine: AbilityEngine, me: BattleFighter, changes: BoostChanges): unknown;
+  onCritStage?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, stage: number): unknown;
+  onDamage?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, dmg: number): unknown;
+  onDamagingHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, info: HitInfo): unknown;
+  onDefenderFinal?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, info: { eff: number; crit: boolean }): unknown;
+  onDefense?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): unknown;
+  onEffectiveness?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, eff: number): unknown;
+  onEndTurn?(engine: AbilityEngine, me: BattleFighter): unknown;
+  onEvasion?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, acc: number): unknown;
+  onFaint?(engine: AbilityEngine, me: BattleFighter, by: BattleFighter | null, move: BattleMove | null, lastHit: number): unknown;
+  onFlinch?(engine: AbilityEngine, me: BattleFighter): unknown;
+  onFoeBoost?(engine: AbilityEngine, me: BattleFighter, foe: BattleFighter, ups: Boosts, effect?: string): unknown;
+  onFoeFaint?(engine: AbilityEngine, me: BattleFighter, fainted: BattleFighter): unknown;
+  onFoeMove?(engine: AbilityEngine, me: BattleFighter, user: BattleFighter, move: BattleMove): unknown;
+  onFractionalPriority?(engine: AbilityEngine, me: BattleFighter, move: MoveData): unknown;
+  onIncoming?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): unknown;
+  onInflictStatus?(engine: AbilityEngine, me: BattleFighter, target: BattleFighter, status: string): unknown;
+  onModifyMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
+  onModifyPriority?(engine: AbilityEngine, me: BattleFighter, move: MoveData, priority: number): unknown;
+  onPrepareMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
+  onSetStatus?(engine: AbilityEngine, me: BattleFighter, status: string, source: BattleFighter | null): unknown;
+  onSpeed?(engine: AbilityEngine, me: BattleFighter, spd: number): unknown;
+  onStart?(engine: AbilityEngine, me: BattleFighter): unknown;
+  onStatusDamage?(engine: AbilityEngine, me: BattleFighter, status: string, amount: number): unknown;
+  onSwitchOut?(engine: AbilityEngine, me: BattleFighter): unknown;
+  onTerrainChange?(engine: AbilityEngine, me: BattleFighter): unknown;
+  onTrapFoe?(engine: AbilityEngine, me: BattleFighter, foe: BattleFighter): unknown;
+  onTryBoost?(engine: AbilityEngine, me: BattleFighter, changes: BoostChanges, source: BattleFighter | null, effect?: string): unknown;
+  onTryHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): unknown;
+  onWeatherChange?(engine: AbilityEngine, me: BattleFighter): unknown;
 }
 
 /** Names of the hooks (the methods of AbilityEffect). */
@@ -113,14 +107,14 @@ const isAttack = (move: MoveData): boolean => move.category !== 'status';
 const physical = (move: MoveData): boolean => move.category === 'physical';
 const special = (move: MoveData): boolean => move.category === 'special';
 const has = (move: MoveData, flag: string): boolean => move.flags.includes(flag);
-const contact = (engine: E, move: MoveData, attacker: F): boolean => has(move, 'contact') && !engine.has(attacker, 'long-reach');
-const full = (fighter: F): boolean => fighter.hp === fighter.stats.hp;
-const fraction = (fighter: F, share: number): number => Math.max(1, Math.floor(fighter.stats.hp * share));
-const droppedBelowHalf = (fighter: F, before: number): boolean => before > fighter.stats.hp / 2 && fighter.hp > 0 && fighter.hp <= fighter.stats.hp / 2;
+const contact = (engine: AbilityEngine, move: MoveData, attacker: BattleFighter): boolean => has(move, 'contact') && !engine.has(attacker, 'long-reach');
+const full = (fighter: BattleFighter): boolean => fighter.hp === fighter.stats.hp;
+const fraction = (fighter: BattleFighter, share: number): number => Math.max(1, Math.floor(fighter.stats.hp * share));
+const droppedBelowHalf = (fighter: BattleFighter, before: number): boolean => before > fighter.stats.hp / 2 && fighter.hp > 0 && fighter.hp <= fighter.stats.hp / 2;
 const STATUS_NAMES = new Set<string | null>(['brn', 'par', 'psn', 'tox', 'slp', 'frz']);
 const isMajor = (status: string | null): boolean => STATUS_NAMES.has(status);
 const poison = (status: string | null): boolean => status === 'psn' || status === 'tox';
-const highestStat = (fighter: F): StatKey => (['atk', 'def', 'satk', 'sdef', 'spd'] as const).reduce<StatKey>((best, k) => (fighter.stats[k] > fighter.stats[best] ? k : best), 'atk');
+const highestStat = (fighter: BattleFighter): StatKey => (['atk', 'def', 'satk', 'sdef', 'spd'] as const).reduce<StatKey>((best, k) => (fighter.stats[k] > fighter.stats[best] ? k : best), 'atk');
 
 const typePower = (type: string, mult: number): AbilityEffect => ({ onBasePower: (engine, me, move) => (move.type === type ? mult : 1) });
 const flagPower = (flag: string, mult: number): AbilityEffect => ({ onBasePower: (engine, me, move) => (has(move, flag) ? mult : 1) });
@@ -140,7 +134,7 @@ const skin = (type: string): AbilityEffect => ({
   onBasePower: (engine, me, move) => (move.skinBoost ? 1.2 : 1),
 });
 
-const blockStatus = (blocked: (status: string, engine: E, me: F) => boolean): AbilityEffect => ({
+const blockStatus = (blocked: (status: string, engine: AbilityEngine, me: BattleFighter) => boolean): AbilityEffect => ({
   breakable: true,
   onSetStatus(engine, me, status, source) {
     if (!blocked(status, engine, me)) return true;
@@ -164,7 +158,7 @@ const absorb = (type: string, effect: { heal?: number; boost?: Boosts; flashFire
   },
 });
 
-const contactChance = (chance: number, apply: (engine: E, me: F, attacker: F) => unknown): AbilityEffect => ({
+const contactChance = (chance: number, apply: (engine: AbilityEngine, me: BattleFighter, attacker: BattleFighter) => unknown): AbilityEffect => ({
   onDamagingHit(engine, me, move, attacker) {
     if (!contact(engine, move, attacker) || attacker.hp <= 0 || engine.rand() >= chance) return;
     apply(engine, me, attacker);
@@ -174,7 +168,7 @@ const contactChance = (chance: number, apply: (engine: E, me: F, attacker: F) =>
 const contactStatus = (status: string, chance = 0.3): AbilityEffect =>
   contactChance(chance, (E, me, attacker) => E.setStatus(attacker, status, me, { ability: me }));
 
-const hitBoost = (test: (move: M) => boolean, boost: Boosts): AbilityEffect => ({
+const hitBoost = (test: (move: BattleMove) => boolean, boost: Boosts): AbilityEffect => ({
   onDamagingHit(engine, me, move, attacker) {
     if (me.hp > 0 && test(move)) engine.boost(me, boost, me, { ability: me });
   },
@@ -189,7 +183,7 @@ const hurtAttackerOnContact: AbilityEffect = {
   },
 };
 
-const onKoBoost = (boost: Boosts | ((me: F) => Boosts)): AbilityEffect => ({
+const onKoBoost = (boost: Boosts | ((me: BattleFighter) => Boosts)): AbilityEffect => ({
   onFoeFaint(engine, me) {
     engine.boost(me, typeof boost === 'function' ? boost(me) : boost, me, { ability: me });
   },
@@ -245,7 +239,7 @@ const merge = (...parts: AbilityEffect[]): AbilityEffect => {
   return out as AbilityEffect;
 };
 
-const formChanger = (decide: (engine: E, me: F) => unknown): AbilityEffect => ({
+const formChanger = (decide: (engine: AbilityEngine, me: BattleFighter) => unknown): AbilityEffect => ({
   unsuppressable: true,
   noTrace: true,
   onStart: (engine, me) => decide(engine, me),
@@ -254,7 +248,7 @@ const formChanger = (decide: (engine: E, me: F) => unknown): AbilityEffect => ({
 
 const stageMult = (stage: number): number => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
 const MINIOR_CORES = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'violet'];
-const miniorCore = (fighter: F): string => `minior-${MINIOR_CORES[[...String(fighter.uid)].reduce((n, ch) => n + ch.charCodeAt(0), 0) % MINIOR_CORES.length]}`;
+const miniorCore = (fighter: BattleFighter): string => `minior-${MINIOR_CORES[[...String(fighter.uid)].reduce((n, ch) => n + ch.charCodeAt(0), 0) % MINIOR_CORES.length]}`;
 
 const EFFECTS: Record<string, AbilityEffect> = {
   stench: {
@@ -1198,7 +1192,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'aura-guard': { breakable: true, onIncoming: (engine, me, move, attacker) => (contact(engine, move, attacker) ? 0.5 : 1) },
 };
 
-function forecastType(engine: E, me: F): void {
+function forecastType(engine: AbilityEngine, me: BattleFighter): void {
   if (me.speciesId !== 351) return;
   const weather = engine.weather();
   const want = isSun(weather) ? 'castform-sunny' : isRain(weather) ? 'castform-rainy' : isIcy(weather) ? 'castform-snowy' : null;
@@ -1207,14 +1201,14 @@ function forecastType(engine: E, me: F): void {
   engine.changeForm(me, want);
 }
 
-function cherrimForm(engine: E, me: F): void {
+function cherrimForm(engine: AbilityEngine, me: BattleFighter): void {
   if (me.speciesId !== 421) return;
   const want = isSun(engine.weather()) ? 'cherrim-sunshine' : null;
   if ((me.form ?? null) === want) return;
   engine.changeForm(me, want);
 }
 
-function mimicryType(engine: E, me: F): void {
+function mimicryType(engine: AbilityEngine, me: BattleFighter): void {
   const TERRAIN_TYPE: Record<string, string> = { electric: 'electric', grassy: 'grass', misty: 'fairy', psychic: 'psychic' };
   const type = TERRAIN_TYPE[engine.terrain() as string];
   const want = type ? [type] : me.baseTypes;
@@ -1270,8 +1264,8 @@ function oncePerBattle(boost: Boosts): AbilityEffect {
   };
 }
 
-function paradox(active: (engine: E) => boolean): AbilityEffect {
-  const stat = (engine: E, me: F): StatKey | null => {
+function paradox(active: (engine: AbilityEngine) => boolean): AbilityEffect {
+  const stat = (engine: AbilityEngine, me: BattleFighter): StatKey | null => {
     if (!active(engine)) return null;
     if (!me.volatiles.paradoxStat) {
       me.volatiles.paradoxStat = highestStat(me);
@@ -1279,7 +1273,7 @@ function paradox(active: (engine: E) => boolean): AbilityEffect {
     }
     return me.volatiles.paradoxStat;
   };
-  const refresh = (engine: E, me: F): void => {
+  const refresh = (engine: AbilityEngine, me: BattleFighter): void => {
     if (!active(engine)) delete me.volatiles.paradoxStat;
     else stat(engine, me);
   };

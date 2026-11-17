@@ -6,10 +6,6 @@ import { TYPES } from './type-chart.js';
 import type { MoveRuleApi } from '../../combat/domain/battle.js';
 import type { BattleFighter, BattleMove } from '../../combat/domain/battle-types.js';
 
-type A = MoveRuleApi;
-type F = BattleFighter;
-type M = BattleMove;
-
 /** What a calling move (Metronome, Copycat…) asks the engine to use instead. */
 export interface CalledMove {
   key?: string;
@@ -24,25 +20,25 @@ export interface CalledMove {
  */
 export interface MoveRule {
   /** Why it fails before doing anything (a reason for the browser), or nothing. */
-  fail?(api: A, me: F, foe: F, move: M): string | null | undefined | false;
+  fail?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): string | null | undefined | false;
   /** Use another move instead. */
-  call?(api: A, me: F, foe: F, move: M): CalledMove | null | undefined;
+  call?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): CalledMove | null | undefined;
   /** Runs before the move; 'skip' stops it. */
-  before?(api: A, me: F, foe: F, move: M): unknown;
+  before?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): unknown;
   /** The whole effect of a status move. */
-  use?(api: A, me: F, foe: F, move: M): unknown;
+  use?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): unknown;
   /** After the move, with the damage it dealt. */
-  after?(api: A, me: F, foe: F, move: M, dealt: number): unknown;
+  after?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove, dealt: number): unknown;
   /** Fixed damage of an attack (null: it does nothing). */
-  damage?(api: A, me: F, target: F, move: M): number | null | undefined;
+  damage?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove): number | null | undefined;
   /** Base power of an attack. */
-  power?(api: A, me: F, target: F, move: M): number;
+  power?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove): number;
   /** How many times it hits. */
-  hits?(api: A, me: F): number;
+  hits?(api: MoveRuleApi, me: BattleFighter): number;
   /** Power of hit number i. */
-  hitPower?(api: A, me: F, hit: number): number;
+  hitPower?(api: MoveRuleApi, me: BattleFighter, hit: number): number;
   /** After all hits landed, with the total damage. */
-  hit?(api: A, me: F, target: F, move: M, total: number): unknown;
+  hit?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove, total: number): unknown;
 }
 
 
@@ -60,11 +56,11 @@ const NATURE_POWER: Record<string, string> = { electric: 'thunderbolt', grassy: 
 const CAMOUFLAGE: Record<string, string> = { electric: 'electric', grassy: 'grass', misty: 'fairy', psychic: 'psychic' };
 const MAGNITUDES: [number, number, number][] = [[4, 10, 0.05], [5, 30, 0.15], [6, 50, 0.35], [7, 70, 0.65], [8, 90, 0.85], [9, 110, 0.95], [10, 150, 1]];
 
-const pick = <T>(api: A, list: readonly T[]): T => list[Math.floor(api.random() * list.length)];
+const pick = <T>(api: MoveRuleApi, list: readonly T[]): T => list[Math.floor(api.random() * list.length)];
 const positive = (boosts: Boosts): number => (Object.values(boosts) as number[]).reduce((sum, v) => sum + Math.max(0, v), 0);
-const lastMoveOf = (fighter: F | null | undefined): MoveData | null => (fighter?.volatiles.lastMove ? moveData(fighter.volatiles.lastMove) : null);
-const benchAlive = (api: A, fighter: F): boolean => api.side(api.sideOf(fighter)).team.some((o) => o !== fighter && o.hp > 0);
-const stockpiled = (fighter: F): number => fighter.volatiles.stockpile?.count ?? 0;
+const lastMoveOf = (fighter: BattleFighter | null | undefined): MoveData | null => (fighter?.volatiles.lastMove ? moveData(fighter.volatiles.lastMove) : null);
+const benchAlive = (api: MoveRuleApi, fighter: BattleFighter): boolean => api.side(api.sideOf(fighter)).team.some((o) => o !== fighter && o.hp > 0);
+const stockpiled = (fighter: BattleFighter): number => fighter.volatiles.stockpile?.count ?? 0;
 
 function fixedRatio(ratio: number, table: readonly (readonly [number, number])[]): number {
   for (const [min, power] of table) if (ratio >= min) return power;
@@ -80,7 +76,7 @@ function weightPower(kg: number): number {
   return 120;
 }
 
-function setSide(api: A, me: F, key: string, turns: number, target: F = me): boolean {
+function setSide(api: MoveRuleApi, me: BattleFighter, key: string, turns: number, target: BattleFighter = me): boolean {
   const sideIndex = api.sideOf(target);
   const conds = api.side(sideIndex).conds;
   if (conds[key]) return false;
@@ -89,7 +85,7 @@ function setSide(api: A, me: F, key: string, turns: number, target: F = me): boo
   return true;
 }
 
-function setRoom(api: A, key: string, turns: number): boolean {
+function setRoom(api: MoveRuleApi, key: string, turns: number): boolean {
   const rooms = api.battle.field.rooms;
   if (rooms[key] && (key === 'trickroom' || key === 'wonderroom')) {
     delete rooms[key];
@@ -111,20 +107,20 @@ function setRoom(api: A, key: string, turns: number): boolean {
   return true;
 }
 
-function setVol(api: A, fighter: F, key: string, value: unknown, kind: string = key, extra: Record<string, unknown> = {}): boolean {
+function setVol(api: MoveRuleApi, fighter: BattleFighter, key: string, value: unknown, kind: string = key, extra: Record<string, unknown> = {}): boolean {
   if (fighter.volatiles[key]) return false;
   fighter.volatiles[key] = value;
   api.volatile(fighter, kind, extra);
   return true;
 }
 
-function copyAbility(api: A, to: F, key: string | null): boolean {
+function copyAbility(api: MoveRuleApi, to: BattleFighter, key: string | null): boolean {
   if (!key || NO_COPY_ABILITY.has(key) || to.ability === key || NO_COPY_ABILITY.has(to.ability)) return false;
   api.changeAbility(to, key);
   return true;
 }
 
-function setBoosts(api: A, fighter: F, boosts: Boosts): boolean {
+function setBoosts(api: MoveRuleApi, fighter: BattleFighter, boosts: Boosts): boolean {
   api.setBoosts(fighter, boosts);
   return true;
 }

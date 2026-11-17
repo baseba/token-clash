@@ -7,9 +7,6 @@ import type { Action, BattleFighter, BattleSide, BattleState, MoveAction, Switch
 import { randomize } from './random-party.js';
 import { PARTY_SIZE } from './team-preview.js';
 
-type F = BattleFighter;
-type B = BattleState;
-
 export const AI_LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
 
 // Skynet's turns are decided by Jev (combat/infrastructure/jev/jev.ts). Everything else, and its fallback when Jev
@@ -36,7 +33,7 @@ const pickOne = <T>(list: readonly T[], random: Random): T => list[Math.floor(ra
 const stageMult = (sideIndex = 0): number => (sideIndex >= 0 ? (2 + sideIndex) / 2 : 2 / (2 - sideIndex));
 const bst = (data: { stats: readonly number[] }): number => data.stats.reduce((a, b) => a + b, 0);
 const fullyEvolved = (data: SpeciesData): boolean => data.chainLen == null || data.stage == null || data.stage >= data.chainLen - 1;
-const hpShare = (fighter: F): number => fighter.hp / fighter.stats.hp;
+const hpShare = (fighter: BattleFighter): number => fighter.hp / fighter.stats.hp;
 
 function rarityOf(data: SpeciesData): Rarity {
   const total = bst(data);
@@ -173,7 +170,7 @@ function expectedMoves(speciesId: number, level: number): MoveData[] {
   return guesses.get(key)!;
 }
 
-function believedFoe(fighter: F): F {
+function believedFoe(fighter: BattleFighter): BattleFighter {
   if (!fighter.seen) return fighter;
   const look = fighter.volatiles.illusion ?? fighter.seenAs;
   let moves = fighter.moves;
@@ -205,31 +202,31 @@ function believedFoe(fighter: F): F {
   };
 }
 
-export function beliefOf(battle: B, sideIndex: number): B {
+export function beliefOf(battle: BattleState, sideIndex: number): BattleState {
   const { random, ...state } = battle;
-  const copy = structuredClone(state) as B;
+  const copy = structuredClone(state) as BattleState;
   const theirs = copy.sides[1 - sideIndex];
   theirs.action = null;
   theirs.team = theirs.team.map(believedFoe);
   return copy;
 }
 
-function moveOf(fighter: F, idx: number): MoveData {
+function moveOf(fighter: BattleFighter, idx: number): MoveData {
   return idx === STRUGGLE_MOVE ? STRUGGLE : fighter.moves[idx];
 }
 
-function typeEffect(move: MoveData, target: F, knowsAbilities: boolean): number {
+function typeEffect(move: MoveData, target: BattleFighter, knowsAbilities: boolean): number {
   if (!move.type) return 1;
   let multiplier = effectiveness(move.type, target.types);
   if (knowsAbilities && IMMUNE_BY_ABILITY[target.ability as string] === move.type) multiplier = 0;
   return multiplier;
 }
 
-function speedOf(fighter: F): number {
+function speedOf(fighter: BattleFighter): number {
   return fighter.stats.spd * stageMult(fighter.boosts?.spd) * (fighter.status === 'par' ? 0.5 : 1);
 }
 
-export function estimateDamage(battle: B, attacker: F, target: F, move: MoveData | null | undefined, knowsAbilities = true): number {
+export function estimateDamage(battle: BattleState, attacker: BattleFighter, target: BattleFighter, move: MoveData | null | undefined, knowsAbilities = true): number {
   if (!move || move.kind === 'status' || move.category === 'status') return 0;
   const eff = typeEffect(move, target, knowsAbilities);
   if (eff === 0) return 0;
@@ -252,18 +249,18 @@ export function estimateDamage(battle: B, attacker: F, target: F, move: MoveData
   return dmg;
 }
 
-function bestDamage(battle: B, attacker: F, target: F, knowsAbilities: boolean): number {
+function bestDamage(battle: BattleState, attacker: BattleFighter, target: BattleFighter, knowsAbilities: boolean): number {
   let best = 0;
   for (const move of attacker.moves) best = Math.max(best, estimateDamage(battle, attacker, target, move, knowsAbilities));
   return best;
 }
 
-function statusImmune(target: F, status: string): boolean {
+function statusImmune(target: BattleFighter, status: string): boolean {
   if (target.status) return true;
   return (STATUS_IMMUNE_TYPES[status] ?? []).some((t) => target.types.includes(t));
 }
 
-export function scoreMove(battle: B, sideIndex: number, idx: number, knowsAbilities = true, deep = true): number {
+export function scoreMove(battle: BattleState, sideIndex: number, idx: number, knowsAbilities = true, deep = true): number {
   const side = battle.sides[sideIndex];
   const me = side.team[side.active];
   const foeSide = battle.sides[1 - sideIndex];
@@ -304,13 +301,13 @@ export function scoreMove(battle: B, sideIndex: number, idx: number, knowsAbilit
     return helps ? 45 : 8;
   }
   if (move.boosts && move.target === 'self') {
-    const ups = (Object.entries(move.boosts) as [keyof F['boosts'], number][]).filter(([, v]) => v > 0);
+    const ups = (Object.entries(move.boosts) as [keyof BattleFighter['boosts'], number][]).filter(([, v]) => v > 0);
     if (!ups.length || ups.every(([k]) => (me.boosts[k] ?? 0) >= 4)) return 0;
     if (hpShare(me) < 0.6 || threat >= 0.5) return 10;
     return 50 + ups.length * 8;
   }
   if (move.boosts) {
-    const downs = Object.keys(move.boosts) as (keyof F['boosts'])[];
+    const downs = Object.keys(move.boosts) as (keyof BattleFighter['boosts'])[];
     return downs.every((k) => (foe.boosts[k] ?? 0) <= -2) ? 0 : 15;
   }
   if (move.volatile === 'leechseed') return foe.types.includes('grass') || foe.volatiles?.leechSeed ? 0 : 35;
@@ -320,7 +317,7 @@ export function scoreMove(battle: B, sideIndex: number, idx: number, knowsAbilit
   return 5;
 }
 
-function matchupScore(battle: B, mon: F, foe: F | null | undefined, knowsAbilities: boolean): number {
+function matchupScore(battle: BattleState, mon: BattleFighter, foe: BattleFighter | null | undefined, knowsAbilities: boolean): number {
   if (!foe || foe.hp <= 0) return hpShare(mon);
   const dealt = Math.min(1, bestDamage(battle, mon, foe, knowsAbilities) / foe.hp);
   const taken = Math.min(1, bestDamage(battle, foe, mon, knowsAbilities) / Math.max(1, mon.hp));
@@ -343,14 +340,14 @@ function sideValue(side: BattleSide): number {
   return side.team.reduce((sum, f) => sum + (f.hp > 0 ? 0.35 + f.hp / f.stats.hp : 0), 0);
 }
 
-function evaluate(battle: B, sideIndex: number): number {
+function evaluate(battle: BattleState, sideIndex: number): number {
   if (battle.status === 'finished') return battle.winner === sideIndex ? 100 : battle.winner === null ? 0 : -100;
   return sideValue(battle.sides[sideIndex]) - sideValue(battle.sides[1 - sideIndex]);
 }
 
-function simulate(battle: B, sideIndex: number, mine: Action, theirs: Action | null, seed: string): number {
+function simulate(battle: BattleState, sideIndex: number, mine: Action, theirs: Action | null, seed: string): number {
   const { random, ...state } = battle;
-  const copy = structuredClone(state) as B;
+  const copy = structuredClone(state) as BattleState;
   copy.random = rng(seed);
   submit(copy, sideIndex, mine);
   if (theirs && needsAction(copy, 1 - sideIndex)) submit(copy, 1 - sideIndex, theirs);
@@ -359,7 +356,7 @@ function simulate(battle: B, sideIndex: number, mine: Action, theirs: Action | n
 
 const SEARCH_SEEDS = 2;
 
-function lookahead(battle: B, sideIndex: number, options: Action[]): Action | null {
+function lookahead(battle: BattleState, sideIndex: number, options: Action[]): Action | null {
   const rival = battle.sides[1 - sideIndex].team;
   const theirs = validActions(battle, 1 - sideIndex).filter((a) => a.type !== 'switch' || rival[a.to].seen);
   const replies: (Action | null)[] = theirs.length ? theirs : [null];
@@ -379,7 +376,7 @@ function lookahead(battle: B, sideIndex: number, options: Action[]): Action | nu
   return best;
 }
 
-function safeLookahead(battle: B, sideIndex: number, options: Action[]): Action | null {
+function safeLookahead(battle: BattleState, sideIndex: number, options: Action[]): Action | null {
   try {
     return lookahead(battle, sideIndex, options);
   } catch {
@@ -387,7 +384,7 @@ function safeLookahead(battle: B, sideIndex: number, options: Action[]): Action 
   }
 }
 
-export function chooseAction(battle: B, sideIndex: number, level: string, random: Random = Math.random): Action | null {
+export function chooseAction(battle: BattleState, sideIndex: number, level: string, random: Random = Math.random): Action | null {
   const difficulty = tactics(level);
   const options = validActions(battle, sideIndex);
   if (!options.length) return null;
