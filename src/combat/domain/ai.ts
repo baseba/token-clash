@@ -30,7 +30,7 @@ const STATUS_VALUE: Record<string, number> = { slp: 70, par: 55, tox: 52, psn: 3
 
 const lastSwitchTurn = new WeakMap<BattleSide, number>();
 const pickOne = <T>(list: readonly T[], random: Random): T => list[Math.floor(random() * list.length)];
-const stageMult = (sideIndex = 0): number => (sideIndex >= 0 ? (2 + sideIndex) / 2 : 2 / (2 - sideIndex));
+const stageMult = (stage = 0): number => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
 const bst = (data: { stats: readonly number[] }): number => data.stats.reduce((a, b) => a + b, 0);
 const fullyEvolved = (data: SpeciesData): boolean => data.chainLen == null || data.stage == null || data.stage >= data.chainLen - 1;
 const hpShare = (fighter: BattleFighter): number => fighter.hp / fighter.stats.hp;

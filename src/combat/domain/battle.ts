@@ -23,8 +23,8 @@ const SAND_PROOF = ['rock', 'ground', 'steel'];
 const SCREEN_KINDS = ['reflect', 'lightscreen', 'auroraveil'];
 const VEIL_WEATHER = new Set<string | null>(['hail', 'snow']);
 
-const stageMult = (sideIndex: number): number => (sideIndex >= 0 ? (2 + sideIndex) / 2 : 2 / (2 - sideIndex));
-const accuracyMult = (sideIndex: number): number => (sideIndex >= 0 ? (3 + sideIndex) / 3 : 3 / (3 - sideIndex));
+const stageMult = (stage: number): number => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
+const accuracyMult = (stage: number): number => (stage >= 0 ? (3 + stage) / 3 : 3 / (3 - stage));
 const freshBoosts = (): Record<BoostKey, number> => ({ atk: 0, def: 0, satk: 0, sdef: 0, spd: 0, acc: 0, eva: 0 });
 const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
 const isSun = (weather: string | null | undefined): boolean => weather === 'sun' || weather === 'harshsun';

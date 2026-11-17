@@ -239,7 +239,7 @@ export class TournamentsService implements OnModuleInit {
     this.broadcast(tournament);
   }
 
-  private matchFinished({ challenge: challenge }: MatchFinished): void {
+  private matchFinished({ challenge }: MatchFinished): void {
     const tournament = challenge.tournamentId ? this.tournaments.findById(challenge.tournamentId) : undefined;
     if (!tournament || tournament.status !== 'running') return;
     const at = now();

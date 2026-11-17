@@ -1,10 +1,14 @@
-// Characterization pin for the combat engine and the AI: seeded battles between AI teams, played to the end, whose
-// full event log and client views must match battle.replays.snapshot.txt line for line. A change that only moves
-// code around keeps it green. A change in behavior shows up as the first line that differs.
-// To accept a deliberate change in behavior: UPDATE_SNAPSHOTS=1 npm test, then review the diff of the snapshot.
+// Characterization pin for the combat engine and the AI: 40 seeded battles between AI teams, played to the end.
+// Each battle's full log (actions, events, and hashes of what each client sees) is reduced to one hash per battle
+// in battle.replays.snapshot.txt. Moving code around keeps every hash; a change in behavior names the battles it
+// changed. Objects are written with sorted keys, so building an event in another key order is not a change.
+//
+// To read the logs: REPLAY_LOGS=1 writes them to dist/replays/<seed>.txt (a failing run writes them too). Run it on
+// main and on your branch and diff the two folders.
+// To accept a deliberate change in behavior: UPDATE_SNAPSHOTS=1 npm test, and say why in the PR.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { rng } from '../../catalog/domain/creatures.js';
@@ -17,8 +21,15 @@ const SNAPSHOT = join(PROJECT_ROOT, 'src', 'combat', 'domain', 'battle.replays.s
 const LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
 const LEVEL_CAPS = [null, 50, 100, 30];
 
-// Client views are large and mostly catalog data, so the snapshot keeps their hash. The event log stays readable.
-const digest = (view: unknown): string => createHash('sha256').update(JSON.stringify(view)).digest('hex');
+const LOGS = join(PROJECT_ROOT, 'dist', 'replays');
+
+const sortedKeys = (_key: string, value: unknown) =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+    : value;
+const canonical = (value: unknown): string => JSON.stringify(value, sortedKeys);
+const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
+const digest = (view: unknown): string => sha256(canonical(view));
 
 function replay(seed: number): string[] {
   const level = (side: number) => LEVELS[(seed + side * 2) % LEVELS.length];
@@ -36,15 +47,15 @@ function replay(seed: number): string[] {
   });
   const choices = [0, 1].map((side) => rng(`choices-${seed}-${side}`));
   const lines = [`# battle ${seed}: ${level(0)} vs ${level(1)}, level cap ${levelCap}`, `preview ${digest(previewView(preview, 0))}`];
-  for (const event of battle.intro) lines.push(`intro ${JSON.stringify(event)}`);
+  for (const event of battle.intro) lines.push(`intro ${canonical(event)}`);
   let submits = 0;
   while (battle.status === 'active' && submits++ < 1000) {
     for (const side of [0, 1]) {
       if (!needsAction(battle, side)) continue;
       const action = chooseAction(battle, side, level(side), choices[side]);
-      lines.push(`turn ${battle.turn} side ${side} ${JSON.stringify(action)}`);
+      lines.push(`turn ${battle.turn} side ${side} ${canonical(action)}`);
       const events = submit(battle, side, action) ?? [];
-      for (const event of events) lines.push(`event ${JSON.stringify(event)}`);
+      for (const event of events) lines.push(`event ${canonical(event)}`);
       if (events.length) lines.push(`seen by 1 ${digest(viewEvents(events, 1))}`);
     }
     if (battle.turn === 3) lines.push(`state for 0 ${digest(publicState(battle, 0))}`);
@@ -53,19 +64,24 @@ function replay(seed: number): string[] {
   return lines;
 }
 
+function writeLogs(logs: Map<number, string[]>): void {
+  mkdirSync(LOGS, { recursive: true });
+  for (const [seed, lines] of logs) writeFileSync(join(LOGS, `${seed}.txt`), lines.join('\n') + '\n');
+}
+
 test('seeded AI battles replay exactly as recorded', () => {
-  const lines: string[] = [];
-  for (let seed = 1; seed <= 40; seed++) lines.push(...replay(seed));
-  const actual = lines.join('\n') + '\n';
+  const logs = new Map<number, string[]>();
+  for (let seed = 1; seed <= 40; seed++) logs.set(seed, replay(seed));
+  const actual = [...logs].map(([seed, lines]) => `${seed} ${sha256(lines.join('\n'))} ${lines[0].slice(2)}`).join('\n') + '\n';
   if (process.env.UPDATE_SNAPSHOTS) writeFileSync(SNAPSHOT, actual);
+  if (process.env.REPLAY_LOGS) writeLogs(logs);
   const expected = readFileSync(SNAPSHOT, 'utf8');
   if (actual === expected) return;
-  const actualLines = actual.split('\n');
-  const expectedLines = expected.split('\n');
-  let first = 0;
-  while (actualLines[first] === expectedLines[first]) first++;
+  writeLogs(logs);
+  const before = new Set(expected.split('\n'));
+  const changed = actual.split('\n').filter((line) => line && !before.has(line)).map((line) => line.split(' ')[0]);
   assert.fail(
-    `The replay differs from the snapshot at line ${first + 1}.\nexpected: ${expectedLines[first]}\nactual:   ${actualLines[first]}\n` +
-      'If the engine changed on purpose, run UPDATE_SNAPSHOTS=1 npm test and review the diff of the snapshot.',
+    `Battles that replay differently: ${changed.join(', ')}. Their logs are in dist/replays/.\n` +
+      'Compare with REPLAY_LOGS=1 on main. If the engine changed on purpose, run UPDATE_SNAPSHOTS=1 npm test.',
   );
 });
