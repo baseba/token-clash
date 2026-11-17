@@ -5,7 +5,7 @@ import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js
 import { ABILITIES, type AbilityEffect, type AbilityHook, type BoostChanges } from './ability-effects.js';
 import type { Gender, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { invalid } from '../../shared/domain/errors.js';
-import type { Action, MoveAction, SwitchAction, SideAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, AbilityDetails, Guard, Look, MoveEvent, Mover, OrderReason, SideCondition, Volatiles } from './battle-types.js';
+import type { Action, SwitchAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, AbilityDetails, Guard, Hazards, Look, MoveEvent, Mover, OrderReason, SideCondition, Volatiles } from './battle-types.js';
 
 export type * from './battle-types.js';
 
@@ -345,7 +345,7 @@ function makeMoveApi(battle: BattleState) {
       emit(battle, { t: 'sideStart', side: sideOf(fighter), kind });
       return true;
     },
-    hazard: (fighter: BattleFighter, kind: string): boolean => {
+    hazard: (fighter: BattleFighter, kind: keyof Hazards | 'toxicspikes'): boolean => {
       const sideIndex = 1 - sideOf(fighter);
       const side = battle.sides[sideIndex];
       if (kind === 'toxicspikes') {
@@ -354,11 +354,15 @@ function makeMoveApi(battle: BattleState) {
         emit(battle, { t: 'hazard', side: sideIndex, layers: side.toxicSpikes });
         return true;
       }
-      const hazards = side.hazards as unknown as Record<string, number | boolean>;
-      const cur = hazards[kind];
-      if (kind === 'spikes' ? (cur as number) >= HAZARD_MAX.spikes : cur) return api.nothing(fighter);
-      hazards[kind] = kind === 'spikes' ? (cur as number) + 1 : true;
-      emit(battle, { t: 'sideStart', side: sideIndex, kind, ...(kind === 'spikes' ? { layers: side.hazards.spikes } : {}) });
+      const { hazards } = side;
+      if (kind === 'spikes') {
+        if (hazards.spikes >= HAZARD_MAX.spikes) return api.nothing(fighter);
+        hazards.spikes += 1;
+      } else {
+        if (hazards[kind]) return api.nothing(fighter);
+        hazards[kind] = true;
+      }
+      emit(battle, { t: 'sideStart', side: sideIndex, kind, ...(kind === 'spikes' ? { layers: hazards.spikes } : {}) });
       return true;
     },
     clearHazards: (sideIndex: number) => clearHazards(battle, sideIndex),
@@ -693,10 +697,11 @@ function clearScreens(battle: BattleState, sideIndex: number, cause: string): bo
 function clearHazards(battle: BattleState, sideIndex: number): boolean {
   const side = battle.sides[sideIndex];
   let did = clearToxicSpikes(battle, sideIndex);
-  for (const kind of ['spikes', 'stealthrock', 'stickyweb']) {
-    const hazards = side.hazards as unknown as Record<string, number | boolean>;
+  const { hazards } = side;
+  for (const kind of ['spikes', 'stealthrock', 'stickyweb'] as const) {
     if (!hazards[kind]) continue;
-    hazards[kind] = kind === 'spikes' ? 0 : false;
+    if (kind === 'spikes') hazards.spikes = 0;
+    else hazards[kind] = false;
     emit(battle, { t: 'sideEnd', side: sideIndex, kind });
     did = true;
   }
@@ -1090,7 +1095,7 @@ export function validActions(battle: BattleState, sideIndex: number): Action[] {
   return moves.concat(trapped(battle, sideIndex) ? [] : switches);
 }
 
-const sameAction = (a: Action, b: Action): boolean => a.type === b.type && (a.type === 'move' ? a.move === (b as MoveAction).move : a.to === (b as SwitchAction).to);
+const sameAction = (a: Action, b: Action): boolean => (a.type === 'move' ? b.type === 'move' && a.move === b.move : b.type === 'switch' && a.to === b.to);
 
 // Returns the events of the resolved turn, or null if still waiting on the other side.
 export function submit(battle: BattleState, sideIndex: number, action: Action | null | undefined): BattleEvent[] | null {
@@ -1762,7 +1767,7 @@ function computeDamage(
   const mw = weatherFor(battle, me);
   if (isSun(mw)) dmg *= move.type === 'fire' || move.id === 'hydro-steam' ? 1.5 : move.type === 'water' ? 0.5 : 1;
   if (isRain(mw)) dmg *= move.type === 'water' ? 1.5 : move.type === 'fire' ? 0.5 : 1;
-  if (move.type && me.types.includes(move.type)) dmg *= flag(battle, me, 'stab') ? (abilityDef(battle, me)!.stab as number) : 1.5;
+  if (move.type && me.types.includes(move.type)) dmg *= abilityDef(battle, me)?.stab ?? 1.5;
   dmg *= eff * (0.85 + battle.random() * 0.15) * (crit ? 1.5 : 1);
   if (me.status === 'brn' && physical && !flag(battle, me, 'ignoresBurn') && move.id !== 'facade') dmg *= 0.5;
   if (!crit && screened(battle, me, target, move)) dmg *= 0.5;
@@ -1946,7 +1951,7 @@ function resolveTurn(battle: BattleState): BattleEvent[] {
   battle.moved = new Set();
   for (const fighter of activeFighters(battle)) fighter.activeTurns += 1;
   // Both sides have chosen by now (submit() only resolves then).
-  const acts = battle.sides.map((side, sideIndex) => ({ sideIndex, ...(side.action as SideAction) }));
+  const acts = battle.sides.flatMap((side, sideIndex) => (side.action ? [{ sideIndex, ...side.action }] : []));
   battle.chosen = acts.map((a) => (a.type === 'move' ? moveOfAction(battle, a.sideIndex, a.move) : null));
   for (const side of battle.sides) side.action = null;
   for (const side of battle.sides) for (const fighter of side.team) delete fighter.turnHit;
@@ -1962,7 +1967,7 @@ function resolveTurn(battle: BattleState): BattleEvent[] {
   if (checkEnd(battle)) return done(battle, events);
 
   const movers: Mover[] = acts
-    .filter((a): a is { sideIndex: number } & MoveAction & { auto?: boolean } => a.type === 'move')
+    .filter((a) => a.type === 'move')
     .map((action) => {
       const fighter = activeOf(battle, action.sideIndex);
       const move = action.move === STRUGGLE_MOVE ? STRUGGLE : fighter.moves[action.move];
@@ -2236,8 +2241,8 @@ function resolveReplacements(battle: BattleState): BattleEvent[] {
   battle.events = events;
   const entered: number[] = [];
   battle.sides.forEach((side, sideIndex) => {
-    if (side.mustSwitch && side.action) {
-      if (doSwitch(battle, sideIndex, (side.action as SwitchAction).to)) wakeAbilities(battle, activeOf(battle, sideIndex));
+    if (side.mustSwitch && side.action?.type === 'switch') {
+      if (doSwitch(battle, sideIndex, side.action.to)) wakeAbilities(battle, activeOf(battle, sideIndex));
       entered.push(sideIndex);
     }
     side.action = null;

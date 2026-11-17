@@ -10,7 +10,7 @@ import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js'
 import { now } from '../../shared/domain/clock.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import { ChallengeRepository } from '../domain/arena.repositories.js';
-import { isHumanDuel, type FinalBattleState } from '../domain/challenge.js';
+import { isHumanDuel } from '../domain/challenge.js';
 import { viewersBehind } from '../domain/tournament.js';
 import { ArenaEvents } from './arena-events.js';
 import type { ClientConnection } from './connection.js';
@@ -191,7 +191,7 @@ export class LiveBattleService {
     const { battle } = phase;
     const { challenge } = room;
     const winnerId = battle.winner !== null ? battle.sides[battle.winner].trainerId : null;
-    challenge.finish({ winnerId, turns: battle.turn, final: publicState(battle) as unknown as FinalBattleState, at: now() });
+    challenge.finish({ winnerId, turns: battle.turn, final: publicState(battle), at: now() });
     // Only 1v1 between people counts for the ranking, which belongs to the trainers context.
     if (battle.winner !== null && isHumanDuel(challenge))
       this.trainers.recordRankedResult(battle.sides[battle.winner].trainerId, battle.sides[1 - battle.winner].trainerId);

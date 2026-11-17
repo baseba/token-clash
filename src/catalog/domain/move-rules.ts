@@ -602,7 +602,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
       move.bideDamage = lock.damage * 2;
       return null;
     },
-    damage: (api, me, target, move) => (move.bideDamage! > 0 ? move.bideDamage : null),
+    damage: (api, me, target, move) => ((move.bideDamage ?? 0) > 0 ? move.bideDamage : null),
   },
 
   'crush-grip': { power: (api, me, target) => Math.max(1, Math.floor((120 * target.hp) / target.stats.hp)) },
