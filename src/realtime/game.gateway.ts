@@ -102,88 +102,100 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
 
   @SubscribeMessage('lobby')
   onLobby(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'lobby'>): void {
-    const c = this.conn(socket);
-    if (!c || c.roomId || c.inLobby) return;
-    c.inLobby = true;
-    this.lobby.subscribe(c, msg.token);
+    const connection = this.conn(socket);
+    if (!connection || connection.roomId || connection.inLobby) return;
+    connection.inLobby = true;
+    this.lobby.subscribe(connection, msg.token);
   }
 
   @SubscribeMessage('tour')
   onTour(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'tour'>): void {
-    const c = this.conn(socket);
-    if (!c?.idle) return;
-    const T = this.tournaments.follow(c, msg.id, msg.token);
-    if (T) c.send({ t: 'chatLog', messages: this.chat.history(tournamentChannel(T.id)) });
+    const connection = this.conn(socket);
+    if (!connection?.idle) return;
+    const tournament = this.tournaments.follow(connection, msg.id, msg.token);
+    if (tournament) connection.send({ t: 'chatLog', messages: this.chat.history(tournamentChannel(tournament.id)) });
   }
 
   @SubscribeMessage('hello')
   onHello(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'hello'>): void {
-    const c = this.conn(socket);
-    if (!c?.idle) return;
-    const challenge = this.duels.enter(c, msg.room, msg.token);
-    if (challenge) c.send({ t: 'chatLog', messages: this.chat.history(chatChannel(challenge)) });
+    const connection = this.conn(socket);
+    if (!connection?.idle) return;
+    const challenge = this.duels.enter(connection, msg.room, msg.token);
+    if (challenge) connection.send({ t: 'chatLog', messages: this.chat.history(chatChannel(challenge)) });
   }
 
   @SubscribeMessage('set-ready')
   onSetReady(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'set-ready'>): void {
-    const c = this.conn(socket);
-    if (c?.roomId) this.duels.setReady(c, msg.ready);
+    const connection = this.conn(socket);
+    if (connection?.roomId) this.duels.setReady(connection, msg.ready);
   }
 
   @SubscribeMessage('leave')
   onLeave(@ConnectedSocket() socket: WebSocket): void {
-    const c = this.conn(socket);
-    if (c?.roomId) this.duels.leaveReadyCheck(c);
+    const connection = this.conn(socket);
+    if (connection?.roomId) this.duels.leaveReadyCheck(connection);
   }
 
   @SubscribeMessage('seen')
   onSeen(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'seen'>): void {
-    const c = this.conn(socket);
-    if (c?.roomId) this.duels.seen(c, msg.turn);
+    const connection = this.conn(socket);
+    if (connection?.roomId) this.duels.seen(connection, msg.turn);
   }
 
   @SubscribeMessage('choosing')
   onChoosing(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'choosing'>): void {
-    const c = this.conn(socket);
-    if (c?.roomId) this.duels.choosing(c, msg.picks);
+    const connection = this.conn(socket);
+    if (connection?.roomId) this.duels.choosing(connection, msg.picks);
   }
 
   @SubscribeMessage('pick')
   onPick(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'pick'>): void {
-    const c = this.conn(socket);
-    if (c?.roomId) this.duels.pick(c, msg.picks);
+    const connection = this.conn(socket);
+    if (connection?.roomId) this.duels.pick(connection, msg.picks);
   }
 
   @SubscribeMessage('act')
   onAct(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'act'>): void {
-    const c = this.conn(socket);
-    if (c?.roomId) this.duels.act(c, msg.action);
+    const connection = this.conn(socket);
+    if (connection?.roomId) this.duels.act(connection, msg.action);
   }
 
   @SubscribeMessage('chat')
   onChat(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'chat'>): void {
-    const c = this.conn(socket);
-    if (!c || (!c.roomId && !c.tourId)) return;
-    const trainer = this.trainers.byId(c.trainerId);
+    const connection = this.conn(socket);
+    if (!connection || (!connection.roomId && !connection.tourId)) return;
+    const trainer = this.trainers.byId(connection.trainerId);
     if (!trainer) return;
-    const from = this.chatSender(c, trainer.id);
+    const from = this.chatSender(connection, trainer.id);
     if (!from) return;
     const at = now();
-    const message = this.chat.post(from.channel, { trainerId: trainer.id, name: trainer.name, role: from.role, side: from.side, text: msg.text, lastAt: c.lastChatAt, at });
+    const message = this.chat.post(from.channel, {
+      trainerId: trainer.id,
+      name: trainer.name,
+      role: from.role,
+      side: from.side,
+      text: msg.text,
+      lastAt: connection.lastChatAt,
+      at,
+    });
     if (!message) return;
-    c.lastChatAt = at;
+    connection.lastChatAt = at;
     this.sendToChannel(from.channel, JSON.stringify({ t: 'chat', message }));
   }
 
   /** Where a connection talks and as what: a room player (with their side) or a viewer. */
-  private chatSender(c: WsConnection, trainerId: string) {
-    if (c.roomId) {
-      const found = this.duels.chatRole(c, trainerId, (tournamentId) => this.tournaments.isPlayer(tournamentId, trainerId));
+  private chatSender(connection: WsConnection, trainerId: string) {
+    if (connection.roomId) {
+      const found = this.duels.chatRole(connection, trainerId, (tournamentId) => this.tournaments.isPlayer(tournamentId, trainerId));
       return found && { channel: chatChannel(found.challenge), role: found.role, side: found.side };
     }
-    const T = this.arena.allTournaments().find((t) => t.id === c.tourId);
-    if (!T) return null;
-    return { channel: tournamentChannel(T.id), role: T.seatOf(trainerId) !== -1 ? ('player' as const) : ('watcher' as const), side: null };
+    const tournament = this.arena.allTournaments().find((t) => t.id === connection.tourId);
+    if (!tournament) return null;
+    return {
+      channel: tournamentChannel(tournament.id),
+      role: tournament.seatOf(trainerId) !== -1 ? ('player' as const) : ('watcher' as const),
+      side: null,
+    };
   }
 
   private sendToChannel(channel: string, frame: string): void {

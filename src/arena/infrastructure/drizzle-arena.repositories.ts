@@ -11,9 +11,9 @@ import type { Tournament } from '../domain/tournament.js';
 import { challengeToDomain, challengeToRow, tournamentToDomain, tournamentToRows } from './arena.mapper.js';
 import { challenges, tournamentMatches, tournaments, tournamentSeats, type MatchRow, type SeatRow } from './arena.schema.js';
 
-const groupBy = <T>(rows: T[], key: (r: T) => string) => {
+const groupBy = <T>(rows: T[], key: (row: T) => string) => {
   const out = new Map<string, T[]>();
-  for (const r of rows) out.set(key(r), [...(out.get(key(r)) ?? []), r]);
+  for (const row of rows) out.set(key(row), [...(out.get(key(row)) ?? []), row]);
   return out;
 };
 
@@ -24,8 +24,8 @@ export class DrizzleChallengeRepository extends ChallengeRepository {
   constructor(@InjectDrizzle() private readonly db: Database) {
     super();
     for (const row of this.db.select().from(challenges).all()) {
-      const c = challengeToDomain(row);
-      this.byId.set(c.id, c);
+      const challenge = challengeToDomain(row);
+      this.byId.set(challenge.id, challenge);
     }
   }
 
@@ -37,10 +37,10 @@ export class DrizzleChallengeRepository extends ChallengeRepository {
     return this.byId.get(id);
   }
 
-  save(c: Challenge): void {
-    const row = challengeToRow(c);
+  save(challenge: Challenge): void {
+    const row = challengeToRow(challenge);
     this.db.insert(challenges).values(row).onConflictDoUpdate({ target: challenges.id, set: row }).run();
-    this.byId.set(c.id, c);
+    this.byId.set(challenge.id, challenge);
   }
 }
 
@@ -53,8 +53,8 @@ export class DrizzleTournamentRepository extends TournamentRepository {
     const seats = groupBy<SeatRow>(this.db.select().from(tournamentSeats).all(), (r) => r.tournamentId);
     const matches = groupBy<MatchRow>(this.db.select().from(tournamentMatches).all(), (r) => r.tournamentId);
     for (const row of this.db.select().from(tournaments).all()) {
-      const t = tournamentToDomain(row, seats.get(row.id) ?? [], matches.get(row.id) ?? []);
-      this.byId.set(t.id, t);
+      const tournament = tournamentToDomain(row, seats.get(row.id) ?? [], matches.get(row.id) ?? []);
+      this.byId.set(tournament.id, tournament);
     }
   }
 
@@ -67,15 +67,15 @@ export class DrizzleTournamentRepository extends TournamentRepository {
   }
 
   /** The whole aggregate, in one transaction: tournament row, its seats and its bracket. */
-  save(t: Tournament): void {
-    const rows = tournamentToRows(t);
+  save(tournament: Tournament): void {
+    const rows = tournamentToRows(tournament);
     this.db.transaction((tx) => {
       tx.insert(tournaments).values(rows.tournament).onConflictDoUpdate({ target: tournaments.id, set: rows.tournament }).run();
-      tx.delete(tournamentSeats).where(eq(tournamentSeats.tournamentId, t.id)).run();
-      tx.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, t.id)).run();
+      tx.delete(tournamentSeats).where(eq(tournamentSeats.tournamentId, tournament.id)).run();
+      tx.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, tournament.id)).run();
       if (rows.seats.length) tx.insert(tournamentSeats).values(rows.seats).run();
       if (rows.matches.length) tx.insert(tournamentMatches).values(rows.matches).run();
     });
-    this.byId.set(t.id, t);
+    this.byId.set(tournament.id, tournament);
   }
 }

@@ -191,22 +191,22 @@ const FLOATING_ABILITIES = new Set(['levitate', 'eelevate']);
 
 export function floats(id: number): boolean {
   if (id <= AIRBORNE.coversUpTo) return AIRBORNE_IDS.has(id);
-  const d = POKEAPI[id];
-  if (!d) return false;
-  return d.types.includes('flying') || [...(d.abilities ?? []), d.hiddenAbility].some((a) => FLOATING_ABILITIES.has(a as string));
+  const species = POKEAPI[id];
+  if (!species) return false;
+  return species.types.includes('flying') || [...(species.abilities ?? []), species.hiddenAbility].some((a) => FLOATING_ABILITIES.has(a as string));
 }
 
 // PokeAPI data of a species number, or null when we don't have it (unknown or newer species).
 export function speciesData(id: number): SpeciesData | null {
-  const d = POKEAPI[id];
-  if (!d) return null;
-  const [hp, attack, defense, spAttack, spDefense, speed] = d.stats;
-  return { ...d, base: { hp, attack, defense, spAttack, spDefense, speed } };
+  const species = POKEAPI[id];
+  if (!species) return null;
+  const [hp, attack, defense, spAttack, spDefense, speed] = species.stats;
+  return { ...species, base: { hp, attack, defense, spAttack, spDefense, speed } };
 }
 
 export function formData(name: string): FormData | null {
-  const f = FORMS[name];
-  return f ? { types: f.types, base: f.stats, sprite: f.sprite } : null;
+  const form = FORMS[name];
+  return form ? { types: form.types, base: form.stats, sprite: form.sprite } : null;
 }
 
 export function hash(str: string): number {
@@ -231,7 +231,7 @@ export function rng(seed: number | string): Random {
   };
 }
 
-const between = (r: Random, lo: number, hi: number) => lo + Math.floor(r() * (hi - lo + 1));
+const between = (random: Random, lo: number, hi: number) => lo + Math.floor(random() * (hi - lo + 1));
 
 export function shuffled<T>(items: Iterable<T>, random: Random = Math.random): T[] {
   const out = [...items];
@@ -267,51 +267,59 @@ export const STRUGGLE: MoveData = {
   type: null, category: 'physical', power: 50, accuracy: null, pp: 1, priority: 0, target: 'foe', flags: ['contact'], kind: 'attack', recoilMaxHp: 1 / 4, supported: true,
 };
 
-function supportedMove(m: MoveData): boolean {
-  if (m.category !== 'status') return m.power > 0 || !!m.fixedDamage || !!m.ohko;
-  return !!(m.boosts || m.self || m.status || m.screen || SUPPORTED_VOLATILES.has(m.volatile as string) || m.heal || m.weather || m.terrain || SPECIAL_STATUS_MOVES.has(m.id));
+function supportedMove(move: MoveData): boolean {
+  if (move.category !== 'status') return move.power > 0 || !!move.fixedDamage || !!move.ohko;
+  return !!(move.boosts
+    || move.self
+    || move.status
+    || move.screen
+    || SUPPORTED_VOLATILES.has(move.volatile as string)
+    || move.heal
+    || move.weather
+    || move.terrain
+    || SPECIAL_STATUS_MOVES.has(move.id));
 }
 
 export const ALL_MOVE_IDS = (): string[] => Object.keys(MOVEDEX);
 
 export function moveData(id: string): MoveData | null {
-  const d = MOVEDEX[id];
-  if (!d) return null;
+  const raw = MOVEDEX[id];
+  if (!raw) return null;
   // `supported` is set last, as before, so the object keeps its key order.
-  const m = { key: id, id, ...d, flags: [...(d.flags ?? [])], kind: d.category === 'status' ? 'status' : 'attack' } as MoveData;
-  if (GRASSY_HALVED.has(id)) m.weakenedByGrassyTerrain = true;
-  if (id === 'foul-play') m.usesTargetAttack = true;
-  if (id === 'toxic') m.status = 'tox';
-  if (SCREEN_MOVES[id]) m.screen = SCREEN_MOVES[id];
-  if (SCREEN_BREAKERS.has(id)) m.breaksScreens = true;
+  const move = { key: id, id, ...raw, flags: [...(raw.flags ?? [])], kind: raw.category === 'status' ? 'status' : 'attack' } as MoveData;
+  if (GRASSY_HALVED.has(id)) move.weakenedByGrassyTerrain = true;
+  if (id === 'foul-play') move.usesTargetAttack = true;
+  if (id === 'toxic') move.status = 'tox';
+  if (SCREEN_MOVES[id]) move.screen = SCREEN_MOVES[id];
+  if (SCREEN_BREAKERS.has(id)) move.breaksScreens = true;
   if (id === 'defog') {
-    m.boosts = { eva: -1 };
-    m.clearsScreens = true;
+    move.boosts = { eva: -1 };
+    move.clearsScreens = true;
   }
-  if (FIRST_TURN_ONLY.has(id)) m.firstTurnOnly = true;
-  if (RAMPAGE.has(id)) m.rampage = true;
-  if (BINDING.has(id)) m.binds = true;
-  if (TRAPPING.has(id)) m.traps = true;
-  if (SELF_SWITCH.has(id)) m.selfSwitch = true;
-  if (FORCE_SWITCH.has(id)) m.forceSwitch = true;
-  if (LEAVES_ONE.has(id)) m.leavesOne = true;
-  if (CRASHES.has(id)) m.crashes = true;
-  if (IGNORES_DEF_BOOSTS.has(id)) m.ignoresDefBoosts = true;
-  if (HITS_PHYSICAL_DEF.has(id)) m.hitsPhysicalDef = true;
-  if (LOSES_TYPE[id]) m.losesType = LOSES_TYPE[id];
-  if (SELF_COST[id]) m.selfCost = SELF_COST[id];
-  if (id === 'body-press') m.usesDefense = true;
-  if (id === 'flying-press') m.extraType = 'flying';
-  if (id === 'clanging-scales') m.self = { def: -1 };
-  if (id === 'scale-shot') m.self = { def: -1, spd: 1 };
-  if (id === 'mind-blown' || id === 'steel-beam') m.recoilMaxHp = 1 / 2;
-  if (id === 'memento') m.selfDestruct = true;
-  if (id === 'snore') m.usableAsleep = true;
-  if (id === 'smack-down' || id === 'thousand-arrows') m.grounds = true;
-  if (id === 'thousand-arrows') m.hitsAirborne = true;
-  if (id === 'defense-curl') m.curls = true;
-  m.supported = !IMPOSSIBLE_MOVES.has(id) && (supportedMove(m) || !!MOVE_RULES[id]);
-  return m;
+  if (FIRST_TURN_ONLY.has(id)) move.firstTurnOnly = true;
+  if (RAMPAGE.has(id)) move.rampage = true;
+  if (BINDING.has(id)) move.binds = true;
+  if (TRAPPING.has(id)) move.traps = true;
+  if (SELF_SWITCH.has(id)) move.selfSwitch = true;
+  if (FORCE_SWITCH.has(id)) move.forceSwitch = true;
+  if (LEAVES_ONE.has(id)) move.leavesOne = true;
+  if (CRASHES.has(id)) move.crashes = true;
+  if (IGNORES_DEF_BOOSTS.has(id)) move.ignoresDefBoosts = true;
+  if (HITS_PHYSICAL_DEF.has(id)) move.hitsPhysicalDef = true;
+  if (LOSES_TYPE[id]) move.losesType = LOSES_TYPE[id];
+  if (SELF_COST[id]) move.selfCost = SELF_COST[id];
+  if (id === 'body-press') move.usesDefense = true;
+  if (id === 'flying-press') move.extraType = 'flying';
+  if (id === 'clanging-scales') move.self = { def: -1 };
+  if (id === 'scale-shot') move.self = { def: -1, spd: 1 };
+  if (id === 'mind-blown' || id === 'steel-beam') move.recoilMaxHp = 1 / 2;
+  if (id === 'memento') move.selfDestruct = true;
+  if (id === 'snore') move.usableAsleep = true;
+  if (id === 'smack-down' || id === 'thousand-arrows') move.grounds = true;
+  if (id === 'thousand-arrows') move.hitsAirborne = true;
+  if (id === 'defense-curl') move.curls = true;
+  move.supported = !IMPOSSIBLE_MOVES.has(id) && (supportedMove(move) || !!MOVE_RULES[id]);
+  return move;
 }
 
 export function lineage(id: number): number[] {
@@ -321,7 +329,8 @@ export function lineage(id: number): number[] {
 }
 
 const CHILDREN = new Map<number, number[]>();
-for (const [id, d] of Object.entries(POKEAPI)) if (d.evolvesFrom) CHILDREN.set(d.evolvesFrom, [...(CHILDREN.get(d.evolvesFrom) ?? []), Number(id)]);
+for (const [id, species] of Object.entries(POKEAPI))
+  if (species.evolvesFrom) CHILDREN.set(species.evolvesFrom, [...(CHILDREN.get(species.evolvesFrom) ?? []), Number(id)]);
 
 
 export function family(id: number): { id: number; stage: number }[] {
@@ -355,7 +364,7 @@ type EntryLike = Pick<RosterEntry, 'finalID'> & Partial<RosterEntry>;
 export function moveOrigins(entry: EntryLike): Map<string, MoveOrigin> {
   const out = new Map<string, MoveOrigin>();
   const byLevel = [...lineageLearnset(entry.finalID)].sort((a, b) => a[1].level - b[1].level || a[0].localeCompare(b[0]));
-  for (const [id, m] of byLevel) out.set(id, { origin: 'level', level: m.level });
+  for (const [id, learned] of byLevel) out.set(id, { origin: 'level', level: learned.level });
   const line = lineage(entry.finalID);
   for (const origin of TEACH_ORIGINS) {
     const ids = new Set(line.flatMap((speciesId) => POKEAPI[speciesId].teachable?.[origin] ?? []));
@@ -426,22 +435,22 @@ const RARITY_BASE: Record<string, number> = { common: 55, uncommon: 65, rare: 75
 export function species(entry: EntryLike): SpeciesView {
   const { finalID, rarity } = entry;
   const data = speciesData(finalID);
-  const r = rng(`sp:${finalID}`);
+  const random = rng(`sp:${finalID}`);
   const types = data ? data.types : ['normal'];
 
   let stats: Stats;
   if (data) {
-    const b = data.base;
-    stats = { hp: b.hp, atk: b.attack, def: b.defense, satk: b.spAttack, sdef: b.spDefense, spd: b.speed };
+    const base = data.base;
+    stats = { hp: base.hp, atk: base.attack, def: base.defense, satk: base.spAttack, sdef: base.spDefense, spd: base.speed };
   } else {
     const base = RARITY_BASE[rarity as string] ?? RARITY_BASE.common;
     stats = {
-      hp: base + between(r, -14, 14),
-      atk: base + between(r, -16, 16),
-      def: base + between(r, -16, 16),
-      satk: base + between(r, -16, 16),
-      sdef: base + between(r, -16, 16),
-      spd: base + between(r, -18, 18),
+      hp: base + between(random, -14, 14),
+      atk: base + between(random, -16, 16),
+      def: base + between(random, -16, 16),
+      satk: base + between(random, -16, 16),
+      sdef: base + between(random, -16, 16),
+      spd: base + between(random, -18, 18),
     };
   }
   return { id: finalID, name: data ? data.name : `#${finalID}`, sprite: String(finalID), types, stats, floats: floats(finalID) };

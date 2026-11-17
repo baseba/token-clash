@@ -95,29 +95,34 @@ export class AppConfig {
       const problems = parsed.error.issues.map((issue) => `${issue.path.join('.')}=${JSON.stringify(set[String(issue.path[0])])}: ${issue.message}`);
       throw new Error(`Configuración inválida:\n  ${problems.join('\n  ')}`);
     }
-    const e = parsed.data;
+    const vars = parsed.data;
     return new AppConfig(
-      e.PORT,
-      e.HOST,
-      e.DATA_DIR,
-      e.PUBLIC_ORIGIN ?? '',
-      e.TRUST_CF_CONNECTING_IP === '1',
-      { apiKey: e.JEV_API_KEY, url: e.JEV_API_URL ?? null, model: e.JEV_MODEL ?? null, enabled: Boolean(e.JEV_API_KEY || e.JEV_API_URL) },
+      vars.PORT,
+      vars.HOST,
+      vars.DATA_DIR,
+      vars.PUBLIC_ORIGIN ?? '',
+      vars.TRUST_CF_CONNECTING_IP === '1',
       {
-        turnLimitMs: e.TURN_MS,
-        pickLimitMs: e.PREVIEW_MS,
-        diceRollBonusMs: e.ROLL_MS,
-        countdownMs: e.MATCH_MS,
-        revealMs: e.REVEAL_MS,
-        diceAnimationMs: e.DICE_ANIM_MS,
-        aiPickMs: e.AI_PICK_MS,
-        bracketDrawMs: e.DRAW_MS,
-        betweenMatchesMs: e.BETWEEN_MS,
-        aiVsAiPauseMs: e.AI_PACE_MS,
-        aiVsAiViewerWaitMs: e.AI_WATCH_MS,
-        absentLimitMs: e.ABSENT_MS,
-        seatGraceMs: e.SEAT_GRACE_MS,
-        arrivalWaitMs: e.ARRIVAL_MS,
+        apiKey: vars.JEV_API_KEY,
+        url: vars.JEV_API_URL ?? null,
+        model: vars.JEV_MODEL ?? null,
+        enabled: Boolean(vars.JEV_API_KEY || vars.JEV_API_URL),
+      },
+      {
+        turnLimitMs: vars.TURN_MS,
+        pickLimitMs: vars.PREVIEW_MS,
+        diceRollBonusMs: vars.ROLL_MS,
+        countdownMs: vars.MATCH_MS,
+        revealMs: vars.REVEAL_MS,
+        diceAnimationMs: vars.DICE_ANIM_MS,
+        aiPickMs: vars.AI_PICK_MS,
+        bracketDrawMs: vars.DRAW_MS,
+        betweenMatchesMs: vars.BETWEEN_MS,
+        aiVsAiPauseMs: vars.AI_PACE_MS,
+        aiVsAiViewerWaitMs: vars.AI_WATCH_MS,
+        absentLimitMs: vars.ABSENT_MS,
+        seatGraceMs: vars.SEAT_GRACE_MS,
+        arrivalWaitMs: vars.ARRIVAL_MS,
       },
     );
   }

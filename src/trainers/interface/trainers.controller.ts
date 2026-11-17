@@ -33,41 +33,41 @@ export class TrainersController {
 
   @Get('me')
   @Authenticated()
-  me(@CurrentTrainer() t: Trainer) {
-    return { me: myView(t, this.skynet.aiLevels) };
+  me(@CurrentTrainer() trainer: Trainer) {
+    return { me: myView(trainer, this.skynet.aiLevels) };
   }
 
   @Put('me')
   @Authenticated()
-  updateMe(@CurrentTrainer() t: Trainer, @Body({ schema: UpdateProfileDto }) body: UpdateProfileDto) {
-    return { me: myView(this.trainers.updateProfile(t, body), this.skynet.aiLevels) };
+  updateMe(@CurrentTrainer() trainer: Trainer, @Body({ schema: UpdateProfileDto }) body: UpdateProfileDto) {
+    return { me: myView(this.trainers.updateProfile(trainer, body), this.skynet.aiLevels) };
   }
 
   @Get('me/mons/:id')
   @Authenticated()
-  mon(@CurrentTrainer() t: Trainer, @Param('id') id: string) {
-    return { mon: monDetail(t.entry(id)) };
+  mon(@CurrentTrainer() trainer: Trainer, @Param('id') id: string) {
+    return { mon: monDetail(trainer.entry(id)) };
   }
 
   @Put('me/mons/:id')
   @Authenticated()
-  updateMon(@CurrentTrainer() t: Trainer, @Param('id') id: string, @Body({ schema: UpdateMonDto }) body: UpdateMonDto) {
-    this.trainers.updateMon(t, id, body);
-    return { mon: monDetail(t.entry(id)) };
+  updateMon(@CurrentTrainer() trainer: Trainer, @Param('id') id: string, @Body({ schema: UpdateMonDto }) body: UpdateMonDto) {
+    this.trainers.updateMon(trainer, id, body);
+    return { mon: monDetail(trainer.entry(id)) };
   }
 
   @All('me/mons/:id')
   @Authenticated()
-  monOtherMethods(@CurrentTrainer() t: Trainer, @Param('id') id: string) {
-    t.entry(id); // 404 first, like the routes above
+  monOtherMethods(@CurrentTrainer() trainer: Trainer, @Param('id') id: string) {
+    trainer.entry(id); // 404 first, like the routes above
     throw new HttpError(405, 'Método no permitido');
   }
 
   /** Species you have registered (owned, or an earlier form of one you own). */
   @Get('pokedex')
   @Authenticated()
-  pokedex(@CurrentTrainer() t: Trainer) {
-    return { pokedex: pokedexOf(t.roster) };
+  pokedex(@CurrentTrainer() trainer: Trainer) {
+    return { pokedex: pokedexOf(trainer.roster) };
   }
 
   @Get('leaderboard')

@@ -27,9 +27,9 @@ export class DrizzleTrainerRepository extends TrainerRepository {
     for (const row of this.db.select().from(trainers).all()) this.remember(toDomain(row, roster.get(row.id) ?? []));
   }
 
-  private remember(t: Trainer): void {
-    this.byId.set(t.id, t);
-    this.byToken.set(t.tokenHash, t);
+  private remember(trainer: Trainer): void {
+    this.byId.set(trainer.id, trainer);
+    this.byToken.set(trainer.tokenHash, trainer);
   }
 
   all(): Trainer[] {
@@ -44,18 +44,18 @@ export class DrizzleTrainerRepository extends TrainerRepository {
     return this.byToken.get(tokenHash);
   }
 
-  save(t: Trainer): void {
-    const row = toRow(t);
-    const entries = t.roster.map((e, i) => entryToRow(t.id, e, i));
+  save(trainer: Trainer): void {
+    const row = toRow(trainer);
+    const entries = trainer.roster.map((e, i) => entryToRow(trainer.id, e, i));
     this.db.transaction((tx) => {
       tx.insert(trainers).values(row).onConflictDoUpdate({ target: trainers.id, set: row }).run();
-      tx.delete(rosterEntries).where(eq(rosterEntries.trainerId, t.id)).run();
+      tx.delete(rosterEntries).where(eq(rosterEntries.trainerId, trainer.id)).run();
       for (let i = 0; i < entries.length; i += CHUNK) tx.insert(rosterEntries).values(entries.slice(i, i + CHUNK)).run();
     });
-    this.remember(t);
+    this.remember(trainer);
   }
 
-  saveLastSeen(t: Trainer): void {
-    this.db.update(trainers).set({ lastSeen: t.lastSeen ?? null }).where(eq(trainers.id, t.id)).run();
+  saveLastSeen(trainer: Trainer): void {
+    this.db.update(trainers).set({ lastSeen: trainer.lastSeen ?? null }).where(eq(trainers.id, trainer.id)).run();
   }
 }

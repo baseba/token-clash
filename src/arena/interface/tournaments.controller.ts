@@ -22,72 +22,72 @@ export class TournamentsController {
   @HttpCode(200)
   @RateLimit({ bucket: 'challenge', by: 'trainer', max: 30, windowMs: 10 * 60_000, message: 'Demasiados desafíos, espera unos minutos.' })
   @Authenticated(NO_SESSION)
-  create(@CurrentTrainer() t: Trainer, @Body({ schema: NewTournamentDto }) body: NewTournamentDto) {
-    const { tournament, joined } = this.tournaments.create(t, body);
-    return { tournament: this.views.tournament(tournament, t.id), ...(joined ? { joined } : {}) };
+  create(@CurrentTrainer() trainer: Trainer, @Body({ schema: NewTournamentDto }) body: NewTournamentDto) {
+    const { tournament, joined } = this.tournaments.create(trainer, body);
+    return { tournament: this.views.tournament(tournament, trainer.id), ...(joined ? { joined } : {}) };
   }
 
   @Get(':id')
   @MaybeAuthenticated()
-  get(@CurrentTrainer() t: Trainer | undefined, @Param('id') id: string) {
-    return { tournament: this.views.tournament(this.tournaments.find(id), t?.id) };
+  get(@CurrentTrainer() trainer: Trainer | undefined, @Param('id') id: string) {
+    return { tournament: this.views.tournament(this.tournaments.find(id), trainer?.id) };
   }
 
   @Delete(':id')
   @HttpCode(200)
   @Authenticated(NO_SESSION)
-  close(@CurrentTrainer() t: Trainer, @Param('id') id: string) {
-    return this.after(t, id, (T) => this.tournaments.closeByHost(T, t));
+  close(@CurrentTrainer() trainer: Trainer, @Param('id') id: string) {
+    return this.after(trainer, id, (T) => this.tournaments.closeByHost(T, trainer));
   }
 
   @Post(':id/join')
   @HttpCode(200)
   @Authenticated(NO_SESSION)
-  join(@CurrentTrainer() t: Trainer, @Param('id') id: string) {
-    return this.after(t, id, (T) => this.tournaments.join(T, t));
+  join(@CurrentTrainer() trainer: Trainer, @Param('id') id: string) {
+    return this.after(trainer, id, (T) => this.tournaments.join(T, trainer));
   }
 
   @Post(':id/leave')
   @HttpCode(200)
   @Authenticated(NO_SESSION)
-  leave(@CurrentTrainer() t: Trainer, @Param('id') id: string) {
-    return this.after(t, id, (T) => this.tournaments.leave(T, t));
+  leave(@CurrentTrainer() trainer: Trainer, @Param('id') id: string) {
+    return this.after(trainer, id, (T) => this.tournaments.leave(T, trainer));
   }
 
   @Post(':id/ready')
   @HttpCode(200)
   @Authenticated(NO_SESSION)
-  ready(@CurrentTrainer() t: Trainer, @Param('id') id: string, @Body({ schema: SetReadyDto }) body: SetReadyDto) {
-    return this.after(t, id, (T) => this.tournaments.setReady(T, t, body.ready));
+  ready(@CurrentTrainer() trainer: Trainer, @Param('id') id: string, @Body({ schema: SetReadyDto }) body: SetReadyDto) {
+    return this.after(trainer, id, (T) => this.tournaments.setReady(T, trainer, body.ready));
   }
 
   @Post(':id/ai')
   @HttpCode(200)
   @Authenticated(NO_SESSION)
-  addAi(@CurrentTrainer() t: Trainer, @Param('id') id: string, @Body({ schema: AddAisDto }) body: AddAisDto) {
-    return this.after(t, id, (T) => this.tournaments.addAis(T, t, body));
+  addAi(@CurrentTrainer() trainer: Trainer, @Param('id') id: string, @Body({ schema: AddAisDto }) body: AddAisDto) {
+    return this.after(trainer, id, (T) => this.tournaments.addAis(T, trainer, body));
   }
 
   @Delete(':id/seats/:seat')
   @HttpCode(200)
   @Authenticated(NO_SESSION)
-  kick(@CurrentTrainer() t: Trainer, @Param('id') id: string, @Param('seat') seat: string) {
+  kick(@CurrentTrainer() trainer: Trainer, @Param('id') id: string, @Param('seat') seat: string) {
     if (!/^\d+$/.test(seat)) throw new HttpError(404, 'No encontrado');
-    return this.after(t, id, (T) => this.tournaments.kick(T, t, Number(seat)));
+    return this.after(trainer, id, (T) => this.tournaments.kick(T, trainer, Number(seat)));
   }
 
   @All([':id', ':id/join', ':id/leave', ':id/ready', ':id/ai', ':id/seats/:seat'])
   @MaybeAuthenticated()
-  otherMethods(@CurrentTrainer() t: Trainer | undefined, @Param('id') id: string) {
+  otherMethods(@CurrentTrainer() trainer: Trainer | undefined, @Param('id') id: string) {
     this.tournaments.find(id);
-    if (!t) throw new HttpError(401, NO_SESSION);
+    if (!trainer) throw new HttpError(401, NO_SESSION);
     throw new HttpError(405, 'Método no permitido');
   }
 
   /** Runs a change on an existing tournament and answers with how it looks now. */
-  private after(t: Trainer, id: string, change: (T: Tournament) => void) {
-    const T = this.tournaments.find(id);
-    change(T);
-    return { tournament: this.views.tournament(T, t.id) };
+  private after(trainer: Trainer, id: string, change: (tournament: Tournament) => void) {
+    const tournament = this.tournaments.find(id);
+    change(tournament);
+    return { tournament: this.views.tournament(tournament, trainer.id) };
   }
 }

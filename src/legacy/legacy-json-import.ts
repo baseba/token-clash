@@ -50,8 +50,8 @@ export function importLegacyJson(db: Database, dataDir: string, log?: Pick<Logge
     mark({ result: 'no-file' });
     return { imported: false, reason: 'no-file' };
   }
-  const [{ n }] = db.select({ n: count() }).from(trainers).all();
-  if (n > 0) {
+  const [{ trainerCount }] = db.select({ trainerCount: count() }).from(trainers).all();
+  if (trainerCount > 0) {
     // Someone already has data in SQLite: never mix an old JSON into it.
     log?.warn(`Hay ${LEGACY_FILE} pero la base ya tiene datos: no lo importo.`);
     mark({ result: 'skipped-db-not-empty' });
@@ -68,8 +68,8 @@ export function importLegacyJson(db: Database, dataDir: string, log?: Pick<Logge
     for (const rows of chunks(ts.map(toRow))) tx.insert(trainers).values(rows).run();
     for (const rows of chunks(entries)) tx.insert(rosterEntries).values(rows).run();
     for (const rows of chunks(cs.map(challengeToRow))) tx.insert(challenges).values(rows).run();
-    for (const t of tours) {
-      const rows = tournamentToRows(t);
+    for (const tournament of tours) {
+      const rows = tournamentToRows(tournament);
       tx.insert(tournaments).values(rows.tournament).run();
       if (rows.seats.length) tx.insert(tournamentSeats).values(rows.seats).run();
       if (rows.matches.length) tx.insert(tournamentMatches).values(rows.matches).run();

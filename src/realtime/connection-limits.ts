@@ -27,8 +27,8 @@ export class ConnectionLimits {
   }
 
   closed(ip: string): void {
-    const n = (this.perIp.get(ip) ?? 1) - 1;
-    if (n <= 0) this.perIp.delete(ip);
-    else this.perIp.set(ip, n);
+    const remaining = (this.perIp.get(ip) ?? 1) - 1;
+    if (remaining <= 0) this.perIp.delete(ip);
+    else this.perIp.set(ip, remaining);
   }
 }

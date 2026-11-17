@@ -21,9 +21,10 @@ export interface Asset {
 @Injectable()
 export class WebAssets {
   readonly version: string = (() => {
-    const h = createHash('sha256');
-    for (const f of readdirSync(PUBLIC_DIR).filter((f) => /\.(js|css|html)$/.test(f)).sort()) h.update(f).update(readFileSync(join(PUBLIC_DIR, f)));
-    return h.digest('hex').slice(0, 10);
+    const hash = createHash('sha256');
+    for (const file of readdirSync(PUBLIC_DIR).filter((f) => /\.(js|css|html)$/.test(f)).sort())
+      hash.update(file).update(readFileSync(join(PUBLIC_DIR, file)));
+    return hash.digest('hex').slice(0, 10);
   })();
 
   /** A file of public/, or null if there is none (or the path tries to leave public/). */
