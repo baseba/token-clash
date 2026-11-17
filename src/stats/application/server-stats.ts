@@ -3,6 +3,7 @@
 import { humanCount, type TournamentState } from '../../arena/domain/tournament.js';
 import type { ChallengeState } from '../../arena/domain/challenge.js';
 import { TURN_LIMIT } from '../../combat/domain/battle.js';
+import { byRanking } from '../../trainers/domain/ranking.js';
 import type { TrainerState } from '../../trainers/domain/trainer.js';
 
 const RECENT = 12;
@@ -38,7 +39,7 @@ export function rankingOf(trainers: TrainerLike[]) {
         totalTokens: t.totalTokens ?? 0,
       };
     })
-    .sort((a, b) => b.wins - a.wins || b.winRate! - a.winRate! || a.losses - b.losses || a.name.localeCompare(b.name));
+    .sort(byRanking);
 }
 
 /** Groups accounts that imported the same save (they share Pokémon instance ids): one person each. */
