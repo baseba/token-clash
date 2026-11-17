@@ -8,7 +8,7 @@ import { SkynetService } from '../../combat/application/skynet.service.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { newId, now } from '../../shared/domain/clock.js';
-import { conflict, forbidden, invalid, notFound } from '../../shared/domain/errors.js';
+import { conflict, notFound } from '../../shared/domain/errors.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
@@ -101,7 +101,7 @@ export class TournamentsService implements OnModuleInit {
   }
 
   closeByHost(T: Tournament, trainer: Trainer): void {
-    if (T.hostId !== trainer.id) throw forbidden('Solo el dueño puede cerrar el torneo.');
+    T.assertHost(trainer.id, 'cerrar el torneo');
     T.assertLobby();
     this.close(T);
   }
@@ -113,15 +113,15 @@ export class TournamentsService implements OnModuleInit {
   }
 
   addAis(T: Tournament, trainer: Trainer, { level, count }: { level: string; count: number }): void {
-    if (T.hostId !== trainer.id) throw forbidden('Solo el dueño puede agregar IAs.');
+    T.assertHost(trainer.id, 'agregar IAs');
     T.assertLobby();
-    if (!this.skynet.aiLevels.includes(level)) throw invalid('Esa dificultad no está disponible.');
+    this.skynet.assertOffered(level);
     T.addAis(level, count);
     this.afterSeatsChange(T);
   }
 
   kick(T: Tournament, trainer: Trainer, seat: number): void {
-    if (T.hostId !== trainer.id) throw forbidden('Solo el dueño puede quitar jugadores.');
+    T.assertHost(trainer.id, 'quitar jugadores');
     T.assertLobby();
     T.kick(seat);
     this.afterSeatsChange(T);

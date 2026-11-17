@@ -2,10 +2,9 @@
 // it, join it, and list your history.
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { uniqueSpecies } from '../../catalog/domain/roster-entry.js';
-import { JEV_LEVEL } from '../../combat/domain/ai.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { newId, now } from '../../shared/domain/clock.js';
-import { forbidden, invalid, notFound, unavailable } from '../../shared/domain/errors.js';
+import { forbidden, notFound } from '../../shared/domain/errors.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
 import { Challenge, type BattleMode, type Visibility } from '../domain/challenge.js';
@@ -59,9 +58,10 @@ export class ChallengesService implements OnModuleInit {
    * same mode and level (or returns your own); otherwise a new room is opened.
    */
   create(trainer: Trainer, input: NewChallenge): { challenge: Challenge; joined?: boolean } {
-    if (input.ai === JEV_LEVEL && !this.skynet.enabled) throw unavailable('Skynet no está disponible en este servidor.');
-    if (input.ai !== undefined && !this.skynet.aiLevels.includes(input.ai)) throw invalid('Esa dificultad no está disponible.');
-    if (input.ai !== undefined) return { challenge: this.duels.startAgainstAi(trainer, { mode: input.mode, levelCap: input.levelCap, level: input.ai }) };
+    if (input.ai !== undefined) {
+      this.skynet.assertOffered(input.ai);
+      return { challenge: this.duels.startAgainstAi(trainer, { mode: input.mode, levelCap: input.levelCap, level: input.ai }) };
+    }
     if (input.visibility === 'public') {
       const { own, rival } = matchFor(this.lobby.publicRooms(), { trainerId: trainer.id, mode: input.mode, levelCap: input.levelCap });
       if (rival) {
