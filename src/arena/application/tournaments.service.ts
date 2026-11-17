@@ -1,6 +1,6 @@
 // Use cases for tournaments: the lobby (seats, AIs, ready), the draw, and playing the bracket one
-// match at a time. Each match is an ordinary challenge driven by DuelService; when it ends,
-// DuelService announces it (ArenaEvents) and the bracket advances here.
+// match at a time. Each match is an ordinary challenge that starts at its countdown; when its
+// battle ends, LiveBattleService announces it (ArenaEvents) and the bracket advances here.
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { buildAiRandomParty, buildAiTeam } from '../../combat/domain/ai.js';
 import { randomParty } from '../../combat/domain/random-party.js';
@@ -17,9 +17,10 @@ import { shuffledOrder, tournamentMatchFor, type Seat, Tournament } from '../dom
 import { ArenaEvents, type MatchFinished } from './arena-events.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
-import { averageLevel, DuelService } from './duel.service.js';
+import { averageLevel } from './duel.service.js';
 import { LobbyService } from './lobby.service.js';
 import { Presence } from './presence.js';
+import { TeamPreviewService } from './team-preview.service.js';
 
 export interface NewTournament {
   mode: BattleMode;
@@ -39,7 +40,7 @@ export class TournamentsService implements OnModuleInit {
     private readonly tournaments: TournamentRepository,
     private readonly challenges: ChallengeRepository,
     private readonly trainers: TrainersService,
-    private readonly duels: DuelService,
+    private readonly previews: TeamPreviewService,
     private readonly lobby: LobbyService,
     private readonly presence: Presence,
     private readonly views: ArenaViews,
@@ -235,7 +236,7 @@ export class TournamentsService implements OnModuleInit {
     this.challenges.save(challenge);
     tournament.matchStarted(next, challenge.id);
     this.tournaments.save(tournament);
-    this.duels.startCountdown(challenge, tournament.label(next));
+    this.previews.startCountdown(challenge, tournament.label(next));
     this.broadcast(tournament);
   }
 

@@ -9,7 +9,9 @@ import type { WebSocket, WebSocketServer } from 'ws';
 import { ArenaQueries } from '../arena/application/arena-queries.js';
 import type { ClientConnection } from '../arena/application/connection.js';
 import { DuelService } from '../arena/application/duel.service.js';
+import { LiveBattleService } from '../arena/application/live-battle.service.js';
 import { LobbyService } from '../arena/application/lobby.service.js';
+import { TeamPreviewService } from '../arena/application/team-preview.service.js';
 import { TournamentsService } from '../arena/application/tournaments.service.js';
 import { ChatService } from '../chat/application/chat.service.js';
 import { chatChannel, tournamentChannel } from '../chat/domain/chat.js';
@@ -58,6 +60,8 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
     private readonly trainers: TrainersService,
     private readonly lobby: LobbyService,
     private readonly duels: DuelService,
+    private readonly previews: TeamPreviewService,
+    private readonly battles: LiveBattleService,
     private readonly tournaments: TournamentsService,
     private readonly arena: ArenaQueries,
     private readonly chat: ChatService,
@@ -139,25 +143,25 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
   @SubscribeMessage('seen')
   onSeen(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'seen'>): void {
     const connection = this.conn(socket);
-    if (connection?.roomId) this.duels.seen(connection, msg.turn);
+    if (connection?.roomId) this.battles.seen(connection, msg.turn);
   }
 
   @SubscribeMessage('choosing')
   onChoosing(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'choosing'>): void {
     const connection = this.conn(socket);
-    if (connection?.roomId) this.duels.choosing(connection, msg.picks);
+    if (connection?.roomId) this.previews.choosing(connection, msg.picks);
   }
 
   @SubscribeMessage('pick')
   onPick(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'pick'>): void {
     const connection = this.conn(socket);
-    if (connection?.roomId) this.duels.pick(connection, msg.picks);
+    if (connection?.roomId) this.previews.pick(connection, msg.picks);
   }
 
   @SubscribeMessage('act')
   onAct(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'act'>): void {
     const connection = this.conn(socket);
-    if (connection?.roomId) this.duels.act(connection, msg.action);
+    if (connection?.roomId) this.battles.act(connection, msg.action);
   }
 
   @SubscribeMessage('chat')
