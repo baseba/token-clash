@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Challenge } from './challenge.js';
 import { openRooms, matchFor, joinBlocker, HOST_GRACE_MS } from './lobby.js';
 
 const now = 1_000_000;
@@ -29,7 +30,7 @@ test('a public search joins a rival room with the same mode and level, never its
 });
 
 test('joining explains why a room is no longer available', () => {
-  const why = (c, extra = {}) => joinBlocker(c, { trainerId: 'me', now, ...extra })?.message ?? null;
+  const why = (c, extra = {}) => joinBlocker(c && Challenge.restore(c), { trainerId: 'me', now, ...extra })?.message ?? null;
   assert.match(why(undefined), /ya no existe/);
   assert.match(why(room('a', { hostId: 'me' })), /tu propia sala/);
   assert.match(why(room('a', { status: 'active', guestId: 'otro' })), /Llegaste tarde/);
@@ -41,5 +42,5 @@ test('joining explains why a room is no longer available', () => {
   assert.equal(why(room('a'), { hostWaiting: () => true }), null);
   assert.equal(why(room('a', { visibility: 'private' })), null);
   // The domain says which kind of "no" it is; the HTTP layer turns 'conflict' into a 409.
-  assert.equal(joinBlocker(room('a', { status: 'active' }), { trainerId: 'x', now }).kind, 'conflict');
+  assert.equal(joinBlocker(Challenge.restore(room('a', { status: 'active' })), { trainerId: 'x', now }).kind, 'conflict');
 });

@@ -119,10 +119,10 @@ export class DuelService {
   }
 
   /** The host closes the room (or leaves it): everyone inside is told. */
-  close(challenge: Challenge): void {
+  close(challenge: Challenge, byTrainerId: string | undefined): void {
     const room = this.presence.rooms.get(challenge.id);
-    if (room?.readyCheck) room.readyCheck = null;
-    challenge.cancel();
+    challenge.cancel(byTrainerId, { readyCheck: !!room?.readyCheck });
+    if (room) room.readyCheck = null;
     this.challenges.save(challenge);
     if (room) for (const ws of room.sockets) if (ws.open) ws.send({ t: 'closed' });
     this.lobby.notify();
@@ -471,7 +471,7 @@ export class DuelService {
     room.deadline = null;
     const battle = room.battle!;
     const challenge = this.challenges.findById(id);
-    if (!challenge || challenge.status !== 'active') return;
+    if (!challenge) return;
     const winnerId = battle.winner !== null ? battle.sides[battle.winner].trainerId : null;
     challenge.finish({ winnerId, turns: battle.turn, final: publicState(battle) as unknown as FinalBattleState, at: now() });
     // Only 1v1 between people counts for the ranking, which belongs to the trainers context.
@@ -523,7 +523,7 @@ export class DuelService {
       this.broadcast(room, { t: 'lobby' });
       setTimeout(() => {
         if (!room.readyCheck || this.presence.inRoom(room, ws.trainerId)) return;
-        if (ws.trainerId === challenge.hostId) this.close(challenge);
+        if (ws.trainerId === challenge.hostId) this.close(challenge, challenge.hostId);
         else this.reopenRoom(challenge, room);
       }, this.timings.seatGraceMs).unref();
     }
