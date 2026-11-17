@@ -8,7 +8,6 @@ import { PROJECT_ROOT } from '../paths.js';
 
 /** How long each step of a match waits. Production uses the defaults; e2e tests shrink them. */
 export interface ArenaTimings {
-  /** Each turn: time to choose an action. */
   turnLimitMs: number;
   /** Time to choose the 3 Pokémon. */
   pickLimitMs: number;
@@ -20,6 +19,7 @@ export interface ArenaTimings {
   revealMs: number;
   /** The AI starts marking its picks once the dice animation is over. */
   diceAnimationMs: number;
+  /** How long an AI takes to mark its picks, one by one. */
   aiPickMs: number;
   /** The animation that draws a tournament's bracket. */
   bracketDrawMs: number;

@@ -35,8 +35,6 @@ export class TrainersService implements OnModuleInit {
     if (fixed) this.logger.log(`Quité especies repetidas de ${fixed} entrenador(es).`);
   }
 
-  // ---------- queries (read-only, also used by other contexts) ----------
-
   byId(id: string | null | undefined): Trainer | undefined {
     return id ? this.trainers.findById(id) : undefined;
   }
@@ -65,8 +63,6 @@ export class TrainersService implements OnModuleInit {
     const m = /^Bearer (.+)$/.exec(header ?? '');
     return m && TOKEN_FORMAT.test(m[1]) ? this.authenticate(m[1]) : undefined;
   }
-
-  // ---------- commands ----------
 
   /**
    * Imports a save. Without a session it registers a new trainer and returns their token (shown

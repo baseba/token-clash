@@ -127,8 +127,6 @@ export class TournamentsService implements OnModuleInit {
     this.afterSeatsChange(T);
   }
 
-  // ---------- following a tournament over the socket ----------
-
   /** A client opens the tournament page. Returns it, or null if it doesn't exist. */
   follow(ws: ClientConnection, id: string, token: string | undefined): Tournament | null {
     const T = this.tournaments.findById(id);
@@ -163,8 +161,6 @@ export class TournamentsService implements OnModuleInit {
     if (T.visibility === 'public') this.lobby.notify();
   }
 
-  // ---------- lobby ----------
-
   private afterSeatsChange(T: Tournament): void {
     if (T.everyoneReady) return this.start(T);
     this.tournaments.save(T);
@@ -191,8 +187,6 @@ export class TournamentsService implements OnModuleInit {
     timer.unref();
     this.seatTimers.set(key, timer);
   }
-
-  // ---------- playing the bracket ----------
 
   private humanAverageLevel(T: Tournament): number {
     const entries = T.seats.filter((seat) => !seat.ai).flatMap((seat) => this.trainers.byId(seat.id)?.teamEntries() ?? []);

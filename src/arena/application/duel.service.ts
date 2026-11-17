@@ -365,7 +365,7 @@ export class DuelService {
       events = submit(b, s, action);
     } catch (e) {
       // The turn timer still plays for Skynet.
-      this.logger.warn(`Skynet eligió una acción que el motor no acepta: ${e}`);
+      this.logger.warn(`Skynet: no se pudo jugar su acción (${e}).`);
       return;
     }
     if (events) this.afterResolve(id, r, events);
