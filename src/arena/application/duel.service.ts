@@ -146,7 +146,7 @@ export class DuelService {
     const check = room.phase;
     if (ready) check.ready.add(trainerId);
     else check.ready.delete(trainerId);
-    if (check.players.every((p) => check.ready.has(p.id))) this.previews.startCountdown(room.challenge);
+    if (check.players.every((p) => check.ready.has(p.id))) this.previews.startCountdown(room);
     else broadcast(room, { t: 'lobby' });
   }
 

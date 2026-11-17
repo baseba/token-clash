@@ -1,10 +1,10 @@
 {
-  "version": "7",
-  "dialect": "sqlite",
-  "id": "5dbbab4d-8129-4867-adc0-eee0c95ad116",
+  "id": "9a048b19-31fa-44bc-9b88-333bd90207e7",
   "prevIds": [
     "9118926f-ba32-4736-a05d-eb3d892198a9"
   ],
+  "version": "7",
+  "dialect": "sqlite",
   "ddl": [
     {
       "name": "roster_entries",
@@ -358,7 +358,7 @@
       "table": "challenges",
       "name": "mode",
       "type": "text",
-      "notNull": true,
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -378,7 +378,7 @@
       "table": "challenges",
       "name": "visibility",
       "type": "text",
-      "notNull": true,
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,

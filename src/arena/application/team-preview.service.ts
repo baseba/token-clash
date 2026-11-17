@@ -7,7 +7,6 @@ import { createPreview, fillMissing, pick, picksNeeded, previewReady } from '../
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { now } from '../../shared/domain/clock.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
-import type { Challenge } from '../domain/challenge.js';
 import { pendingArrivals, type TournamentLabel } from '../domain/tournament.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
@@ -31,8 +30,8 @@ export class TeamPreviewService {
   }
 
   /** Both players are here and ready (or it's a tournament match): the countdown starts. */
-  startCountdown(challenge: Challenge, tournament: TournamentLabel | null = null): void {
-    const room = this.presence.room(challenge);
+  startCountdown(room: Room, tournament: TournamentLabel | null = null): void {
+    const { challenge } = room;
     const phase: CountdownPhase = {
       kind: 'countdown',
       startedAt: now(),

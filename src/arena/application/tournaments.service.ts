@@ -231,7 +231,7 @@ export class TournamentsService implements OnModuleInit {
     this.challenges.save(challenge);
     tournament.matchStarted(next, challenge.id);
     this.tournaments.save(tournament);
-    this.previews.startCountdown(challenge, tournament.label(next));
+    this.previews.startCountdown(this.presence.room(challenge), tournament.label(next));
     this.broadcast(tournament);
   }
 

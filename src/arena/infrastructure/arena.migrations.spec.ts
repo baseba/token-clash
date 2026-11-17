@@ -62,6 +62,10 @@ test('old rooms without mode or visibility become private team battles; nothing 
     current: ['random', 'public'],
     match: ['team', 'private'],
   });
+  // After a rollback the previous image may still insert NULLs: they read the same way.
+  new DatabaseSync(file).prepare("INSERT INTO challenges (id, status, host_id, host_name, host_team, created_at) VALUES ('rolled-back', 'open', 't1', 'Ana', '[]', 8)").run();
+  const reread = new DrizzleChallengeRepository(openDatabase(file)).findById('rolled-back');
+  assert.deepEqual([reread?.mode, reread?.visibility], ['team', 'private']);
   const indexes = new DatabaseSync(file).prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'challenges' AND sql IS NOT NULL ORDER BY name").all();
   assert.deepEqual(indexes.map((index) => index.name), ['challenges_guest', 'challenges_host', 'challenges_status', 'challenges_tournament']);
 });

@@ -10,8 +10,9 @@ export function challengeToDomain(row: ChallengeRow): Challenge {
     ...compact({
       id: row.id,
       status: row.status as ChallengeStatus,
-      mode: row.mode as BattleMode,
-      visibility: row.visibility as Visibility,
+      // NULL only if the previous image wrote this row after a rollback (see the backfill migration).
+      mode: (row.mode ?? 'team') as BattleMode,
+      visibility: (row.visibility ?? 'private') as Visibility,
       ai: row.ai ?? undefined,
       aiOnly: row.aiOnly ?? undefined,
       hostId: row.hostId,

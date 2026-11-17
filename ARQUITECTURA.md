@@ -174,7 +174,7 @@ waiting → readyCheck → countdown → preview → (se revelan) → battle (tu
 `DuelService` sienta al rival, maneja la confirmación y la gente que entra y sale. `TeamPreviewService` lleva la
 cuenta regresiva (en un torneo espera un rato a los que vienen llegando), el reloj para elegir 3 de 6 y las
 elecciones de la IA. `LiveBattleService` juega los turnos, los de la IA y Skynet, y guarda el resultado. Lo que ve
-cada cliente en cada fase lo arma `room-frames.ts`, con funciones puras: el jugador ve su lado y el espectador ve
+cada cliente en cada fase lo arma `room-frames.ts`: el jugador ve su lado y el espectador ve
 lo que ve el público.
 
 El estado de la batalla (`BattleState`) vive solo en memoria: el motor de `combat` es una función
@@ -202,9 +202,11 @@ El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection
   transacción y con los mappers de cada dominio. `legacy-json-import.spec.ts` comprueba que leerlo de vuelta da
   exactamente los mismos datos.
 - **Datos viejos, normalizados una vez:** las salas anteriores a los modos o a la visibilidad no tenían esos campos.
-  Una migración de `drizzle/` los rellenó con lo que siempre significaron (`team`, `private`) y los dejó `NOT NULL`,
-  así que el dominio los tiene obligatorios y ningún código sigue preguntando por el caso viejo.
-  `arena.migrations.spec.ts` lo prueba sobre una base creada con el primer esquema.
+  Una migración de `drizzle/` los rellenó con lo que siempre significaron (`team`, `private`), y el dominio los tiene
+  obligatorios. Las columnas siguen aceptando NULL a propósito, en dos pasos (*expand/contract*). Si un deploy
+  falla, `deploy.sh` vuelve a la imagen anterior, que todavía escribe NULL. Por eso hoy el mapper lee NULL como el
+  valor de siempre, y el `NOT NULL` llega en una versión posterior, cuando ninguna imagen a la que se pueda volver
+  escriba NULL. `arena.migrations.spec.ts` lo prueba sobre una base creada con el primer esquema.
 
 ## 7. Tests
 
