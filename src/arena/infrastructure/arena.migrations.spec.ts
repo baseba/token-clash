@@ -14,6 +14,7 @@ import { PROJECT_ROOT } from '../../shared/paths.js';
 import { DrizzleChallengeRepository } from './drizzle-arena.repositories.js';
 
 const INITIAL = '20261117022843_initial';
+const BACKFILL = '20261117123258_challenge_mode_visibility_backfill';
 const { roster } = parseSave(readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8'));
 const team = JSON.stringify(roster.slice(0, 2));
 const final = JSON.stringify({ winner: 0, sides: [{ team: [{ speciesName: 'Pikachu' }] }, { team: [{ hidden: true }] }] });
@@ -27,13 +28,14 @@ const rows = [
   { id: 'match', status: 'abandoned', mode: 'team', visibility: 'private', host_team: team, guest_id: 'ai:easy#1', guest_name: 'tom ai', guest_team: team, ai: 'easy', ai_only: 0, tournament_id: 'T1', round: 0, match_index: 1, created_at: 7 },
 ];
 
-function databaseAtInitialSchema(): string {
+/** A database migrated only up to `upTo`, with `rows` written as that schema stored them. */
+function databaseAt(upTo: string[], rowsToWrite: Record<string, string | number | null>[]): string {
   const dir = mkdtempSync(join(tmpdir(), 'tc-migrations-'));
-  cpSync(join(MIGRATIONS_DIR, INITIAL), join(dir, 'migrations', INITIAL), { recursive: true });
+  for (const name of upTo) cpSync(join(MIGRATIONS_DIR, name), join(dir, 'migrations', name), { recursive: true });
   const file = join(dir, 'token-clash.db');
   const client = new DatabaseSync(file);
   migrate(drizzle({ client }), { migrationsFolder: join(dir, 'migrations') });
-  for (const row of rows) {
+  for (const row of rowsToWrite) {
     const columns = Object.keys(row);
     client.prepare(`INSERT INTO challenges (host_id, host_name, ${columns.join(', ')}) VALUES ('t1', 'Ana', ${columns.map(() => '?').join(', ')})`).run(...Object.values(row));
   }
@@ -44,7 +46,7 @@ function databaseAtInitialSchema(): string {
 const rawRows = (file: string) => new DatabaseSync(file).prepare('SELECT * FROM challenges ORDER BY id').all().map((row) => ({ ...row }));
 
 test('old rooms without mode or visibility become private team battles; nothing else changes', () => {
-  const file = databaseAtInitialSchema();
+  const file = databaseAt([INITIAL], rows);
   const before = rawRows(file);
   const db = openDatabase(file);
   const after = rawRows(file);
@@ -62,10 +64,14 @@ test('old rooms without mode or visibility become private team battles; nothing 
     current: ['random', 'public'],
     match: ['team', 'private'],
   });
-  // After a rollback the previous image may still insert NULLs: they read the same way.
-  new DatabaseSync(file).prepare("INSERT INTO challenges (id, status, host_id, host_name, host_team, created_at) VALUES ('rolled-back', 'open', 't1', 'Ana', '[]', 8)").run();
-  const reread = new DrizzleChallengeRepository(openDatabase(file)).findById('rolled-back');
-  assert.deepEqual([reread?.mode, reread?.visibility], ['team', 'private']);
   const indexes = new DatabaseSync(file).prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'challenges' AND sql IS NOT NULL ORDER BY name").all();
   assert.deepEqual(indexes.map((index) => index.name), ['challenges_guest', 'challenges_host', 'challenges_status', 'challenges_tournament']);
+});
+
+test('a NULL written by a rollback between the two steps is filled before the column becomes NOT NULL', () => {
+  const rolledBack = { id: 'rolled-back', status: 'open', mode: null, visibility: null, host_team: '[]', created_at: 8 };
+  const file = databaseAt([INITIAL, BACKFILL], [rolledBack]);
+  const challenge = new DrizzleChallengeRepository(openDatabase(file)).findById('rolled-back');
+  assert.deepEqual([challenge?.mode, challenge?.visibility], ['team', 'private']);
+  assert.throws(() => new DatabaseSync(file).prepare("INSERT INTO challenges (id, status, host_id, host_name, host_team, created_at) VALUES ('x', 'open', 't1', 'Ana', '[]', 9)").run(), /NOT NULL/);
 });

@@ -202,11 +202,13 @@ El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection
   transacción y con los mappers de cada dominio. `legacy-json-import.spec.ts` comprueba que leerlo de vuelta da
   exactamente los mismos datos.
 - **Datos viejos, normalizados una vez:** las salas anteriores a los modos o a la visibilidad no tenían esos campos.
-  Una migración de `drizzle/` los rellenó con lo que siempre significaron (`team`, `private`), y el dominio los tiene
-  obligatorios. Las columnas siguen aceptando NULL a propósito, en dos pasos (*expand/contract*). Si un deploy
-  falla, `deploy.sh` vuelve a la imagen anterior, que todavía escribe NULL. Por eso hoy el mapper lee NULL como el
-  valor de siempre, y el `NOT NULL` llega en una versión posterior, cuando ninguna imagen a la que se pueda volver
-  escriba NULL. `arena.migrations.spec.ts` lo prueba sobre una base creada con el primer esquema.
+  Se arreglaron en dos pasos (*expand/contract*), porque si un deploy falla `deploy.sh` vuelve a la imagen anterior:
+  1. **Expand** (`…_backfill`): rellenó lo que siempre significaron (`team`, `private`), y desde esa versión la
+     app escribe los dos campos. Las columnas siguieron aceptando NULL, porque la imagen de antes todavía lo escribía.
+  2. **Contract** (`…_not_null`): una vez que ninguna imagen a la que se pueda volver escribía NULL, la columna pasó
+     a `NOT NULL`. Antes vuelve a rellenar por si un rollback alcanzó a escribir alguna.
+
+  `arena.migrations.spec.ts` prueba los dos pasos sobre una base creada con el primer esquema.
 
 ## 7. Tests
 
