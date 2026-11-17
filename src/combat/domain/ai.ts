@@ -49,7 +49,8 @@ export function aiPool(): number[] {
 function moveValue(move: MoveData, mon: { types: string[]; stats: { atk: number; satk: number } }): number {
   if (!move.supported) return 0;
   if (move.kind === 'status') {
-    const ups = (Object.entries(move.boosts ?? {}) as [string, number][]).filter(([k, v]) => v > 0 && move.target === 'self' && ['atk', 'satk', 'spd'].includes(k)).length;
+    const ups = (Object.entries(move.boosts ?? {}) as [string, number][]).filter(([k, v]) =>
+      v > 0 && move.target === 'self' && ['atk', 'satk', 'spd'].includes(k)).length;
     if (ups) return 55 + ups * 12;
     if (move.heal) return 60;
     if (move.status) return STATUS_VALUE[move.status] ?? 30;
@@ -64,7 +65,10 @@ function moveValue(move: MoveData, mon: { types: string[]; stats: { atk: number;
   if (move.multihit) power *= (move.multihit[0] + move.multihit[1]) / 2;
   const physical = move.category === 'physical';
   const stat = physical ? mon.stats.atk : mon.stats.satk;
-  let value = power * ((move.accuracy ?? 100) / 100) * (move.type && mon.types.includes(move.type) ? 1.5 : 1) * (stat / Math.max(1, (mon.stats.atk + mon.stats.satk) / 2));
+  let value = power
+    * ((move.accuracy ?? 100) / 100)
+    * (move.type && mon.types.includes(move.type) ? 1.5 : 1)
+    * (stat / Math.max(1, (mon.stats.atk + mon.stats.satk) / 2));
   if (move.flags.includes('recharge')) value *= 0.55;
   if (move.flags.includes('charge')) value *= 0.55;
   if (move.selfDestruct) value *= 0.3;
@@ -78,7 +82,9 @@ export function pickMoveset(entry: RosterEntry, difficulty: string, random: Rand
   const pool = usableMovepool(entry);
   if (difficulty === 'easy' || pool.length <= MOVES_PER_FIGHTER) return shuffled(pool, random).slice(0, MOVES_PER_FIGHTER);
   const mon = buildFighter({ ...entry, moveset: pool.slice(0, 1) });
-  const scored = pool.map((id) => ({ id, move: moveData(id) as MoveData })).map((x) => ({ ...x, value: moveValue(x.move, mon) * (difficulty === 'mid' ? 0.75 + random() * 0.5 : 1) }));
+  const scored = pool
+    .map((id) => ({ id, move: moveData(id) as MoveData }))
+    .map((x) => ({ ...x, value: moveValue(x.move, mon) * (difficulty === 'mid' ? 0.75 + random() * 0.5 : 1) }));
   if (difficulty === 'mid') return scored.sort((a, b) => b.value - a.value).slice(0, MOVES_PER_FIGHTER).map((x) => x.id);
   const maxStatus = difficulty === 'veryhard' ? 2 : 1;
   const chosen: typeof scored = [];
@@ -139,7 +145,11 @@ export function aiPicks({ difficulty: level, own, random = Math.random }: { diff
   const count = Math.min(BATTLE_SIZE, own.length);
   if (difficulty === 'easy' || difficulty === 'mid') return shuffled(order, random).slice(0, count);
   const strength = (index: number) => bst(speciesData(own[index].finalID) ?? { stats: [0] }) / 150;
-  return order.map((index) => ({ index, score: strength(index) + random() * 2 })).sort((a, b) => b.score - a.score).slice(0, count).map((x) => x.index);
+  return order
+    .map((index) => ({ index, score: strength(index) + random() * 2 }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, count)
+    .map((x) => x.index);
 }
 
 // ---------- what the AI may know ----------
@@ -226,7 +236,13 @@ function speedOf(fighter: BattleFighter): number {
   return fighter.stats.spd * stageMult(fighter.boosts?.spd) * (fighter.status === 'par' ? 0.5 : 1);
 }
 
-export function estimateDamage(battle: BattleState, attacker: BattleFighter, target: BattleFighter, move: MoveData | null | undefined, knowsAbilities = true): number {
+export function estimateDamage(
+  battle: BattleState,
+  attacker: BattleFighter,
+  target: BattleFighter,
+  move: MoveData | null | undefined,
+  knowsAbilities = true,
+): number {
   if (!move || move.kind === 'status' || move.category === 'status') return 0;
   const eff = typeEffect(move, target, knowsAbilities);
   if (eff === 0) return 0;
@@ -365,7 +381,8 @@ function lookahead(battle: BattleState, sideIndex: number, options: Action[]): A
   for (const mine of options) {
     const outcomes = replies.map((reply) => {
       let total = 0;
-      for (let seed = 0; seed < SEARCH_SEEDS; seed++) total += simulate(battle, sideIndex, mine, reply, `${battle.turn}:${seed}:${JSON.stringify(mine)}:${JSON.stringify(reply)}`);
+      for (let seed = 0; seed < SEARCH_SEEDS; seed++)
+        total += simulate(battle, sideIndex, mine, reply, `${battle.turn}:${seed}:${JSON.stringify(mine)}:${JSON.stringify(reply)}`);
       return total / SEARCH_SEEDS;
     });
     // When every line looks the same (say, lost either way), the plain move score breaks the tie.
@@ -400,7 +417,9 @@ export function chooseAction(battle: BattleState, sideIndex: number, level: stri
 
   if (!moves.length) {
     if (!smart) return pickOne(switches, random);
-    return switches.map((action) => ({ action, score: matchupScore(belief, side.team[action.to], foe, true) + (difficulty === 'hard' ? random() * 0.3 : 0) })).sort((x, y) => y.score - x.score)[0].action;
+    return switches
+      .map((action) => ({ action, score: matchupScore(belief, side.team[action.to], foe, true) + (difficulty === 'hard' ? random() * 0.3 : 0) }))
+      .sort((x, y) => y.score - x.score)[0].action;
   }
   if (difficulty === 'easy') return pickOne(moves, random);
   if (difficulty === 'veryhard' && belief.phase === 'choose' && foe && foe.hp > 0) {
@@ -418,20 +437,25 @@ export function chooseAction(battle: BattleState, sideIndex: number, level: stri
   scored.sort((x, y) => y.score - x.score);
   const best = scored[0];
   if (switches.length) {
-    const canKo = foe && foe.hp > 0 && scored.some((x) => moveOf(me, x.action.move).kind !== 'status' && estimateDamage(belief, me, foe, moveOf(me, x.action.move)) >= foe.hp);
+    const canKo = foe
+      && foe.hp > 0
+      && scored.some((x) => moveOf(me, x.action.move).kind !== 'status' && estimateDamage(belief, me, foe, moveOf(me, x.action.move)) >= foe.hp);
     const doomed = foe && foe.hp > 0 && bestDamage(belief, foe, me, true) >= me.hp && speedOf(foe) > speedOf(me);
     const stuck = best.score < 15;
     const lastSwitched = lastSwitchTurn.get(memory) === belief.turn - 1;
     const willing = veryhard ? true : random() < 0.35;
     if (!canKo && (veryhard ? doomed || stuck : stuck) && !lastSwitched && willing) {
       const here = matchupScore(belief, me, foe, true);
-      const alt = switches.map((action) => ({ action, score: matchupScore(belief, side.team[action.to], foe, true) })).sort((x, y) => y.score - x.score)[0];
+      const alt = switches
+        .map((action) => ({ action, score: matchupScore(belief, side.team[action.to], foe, true) }))
+        .sort((x, y) => y.score - x.score)[0];
       if (alt.score > here + 0.35) {
         lastSwitchTurn.set(memory, belief.turn);
         return alt.action;
       }
     }
   }
-  if (difficulty === 'hard' && scored.length > 1 && scored[1].score > 0 && scored[1].score >= best.score * 0.6 && random() < 0.25) return scored[1].action;
+  if (difficulty === 'hard' && scored.length > 1 && scored[1].score > 0 && scored[1].score >= best.score * 0.6 && random() < 0.25)
+    return scored[1].action;
   return best.action;
 }

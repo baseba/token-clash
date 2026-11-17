@@ -71,7 +71,15 @@ export class ChallengesService implements OnModuleInit {
       }
       if (own) return { challenge: own };
     }
-    const challenge = Challenge.open({ id: newId(), host: trainer, hostTeam: input.mode === 'random' ? [] : trainer.teamSnapshot(), levelCap: input.levelCap, mode: input.mode, visibility: input.visibility, at: now() });
+    const challenge = Challenge.open({
+      id: newId(),
+      host: trainer,
+      hostTeam: input.mode === 'random' ? [] : trainer.teamSnapshot(),
+      levelCap: input.levelCap,
+      mode: input.mode,
+      visibility: input.visibility,
+      at: now(),
+    });
     this.challenges.save(challenge);
     if (input.visibility === 'public') {
       this.lobby.notify();
@@ -84,7 +92,8 @@ export class ChallengesService implements OnModuleInit {
   close(trainer: Trainer | undefined, id: string): Challenge {
     const challenge = this.find(id);
     const checking = challenge.status === 'active' && !!this.presence.rooms.get(challenge.id)?.readyCheck;
-    if (!trainer || challenge.hostId !== trainer.id || (challenge.status !== 'open' && !checking) || challenge.tournamentId) throw forbidden('No puedes cerrar esta sala.');
+    if (!trainer || challenge.hostId !== trainer.id || (challenge.status !== 'open' && !checking) || challenge.tournamentId)
+      throw forbidden('No puedes cerrar esta sala.');
     this.duels.close(challenge);
     return challenge;
   }

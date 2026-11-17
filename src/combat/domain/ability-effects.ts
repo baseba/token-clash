@@ -70,7 +70,13 @@ export interface AbilityEffect {
   onCritStage?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, stage: number): unknown;
   onDamage?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, dmg: number): unknown;
   onDamagingHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, info: HitInfo): unknown;
-  onDefenderFinal?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, info: { eff: number; crit: boolean }): unknown;
+  onDefenderFinal?(
+    engine: AbilityEngine,
+    me: BattleFighter,
+    move: BattleMove,
+    attacker: BattleFighter,
+    info: { eff: number; crit: boolean },
+  ): unknown;
   onDefense?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): unknown;
   onEffectiveness?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, eff: number): unknown;
   onEndTurn?(engine: AbilityEngine, me: BattleFighter): unknown;
@@ -107,19 +113,24 @@ const isAttack = (move: MoveData): boolean => move.category !== 'status';
 const physical = (move: MoveData): boolean => move.category === 'physical';
 const special = (move: MoveData): boolean => move.category === 'special';
 const has = (move: MoveData, flag: string): boolean => move.flags.includes(flag);
-const contact = (engine: AbilityEngine, move: MoveData, attacker: BattleFighter): boolean => has(move, 'contact') && !engine.has(attacker, 'long-reach');
+const contact = (engine: AbilityEngine, move: MoveData, attacker: BattleFighter): boolean =>
+  has(move, 'contact') && !engine.has(attacker, 'long-reach');
 const full = (fighter: BattleFighter): boolean => fighter.hp === fighter.stats.hp;
 const fraction = (fighter: BattleFighter, share: number): number => Math.max(1, Math.floor(fighter.stats.hp * share));
-const droppedBelowHalf = (fighter: BattleFighter, before: number): boolean => before > fighter.stats.hp / 2 && fighter.hp > 0 && fighter.hp <= fighter.stats.hp / 2;
+const droppedBelowHalf = (fighter: BattleFighter, before: number): boolean =>
+  before > fighter.stats.hp / 2 && fighter.hp > 0 && fighter.hp <= fighter.stats.hp / 2;
 const STATUS_NAMES = new Set<string | null>(['brn', 'par', 'psn', 'tox', 'slp', 'frz']);
 const isMajor = (status: string | null): boolean => STATUS_NAMES.has(status);
 const poison = (status: string | null): boolean => status === 'psn' || status === 'tox';
-const highestStat = (fighter: BattleFighter): StatKey => (['atk', 'def', 'satk', 'sdef', 'spd'] as const).reduce<StatKey>((best, k) => (fighter.stats[k] > fighter.stats[best] ? k : best), 'atk');
+const highestStat = (fighter: BattleFighter): StatKey =>
+  (['atk', 'def', 'satk', 'sdef', 'spd'] as const).reduce<StatKey>((best, k) => (fighter.stats[k] > fighter.stats[best] ? k : best), 'atk');
 
 const typePower = (type: string, mult: number): AbilityEffect => ({ onBasePower: (engine, me, move) => (move.type === type ? mult : 1) });
 const flagPower = (flag: string, mult: number): AbilityEffect => ({ onBasePower: (engine, me, move) => (has(move, flag) ? mult : 1) });
 const pinch = (type: string): AbilityEffect => ({ onBasePower: (engine, me, move) => (move.type === type && me.hp <= me.stats.hp / 3 ? 1.5 : 1) });
-const weatherSpeed = (test: (weather: string | null) => boolean): AbilityEffect => ({ onSpeed: (engine, me, spd) => (test(engine.weather()) ? spd * 2 : spd) });
+const weatherSpeed = (test: (weather: string | null) => boolean): AbilityEffect => ({
+  onSpeed: (engine, me, spd) => (test(engine.weather()) ? spd * 2 : spd),
+});
 const isSun = (weather: string | null): boolean => weather === 'sun' || weather === 'harshsun';
 const isRain = (weather: string | null): boolean => weather === 'rain' || weather === 'heavyrain';
 const isIcy = (weather: string | null): boolean => weather === 'snow' || weather === 'hail';
@@ -230,7 +241,8 @@ const merge = (...parts: AbilityEffect[]): AbilityEffect => {
           const previousResult = (prev as AnyHook)(...args);
           const nextResult = (next as AnyHook)(...args);
           if (typeof previousResult === 'number' && typeof nextResult === 'number') return previousResult * nextResult;
-          if (typeof previousResult === 'boolean' || typeof nextResult === 'boolean') return hook === 'onSetStatus' ? previousResult !== false && nextResult !== false : previousResult || nextResult;
+          if (typeof previousResult === 'boolean' || typeof nextResult === 'boolean')
+            return hook === 'onSetStatus' ? previousResult !== false && nextResult !== false : previousResult || nextResult;
           return nextResult ?? previousResult;
         };
       } else out[hook] = next;
@@ -248,7 +260,8 @@ const formChanger = (decide: (engine: AbilityEngine, me: BattleFighter) => unkno
 
 const stageMult = (stage: number): number => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
 const MINIOR_CORES = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'violet'];
-const miniorCore = (fighter: BattleFighter): string => `minior-${MINIOR_CORES[[...String(fighter.uid)].reduce((n, ch) => n + ch.charCodeAt(0), 0) % MINIOR_CORES.length]}`;
+const miniorCore = (fighter: BattleFighter): string =>
+  `minior-${MINIOR_CORES[[...String(fighter.uid)].reduce((n, ch) => n + ch.charCodeAt(0), 0) % MINIOR_CORES.length]}`;
 
 const EFFECTS: Record<string, AbilityEffect> = {
   stench: {
@@ -612,7 +625,8 @@ const EFFECTS: Record<string, AbilityEffect> = {
   defeatist: { onAttack: (engine, me) => (me.hp <= me.stats.hp / 2 ? 0.5 : 1) },
   'cursed-body': {
     onDamagingHit(engine, me, move, attacker) {
-      if (attacker.hp > 0 && move.key && !attacker.volatiles.disabled && engine.rand() < 0.3) engine.addVolatile(attacker, 'disable', me, { ability: me, move });
+      if (attacker.hp > 0 && move.key && !attacker.volatiles.disabled && engine.rand() < 0.3)
+        engine.addVolatile(attacker, 'disable', me, { ability: me, move });
     },
   },
   'weak-armor': hitBoost(physical, { def: -1, spd: 2 }),
@@ -1002,7 +1016,8 @@ const EFFECTS: Record<string, AbilityEffect> = {
   },
   'wandering-spirit': {
     onDamagingHit(engine, me, move, attacker) {
-      if (!contact(engine, move, attacker) || !attacker.ability || EFFECTS[attacker.ability]?.unsuppressable || EFFECTS[attacker.ability]?.noTrace) return;
+      if (!contact(engine, move, attacker) || !attacker.ability || EFFECTS[attacker.ability]?.unsuppressable || EFFECTS[attacker.ability]?.noTrace)
+        return;
       engine.show(me);
       const theirs = attacker.ability;
       engine.setAbility(attacker, me.ability);
@@ -1032,7 +1047,11 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'as-one-spectrier': merge(announce('asOne'), onKoBoost({ satk: 1 }), { unsuppressable: true, noTrace: true }),
   'lingering-aroma': {
     onDamagingHit(engine, me, move, attacker) {
-      if (!contact(engine, move, attacker) || !attacker.ability || attacker.ability === 'lingering-aroma' || EFFECTS[attacker.ability]?.unsuppressable) return;
+      if (!contact(engine, move, attacker)
+        || !attacker.ability
+        || attacker.ability === 'lingering-aroma'
+        || EFFECTS[attacker.ability]?.unsuppressable)
+        return;
       engine.show(me);
       engine.setAbility(attacker, 'lingering-aroma');
     },

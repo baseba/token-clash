@@ -269,7 +269,15 @@ export const STRUGGLE: MoveData = {
 
 function supportedMove(move: MoveData): boolean {
   if (move.category !== 'status') return move.power > 0 || !!move.fixedDamage || !!move.ohko;
-  return !!(move.boosts || move.self || move.status || move.screen || SUPPORTED_VOLATILES.has(move.volatile as string) || move.heal || move.weather || move.terrain || SPECIAL_STATUS_MOVES.has(move.id));
+  return !!(move.boosts
+    || move.self
+    || move.status
+    || move.screen
+    || SUPPORTED_VOLATILES.has(move.volatile as string)
+    || move.heal
+    || move.weather
+    || move.terrain
+    || SPECIAL_STATUS_MOVES.has(move.id));
 }
 
 export const ALL_MOVE_IDS = (): string[] => Object.keys(MOVEDEX);
@@ -321,7 +329,8 @@ export function lineage(id: number): number[] {
 }
 
 const CHILDREN = new Map<number, number[]>();
-for (const [id, species] of Object.entries(POKEAPI)) if (species.evolvesFrom) CHILDREN.set(species.evolvesFrom, [...(CHILDREN.get(species.evolvesFrom) ?? []), Number(id)]);
+for (const [id, species] of Object.entries(POKEAPI))
+  if (species.evolvesFrom) CHILDREN.set(species.evolvesFrom, [...(CHILDREN.get(species.evolvesFrom) ?? []), Number(id)]);
 
 
 export function family(id: number): { id: number; stage: number }[] {

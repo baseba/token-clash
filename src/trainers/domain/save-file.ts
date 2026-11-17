@@ -38,7 +38,14 @@ function ivsFrom(profile: Json | null, seedKey: string): Ivs {
   const fb = 8 + (hash(seedKey) % 16);
   if (!iv) return { hp: fb, atk: fb, def: fb, satk: fb, sdef: fb, spd: fb };
   const ivFor = (key: string) => int(iv[key], 0, 31, fb);
-  return { hp: ivFor('hp'), atk: ivFor('attack'), def: ivFor('defense'), satk: ivFor('specialAttack'), sdef: ivFor('specialDefense'), spd: ivFor('speed') };
+  return {
+    hp: ivFor('hp'),
+    atk: ivFor('attack'),
+    def: ivFor('defense'),
+    satk: ivFor('specialAttack'),
+    sdef: ivFor('specialDefense'),
+    spd: ivFor('speed'),
+  };
 }
 
 // Where finalID sits in its evolution chain (0 = first form) and how long the chain is.
@@ -104,7 +111,9 @@ export function firstOfEachSpecies(candidates: CaughtCandidate[]): RosterEntry[]
     const prev = first.get(key);
     if (!prev || candidate.caught < prev.caught || (candidate.caught === prev.caught && candidate.order < prev.order)) first.set(key, candidate);
   }
-  return [...first.values()].sort((x, y) => x.entry.finalID - y.entry.finalID || Number(!!x.entry.shiny) - Number(!!y.entry.shiny)).map((c) => c.entry);
+  return [...first.values()]
+    .sort((x, y) => x.entry.finalID - y.entry.finalID || Number(!!x.entry.shiny) - Number(!!y.entry.shiny))
+    .map((c) => c.entry);
 }
 
 /**
@@ -146,15 +155,33 @@ export function parseSave(text: string): ParsedSave {
   const dex = Array.isArray(state.dex) ? state.dex : [];
   dex.forEach((seen: unknown, i: number) => {
     if (!isObject(seen) || seen.releasedAt) return; // released ones were let go, not raised
-    add(entryFrom(seen, { finalID: seen.finalID, baseID: seen.baseID, defaultLevel: 100, fallbackId: `dex-${i}-${seen.finalID}`, chain: seen.chainOrder }), seen.caughtAt);
+    add(
+      entryFrom(seen, {
+        finalID: seen.finalID,
+        baseID: seen.baseID,
+        defaultLevel: 100,
+        fallbackId: `dex-${i}-${seen.finalID}`,
+        chain: seen.chainOrder,
+      }),
+      seen.caughtAt,
+    );
   });
 
   const active = state.active;
   if (isObject(active) && Array.isArray(active.pathIDs)) {
     const stage = int(active.stageIndex, 0, active.pathIDs.length - 1, 0);
     const current = active.pathIDs[stage];
-    const planned = Array.isArray(active.plannedPathIDs) && active.plannedPathIDs.length >= active.pathIDs.length ? active.plannedPathIDs : active.pathIDs;
-    const entry = entryFrom(active, { finalID: current, baseID: active.baseID, defaultLevel: 30, fallbackId: `active-${active.baseID}`, chain: planned, stageHint: stage });
+    const planned = Array.isArray(active.plannedPathIDs) && active.plannedPathIDs.length >= active.pathIDs.length
+      ? active.plannedPathIDs
+      : active.pathIDs;
+    const entry = entryFrom(active, {
+      finalID: current,
+      baseID: active.baseID,
+      defaultLevel: 30,
+      fallbackId: `active-${active.baseID}`,
+      chain: planned,
+      stageHint: stage,
+    });
     if (entry) {
       entry.active = true;
       add(entry, null);

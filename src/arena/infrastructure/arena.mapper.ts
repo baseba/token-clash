@@ -64,7 +64,13 @@ export function tournamentToDomain(row: TournamentRow, seats: SeatRow[], matches
   if (matches.length) {
     bracket = [];
     for (const row of [...matches].sort((x, y) => x.round - y.round || x.position - y.position)) {
-      (bracket[row.round] ??= [])[row.position] = { a: row.seatA, b: row.seatB, winner: row.winner, challengeId: row.challengeId, ...(row.coinFlip ? { coinFlip: true } : {}) };
+      (bracket[row.round] ??= [])[row.position] = {
+        a: row.seatA,
+        b: row.seatB,
+        winner: row.winner,
+        challengeId: row.challengeId,
+        ...(row.coinFlip ? { coinFlip: true } : {}),
+      };
     }
   }
   return Tournament.restore({
@@ -113,9 +119,26 @@ export function tournamentToRows(tournament: Tournament): {
       champion: tournament.champion ?? null,
       finishedAt: tournament.finishedAt ?? null,
     },
-    seats: tournament.seats.map((s, position) => ({ tournamentId: tournament.id, position, seatId: s.id, name: s.name, ai: s.ai ?? null, aiBase: s.aiBase ?? null, ready: !!s.ready })),
+    seats: tournament.seats.map((s, position) => ({
+      tournamentId: tournament.id,
+      position,
+      seatId: s.id,
+      name: s.name,
+      ai: s.ai ?? null,
+      aiBase: s.aiBase ?? null,
+      ready: !!s.ready,
+    })),
     matches: (tournament.bracket ?? []).flatMap((round, r) =>
-      round.map((m, position) => ({ tournamentId: tournament.id, round: r, position, seatA: m.a, seatB: m.b, winner: m.winner, coinFlip: m.coinFlip ?? null, challengeId: m.challengeId ?? null })),
+      round.map((m, position) => ({
+        tournamentId: tournament.id,
+        round: r,
+        position,
+        seatA: m.a,
+        seatB: m.b,
+        winner: m.winner,
+        coinFlip: m.coinFlip ?? null,
+        challengeId: m.challengeId ?? null,
+      })),
     ),
   };
 }

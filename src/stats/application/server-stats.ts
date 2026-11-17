@@ -158,7 +158,16 @@ export function tournamentStats(source: StatsSource) {
     .slice(0, RECENT)
     .map((tournament) => {
       const champ = tournament.seats[tournament.champion!];
-      return { id: tournament.id, size: tournament.size, mode: tournament.mode ?? 'team', levelCap: tournament.levelCap ?? null, humans: humanCount(tournament), champion: champ ? nameOf(source, champ.ai ? null : champ.id, champ.name) : '¿?', championAi: !!champ?.ai, finishedAt: tournament.finishedAt ?? tournament.createdAt };
+      return {
+        id: tournament.id,
+        size: tournament.size,
+        mode: tournament.mode ?? 'team',
+        levelCap: tournament.levelCap ?? null,
+        humans: humanCount(tournament),
+        champion: champ ? nameOf(source, champ.ai ? null : champ.id, champ.name) : '¿?',
+        championAi: !!champ?.ai,
+        finishedAt: tournament.finishedAt ?? tournament.createdAt,
+      };
     });
   return {
     totals: { tournaments: done.length, matches: done.reduce((n, t) => n + t.size - 1, 0), aiTitles: done.filter((t) => t.seats[t.champion!]?.ai).length },

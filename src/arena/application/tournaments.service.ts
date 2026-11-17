@@ -157,7 +157,8 @@ export class TournamentsService implements OnModuleInit {
   }
 
   broadcast(tournament: Tournament): void {
-    for (const ws of this.presence.tournamentSockets(tournament.id)) if (ws.open) ws.send({ t: 'tour', tournament: this.views.tournament(tournament, ws.trainerId) });
+    for (const ws of this.presence.tournamentSockets(tournament.id))
+      if (ws.open) ws.send({ t: 'tour', tournament: this.views.tournament(tournament, ws.trainerId) });
     if (tournament.visibility === 'public') this.lobby.notify();
   }
 
@@ -195,7 +196,12 @@ export class TournamentsService implements OnModuleInit {
 
   private start(tournament: Tournament): void {
     const at = now();
-    tournament.start({ at, order: shuffledOrder(tournament.size), aiLevel: tournament.levelCap ?? this.humanAverageLevel(tournament), firstMatchAt: at + this.timings.bracketDrawMs });
+    tournament.start({
+      at,
+      order: shuffledOrder(tournament.size),
+      aiLevel: tournament.levelCap ?? this.humanAverageLevel(tournament),
+      firstMatchAt: at + this.timings.bracketDrawMs,
+    });
     this.tournaments.save(tournament);
     this.broadcast(tournament);
     this.lobby.notify();
@@ -237,7 +243,10 @@ export class TournamentsService implements OnModuleInit {
     const tournament = challenge.tournamentId ? this.tournaments.findById(challenge.tournamentId) : undefined;
     if (!tournament || tournament.status !== 'running') return;
     const at = now();
-    const champion = tournament.matchFinished({ round: challenge.round!, index: challenge.match! }, challenge.winnerId ?? null, { now: at, nextMatchAt: at + this.timings.betweenMatchesMs });
+    const champion = tournament.matchFinished({ round: challenge.round!, index: challenge.match! }, challenge.winnerId ?? null, {
+      now: at,
+      nextMatchAt: at + this.timings.betweenMatchesMs,
+    });
     if (champion === null) setTimeout(() => this.startMatch(tournament), this.timings.betweenMatchesMs).unref();
     this.tournaments.save(tournament);
     this.broadcast(tournament);

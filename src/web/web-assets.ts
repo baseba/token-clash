@@ -22,7 +22,8 @@ export interface Asset {
 export class WebAssets {
   readonly version: string = (() => {
     const hash = createHash('sha256');
-    for (const file of readdirSync(PUBLIC_DIR).filter((f) => /\.(js|css|html)$/.test(f)).sort()) hash.update(file).update(readFileSync(join(PUBLIC_DIR, file)));
+    for (const file of readdirSync(PUBLIC_DIR).filter((f) => /\.(js|css|html)$/.test(f)).sort())
+      hash.update(file).update(readFileSync(join(PUBLIC_DIR, file)));
     return hash.digest('hex').slice(0, 10);
   })();
 

@@ -58,7 +58,12 @@ export function pokedexOf(roster: RosterEntry[]): Pokedex {
           height: species.height ?? null,
           weight: species.weight ?? null,
           genderRate: species.genderRate ?? null,
-          abilities: [...(species.abilities ?? []).map((key) => ({ name: abilityInfo(key)?.name ?? key, hidden: false })), ...(species.hiddenAbility && !(species.abilities ?? []).includes(species.hiddenAbility) ? [{ name: abilityInfo(species.hiddenAbility)?.name ?? species.hiddenAbility, hidden: true }] : [])],
+          abilities: [
+            ...(species.abilities ?? []).map((key) => ({ name: abilityInfo(key)?.name ?? key, hidden: false })),
+            ...(species.hiddenAbility && !(species.abilities ?? []).includes(species.hiddenAbility)
+              ? [{ name: abilityInfo(species.hiddenAbility)?.name ?? species.hiddenAbility, hidden: true }]
+              : []),
+          ],
           owned: 0,
           shiny: false,
           levels: [],

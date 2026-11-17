@@ -28,7 +28,9 @@ export class ArenaViews {
 
   challenge(challenge: Challenge, viewerId: string | null = null) {
     const host = this.trainers.byId(challenge.hostId);
-    const hostTeam = (challenge.status === 'finished' || challenge.battleMode !== 'random' ? challenge.hostTeam : []).map((e) => buildFighter(e, { levelCap: challenge.levelCap }));
+    const hostTeam = (challenge.status === 'finished' || challenge.battleMode !== 'random'
+      ? challenge.hostTeam
+      : []).map((e) => buildFighter(e, { levelCap: challenge.levelCap }));
     const tournament = challenge.tournamentId ? this.tournaments.findById(challenge.tournamentId) : undefined;
     return {
       id: challenge.id,
@@ -52,13 +54,31 @@ export class ArenaViews {
   /** A duel room in the "open rooms" list. */
   room(challenge: Challenge, viewerId: string | null) {
     const host = this.trainers.byId(challenge.hostId);
-    return { id: challenge.id, kind: 'duel', mode: challenge.battleMode, levelCap: challenge.levelCap ?? null, createdAt: challenge.createdAt, host: { name: host?.name ?? challenge.hostName, wins: host?.wins ?? 0, losses: host?.losses ?? 0 }, mine: challenge.hostId === viewerId };
+    return {
+      id: challenge.id,
+      kind: 'duel',
+      mode: challenge.battleMode,
+      levelCap: challenge.levelCap ?? null,
+      createdAt: challenge.createdAt,
+      host: { name: host?.name ?? challenge.hostName, wins: host?.wins ?? 0, losses: host?.losses ?? 0 },
+      mine: challenge.hostId === viewerId,
+    };
   }
 
   /** A tournament in the "open rooms" list. */
   tournamentRoom(tournament: Tournament, viewerId: string | null) {
     const host = this.trainers.byId(tournament.hostId);
-    return { id: tournament.id, kind: 'tournament', mode: tournament.mode, levelCap: tournament.levelCap ?? null, size: tournament.size, filled: tournament.seats.length, createdAt: tournament.createdAt, host: { name: host?.name ?? tournament.seats[0]?.name, wins: host?.wins ?? 0, losses: host?.losses ?? 0 }, mine: tournament.seatOf(viewerId) !== -1 };
+    return {
+      id: tournament.id,
+      kind: 'tournament',
+      mode: tournament.mode,
+      levelCap: tournament.levelCap ?? null,
+      size: tournament.size,
+      filled: tournament.seats.length,
+      createdAt: tournament.createdAt,
+      host: { name: host?.name ?? tournament.seats[0]?.name, wins: host?.wins ?? 0, losses: host?.losses ?? 0 },
+      mine: tournament.seatOf(viewerId) !== -1,
+    };
   }
 
   tournament(tournament: Tournament, viewerId: string | null = null) {
@@ -76,9 +96,20 @@ export class ArenaViews {
       you: you === -1 ? null : you,
       seats: tournament.seats.map((seat) => {
         const trainer = seat.ai ? undefined : this.trainers.byId(seat.id);
-        return { name: seat.name, ai: seat.ai ?? null, ready: seat.ready, online: seat.ai ? true : this.presence.inTournament(tournament.id, seat.id), wins: trainer?.wins ?? 0, losses: trainer?.losses ?? 0, rosterSize: trainer?.roster.length ?? 0 };
+        return {
+          name: seat.name,
+          ai: seat.ai ?? null,
+          ready: seat.ready,
+          online: seat.ai ? true : this.presence.inTournament(tournament.id, seat.id),
+          wins: trainer?.wins ?? 0,
+          losses: trainer?.losses ?? 0,
+          rosterSize: trainer?.roster.length ?? 0,
+        };
       }),
-      rounds: (tournament.bracket ?? []).map((round, i) => ({ name: roundName(tournament.size, i), matches: round.map((m) => ({ a: m.a, b: m.b, winner: m.winner, coinFlip: !!m.coinFlip, challengeId: m.challengeId })) })),
+      rounds: (tournament.bracket ?? []).map((round, i) => ({
+        name: roundName(tournament.size, i),
+        matches: round.map((m) => ({ a: m.a, b: m.b, winner: m.winner, coinFlip: !!m.coinFlip, challengeId: m.challengeId })),
+      })),
       current: tournament.current ?? null,
       drawAt: tournament.drawAt ?? null,
       nextAt: tournament.nextAt ?? null,
@@ -101,7 +132,9 @@ export class ArenaViews {
       ai: challenge.ai ?? null,
       visibility: visibilityOf(challenge),
       createdAt: challenge.createdAt,
-      opponent: mine ? (challenge.guestId ? (this.nameOf(challenge.guestId, challenge.guestName) ?? null) : null) : this.nameOf(challenge.hostId, challenge.hostName),
+      opponent: mine
+        ? (challenge.guestId ? (this.nameOf(challenge.guestId, challenge.guestName) ?? null) : null)
+        : this.nameOf(challenge.hostId, challenge.hostName),
       won: challenge.status === 'finished' ? challenge.winnerId === trainerId : null,
       mine,
     };
@@ -111,13 +144,31 @@ export class ArenaViews {
   pastTournament(tournament: Tournament, trainerId: string) {
     const seat = tournament.seatOf(trainerId);
     const reached = tournament.bracket ? reachedRound(tournament.bracket, seat) : -1;
-    return { id: tournament.id, size: tournament.size, mode: tournament.mode, levelCap: tournament.levelCap ?? null, status: tournament.status, humans: humanCount(tournament), createdAt: tournament.createdAt, champion: tournament.champion === seat, reached: reached === -1 ? null : roundName(tournament.size, reached) };
+    return {
+      id: tournament.id,
+      size: tournament.size,
+      mode: tournament.mode,
+      levelCap: tournament.levelCap ?? null,
+      status: tournament.status,
+      humans: humanCount(tournament),
+      createdAt: tournament.createdAt,
+      champion: tournament.champion === seat,
+      reached: reached === -1 ? null : roundName(tournament.size, reached),
+    };
   }
 
   countdownPlayer(id: string, fallbackName: string): CountdownPlayer {
     const level = aiLevelOf(id);
     if (level) return { id, name: fallbackName, ai: level, wins: 0, losses: 0, rosterSize: 0, shinies: 0 };
     const trainer = this.trainers.byId(id);
-    return { id, name: trainer?.name ?? fallbackName, ai: null, wins: trainer?.wins ?? 0, losses: trainer?.losses ?? 0, rosterSize: trainer?.roster.length ?? 0, shinies: trainer?.roster.filter((e) => e.shiny).length ?? 0 };
+    return {
+      id,
+      name: trainer?.name ?? fallbackName,
+      ai: null,
+      wins: trainer?.wins ?? 0,
+      losses: trainer?.losses ?? 0,
+      rosterSize: trainer?.roster.length ?? 0,
+      shinies: trainer?.roster.filter((e) => e.shiny).length ?? 0,
+    };
   }
 }

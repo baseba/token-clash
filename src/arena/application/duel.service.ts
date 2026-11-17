@@ -72,7 +72,16 @@ export class DuelService {
     const hostTeam = mode === 'random' ? randomParty(trainer.roster) : trainer.teamSnapshot();
     const aiLevel = levelCap ?? averageLevel(hostTeam);
     const aiTeam = mode === 'random' ? buildAiRandomParty({ level: aiLevel }) : buildAiTeam({ difficulty: level, level: aiLevel });
-    const challenge = Challenge.againstAi({ id: newId(), host: trainer, hostTeam, ai: { id: aiTrainerId(level), name: aiName(level).name, level }, aiTeam, levelCap, mode, at: now() });
+    const challenge = Challenge.againstAi({
+      id: newId(),
+      host: trainer,
+      hostTeam,
+      ai: { id: aiTrainerId(level), name: aiName(level).name, level },
+      aiTeam,
+      levelCap,
+      mode,
+      at: now(),
+    });
     this.challenges.save(challenge);
     const room = this.presence.room(challenge.id);
     room.preview = createPreview({
@@ -101,7 +110,10 @@ export class DuelService {
     } else challenge.join(guest, { guestTeam: guest.teamSnapshot() });
     this.challenges.save(challenge);
     const room = this.presence.room(challenge.id);
-    room.readyCheck = { ready: new Set(), players: [this.views.countdownPlayer(challenge.hostId, challenge.hostName), this.views.countdownPlayer(guest.id, guest.name)] };
+    room.readyCheck = {
+      ready: new Set(),
+      players: [this.views.countdownPlayer(challenge.hostId, challenge.hostName), this.views.countdownPlayer(guest.id, guest.name)],
+    };
     this.broadcast(room, { t: 'lobby' });
     this.lobby.notify();
   }
@@ -120,7 +132,15 @@ export class DuelService {
   startCountdown(challenge: Challenge, tournament: TournamentLabel | null = null): void {
     const room = this.presence.room(challenge.id);
     room.readyCheck = null;
-    room.countdown = { startedAt: now(), endsAt: now() + this.timings.countdownMs, players: [this.views.countdownPlayer(challenge.hostId, challenge.hostName), this.views.countdownPlayer(challenge.guestId!, challenge.guestName!)], tournament };
+    room.countdown = {
+      startedAt: now(),
+      endsAt: now() + this.timings.countdownMs,
+      players: [
+        this.views.countdownPlayer(challenge.hostId, challenge.hostName),
+        this.views.countdownPlayer(challenge.guestId!, challenge.guestName!),
+      ],
+      tournament,
+    };
     setTimeout(() => this.openWhenArrived(challenge, room), this.timings.countdownMs);
     this.broadcast(room, { t: 'countdown' });
   }
@@ -130,18 +150,37 @@ export class DuelService {
   private previewFrame(room: Room, ws: ClientConnection, extra: Frame): Frame {
     const preview = room.preview!;
     const you = sideIn(preview.sides, ws.trainerId);
-    return { ...extra, t: extra.t === 'presence' || extra.t === 'ready' ? 'preview' : extra.t, preview: previewView(preview, you), you, deadline: room.deadline, watchers: room.sockets.size };
+    return {
+      ...extra,
+      t: extra.t === 'presence' || extra.t === 'ready' ? 'preview' : extra.t,
+      preview: previewView(preview, you),
+      you,
+      deadline: room.deadline,
+      watchers: room.sockets.size,
+    };
   }
 
   frameFor(room: Room, ws: ClientConnection, extra: Frame = {}): Frame {
     if (room.readyCheck) {
       const { players, ready } = room.readyCheck;
       const you = players.findIndex((p) => p.id === ws.trainerId);
-      return { t: 'lobby', players: players.map((p) => ({ ...p, ready: ready.has(p.id), online: this.presence.inRoom(room, p.id) })), you: you === -1 ? null : you };
+      return {
+        t: 'lobby',
+        players: players.map((p) => ({ ...p, ready: ready.has(p.id), online: this.presence.inRoom(room, p.id) })),
+        you: you === -1 ? null : you,
+      };
     }
     if (room.countdown) {
       const you = room.countdown.players.findIndex((p) => p.id === ws.trainerId);
-      return { ...extra, t: 'countdown', ms: Math.max(0, room.countdown.endsAt - now()), players: room.countdown.players, you: you === -1 ? null : you, tournament: room.countdown.tournament ?? null, waiting: room.countdown.waiting ?? null };
+      return {
+        ...extra,
+        t: 'countdown',
+        ms: Math.max(0, room.countdown.endsAt - now()),
+        players: room.countdown.players,
+        you: you === -1 ? null : you,
+        tournament: room.countdown.tournament ?? null,
+        waiting: room.countdown.waiting ?? null,
+      };
     }
     if (room.preview) return this.previewFrame(room, ws, extra);
     const battle = room.battle!;
@@ -164,7 +203,8 @@ export class DuelService {
 
   /** Viewers (not the players) see each side's draft as it is marked. */
   private broadcastWatchers(room: Room): void {
-    for (const ws of room.sockets) if (ws.open && (!room.preview || sideIn(room.preview.sides, ws.trainerId) === null)) ws.send(this.frameFor(room, ws, { t: 'preview' }));
+    for (const ws of room.sockets)
+      if (ws.open && (!room.preview || sideIn(room.preview.sides, ws.trainerId) === null)) ws.send(this.frameFor(room, ws, { t: 'preview' }));
   }
 
   // ---------- ready check and countdown ----------
@@ -326,7 +366,8 @@ export class DuelService {
       if (room.battle !== battle) return;
       const waited = now() - since;
       const watching = [...room.sockets].filter((ws) => ws.open).map((ws) => ws.seenTurn);
-      if (waited >= this.timings.aiVsAiPauseMs && (waited >= this.timings.aiVsAiViewerWaitMs || !viewersBehind(watching, turn))) return this.aiTurn(id, room);
+      if (waited >= this.timings.aiVsAiPauseMs && (waited >= this.timings.aiVsAiViewerWaitMs || !viewersBehind(watching, turn)))
+        return this.aiTurn(id, room);
       setTimeout(check, 250).unref();
     };
     setTimeout(check, Math.min(this.timings.aiVsAiPauseMs, 250)).unref();
@@ -434,7 +475,8 @@ export class DuelService {
     const winnerId = battle.winner !== null ? battle.sides[battle.winner].trainerId : null;
     challenge.finish({ winnerId, turns: battle.turn, final: publicState(battle) as unknown as FinalBattleState, at: now() });
     // Only 1v1 between people counts for the ranking, which belongs to the trainers context.
-    if (battle.winner !== null && challenge.ranked) this.trainers.recordRankedResult(battle.sides[battle.winner].trainerId, battle.sides[1 - battle.winner].trainerId);
+    if (battle.winner !== null && challenge.ranked)
+      this.trainers.recordRankedResult(battle.sides[battle.winner].trainerId, battle.sides[1 - battle.winner].trainerId);
     this.challenges.save(challenge);
     if (challenge.tournamentId) this.events.matchFinished({ challenge, winnerSide: battle.winner });
     // Keep the finished room a while for late viewers, then drop it.
@@ -458,7 +500,12 @@ export class DuelService {
     const room = this.presence.room(challenge.id);
     room.sockets.add(ws);
     if (ws.trainerId === challenge.hostId && challenge.status === 'open') this.lobby.notify();
-    if (room.preview && !room.preview.revealed && room.previewShort && sideIn(room.preview.sides, ws.trainerId) !== null && !this.someoneAbsent(challenge.id, room, room.preview.sides)) this.armPreviewTimer(challenge.id, room);
+    if (room.preview
+      && !room.preview.revealed
+      && room.previewShort
+      && sideIn(room.preview.sides, ws.trainerId) !== null
+      && !this.someoneAbsent(challenge.id, room, room.preview.sides))
+      this.armPreviewTimer(challenge.id, room);
     if (room.battle || room.preview || room.readyCheck) this.broadcast(room, { t: 'presence' });
     else if (room.countdown) ws.send(this.frameFor(room, ws));
     else ws.send({ t: 'waiting', watchers: room.sockets.size });

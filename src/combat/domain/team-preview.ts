@@ -36,7 +36,9 @@ export const picksNeeded = (preview: PreviewState, sideIndex: number): number =>
 
 function validPicks(preview: PreviewState, sideIndex: number, picks: number[]): boolean {
   const needed = picksNeeded(preview, sideIndex);
-  return picks.length === needed && new Set(picks).size === needed && picks.every((i) => Number.isInteger(i) && i >= 0 && i < preview.sides[sideIndex].entries.length);
+  return picks.length === needed
+    && new Set(picks).size === needed
+    && picks.every((i) => Number.isInteger(i) && i >= 0 && i < preview.sides[sideIndex].entries.length);
 }
 
 export function pick(preview: PreviewState, sideIndex: number, picks: number[]): void {
@@ -62,13 +64,23 @@ export function fillMissing(preview: PreviewState, random: () => number = Math.r
 
 export const previewReady = (preview: PreviewState): boolean => preview.sides.every((s) => s.picks);
 
-export const chosenEntries = (preview: PreviewState, sideIndex: number): RosterEntry[] => preview.sides[sideIndex].picks!.map((i) => preview.sides[sideIndex].entries[i]);
+export const chosenEntries = (preview: PreviewState, sideIndex: number): RosterEntry[] =>
+  preview.sides[sideIndex].picks!.map((i) => preview.sides[sideIndex].entries[i]);
 
 /** What a rival sees of a Pokémon in your party: no stats, moves or ability. */
 export type SeenCard = Pick<Fighter, 'name' | 'speciesName' | 'sprite' | 'shiny' | 'floats' | 'rarity' | 'types' | 'gender'>;
 
 function seenCard(fighter: Fighter): SeenCard {
-  return { name: fighter.name, speciesName: fighter.speciesName, sprite: fighter.sprite, shiny: fighter.shiny, floats: fighter.floats, rarity: fighter.rarity, types: fighter.types, gender: fighter.gender };
+  return {
+    name: fighter.name,
+    speciesName: fighter.speciesName,
+    sprite: fighter.sprite,
+    shiny: fighter.shiny,
+    floats: fighter.floats,
+    rarity: fighter.rarity,
+    types: fighter.types,
+    gender: fighter.gender,
+  };
 }
 
 export interface PreviewSideView {

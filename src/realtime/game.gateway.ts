@@ -169,7 +169,15 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
     const from = this.chatSender(connection, trainer.id);
     if (!from) return;
     const at = now();
-    const message = this.chat.post(from.channel, { trainerId: trainer.id, name: trainer.name, role: from.role, side: from.side, text: msg.text, lastAt: connection.lastChatAt, at });
+    const message = this.chat.post(from.channel, {
+      trainerId: trainer.id,
+      name: trainer.name,
+      role: from.role,
+      side: from.side,
+      text: msg.text,
+      lastAt: connection.lastChatAt,
+      at,
+    });
     if (!message) return;
     connection.lastChatAt = at;
     this.sendToChannel(from.channel, JSON.stringify({ t: 'chat', message }));
@@ -183,7 +191,11 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
     }
     const tournament = this.arena.allTournaments().find((t) => t.id === connection.tourId);
     if (!tournament) return null;
-    return { channel: tournamentChannel(tournament.id), role: tournament.seatOf(trainerId) !== -1 ? ('player' as const) : ('watcher' as const), side: null };
+    return {
+      channel: tournamentChannel(tournament.id),
+      role: tournament.seatOf(trainerId) !== -1 ? ('player' as const) : ('watcher' as const),
+      side: null,
+    };
   }
 
   private sendToChannel(channel: string, frame: string): void {

@@ -102,7 +102,12 @@ export class AppConfig {
       vars.DATA_DIR,
       vars.PUBLIC_ORIGIN ?? '',
       vars.TRUST_CF_CONNECTING_IP === '1',
-      { apiKey: vars.JEV_API_KEY, url: vars.JEV_API_URL ?? null, model: vars.JEV_MODEL ?? null, enabled: Boolean(vars.JEV_API_KEY || vars.JEV_API_URL) },
+      {
+        apiKey: vars.JEV_API_KEY,
+        url: vars.JEV_API_URL ?? null,
+        model: vars.JEV_MODEL ?? null,
+        enabled: Boolean(vars.JEV_API_KEY || vars.JEV_API_URL),
+      },
       {
         turnLimitMs: vars.TURN_MS,
         pickLimitMs: vars.PREVIEW_MS,

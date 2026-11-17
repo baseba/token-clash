@@ -72,7 +72,8 @@ export function viewersBehind(seenTurns: (number | undefined)[], turn: number): 
 
 export const isFull = (tournament: Seated) => tournament.seats.length >= tournament.size;
 export const allReady = (tournament: Seated) => isFull(tournament) && tournament.seats.every((s) => s.ready);
-export const seatOf = (tournament: Pick<Seated, 'seats'>, trainerId: string | null | undefined) => tournament.seats.findIndex((s) => s.id === trainerId);
+export const seatOf = (tournament: Pick<Seated, 'seats'>, trainerId: string | null | undefined) =>
+  tournament.seats.findIndex((s) => s.id === trainerId);
 
 export function roundName(size: number, round: number): string {
   const matches = size / 2 ** (round + 1);
@@ -211,7 +212,17 @@ export class Tournament implements TournamentState {
 
   /** A new tournament, with its creator in the first seat (the host seat can't be removed). */
   static create(input: { id: string; host: { id: string; name: string }; mode: BattleMode; levelCap: number | null; size: number; visibility: Visibility; at: number }): Tournament {
-    const tournament = new Tournament({ id: input.id, hostId: input.host.id, mode: input.mode, levelCap: input.levelCap, size: input.size, visibility: input.visibility, status: 'open', createdAt: input.at, seats: [] });
+    const tournament = new Tournament({
+      id: input.id,
+      hostId: input.host.id,
+      mode: input.mode,
+      levelCap: input.levelCap,
+      size: input.size,
+      visibility: input.visibility,
+      status: 'open',
+      createdAt: input.at,
+      seats: [],
+    });
     addSeat(tournament, { id: input.host.id, name: input.host.name, ai: null });
     return tournament;
   }

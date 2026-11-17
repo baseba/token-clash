@@ -12,7 +12,8 @@ type HostWaiting<T> = (room: T) => boolean;
 
 export const visibilityOf = (room: Pick<Challenge, 'visibility'>) => room.visibility ?? 'private';
 
-const hostPresent = <T extends RoomLike>(room: T, now: number, hostWaiting: HostWaiting<T>) => now - room.createdAt < HOST_GRACE_MS || hostWaiting(room);
+const hostPresent = <T extends RoomLike>(room: T, now: number, hostWaiting: HostWaiting<T>) =>
+  now - room.createdAt < HOST_GRACE_MS || hostWaiting(room);
 
 export function openRooms<T extends RoomLike>(challenges: Record<string, T> | T[], { now = Date.now(), hostWaiting = (() => false) as HostWaiting<T> } = {}): T[] {
   return Object.values(challenges)
@@ -26,14 +27,19 @@ export function matchFor<T extends RoomLike>(rooms: T[], { trainerId, mode, leve
 }
 
 /** Why `trainerId` can't join this room, or null if they can. */
-export function joinBlocker<T extends RoomLike>(room: T | null | undefined, { trainerId, now = Date.now(), hostWaiting = (() => false) as HostWaiting<T> }: { trainerId: string; now?: number; hostWaiting?: HostWaiting<T> }): DomainError | null {
+export function joinBlocker<T extends RoomLike>(
+  room: T | null | undefined,
+  { trainerId, now = Date.now(), hostWaiting = (() => false) as HostWaiting<T> }: { trainerId: string; now?: number; hostWaiting?: HostWaiting<T> },
+): DomainError | null {
   if (!room) return notFound('Esa sala ya no existe.');
   if (room.ai) return conflict('Esa pelea es contra la IA: no se puede entrar.');
   if (room.hostId === trainerId) return invalid('Es tu propia sala: espera a que entre alguien o mándale el link a otro jugador.');
-  if (room.status === 'active') return conflict(room.guestId === trainerId ? 'Ya estás en esta pelea.' : 'Llegaste tarde: otro jugador entró primero a esta sala.');
+  if (room.status === 'active')
+    return conflict(room.guestId === trainerId ? 'Ya estás en esta pelea.' : 'Llegaste tarde: otro jugador entró primero a esta sala.');
   if (room.status === 'finished') return conflict('Esta sala ya terminó su pelea.');
   if (room.status === 'cancelled') return gone('El anfitrión cerró esta sala.');
   if (room.status !== 'open') return gone('Esta sala se cortó cuando se reinició el servidor.');
-  if (visibilityOf(room) === 'public' && !hostPresent(room, now, hostWaiting)) return conflict('El anfitrión ya no está en la sala. Busca otra o abre la tuya.');
+  if (visibilityOf(room) === 'public' && !hostPresent(room, now, hostWaiting))
+    return conflict('El anfitrión ya no está en la sala. Busca otra o abre la tuya.');
   return null;
 }

@@ -56,7 +56,8 @@ function monFacts(view: FighterView, { own, foe = null }: { own: boolean; foe?: 
     ...(Object.keys(nonZero(view.boosts)).length ? { statStages: nonZero(view.boosts) } : {}),
     ...(Object.keys(view.volatiles ?? {}).length ? { conditions: view.volatiles } : {}),
   };
-  if (own) out.stats = { attack: view.stats.atk, defense: view.stats.def, spAttack: view.stats.satk, spDefense: view.stats.sdef, speed: view.stats.spd };
+  if (own)
+    out.stats = { attack: view.stats.atk, defense: view.stats.def, spAttack: view.stats.satk, spDefense: view.stats.sdef, speed: view.stats.spd };
   if (view.abilityInfo) out.ability = { name: view.abilityInfo.name, effect: view.abilityInfo.desc };
   if (view.moves.length) out[own ? 'moves' : 'revealedMoves'] = view.moves.map((m) => moveFacts(m, view, foe, own ? view.pp[m.key] : null));
   return out;
@@ -116,7 +117,9 @@ export function jevOptions(battle: BattleState, sideIndex: number): { criteria: 
         hpPercent: pct(view),
         ...(view.status ? { status: STATUS_NAME[view.status] ?? view.status } : {}),
         ...(foe ? { worstRivalTypeVsIt: `x${Math.max(...foe.types.map((t) => effectiveness(t, view.types)))}` } : {}),
-        ...(foe ? { bestMoveVsRival: `x${Math.max(0, ...view.moves.filter((m) => m.kind !== 'status' && m.type).map((m) => effectiveness(m.type, foe.types)))}` } : {}),
+        ...(foe
+          ? { bestMoveVsRival: `x${Math.max(0, ...view.moves.filter((m) => m.kind !== 'status' && m.type).map((m) => effectiveness(m.type, foe.types)))}` }
+          : {}),
       };
     }
   }
@@ -155,7 +158,11 @@ export async function askJev({ url = JEV_DEFAULT_URL, model = JEV_DEFAULT_MODEL,
 
 // The action Jev picks for side s, or null if Jev can't decide (error, timeout, bad answer).
 // Without apiKey no Authorization is sent: the proxy adds it.
-export async function chooseJevAction(battle: BattleState, sideIndex: number, { url, model, apiKey, fetchImpl, timeoutMs }: JevOptions = {}): Promise<Action | null> {
+export async function chooseJevAction(
+  battle: BattleState,
+  sideIndex: number,
+  { url, model, apiKey, fetchImpl, timeoutMs }: JevOptions = {},
+): Promise<Action | null> {
   try {
     const { criteria, actions } = jevOptions(battle, sideIndex);
     const keys = Object.keys(criteria);
