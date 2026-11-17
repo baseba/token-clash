@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { MUSIC_TRACKS, musicFile } from '../public/music.js';
 
 const RAW = 'https://raw.githubusercontent.com/pagefaultgames/pokerogue-assets/beta';
-const MOVEDEX = new URL('../server/movedex.json', import.meta.url);
+const MOVEDEX = new URL('../src/catalog/data/movedex.json', import.meta.url);
 const ANIMS = new URL('../public/anims/', import.meta.url);
 const GRAPHICS = new URL('graphics/', ANIMS);
 const UI = new URL('ui/', ANIMS);

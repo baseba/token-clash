@@ -1,0 +1,89 @@
+// Who is connected where, right now: the live rooms with their sockets and in-memory battle, the
+// tournament followers and the lobby. This is runtime state, not domain data: it is lost on restart
+// on purpose (a battle can't be resumed), and it is never stored.
+import { Injectable } from '@nestjs/common';
+import type { BattleState } from '../../combat/domain/battle.js';
+import type { PreviewState } from '../../combat/domain/team-preview.js';
+import type { TournamentLabel } from '../domain/tournament.js';
+import type { ClientConnection } from './connection.js';
+
+export interface CountdownPlayer {
+  id: string;
+  name: string;
+  ai: string | null;
+  wins: number;
+  losses: number;
+  rosterSize: number;
+  shinies: number;
+}
+
+/** The live side of a challenge: its sockets and which step of the match it is in. */
+export interface Room {
+  sockets: Set<ClientConnection>;
+  /** Both players are in the room and press "ready". */
+  readyCheck?: { ready: Set<string>; players: CountdownPlayer[] } | null;
+  /** The countdown before choosing teams. */
+  countdown?: { startedAt: number; endsAt: number; players: CountdownPlayer[]; tournament: TournamentLabel | null; waiting?: string[] } | null;
+  countdownTimer?: NodeJS.Timeout;
+  /** Each side picks 3 of its 6. */
+  preview?: PreviewState | null;
+  /** The preview timer was shortened because a tournament player is away. */
+  previewShort?: boolean;
+  battle: BattleState | null;
+  /** When the current step times out (shown to the clients). */
+  deadline: number | null;
+  timer: NodeJS.Timeout | null;
+  /** Skynet questions in flight, by `turn:phase`. */
+  jevAsked?: Set<string>;
+}
+
+@Injectable()
+export class Presence {
+  readonly rooms = new Map<string, Room>();
+  readonly lobby = new Set<ClientConnection>();
+  private readonly tours = new Map<string, Set<ClientConnection>>();
+
+  /** The live room of a challenge, created on first use. */
+  room(id: string): Room {
+    let r = this.rooms.get(id);
+    if (!r) {
+      r = { battle: null, sockets: new Set(), deadline: null, timer: null };
+      this.rooms.set(id, r);
+    }
+    return r;
+  }
+
+  inRoom(r: Room, trainerId: string | null | undefined): boolean {
+    return [...r.sockets].some((ws) => ws.trainerId === trainerId && ws.open);
+  }
+
+  /** Is the host of this challenge connected to its room? */
+  hostWaiting = (c: { id: string; hostId: string }): boolean => {
+    const r = this.rooms.get(c.id);
+    return !!r && this.inRoom(r, c.hostId);
+  };
+
+  tourWatchers(id: string): Set<ClientConnection> {
+    let set = this.tours.get(id);
+    if (!set) this.tours.set(id, (set = new Set()));
+    return set;
+  }
+
+  tourSockets(id: string): Set<ClientConnection> {
+    return this.tours.get(id) ?? new Set();
+  }
+
+  inTournament(id: string, trainerId: string | null | undefined): boolean {
+    return [...this.tourSockets(id)].some((ws) => ws.trainerId === trainerId && ws.open);
+  }
+
+  /** Rooms with a match going on (someone watching it). Shown in /stats. */
+  liveBattles(): number {
+    return [...this.rooms.values()].filter((r) => r.sockets.size > 0 && (r.countdown || r.preview || r.battle?.status === 'active')).length;
+  }
+
+  /** Rooms a restart would cut, watched or not. deploy/deploy.sh waits for this to be 0. */
+  busyRooms(): number {
+    return [...this.rooms.values()].filter((r) => r.readyCheck || r.countdown || r.preview || r.battle?.status === 'active').length;
+  }
+}

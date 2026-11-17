@@ -1,0 +1,175 @@
+// Reads a PokeTokenBar save: the app's export / snapshot ({format: "poketokenbar.save", state})
+// or the raw live file (~/Library/Application Support/PokeTokenBar/companion-state.json).
+// We keep only game data: species numbers, rarity, level, IVs, nature, shiny, ability, gender and
+// learned moves. Names, device name and token logs are dropped on purpose.
+//
+// Pure domain: text in, roster out. No database, no HTTP.
+
+import { hash, NATURE_NAMES } from '../../catalog/domain/creatures.js';
+import { uniqueSpecies, variantKey, type Gender, type Ivs, type Rarity, type RosterEntry } from '../../catalog/domain/roster-entry.js';
+
+const RARITIES = new Set(['common', 'uncommon', 'rare', 'legendary']);
+const UUID = /^[0-9a-fA-F-]{8,40}$/;
+const MAX_ROSTER = 300;
+const ABILITY_KEY = /^[a-z0-9-]{1,40}$/;
+const GENDERS = new Set(['male', 'female']);
+const MOVE_KEY = /^[a-z0-9-]{1,40}$/;
+const MAX_LEARNED = 120;
+
+/** The file is not a save we can read. The message tells the player what to do. */
+export class SaveError extends Error {}
+
+export interface ParsedSave {
+  roster: RosterEntry[];
+  totalTokens: number;
+}
+
+// The save is untrusted JSON: everything below reads it as `unknown` and checks each field.
+type Json = Record<string, unknown>;
+const isObject = (v: unknown): v is Json => !!v && typeof v === 'object';
+
+const int = (v: unknown, lo: number, hi: number, fallback: number) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(hi, Math.max(lo, Math.round(n)));
+};
+
+function ivsFrom(profile: Json | null, seedKey: string): Ivs {
+  const iv = profile && isObject(profile.ivs) ? profile.ivs : null;
+  // Old saves have no IVs: give a stable middling value instead of a random one.
+  const fb = 8 + (hash(seedKey) % 16);
+  if (!iv) return { hp: fb, atk: fb, def: fb, satk: fb, sdef: fb, spd: fb };
+  const g = (k: string) => int(iv[k], 0, 31, fb);
+  return { hp: g('hp'), atk: g('attack'), def: g('defense'), satk: g('specialAttack'), sdef: g('specialDefense'), spd: g('speed') };
+}
+
+// Where finalID sits in its evolution chain (0 = first form) and how long the chain is.
+function chainInfo(chain: unknown, finalID: number, stageHint?: number): { stage?: number; chainLen?: number } {
+  if (!Array.isArray(chain) || chain.length < 1 || chain.length > 10 || !chain.every(Number.isInteger)) return {};
+  const stage = Number.isInteger(stageHint) ? (stageHint as number) : chain.indexOf(finalID);
+  if (stage < 0 || stage >= chain.length) return {};
+  return { stage, chainLen: chain.length };
+}
+
+function currentMovesOf(profile: Json | null): string[] {
+  const list = Array.isArray(profile?.currentMoves) ? profile.currentMoves.filter((n): n is string => typeof n === 'string' && MOVE_KEY.test(n)) : [];
+  return [...new Set(list)].slice(0, 4);
+}
+
+interface EntryHints {
+  finalID: unknown;
+  baseID: unknown;
+  defaultLevel: number;
+  fallbackId: string;
+  chain: unknown;
+  stageHint?: number;
+}
+
+function entryFrom(raw: Json, { finalID, baseID, defaultLevel, fallbackId, chain, stageHint }: EntryHints): RosterEntry | null {
+  if (!Number.isInteger(finalID) || (finalID as number) < 1 || (finalID as number) > 5000) return null;
+  const species = finalID as number;
+  const base = Number.isInteger(baseID) && (baseID as number) >= 1 && (baseID as number) <= 5000 ? (baseID as number) : species;
+  const profile = isObject(raw.profile) ? raw.profile : null;
+  let id = typeof raw.id === 'string' ? raw.id : profile && typeof profile.instanceID === 'string' ? profile.instanceID : '';
+  if (!UUID.test(id)) id = fallbackId;
+  const moves = Array.isArray(profile?.moves) ? profile.moves.map((m: unknown) => (isObject(m) ? m.name : undefined)) : [];
+  const current = currentMovesOf(profile);
+  return {
+    id: id.toLowerCase(),
+    finalID: species,
+    baseID: base,
+    rarity: RARITIES.has(raw.rarity as string) ? (raw.rarity as Rarity) : 'common',
+    shiny: raw.isShiny === true,
+    level: int(profile?.level, 1, 100, defaultLevel),
+    ivs: ivsFrom(profile, id),
+    ability: typeof profile?.abilityName === 'string' && ABILITY_KEY.test(profile.abilityName) ? profile.abilityName : null,
+    abilitySlot: [1, 2, 3].includes(profile?.abilitySlot as number) ? (profile!.abilitySlot as 1 | 2 | 3) : null,
+    gender: GENDERS.has(profile?.gender as string) ? (profile!.gender as Gender) : null,
+    nature: NATURE_NAMES.has(raw.nature as string) ? (raw.nature as string) : NATURE_NAMES.has(profile?.nature as string) ? (profile!.nature as string) : null,
+    learned: [...new Set([...moves, ...current])].filter((n): n is string => typeof n === 'string' && MOVE_KEY.test(n)).slice(0, MAX_LEARNED),
+    ...(current.length ? { moveset: current } : {}),
+    ...chainInfo(chain, species, stageHint),
+  };
+}
+
+export interface CaughtCandidate {
+  e: RosterEntry;
+  caught: number;
+  order: number;
+}
+
+/** Keeps the first one caught of each species and variant (shiny/plain), sorted by dex number. */
+export function firstOfEachSpecies(candidates: CaughtCandidate[]): RosterEntry[] {
+  const first = new Map<string, CaughtCandidate>();
+  for (const c of candidates) {
+    const key = variantKey(c.e);
+    const prev = first.get(key);
+    if (!prev || c.caught < prev.caught || (c.caught === prev.caught && c.order < prev.order)) first.set(key, c);
+  }
+  return [...first.values()].sort((x, y) => x.e.finalID - y.e.finalID || Number(!!x.e.shiny) - Number(!!y.e.shiny)).map((c) => c.e);
+}
+
+/**
+ * After a roster changes (a new save, or dropping repeats), keeps the team pointing at the same
+ * Pokémon: by instance id, or by species and variant when the id changed.
+ */
+export function carryTeam(team: string[], before: RosterEntry[], after: RosterEntry[]): string[] {
+  const kept = new Map(after.map((e) => [e.id, e]));
+  const keptByVariant = new Map(after.map((e) => [variantKey(e), e]));
+  const variantOf = new Map(before.map((e) => [e.id, variantKey(e)]));
+  const carried = team.map((id) => kept.get(id) ?? keptByVariant.get(variantOf.get(id) ?? '')).filter((e): e is RosterEntry => !!e);
+  return uniqueSpecies(carried).map((e) => e.id);
+}
+
+export function parseSave(text: string): ParsedSave {
+  let json: unknown;
+  try {
+    // profile.seed is a uint64 and loses precision here; we never use it.
+    json = JSON.parse(text);
+  } catch {
+    throw new SaveError('El archivo no es JSON válido.');
+  }
+  if (!isObject(json)) throw new SaveError('El archivo no es un save de PokeTokenBar.');
+  if ('format' in json && json.format !== 'poketokenbar.save') throw new SaveError('Formato de archivo desconocido.');
+  const state = json.format === 'poketokenbar.save' ? json.state : json;
+  if (!isObject(state) || (!Array.isArray(state.dex) && !state.active)) {
+    throw new SaveError('No encontré tu colección. Exporta desde PokeTokenBar → Ajustes → Backup & Transfer.');
+  }
+
+  const candidates: CaughtCandidate[] = [];
+  const seenIds = new Set<string>();
+  const add = (e: RosterEntry | null, caughtAt: unknown) => {
+    if (!e || seenIds.has(e.id)) return;
+    seenIds.add(e.id);
+    const t = Date.parse(caughtAt as string);
+    candidates.push({ e, caught: Number.isFinite(t) ? t : Infinity, order: candidates.length });
+  };
+
+  const dex = Array.isArray(state.dex) ? state.dex : [];
+  dex.forEach((d: unknown, i: number) => {
+    if (!isObject(d) || d.releasedAt) return; // released ones were let go, not raised
+    add(entryFrom(d, { finalID: d.finalID, baseID: d.baseID, defaultLevel: 100, fallbackId: `dex-${i}-${d.finalID}`, chain: d.chainOrder }), d.caughtAt);
+  });
+
+  const a = state.active;
+  if (isObject(a) && Array.isArray(a.pathIDs)) {
+    const stage = int(a.stageIndex, 0, a.pathIDs.length - 1, 0);
+    const current = a.pathIDs[stage];
+    const planned = Array.isArray(a.plannedPathIDs) && a.plannedPathIDs.length >= a.pathIDs.length ? a.plannedPathIDs : a.pathIDs;
+    const e = entryFrom(a, { finalID: current, baseID: a.baseID, defaultLevel: 30, fallbackId: `active-${a.baseID}`, chain: planned, stageHint: stage });
+    if (e) {
+      e.active = true;
+      add(e, null);
+    }
+  }
+
+  const roster = firstOfEachSpecies(candidates).slice(0, MAX_ROSTER);
+
+  if (roster.length === 0) throw new SaveError('Tu save no tiene Pokémon todavía (¿solo un huevo?). Vuelve cuando nazca el primero.');
+
+  const used = Number(state.usedSinceInstall);
+  return {
+    roster,
+    totalTokens: Number.isFinite(used) && used > 0 ? Math.min(used, 1e15) : 0,
+  };
+}

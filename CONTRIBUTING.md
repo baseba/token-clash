@@ -5,7 +5,7 @@
 
    ```sh
    npm install
-   npm run dev     # http://localhost:8080, datos en ./data
+   npm run dev     # http://localhost:8080, datos en ./data (SQLite)
    npm test
    ```
 
@@ -18,11 +18,16 @@
 
 ## Ojo con
 
-- El servidor no tiene salida a internet en producción: nada en `server/` puede llamar APIs externas en
+- El servidor no tiene salida a internet en producción: nada en `src/` puede llamar APIs externas en
   tiempo de ejecución. Los datos externos se bajan con scripts en `scripts/` y se commitean.
-- Los datos de PokeAPI (`server/pokeapi.json`, `public/sprites/`) se commitean: si tocas
+- Los datos de PokeAPI (`src/catalog/data/*.json`) se commitean: si tocas
   `scripts/import-pokeapi.mjs`, córrelo (Node 22+) y sube lo que genera.
 - Los cambios a `deploy/*.container`, `*.network`, `*.service`, `*.timer` y `deploy/deploy.sh` no se aplican solos:
   avisa en el PR para que se instalen a mano.
-- `server/battle.js` es puro (la aleatoriedad se inyecta): mantenlo así para que se pueda testear.
+- El dominio es puro: nada en `*/domain/` importa Nest, Drizzle ni `node:http`, y el motor
+  (`src/combat/domain/battle.ts`) recibe la aleatoriedad inyectada. Mantenlo así para que se pueda testear.
+- Cada dominio es dueño de sus tablas. Si otro dominio necesita algo, se lo pide a su servicio de aplicación
+  (el único que exporta su módulo), nunca a su repositorio. Ver [ARQUITECTURA.md](ARQUITECTURA.md).
+- Si cambias un `*.schema.ts`, corre `npm run db:generate` y commitea la migración de `drizzle/`. Nunca edites una
+  migración ya publicada.
 - Sin build ni dependencias nuevas en el frontend (`public/` es JS de módulos tal cual).

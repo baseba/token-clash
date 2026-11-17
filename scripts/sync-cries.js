@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const API = 'https://pokeapi.co/api/v2';
 const RAW = 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon';
 
-const DATA = new URL('../server/pokeapi.json', import.meta.url);
+const DATA = new URL('../src/catalog/data/pokeapi.json', import.meta.url);
 const CRIES = new URL('../public/cries/', import.meta.url);
 
 const CONCURRENCY = 16;

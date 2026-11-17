@@ -1,0 +1,11 @@
+{
+  // Tests build half-made fixtures (a Pokémon with only the fields a rule reads), so they compile
+  // with looser checks than src/, which tsconfig.json keeps strict.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": false,
+    "noImplicitAny": false,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo.test"
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "public/types.js"]
+}

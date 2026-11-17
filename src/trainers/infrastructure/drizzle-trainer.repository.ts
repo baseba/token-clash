@@ -1,0 +1,61 @@
+// Adapter: TrainerRepository on SQLite through Drizzle.
+//
+// It is also an *identity map*: every trainer is loaded once at startup and the same object is
+// handed out afterwards, so two parts of the app never hold diverging copies of one trainer. Reads
+// come from memory (a few dozen trainers); every save writes through to SQLite at once, inside a
+// transaction. If the data ever outgrows memory, only this class changes.
+import { Injectable } from '@nestjs/common';
+import { InjectDrizzle } from '@nestjs/drizzle';
+import { eq } from 'drizzle-orm';
+import type { Database } from '../../shared/infrastructure/database/database.js';
+import type { Trainer } from '../domain/trainer.js';
+import { TrainerRepository } from '../domain/trainer.repository.js';
+import { entryToRow, toDomain, toRow } from './trainer.mapper.js';
+import { rosterEntries, trainers, type RosterEntryRow } from './trainer.schema.js';
+
+const CHUNK = 100;
+
+@Injectable()
+export class DrizzleTrainerRepository extends TrainerRepository {
+  private readonly byId = new Map<string, Trainer>();
+  private readonly byToken = new Map<string, Trainer>();
+
+  constructor(@InjectDrizzle() private readonly db: Database) {
+    super();
+    const roster = new Map<string, RosterEntryRow[]>();
+    for (const row of this.db.select().from(rosterEntries).all()) roster.set(row.trainerId, [...(roster.get(row.trainerId) ?? []), row]);
+    for (const row of this.db.select().from(trainers).all()) this.remember(toDomain(row, roster.get(row.id) ?? []));
+  }
+
+  private remember(t: Trainer): void {
+    this.byId.set(t.id, t);
+    this.byToken.set(t.tokenHash, t);
+  }
+
+  all(): Trainer[] {
+    return [...this.byId.values()];
+  }
+
+  findById(id: string): Trainer | undefined {
+    return this.byId.get(id);
+  }
+
+  findByTokenHash(tokenHash: string): Trainer | undefined {
+    return this.byToken.get(tokenHash);
+  }
+
+  save(t: Trainer): void {
+    const row = toRow(t);
+    const entries = t.roster.map((e, i) => entryToRow(t.id, e, i));
+    this.db.transaction((tx) => {
+      tx.insert(trainers).values(row).onConflictDoUpdate({ target: trainers.id, set: row }).run();
+      tx.delete(rosterEntries).where(eq(rosterEntries.trainerId, t.id)).run();
+      for (let i = 0; i < entries.length; i += CHUNK) tx.insert(rosterEntries).values(entries.slice(i, i + CHUNK)).run();
+    });
+    this.remember(t);
+  }
+
+  saveLastSeen(t: Trainer): void {
+    this.db.update(trainers).set({ lastSeen: t.lastSeen ?? null }).where(eq(trainers.id, t.id)).run();
+  }
+}
