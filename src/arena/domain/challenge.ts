@@ -8,8 +8,12 @@
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 
 export type ChallengeStatus = 'open' | 'active' | 'finished' | 'cancelled' | 'abandoned';
-export type BattleMode = 'team' | 'random';
-export type Visibility = 'public' | 'private';
+export const BATTLE_MODES = ['team', 'random'] as const;
+export type BattleMode = (typeof BATTLE_MODES)[number];
+export const VISIBILITIES = ['public', 'private'] as const;
+export type Visibility = (typeof VISIBILITIES)[number];
+/** The only level cap there is: everyone fights at level 50. Without it (null), each at their own level. */
+export const LEVEL_CAP = 50;
 
 /** What we keep of a finished battle: its public state (who fought, who won). */
 export interface FinalBattleState {

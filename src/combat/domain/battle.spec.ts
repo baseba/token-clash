@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseSave } from '../src/trainers/domain/save-file.js';
-import { createBattle, submit, autoAction, needsAction, validActions, shownTarget } from '../src/combat/domain/battle.js';
-import { rng, species, speciesData, effectiveness, learnedMoves, defaultMoveset, validMoveset, movesetFor, buildFighter, moveData, statsFor } from '../src/catalog/domain/creatures.js';
-import { PROJECT_ROOT, catalogFile } from '../src/shared/paths.js';
+import { parseSave } from '../../trainers/domain/save-file.js';
+import { createBattle, submit, autoAction, needsAction, validActions, shownTarget } from './battle.js';
+import { rng, species, speciesData, effectiveness, learnedMoves, defaultMoveset, validMoveset, movesetFor, buildFighter, moveData, statsFor } from '../../catalog/domain/creatures.js';
+import { PROJECT_ROOT, catalogFile } from '../../shared/paths.js';
 import { join } from 'node:path';
 
 const { roster } = parseSave(readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8'));

@@ -1,4 +1,6 @@
 {
+  // Unit tests live next to the code they test (src/**/*.spec.ts) and the e2e tests in test/
+  // (*.e2e-spec.ts). tsconfig.json leaves them out of the app build; this one compiles everything.
   // Tests build half-made fixtures (a Pokémon with only the fields a rule reads), so they compile
   // with looser checks than src/, which tsconfig.json keeps strict.
   "extends": "./tsconfig.json",
@@ -7,5 +9,6 @@
     "noImplicitAny": false,
     "tsBuildInfoFile": "./dist/.tsbuildinfo.test"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "public/types.js"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "public/types.js"],
+  "exclude": ["node_modules", "dist"]
 }

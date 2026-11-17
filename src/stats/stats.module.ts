@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ArenaModule } from '../arena/arena.module.js';
 import { TrainersModule } from '../trainers/trainers.module.js';
 import { WebModule } from '../web/web.module.js';
-import { StatsController } from './stats.controller.js';
+import { StatsController } from './interface/stats.controller.js';
 
 /**
  * Stats context: a read model (ranking, recent battles, totals). It never writes. In a bigger

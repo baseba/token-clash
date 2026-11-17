@@ -40,6 +40,7 @@ src/trainers/
   domain/           Reglas del negocio. TypeScript puro: sin Nest, sin SQL, sin HTTP.
     trainer.ts            el agregado Trainer (un equipo nunca repite especie, máximo 6…)
     save-file.ts          leer un save de PokeTokenBar
+    save-file.spec.ts     su test, al lado
     trainer.repository.ts el PUERTO: qué necesita el dominio del almacenamiento, en sus palabras
   application/      Casos de uso: orquestan el dominio y los repositorios.
     trainers.service.ts   importar un save, cambiar el equipo, registrar un resultado…
@@ -48,13 +49,14 @@ src/trainers/
     trainer.mapper.ts     agregado ⇄ filas
     drizzle-trainer.repository.ts
   interface/        Cómo entra el mundo: HTTP.
+    dto/                  la forma de cada petición (import-save.dto.ts, update-profile.dto.ts…)
     trainers.controller.ts, session.guard.ts, trainer.presenter.ts
   trainers.module.ts
 ```
 
 **La regla de dependencia:** `domain` no importa nada de las otras tres. `application` importa `domain`.
 `infrastructure` e `interface` importan las dos anteriores. Por eso el dominio se testea sin base de datos ni
-servidor (`test/save.test.ts`, `test/tournament.test.ts`…), y cambiar Drizzle por otra cosa solo toca
+servidor (`save-file.spec.ts`, `tournament.spec.ts`…), y cambiar Drizzle por otra cosa solo toca
 `infrastructure/`.
 
 El puerto es una clase abstracta (`TrainerRepository`) que además sirve de token de inyección de Nest:
@@ -66,7 +68,24 @@ exports: [TrainersService], // ← el repositorio NO se exporta
 ```
 
 `combat` y `catalog` son solo `domain/`: funciones puras con la aleatoriedad inyectada (`random = Math.random`),
-así que sus tests reproducen una pelea entera con una semilla fija.
+así que sus tests reproducen una pelea entera con una semilla fija. En general, un dominio tiene solo las capas que
+usa: `chat` no tiene HTTP propio (habla por el socket) y `stats` no guarda nada.
+
+### ¿Por qué no se ve como la guía de Nest?
+
+La estructura que recomiendan Nest y la mayoría de las guías es *por feature*: una carpeta por tema con su
+`dto/`, `entities/`, controller, service y module, todo al mismo nivel. Acá el primer nivel es igual (una carpeta por
+dominio, cada una con su `*.module.ts`, más `shared/`), pero adentro hay capas. Las diferencias:
+
+| Guía por feature | Acá | Por qué |
+| --- | --- | --- |
+| `users.service.ts` hace reglas y acceso a datos | `domain/` (reglas) + `application/` (casos de uso) | las reglas se testean sin Nest ni base de datos |
+| `entities/user.entity.ts` es el objeto y la tabla a la vez | `domain/trainer.ts` + `infrastructure/trainer.schema.ts` + un mapper | el dominio no depende de cómo se guarda |
+| `dto/` junto al controller | `interface/dto/` | igual, dentro de la capa que habla HTTP |
+| `*.spec.ts` al lado del código, e2e en `test/` | igual | |
+
+Para un CRUD, la estructura por feature basta. Las capas valen la pena cuando hay reglas de verdad (un torneo, una
+pelea, un equipo que no repite especie), y para mostrar la regla de dependencia, que es el objetivo de esta demo.
 
 ## 3. Reglas entre dominios
 
@@ -95,6 +114,7 @@ así que sus tests reproducen una pelea entera con una semilla fija.
 ```
 SecurityHeadersMiddleware, ApiProtectionMiddleware   cabeceras, origen y límite por IP   (shared/http)
 SessionGuard (@Authenticated)                        Bearer token → Trainer, o 401       (trainers/interface)
+StandardSchemaValidationPipe                         el body cumple su DTO, o 400        (shared/http, */interface/dto)
 ChallengesController.accept                          lee la URL, llama al caso de uso    (arena/interface)
 ChallengesService.accept                             orquesta                            (arena/application)
   joinBlocker(challenge, …)                          ¿se puede entrar? regla pura        (arena/domain/lobby.ts)
@@ -106,6 +126,13 @@ ArenaViews.challenge                                 lo que ve el cliente       
 Si una regla dice que no, el dominio lanza un `DomainError` con un *tipo* (`conflict`, `not-found`…), nunca un
 código HTTP. `DomainErrorFilter` (`shared/http`) traduce el tipo a 409, 404… y responde `{ "error": "…" }`. El
 dominio no sabe que existe HTTP.
+
+**DTO o dominio.** Un DTO (un esquema de [Zod](https://zod.dev) en `interface/dto/`) revisa la *forma* de la
+petición: tipos, valores permitidos y defaults. `mode` es `team` o `random`, y si no viene es `team`. Si no cumple,
+responde 400 antes de llegar al controller. Lo que depende del estado sigue siendo del dominio: si ese Pokémon conoce
+ese movimiento, o si al torneo le queda lugar. Nest lo aplica solo con `@Body({ schema: NewChallengeDto })`, gracias
+al `StandardSchemaValidationPipe` registrado en `app.module.ts`, y el esquema da también el tipo:
+`type NewChallengeDto = z.infer<typeof NewChallengeDto>`.
 
 ## 5. Una pelea en vivo
 
@@ -135,19 +162,22 @@ El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection
   algún día no cabe, solo cambian los repositorios.
 - **Driver:** `node:sqlite`, el que trae Node. No hay módulos nativos que compilar en la imagen de Alpine.
 - **Migración desde JSON:** `src/legacy/legacy-json-import.ts` importa `data/db.json` una sola vez, en una
-  transacción y con los mappers de cada dominio. `test/legacy-import.test.ts` comprueba que leerlo de vuelta da
+  transacción y con los mappers de cada dominio. `legacy-json-import.spec.ts` comprueba que leerlo de vuelta da
   exactamente los mismos datos.
 
 ## 7. Tests
 
 | Qué | Dónde | Cómo |
 | --- | --- | --- |
-| Reglas puras (save, torneo, lobby, chat, stats, motor, IA) | `test/*.test.ts` | funciones, sin Nest ni base de datos |
-| Persistencia y migración | `test/legacy-import.test.ts` | SQLite real en un directorio temporal |
-| Todo junto | `test/e2e.test.ts` | levanta la app compilada y juega peleas y torneos por HTTP y WebSocket, y la reinicia |
-| Frontend | `test/web/*.test.js` | JS tal cual, como el navegador |
+| Reglas puras (save, torneo, lobby, chat, stats, motor, IA) y DTOs | `*.spec.ts` al lado de cada archivo | funciones, sin Nest ni base de datos |
+| Persistencia y migración | `src/legacy/legacy-json-import.spec.ts` | SQLite real en un directorio temporal |
+| Todo junto | `test/app.e2e-spec.ts` | levanta la app compilada y juega peleas y torneos por HTTP y WebSocket, y la reinicia |
+| Frontend | `test/web/*.test.js` | JS tal cual, como el navegador (no van en `public/` porque se publicarían) |
 
-`npm test` hace primero el typecheck estricto de `src/` y después corre todo.
+Los unitarios viven con su código, así que al mover o borrar un archivo su test lo acompaña. Los e2e prueban la app
+entera, sin pertenecer a ningún dominio, y por eso van en `test/`. `tsconfig.json` deja los `*.spec.ts` fuera del
+build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de `src/`, compila los tests con
+`tsconfig.test.json` y corre todo.
 
 ## 8. Decisiones y deudas conocidas
 
@@ -160,21 +190,18 @@ El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection
   `combat` calculara `supported`; queda pendiente porque toca mucho código del motor.
 - **El estado en vivo no se guarda.** Peleas, presencia y chat viven en memoria por diseño: es un juego entre
   amigos y retomar una pelea a medias tras un reinicio no vale la complejidad.
-- **Validación a mano.** Los controllers normalizan la entrada con valores por defecto (`mode` que no sea
-  `random` es `team`), igual que la versión en JS. Si la API creciera, convendría un esquema (Zod con
-  `StandardSchemaValidationPipe`, por ejemplo).
 
 ## 9. Cómo agregar algo
 
 Ejemplo: "un entrenador puede ponerle un título a su perfil".
 
 1. **Dominio:** agrega `title` a `TrainerState` y un método `Trainer.setTitle()` con sus reglas (largo, caracteres).
-   Testéalo en `test/`.
+   Testéalo en `trainer.spec.ts`, al lado.
 2. **Persistencia:** agrega la columna en `trainer.schema.ts`, mapéala en `trainer.mapper.ts` y corre
    `npm run db:generate`.
 3. **Caso de uso:** `TrainersService.updateProfile()` llama a `setTitle()` y guarda.
-4. **Entrada:** el controller ya pasa el body a `updateProfile`; agrégalo al presenter (`trainerSummary`) para que el
-   frontend lo vea.
+4. **Entrada:** agrega `title: z.string().optional()` a `UpdateProfileDto`. El controller ya pasa el body a
+   `updateProfile`. Agrégalo al presenter (`trainerSummary`) para que el frontend lo vea.
 
 Si otro dominio quiere mostrar el título (por ejemplo la arena, en las salas), lo pide con `TrainersService.byId()`.
 Nunca lee la tabla `trainers` directamente.

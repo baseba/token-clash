@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBattle, submit, validActions } from '../src/combat/domain/battle.js';
-import { rng } from '../src/catalog/domain/creatures.js';
-import { jevState, jevOptions, chooseJevAction, jevConfigured } from '../src/combat/infrastructure/jev/jev.js';
+import { createBattle, submit, validActions } from '../../domain/battle.js';
+import { rng } from '../../../catalog/domain/creatures.js';
+import { jevState, jevOptions, chooseJevAction, jevConfigured } from './jev.js';
 
 // Fixtures carry only the fields the rules read.
 const mon = (id, finalID, moves, extra: any = {}): any => ({ id, finalID, baseID: finalID, rarity: 'rare', level: 50, ivs: { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 }, learned: moves, moveset: moves, ...extra });

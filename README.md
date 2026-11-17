@@ -147,7 +147,7 @@ armado y por qué: [ARQUITECTURA.md](ARQUITECTURA.md).
 ```sh
 npm install
 npm run dev          # compila y levanta http://localhost:8080 (recompila al guardar), datos en ./data
-npm test             # typecheck estricto + 200 tests: reglas, motor, IA, persistencia y flujo completo por WebSocket
+npm test             # typecheck estricto + más de 200 tests: reglas, motor, IA, persistencia y flujo completo por WebSocket
 npm run build        # TypeScript → dist/
 npm run db:generate  # tras cambiar un *.schema.ts: genera la migración SQL en drizzle/
 ```
@@ -167,7 +167,8 @@ Node 22.13 o más (usa `node:sqlite`, que viene con Node: no hay módulos nativo
 | `src/shared/` | Configuración, errores de dominio, HTTP (guards, filtro de errores) y la base de datos. |
 | `src/legacy/` | La migración única desde `data/db.json`. |
 | `drizzle/` | Migraciones SQL generadas por drizzle-kit; la app las aplica al arrancar. |
-| `test/` | Tests en TypeScript (`node:test`); `test/web/` son los del frontend, en JS. |
+| `src/**/*.spec.ts` | Tests unitarios (`node:test`), al lado del código que prueban. |
+| `test/` | Tests e2e (`*.e2e-spec.ts`: levantan la app entera), los del frontend (`test/web/`, en JS) y el save de ejemplo (`fixtures/`). |
 
 Datos externos:
 
@@ -188,7 +189,7 @@ Todo vive en `DATA_DIR/token-clash.db` (SQLite, modo WAL). Nada se borra: los de
 Hasta la versión 0.1 los datos estaban en `data/db.json`: el primer arranque con SQLite lo importa entero en una
 transacción y lo deja intacto como respaldo (si un deploy vuelve a la imagen anterior, esa sigue encontrando sus datos).
 No se vuelve a importar. Para comprobar una copia real sin tocar nada:
-`LEGACY_DB=/ruta/a/db.json node --test dist/test/legacy-import.test.js` (tras `npm test` o `npm run build`).
+`LEGACY_DB=/ruta/a/db.json node --test dist/src/legacy/legacy-json-import.spec.js` (tras `npm test`).
 
 Las batallas en curso viven en memoria: reiniciar el servicio corta las peleas activas (quedan como "cortadas").
 

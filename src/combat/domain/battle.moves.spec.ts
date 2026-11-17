@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBattle, submit, validActions, publicState } from '../src/combat/domain/battle.js';
-import { rng, moveData } from '../src/catalog/domain/creatures.js';
+import { createBattle, submit, validActions, publicState } from './battle.js';
+import { rng, moveData } from '../../catalog/domain/creatures.js';
 
 const IV = { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 };
 // Fixtures carry only the fields the rules read.
@@ -186,7 +186,7 @@ test('Meteorobola takes the type of the weather, Plancha uses the Defense, Llama
 });
 
 test('the AI does not pick a move that is sure to fail', async () => {
-  const { scoreMove } = await import('../src/combat/domain/ai.js');
+  const { scoreMove } = await import('./ai.js');
   const b = battle(mon('p', 57, ['fake-out', 'karate-chop']), wall());
   assert.ok(scoreMove(b, 0, idx(b, 0, 'fake-out')) > 0);
   turn(b, 'karate-chop', 'growl');

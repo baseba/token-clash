@@ -1,8 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
-import { ArenaQueries } from '../arena/application/arena-queries.js';
-import { TrainersService } from '../trainers/application/trainers.service.js';
-import { WebAssets } from '../web/web-assets.js';
-import { serverStats } from './application/server-stats.js';
+import { ArenaQueries } from '../../arena/application/arena-queries.js';
+import { TrainersService } from '../../trainers/application/trainers.service.js';
+import { WebAssets } from '../../web/web-assets.js';
+import { serverStats } from '../application/server-stats.js';
 
 const byId = <T extends { id: string }>(list: readonly T[]) => Object.fromEntries(list.map((x) => [x.id, x]));
 

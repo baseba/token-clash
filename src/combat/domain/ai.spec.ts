@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBattle, submit, validActions, needsAction } from '../src/combat/domain/battle.js';
-import { rng, buildFighter, speciesData } from '../src/catalog/domain/creatures.js';
-import { AI_LEVELS, AI_POOL_SHARE, LAST_AI_SPECIES, aiPool, aiTeamPool, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from '../src/combat/domain/ai.js';
+import { createBattle, submit, validActions, needsAction } from './battle.js';
+import { rng, buildFighter, speciesData } from '../../catalog/domain/creatures.js';
+import { AI_LEVELS, AI_POOL_SHARE, LAST_AI_SPECIES, aiPool, aiTeamPool, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
 
 const fullyEvolved = (id) => {
   const d = speciesData(id);

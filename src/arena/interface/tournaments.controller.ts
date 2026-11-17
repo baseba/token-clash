@@ -5,16 +5,11 @@ import type { Trainer } from '../../trainers/domain/trainer.js';
 import { Authenticated, CurrentTrainer, MaybeAuthenticated } from '../../trainers/interface/session.guard.js';
 import { ArenaViews } from '../application/arena-views.js';
 import { TournamentsService } from '../application/tournaments.service.js';
-import { TOURNAMENT_SIZES, type Tournament } from '../domain/tournament.js';
+import type { Tournament } from '../domain/tournament.js';
+import { NewTournamentDto } from './dto/new-tournament.dto.js';
+import { AddAisDto, SetReadyDto } from './dto/tournament-actions.dto.js';
 
 const NO_SESSION = 'Primero importa tu equipo.';
-
-interface NewTournamentBody {
-  mode?: unknown;
-  levelCap?: unknown;
-  size?: unknown;
-  visibility?: unknown;
-}
 
 @Controller('api/tournaments')
 export class TournamentsController {
@@ -27,13 +22,8 @@ export class TournamentsController {
   @HttpCode(200)
   @RateLimit({ bucket: 'challenge', by: 'trainer', max: 30, windowMs: 10 * 60_000, message: 'Demasiados desafíos, espera unos minutos.' })
   @Authenticated(NO_SESSION)
-  create(@CurrentTrainer() t: Trainer, @Body() body: NewTournamentBody) {
-    const { tournament, joined } = this.tournaments.create(t, {
-      mode: body.mode === 'random' ? 'random' : 'team',
-      levelCap: body.levelCap === 50 ? 50 : null,
-      size: (TOURNAMENT_SIZES as readonly unknown[]).includes(body.size) ? (body.size as number) : 8,
-      visibility: body.visibility === 'private' ? 'private' : 'public',
-    });
+  create(@CurrentTrainer() t: Trainer, @Body({ schema: NewTournamentDto }) body: NewTournamentDto) {
+    const { tournament, joined } = this.tournaments.create(t, body);
     return { tournament: this.views.tournament(tournament, t.id), ...(joined ? { joined } : {}) };
   }
 
@@ -67,15 +57,15 @@ export class TournamentsController {
   @Post(':id/ready')
   @HttpCode(200)
   @Authenticated(NO_SESSION)
-  ready(@CurrentTrainer() t: Trainer, @Param('id') id: string, @Body() body: { ready?: unknown }) {
-    return this.after(t, id, (T) => this.tournaments.setReady(T, t, body.ready !== false));
+  ready(@CurrentTrainer() t: Trainer, @Param('id') id: string, @Body({ schema: SetReadyDto }) body: SetReadyDto) {
+    return this.after(t, id, (T) => this.tournaments.setReady(T, t, body.ready));
   }
 
   @Post(':id/ai')
   @HttpCode(200)
   @Authenticated(NO_SESSION)
-  addAi(@CurrentTrainer() t: Trainer, @Param('id') id: string, @Body() body: { level?: unknown; count?: unknown }) {
-    return this.after(t, id, (T) => this.tournaments.addAis(T, t, { level: body.level, count: body.count }));
+  addAi(@CurrentTrainer() t: Trainer, @Param('id') id: string, @Body({ schema: AddAisDto }) body: AddAisDto) {
+    return this.after(t, id, (T) => this.tournaments.addAis(T, t, body));
   }
 
   @Delete(':id/seats/:seat')

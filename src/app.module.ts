@@ -9,7 +9,7 @@
 //   realtime  the WebSocket protocol (/ws)
 //   web       the static frontend and health checks
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { ArenaModule } from './arena/arena.module.js';
 import { ChatModule } from './chat/chat.module.js';
 import { CombatModule } from './combat/combat.module.js';
@@ -19,6 +19,7 @@ import { ApiProtectionMiddleware } from './shared/http/api-protection.middleware
 import { DomainErrorFilter } from './shared/http/domain-error.filter.js';
 import { HttpModule } from './shared/http/http.module.js';
 import { SecurityHeadersMiddleware } from './shared/http/security-headers.middleware.js';
+import { validationPipe } from './shared/http/validation.pipe.js';
 import { DatabaseModule } from './shared/infrastructure/database/database.module.js';
 import { StatsModule } from './stats/stats.module.js';
 import { TrainersModule } from './trainers/trainers.module.js';
@@ -38,7 +39,11 @@ import { WebRoutesModule } from './web/web-routes.module.js';
     // Last: its catch-all route serves the frontend and must not shadow anything above.
     WebRoutesModule,
   ],
-  providers: [{ provide: APP_FILTER, useClass: DomainErrorFilter }],
+  providers: [
+    { provide: APP_FILTER, useClass: DomainErrorFilter },
+    // Checks every @Body/@Query/@Param that declares a schema (the DTOs in */interface/dto/).
+    { provide: APP_PIPE, useFactory: validationPipe },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

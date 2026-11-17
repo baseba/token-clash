@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendChat, chatChannel, chatText, createChatStore, tournamentChannel, CHAT_MAX_LENGTH } from '../src/chat/domain/chat.js';
+import { appendChat, chatChannel, chatText, createChatStore, tournamentChannel, CHAT_MAX_LENGTH } from './chat.js';
 
 test('a chat line is trimmed, keeps to one line and is capped in length', () => {
   assert.equal(chatText('  hola\n\n  mundo\t '), 'hola mundo');

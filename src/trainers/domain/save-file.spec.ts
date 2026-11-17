@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSave, SaveError, firstOfEachSpecies, carryTeam } from '../src/trainers/domain/save-file.js';
-import { uniqueSpecies, uniqueVariants } from '../src/catalog/domain/roster-entry.js';
-import { PROJECT_ROOT } from '../src/shared/paths.js';
+import { parseSave, SaveError, firstOfEachSpecies, carryTeam } from './save-file.js';
+import { uniqueSpecies, uniqueVariants } from '../../catalog/domain/roster-entry.js';
+import { PROJECT_ROOT } from '../../shared/paths.js';
 
 const text = readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8');
 
