@@ -7,7 +7,7 @@ import { newId, now } from '../../shared/domain/clock.js';
 import { forbidden, notFound } from '../../shared/domain/errors.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
-import { Challenge, type BattleMode, type Visibility } from '../domain/challenge.js';
+import { Challenge, isHumanDuel, type BattleMode, type Visibility } from '../domain/challenge.js';
 import { joinBlocker, matchFor } from '../domain/lobby.js';
 import { humanCount } from '../domain/tournament.js';
 import { ArenaViews } from './arena-views.js';
@@ -110,7 +110,7 @@ export class ChallengesService implements OnModuleInit {
   history(trainer: Trainer, { offset, limit }: { offset: number; limit: number }) {
     const mine = this.challenges
       .all()
-      .filter((c) => !c.ai && !c.tournamentId && (c.hostId === trainer.id || c.guestId === trainer.id))
+      .filter((c) => isHumanDuel(c) && c.isPlayer(trainer.id))
       .sort((a, b) => b.createdAt - a.createdAt);
     const tournaments = this.tournaments
       .all()

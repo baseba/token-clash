@@ -48,6 +48,12 @@ export interface ChallengeState {
   finishedAt?: number;
 }
 
+/**
+ * A 1v1 between two people: not against the AI, not a tournament match. Only these count for the
+ * ranking, the history and the stats.
+ */
+export const isHumanDuel = (challenge: Pick<ChallengeState, 'ai' | 'tournamentId'>): boolean => !challenge.ai && !challenge.tournamentId;
+
 interface Player {
   id: string;
   name: string;
@@ -140,11 +146,6 @@ export class Challenge implements ChallengeState {
       status: 'active',
       createdAt: input.at,
     });
-  }
-
-  /** Only 1v1 battles between people count for the ranking (not the AI, not tournaments). */
-  get ranked(): boolean {
-    return !this.ai && !this.tournamentId;
   }
 
   isPlayer(trainerId: string | null | undefined): boolean {

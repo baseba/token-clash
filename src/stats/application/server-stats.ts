@@ -1,7 +1,7 @@
 // The /stats page: ranking, recent battles, most used Pokémon, tournaments and server totals.
 // It is a read model: it only reads (from the other contexts' public queries) and computes.
 import { humanCount, type TournamentState } from '../../arena/domain/tournament.js';
-import type { ChallengeState } from '../../arena/domain/challenge.js';
+import { isHumanDuel, type ChallengeState } from '../../arena/domain/challenge.js';
 import { TURN_LIMIT } from '../../combat/domain/battle.js';
 import { byRanking } from '../../trainers/domain/ranking.js';
 import type { TrainerState } from '../../trainers/domain/trainer.js';
@@ -89,7 +89,7 @@ export function serverStats(source: StatsSource, now = Date.now()) {
   const players = playersOf(trainers);
   const entries = uniqueEntries(trainers);
   const challenges = Object.values(source.challenges);
-  const pvp = challenges.filter((c) => !c.ai && !c.tournamentId && c.status === 'finished' && c.final);
+  const pvp = challenges.filter((c) => isHumanDuel(c) && c.status === 'finished' && c.final);
   const vsAi = challenges.filter((c) => c.ai && !c.aiOnly && c.status === 'finished');
   const turns = pvp.reduce((sum, c) => sum + Math.min(c.turns ?? 0, TURN_LIMIT), 0);
   return {

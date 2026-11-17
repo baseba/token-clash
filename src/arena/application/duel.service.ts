@@ -20,7 +20,7 @@ import { conflict, DomainError } from '../../shared/domain/errors.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository } from '../domain/arena.repositories.js';
-import { Challenge, type BattleMode, type FinalBattleState } from '../domain/challenge.js';
+import { Challenge, isHumanDuel, type BattleMode, type FinalBattleState } from '../domain/challenge.js';
 import { aiName, pendingArrivals, viewersBehind, type TournamentLabel } from '../domain/tournament.js';
 import { ArenaEvents } from './arena-events.js';
 import { ArenaViews } from './arena-views.js';
@@ -475,7 +475,7 @@ export class DuelService {
     const winnerId = battle.winner !== null ? battle.sides[battle.winner].trainerId : null;
     challenge.finish({ winnerId, turns: battle.turn, final: publicState(battle) as unknown as FinalBattleState, at: now() });
     // Only 1v1 between people counts for the ranking, which belongs to the trainers context.
-    if (battle.winner !== null && challenge.ranked)
+    if (battle.winner !== null && isHumanDuel(challenge))
       this.trainers.recordRankedResult(battle.sides[battle.winner].trainerId, battle.sides[1 - battle.winner].trainerId);
     this.challenges.save(challenge);
     if (challenge.tournamentId) this.events.matchFinished({ challenge, winnerSide: battle.winner });
