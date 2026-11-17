@@ -111,6 +111,8 @@ function setRoom(api: MoveRuleApi, key: string, turns: number): boolean {
   return true;
 }
 
+const UNLIFTABLE = new Set([50, 51, 769, 770]);
+
 function setVol<K extends keyof Volatiles>(
   api: MoveRuleApi,
   fighter: BattleFighter,
@@ -274,7 +276,14 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   },
   telekinesis: {
     useOn: (api, me, foe) =>
-      (api.battle.field.rooms.gravity || foe.volatiles.ingrain ? api.nothing(me) : setVol(api, foe, 'telekinesis', { turns: 3 })),
+      (api.battle.field.rooms.gravity || foe.volatiles.ingrain || UNLIFTABLE.has(foe.speciesId) ? api.nothing(me) : setVol(api, foe, 'telekinesis', { turns: 3 })),
+  },
+  roost: {
+    use(api, me) {
+      if (!api.heal(me, me.stats.hp / 2)) return api.nothing(me);
+      me.volatiles.roost = api.turn();
+      return true;
+    },
   },
   ingrain: { use: (api, me) => setVol(api, me, 'ingrain', true) },
   'aqua-ring': { use: (api, me) => setVol(api, me, 'aquaRing', true, 'aquaring') },

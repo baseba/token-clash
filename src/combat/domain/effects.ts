@@ -76,7 +76,13 @@ export function boost(battle: BattleState, fighter: BattleFighter, changes: Boos
 export function grounded(battle: BattleState, fighter: BattleFighter): boolean {
   if (fighter.volatiles.smackedDown || fighter.volatiles.ingrain || battle.field.rooms.gravity) return true;
   if (fighter.volatiles.magnetRise || fighter.volatiles.telekinesis) return false;
-  return !fighter.types.includes('flying') && !flag(battle, fighter, 'levitates');
+  return !defendingTypes(battle, fighter).includes('flying') && !flag(battle, fighter, 'levitates');
+}
+
+export function defendingTypes(battle: BattleState, fighter: BattleFighter): string[] {
+  if (fighter.volatiles.roost !== battle.turn || !fighter.types.includes('flying')) return fighter.types;
+  const landed = fighter.types.filter((type) => type !== 'flying');
+  return landed.length ? landed : ['normal'];
 }
 
 export function currentWeather(battle: BattleState): Weather | null {

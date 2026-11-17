@@ -90,6 +90,7 @@ export interface Volatiles {
   lockOn?: BattleFighter;
   magicCoat?: number;
   magnetRise?: { turns: number };
+  roost?: number;
   /** The slot Mimic replaced and the move that was there. */
   mimic?: { slot: number; original: MoveData };
   miracleEye?: boolean;

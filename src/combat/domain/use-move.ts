@@ -307,14 +307,8 @@ function selfStatus(battle: BattleState, me: BattleFighter, move: BattleMove): v
     return selfStatus(battle, snatcher, move);
   }
   const rules = MOVE_RULES[move.id];
-  if (rules?.use) {
-    rules.use(moveApi(battle), me, foeOf(battle, me), move);
-    return;
-  }
-  if (rules?.useOn) {
-    rules.useOn(moveApi(battle), me, me, move);
-    return;
-  }
+  if (rules?.use) return failLoudly(battle, me, () => rules.use!(moveApi(battle), me, foeOf(battle, me), move));
+  if (rules?.useOn) return failLoudly(battle, me, () => rules.useOn!(moveApi(battle), me, me, move));
   let did = false;
   if (move.selfCost) {
     if (!Object.keys(boost(battle, me, move.boosts ?? {}, me)).length) {
@@ -360,6 +354,11 @@ function selfStatus(battle: BattleState, me: BattleFighter, move: BattleMove): v
     did = true;
   }
   if (!did) emit(battle, { t: 'nothing', side: sideIndexOf(battle, me) });
+}
+
+function failLoudly(battle: BattleState, user: BattleFighter, rule: () => boolean): void {
+  const before = battle.events.length;
+  if (!rule() && battle.events.length === before) emit(battle, { t: 'nothing', side: sideIndexOf(battle, user) });
 }
 
 function statusMove(battle: BattleState, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): boolean {
@@ -411,7 +410,7 @@ function statusMove(battle: BattleState, me: BattleFighter, foe: BattleFighter |
   const source = target === me ? foe : me;
   const rules = MOVE_RULES[move.id];
   if (rules?.useOn) {
-    rules.useOn(moveApi(battle), source, target, move);
+    failLoudly(battle, source, () => rules.useOn!(moveApi(battle), source, target, move));
     return true;
   }
   let did = false;
