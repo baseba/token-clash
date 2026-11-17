@@ -197,6 +197,26 @@ test('a guest who reconnects within the grace keeps the seat, and both ready sta
   await Promise.all([hostClient.close(), again.close()]);
 });
 
+test('a seat timer left by a guest who walked out does not break up the next ready check', async () => {
+  const { host, guest, id } = await acceptedRoom('Constante', 'Indecisa');
+  const hostClient = await Client.room(id, host.token);
+  const first = await Client.room(id, guest.token);
+  await first.close();
+  const back = await Client.room(id, guest.token);
+  back.send({ t: 'leave' });
+  await hostClient.next((f) => f.t === 'reopened');
+  const next = await trainer('Siguiente');
+  assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: next.token })).status, 200);
+  const nextClient = await Client.room(id, next.token);
+  await back.close();
+
+  await sleep(SEAT_GRACE_MS * 2);
+  assert.deepEqual(hostClient.rest().filter((f) => f.t !== 'lobby'), [], 'the first guest\'s timer is stale');
+  const room = (await call(`/api/challenges/${id}`)).data.challenge;
+  assert.deepEqual([room.status, room.guest?.name], ['active', 'Siguiente']);
+  await Promise.all([hostClient.close(), nextClient.close()]);
+});
+
 test('the host closes the room during the ready check: everyone inside is told', async () => {
   const { host, guest, id } = await acceptedRoom('Cierra', 'Mira');
   const hostClient = await Client.room(id, host.token);

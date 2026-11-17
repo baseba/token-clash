@@ -128,7 +128,8 @@ export class DuelService {
     if (phase.kind === 'readyCheck' && phase.players.some((p) => p.id === ws.trainerId)) {
       broadcast(room, { t: 'lobby' });
       setTimeout(() => {
-        if (room.phase.kind !== 'readyCheck' || inRoom(room, ws.trainerId)) return;
+        // This ready check only: after a reopen, a new guest starts another one.
+        if (room.phase !== phase || inRoom(room, ws.trainerId)) return;
         if (ws.trainerId === challenge.hostId) this.close(challenge, challenge.hostId);
         else this.reopen(room);
       }, this.timings.seatGraceMs).unref();
