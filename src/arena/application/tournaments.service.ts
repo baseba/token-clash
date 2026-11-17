@@ -152,11 +152,6 @@ export class TournamentsService implements OnModuleInit {
     }
   }
 
-  isPlayer(tournamentId: string, trainerId: string): boolean {
-    const tournament = this.tournaments.findById(tournamentId);
-    return !!tournament && tournament.seatOf(trainerId) !== -1;
-  }
-
   broadcast(tournament: Tournament): void {
     for (const ws of this.presence.tournamentSockets(tournament.id))
       if (ws.open) ws.send({ t: 'tour', tournament: this.views.tournament(tournament, ws.trainerId) });

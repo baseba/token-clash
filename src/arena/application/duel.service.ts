@@ -23,7 +23,7 @@ import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
 import { LobbyService } from './lobby.service.js';
 import { inRoom, Presence, type Room } from './presence.js';
-import { broadcast, frameFor, sideIn } from './room-frames.js';
+import { broadcast, frameFor } from './room-frames.js';
 import { TeamPreviewService } from './team-preview.service.js';
 
 /** The level the AI plays at when nothing caps it: the average of the rival's team. */
@@ -153,16 +153,6 @@ export class DuelService {
   leaveReadyCheck(ws: ClientConnection): void {
     const room = this.presence.roomOf(ws);
     if (room?.phase.kind === 'readyCheck' && room.challenge.guestId === ws.trainerId) this.reopen(room);
-  }
-
-  /** Who is talking in a room's chat: a player (and which side) or a viewer. */
-  chatRole(ws: ClientConnection, trainerId: string, isTournamentPlayer: (tournamentId: string) => boolean) {
-    const room = this.presence.roomOf(ws);
-    if (!room) return null;
-    const { challenge, phase } = room;
-    const side = phase.kind === 'battle' ? sideIn(phase.battle.sides, trainerId) : phase.kind === 'preview' ? sideIn(phase.preview.sides, trainerId) : null;
-    const player = challenge.tournamentId ? isTournamentPlayer(challenge.tournamentId) : challenge.isPlayer(trainerId);
-    return { challenge, role: player ? ('player' as const) : ('watcher' as const), side };
   }
 
   /** The guest left during the ready check: the room goes back to waiting for a rival. */

@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
 import type { Challenge } from '../domain/challenge.js';
 import type { Tournament } from '../domain/tournament.js';
-import type { ClientConnection } from './connection.js';
 import { Presence } from './presence.js';
 
 /** Read-only questions other contexts (stats, health) may ask the arena. */
@@ -28,17 +27,5 @@ export class ArenaQueries {
 
   busyRooms(): number {
     return this.presence.busyRooms();
-  }
-
-  /** Every live room with its challenge and connections (the chat fans messages out with it). */
-  *roomConnections(): Iterable<[Challenge, ReadonlySet<ClientConnection>]> {
-    for (const [id, room] of this.presence.rooms) {
-      const challenge = this.challenges.findById(id);
-      if (challenge) yield [challenge, room.sockets];
-    }
-  }
-
-  tournamentConnections(id: string): ReadonlySet<ClientConnection> {
-    return this.presence.tournamentSockets(id);
   }
 }
