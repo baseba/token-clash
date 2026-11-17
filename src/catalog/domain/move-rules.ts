@@ -275,13 +275,56 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   foresight: { use: (api, me, foe) => setVol(api, foe, 'foresight', true) },
   'odor-sleuth': { use: (api, me, foe) => setVol(api, foe, 'foresight', true) },
   'miracle-eye': { use: (api, me, foe) => setVol(api, foe, 'miracleEye', true, 'miracleeye') },
-  'mean-look': { use: (api, me, foe) => (foe.volatiles.trappedBy ? api.nothing(me) : (foe.volatiles.trappedBy = me, api.volatile(foe, 'trapped'), true)) },
-  block: { use: (api, me, foe) => (foe.volatiles.trappedBy ? api.nothing(me) : (foe.volatiles.trappedBy = me, api.volatile(foe, 'trapped'), true)) },
-  'spider-web': { use: (api, me, foe) => (foe.volatiles.trappedBy ? api.nothing(me) : (foe.volatiles.trappedBy = me, api.volatile(foe, 'trapped'), true)) },
-  octolock: { use: (api, me, foe) => (foe.volatiles.octolock ? api.nothing(me) : ((foe.volatiles.trappedBy = me), (foe.volatiles.octolock = me), api.volatile(foe, 'octolock'), true)) },
-  electrify: { use: (api, me, foe) => (api.moved(foe) ? api.nothing(me) : ((foe.volatiles.electrify = api.turn()), api.volatile(foe, 'electrify'), true)) },
+  'mean-look': {
+    use(api, me, foe) {
+      if (foe.volatiles.trappedBy) return api.nothing(me);
+      foe.volatiles.trappedBy = me;
+      api.volatile(foe, 'trapped');
+      return true;
+    },
+  },
+  block: {
+    use(api, me, foe) {
+      if (foe.volatiles.trappedBy) return api.nothing(me);
+      foe.volatiles.trappedBy = me;
+      api.volatile(foe, 'trapped');
+      return true;
+    },
+  },
+  'spider-web': {
+    use(api, me, foe) {
+      if (foe.volatiles.trappedBy) return api.nothing(me);
+      foe.volatiles.trappedBy = me;
+      api.volatile(foe, 'trapped');
+      return true;
+    },
+  },
+  octolock: {
+    use(api, me, foe) {
+      if (foe.volatiles.octolock) return api.nothing(me);
+      foe.volatiles.trappedBy = me;
+      foe.volatiles.octolock = me;
+      api.volatile(foe, 'octolock');
+      return true;
+    },
+  },
+  electrify: {
+    use(api, me, foe) {
+      if (api.moved(foe)) return api.nothing(me);
+      foe.volatiles.electrify = api.turn();
+      api.volatile(foe, 'electrify');
+      return true;
+    },
+  },
   'gastro-acid': { use: (api, me, foe) => (api.abilityDef(foe.ability)?.unsuppressable ? api.nothing(me) : setVol(api, foe, 'gastroAcid', true, 'gastroacid')) },
-  'destiny-bond': { use: (api, me) => (me.volatiles.prevMove === 'destiny-bond' ? api.nothing(me) : ((me.volatiles.destinyBond = true), api.volatile(me, 'destinybond'), true)) },
+  'destiny-bond': {
+    use(api, me) {
+      if (me.volatiles.prevMove === 'destiny-bond') return api.nothing(me);
+      me.volatiles.destinyBond = true;
+      api.volatile(me, 'destinybond');
+      return true;
+    },
+  },
   grudge: { use: (api, me) => setVol(api, me, 'grudge', true) },
   'perish-song': {
     use(api, me) {
@@ -290,8 +333,20 @@ export const MOVE_RULES: Record<string, MoveRule> = {
       return did;
     },
   },
-  snatch: { use: (api, me) => ((me.volatiles.snatch = api.turn()), api.volatile(me, 'snatch'), true) },
-  'magic-coat': { use: (api, me) => ((me.volatiles.magicCoat = api.turn()), api.volatile(me, 'magiccoat'), true) },
+  snatch: {
+    use(api, me) {
+      me.volatiles.snatch = api.turn();
+      api.volatile(me, 'snatch');
+      return true;
+    },
+  },
+  'magic-coat': {
+    use(api, me) {
+      me.volatiles.magicCoat = api.turn();
+      api.volatile(me, 'magiccoat');
+      return true;
+    },
+  },
   quash: { use: (api, me, foe) => (api.moved(foe) ? api.nothing(me) : (api.volatile(foe, 'quash'), true)) },
 
   'role-play': { use: (api, me, foe) => copyAbility(api, me, foe.ability) || api.nothing(me) },
@@ -530,7 +585,12 @@ export const MOVE_RULES: Record<string, MoveRule> = {
       return null;
     },
   },
-  rage: { after: (api, me) => ((me.volatiles.rage = true), null) },
+  rage: {
+    after(api, me) {
+      me.volatiles.rage = true;
+      return null;
+    },
+  },
   'future-sight': { before: (api, me, foe, move) => (api.future(me, move), 'skip') },
   'doom-desire': { before: (api, me, foe, move) => (api.future(me, move), 'skip') },
 
