@@ -1,6 +1,7 @@
 // The JSON shapes the frontend reads for a trainer and their Pokémon. Presenters only read.
 import { abilityInfo } from '../../catalog/domain/abilities.js';
-import { abilityOptions, buildFighter, lineageLearnset, moveOrigins, movepool, movesetFor, speciesData, validMoveset, MOVES_PER_FIGHTER } from '../../catalog/domain/creatures.js';
+import { abilityOptions, lineageLearnset, moveOrigins, speciesData } from '../../catalog/domain/creatures.js';
+import { buildFighter, movepool, movesetFor, validMoveset, MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import type { Trainer } from '../domain/trainer.js';
 

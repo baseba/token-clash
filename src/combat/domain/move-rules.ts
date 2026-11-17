@@ -1,10 +1,12 @@
-// Special rules of moves: what the generic engine (combat/domain/battle.ts) can't express with the
-// move's data alone (Protect, Substitute, Metronome, Psych Up…). Each rule gets the MoveRuleApi that
-// battle.ts hands it, so it never touches the battle state directly.
-import { moveData, type BoostKey, type Boosts, type MoveData } from './creatures.js';
-import { TYPES } from './type-chart.js';
-import type { MoveRuleApi } from '../../combat/domain/battle.js';
-import type { BattleFighter, BattleMove, SideCondition, Volatiles } from '../../combat/domain/battle-types.js';
+// Special rules of moves: what the generic engine can't express with the move's data alone (Protect,
+// Substitute, Metronome, Psych Up…). Each rule gets the MoveRuleApi of move-rule-api.ts, so it never
+// touches the battle state directly.
+import type { BoostKey, Boosts } from '../../catalog/domain/creatures.js';
+import { TYPES } from '../../catalog/domain/type-chart.js';
+import type { MoveRuleApi } from './move-rule-api.js';
+import type { BattleFighter, BattleMove, SideCondition, Volatiles } from './battle-types.js';
+import { stageMult } from './conditions.js';
+import { moveData, type MoveData } from './moves.js';
 
 /** What a calling move (Metronome, Copycat…) asks the engine to use instead. */
 export interface CalledMove {
@@ -518,7 +520,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   'strength-sap': {
     useOn(api, me, foe) {
       if (foe.boosts.atk <= -6) return api.nothing(me);
-      const amount = Math.floor(foe.stats.atk * api.stageMult(foe.boosts.atk));
+      const amount = Math.floor(foe.stats.atk * stageMult(foe.boosts.atk));
       api.boost(foe, { atk: -1 }, me);
       api.heal(me, amount);
       return true;

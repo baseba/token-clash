@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { moveShape, SHAPE_NAMES } from '../../public/fx.js';
 // The browser's effects are checked against the server's catalog, from the build (npm test compiles first).
-import { moveData } from '../../dist/src/catalog/domain/creatures.js';
+import { moveData } from '../../dist/src/combat/domain/moves.js';
 
 const MOVEDEX = JSON.parse(readFileSync(new URL('../../src/catalog/data/movedex.json', import.meta.url), 'utf8'));
 

@@ -1,10 +1,12 @@
-// The shapes the battle engine works on. The engine (battle.ts) mutates these in place; the rules of
-// abilities (catalog/domain/abilities.ts) and moves (catalog/domain/move-rules.ts) receive them
-// through the APIs battle.ts hands them (AbilityEngine and MoveRuleApi).
+// The shapes the battle engine works on. The engine mutates these in place; the rules of abilities
+// (ability-effects.ts) and moves (move-rules.ts) receive them through the APIs the engine hands them
+// (AbilityEngine in ability-engine.ts, MoveRuleApi in move-rule-api.ts).
 import type { AbilityInfo } from '../../catalog/domain/abilities.js';
-import type { BoostKey, Fighter, MajorStatus, MoveCategory, MoveData, StatKey, Stats, Weather } from '../../catalog/domain/creatures.js';
+import type { BoostKey, MajorStatus, MoveCategory, StatKey, Stats, Weather } from '../../catalog/domain/creatures.js';
+import type { Fighter } from './fighter.js';
+import type { MoveData } from './moves.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
-import type { FighterView, PublicMove } from './battle.js';
+import type { FighterView, PublicMove } from './battle-view.js';
 
 export interface MoveAction {
   type: 'move';
@@ -193,6 +195,9 @@ export interface BattleMove extends MoveData {
   /** Bide: the damage it stored, doubled. */
   bideDamage?: number;
 }
+
+/** A move as engine functions take it: a catalog move, or the copy being used this turn. */
+export type AnyMove = MoveData | BattleMove;
 
 export interface FieldState {
   weather: Weather | null;

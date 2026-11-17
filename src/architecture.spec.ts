@@ -71,6 +71,11 @@ test('only infrastructure/ folders (and the one-time legacy import) use Drizzle'
   assert.deepEqual(show(bad), []);
 });
 
+test('catalog depends on no other context: it serves data, and combat decides what the engine can play', () => {
+  const bad = imports.filter(({ file, target }) => contextOf(file) === 'catalog' && contextOf(target) && contextOf(target) !== 'catalog');
+  assert.deepEqual(show(bad), []);
+});
+
 test('shared/ depends on no context: the arrows point into it, never out', () => {
   const bad = imports.filter(({ file, target }) => file.startsWith('shared/') && contextOf(target));
   assert.deepEqual(show(bad), []);

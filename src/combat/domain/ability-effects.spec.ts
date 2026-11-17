@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents } from './battle.js';
 import { INERT, abilityInfo } from '../../catalog/domain/abilities.js';
 import { ABILITIES } from './ability-effects.js';
-import { abilityFor, floats, rng, species, movepool, moveOrigins, buildFighter } from '../../catalog/domain/creatures.js';
+import { abilityFor, floats, rng, moveOrigins } from '../../catalog/domain/creatures.js';
+import { movepool, buildFighter } from './fighter.js';
 import { catalogFile } from '../../shared/paths.js';
 
 const CATALOG = JSON.parse(readFileSync(catalogFile('abilities.json'), 'utf8'));
