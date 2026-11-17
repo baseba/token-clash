@@ -2241,7 +2241,7 @@ function afterTurn(battle: BattleState): void {
   battle.sides.forEach((side, sideIndex) => {
     const fighter = side.team[side.active];
     const escaping = fighter.hp > 0
-      && fighter.volatiles.switchNow
+      && !!fighter.volatiles.switchNow
       && side.team.some((o) => o !== fighter && o.hp > 0);
     delete fighter.volatiles.switchNow;
     side.mustSwitch = fighter.hp <= 0 || escaping;
