@@ -179,7 +179,9 @@ cada cliente en cada fase lo arma `room-frames.ts`: el jugador ve su lado y el e
 lo que ve el público.
 
 El estado de la batalla (`BattleState`) vive solo en memoria: el motor de `combat` es una función
-`submit(battle, lado, acción) → eventos`. Lo único que se guarda es el resultado, en el agregado `Challenge`. Por
+`submit(battle, lado, acción) → eventos`. Por dentro está repartido en un archivo por pregunta (en qué orden pasa un
+turno, qué hace un movimiento, cuánto daño hace, qué pasa al final del turno…); el mapa está al principio de
+`combat/domain/battle.ts`. Lo único que se guarda es el resultado, en el agregado `Challenge`. Por
 eso un reinicio corta las peleas en curso (quedan como `abandoned`).
 
 El chat también pasa por la arena. `ArenaChatService` decide en qué canal habla cada conexión (`ChatChannel`: el de

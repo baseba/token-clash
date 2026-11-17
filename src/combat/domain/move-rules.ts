@@ -1,9 +1,9 @@
-// Special rules of moves: what the generic engine (battle.ts) can't express with the
-// move's data alone (Protect, Substitute, Metronome, Psych Up…). Each rule gets the MoveRuleApi that
-// battle.ts hands it, so it never touches the battle state directly.
+// Special rules of moves: what the generic engine can't express with the move's data alone (Protect,
+// Substitute, Metronome, Psych Up…). Each rule gets the MoveRuleApi of move-rule-api.ts, so it never
+// touches the battle state directly.
 import type { BoostKey, Boosts } from '../../catalog/domain/creatures.js';
 import { TYPES } from '../../catalog/domain/type-chart.js';
-import type { MoveRuleApi } from './battle.js';
+import type { MoveRuleApi } from './move-rule-api.js';
 import type { BattleFighter, BattleMove, SideCondition, Volatiles } from './battle-types.js';
 import { stageMult } from './conditions.js';
 import { moveData, type MoveData } from './moves.js';

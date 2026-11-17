@@ -1,9 +1,9 @@
 // What each ability does in battle (EFFECTS). The effects are hooks the engine calls (onStart,
-// onBasePower, onTryHit…) with the AbilityEngine that battle.ts hands them, so they never touch the
+// onBasePower, onTryHit…) with the AbilityEngine of ability-engine.ts, so they never touch the
 // battle state directly. Names and descriptions are catalog data: catalog/domain/abilities.ts.
 import type { Boosts, BoostKey, MajorStatus, StatKey, Weather } from '../../catalog/domain/creatures.js';
 import type { MoveData } from './moves.js';
-import type { AbilityEngine } from './battle.js';
+import type { AbilityEngine } from './ability-engine.js';
 import { isIcy, isMajorStatus, isRain, isSun, poisoned, stageMult } from './conditions.js';
 import type { BattleFighter, BattleMove } from './battle-types.js';
 

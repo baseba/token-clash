@@ -1,12 +1,12 @@
-// The shapes the battle engine works on. The engine (battle.ts) mutates these in place; the rules of
-// abilities (ability-effects.ts) and moves (move-rules.ts) receive them through the APIs battle.ts hands
-// them (AbilityEngine and MoveRuleApi).
+// The shapes the battle engine works on. The engine mutates these in place; the rules of abilities
+// (ability-effects.ts) and moves (move-rules.ts) receive them through the APIs the engine hands them
+// (AbilityEngine in ability-engine.ts, MoveRuleApi in move-rule-api.ts).
 import type { AbilityInfo } from '../../catalog/domain/abilities.js';
 import type { BoostKey, MajorStatus, MoveCategory, StatKey, Stats, Weather } from '../../catalog/domain/creatures.js';
 import type { Fighter } from './fighter.js';
 import type { MoveData } from './moves.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
-import type { FighterView, PublicMove } from './battle.js';
+import type { FighterView, PublicMove } from './battle-view.js';
 
 export interface MoveAction {
   type: 'move';

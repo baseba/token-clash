@@ -68,7 +68,7 @@ En vivo: **https://clash.mirrordev.xyz**
 
 ## Combate
 
-El motor (`src/combat/domain/battle.ts`) sigue las reglas de los juegos para combates individuales: daño con STAB,
+El motor (`src/combat/domain/`, que se lee desde `battle.ts`) sigue las reglas de los juegos para combates individuales: daño con STAB,
 efectividad, críticos y variación; estados y volátiles (confusión, atracción, drenadoras, apresado…); clima,
 campos, barreras (Reflejo, Pantalla de Luz, Velo Aurora), trampas de campo, Protección, Sustituto, prioridad,
 golpes múltiples y movimientos de cambio, que cambian al Pokémon en el momento. Las habilidades están en
