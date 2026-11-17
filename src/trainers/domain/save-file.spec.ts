@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSave, SaveError, firstOfEachSpecies, carryTeam } from './save-file.js';
+import { parseSave, firstOfEachSpecies, carryTeam } from './save-file.js';
+import { DomainError } from '../../shared/domain/errors.js';
 import { uniqueSpecies, uniqueVariants } from '../../catalog/domain/roster-entry.js';
 import { PROJECT_ROOT } from '../../shared/paths.js';
 
@@ -44,11 +45,12 @@ test('keeps the ability and gender from the profile', () => {
   assert.deepEqual([venusaur.ability, venusaur.gender], [null, null]);
 });
 
-test('rejects junk', () => {
-  assert.throws(() => parseSave('nope'), SaveError);
-  assert.throws(() => parseSave('{"format":"other"}'), SaveError);
-  assert.throws(() => parseSave('{"dex":[]}'), SaveError);
-  assert.throws(() => parseSave('{"dex":[{"finalID":"x"}]}'), SaveError);
+test('rejects junk as an invalid request', () => {
+  const invalidSave = (e: unknown) => e instanceof DomainError && e.kind === 'invalid';
+  assert.throws(() => parseSave('nope'), invalidSave);
+  assert.throws(() => parseSave('{"format":"other"}'), invalidSave);
+  assert.throws(() => parseSave('{"dex":[]}'), invalidSave);
+  assert.throws(() => parseSave('{"dex":[{"finalID":"x"}]}'), invalidSave);
 });
 
 test('keeps only the first caught of each species, ordered by Pokédex number', () => {
