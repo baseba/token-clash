@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBattle, submit, validActions } from '../../domain/battle.js';
 import { rng } from '../../../catalog/domain/creatures.js';
-import { jevState, jevOptions, chooseJevAction, jevConfigured } from './jev.js';
+import { jevState, jevOptions, chooseJevAction } from './jev.js';
 
 // Fixtures carry only the fields the rules read.
 const mon = (id, finalID, moves, extra: any = {}): any => ({ id, finalID, baseID: finalID, rarity: 'rare', level: 50, ivs: { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 }, learned: moves, moveset: moves, ...extra });
@@ -72,12 +72,6 @@ test('without a key (behind the proxy) no Authorization header is sent', async (
   const jev = fakeJev(() => 'move_0');
   assert.deepEqual(await chooseJevAction(team(), 1, { fetchImpl: jev.fetchImpl }), { type: 'move', move: 0 });
   assert.equal(jev.calls[0].headers.Authorization, undefined);
-});
-
-test('Skynet is on with a key or a proxy URL, off with neither', () => {
-  assert.equal(jevConfigured({}), false);
-  assert.equal(jevConfigured({ JEV_API_KEY: 'k' }), true);
-  assert.equal(jevConfigured({ JEV_API_URL: 'http://token-clash-jev:8081/v1/systemone' }), true);
 });
 
 test('a forced choice does not ask Jev', async () => {

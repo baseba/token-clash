@@ -7,8 +7,6 @@ import { effectiveness } from '../../../catalog/domain/creatures.js';
 // TypeSafe's endpoint. In production the app calls the egress proxy (jev-proxy.ts) instead, which
 // adds the key: the URL comes from JEV_API_URL (see SkynetService).
 export const JEV_DEFAULT_URL = 'https://api.typesafe.ai/v1/systemone';
-// Skynet exists when there is a way to reach Jev: a key for TypeSafe directly, or a proxy URL.
-export const jevConfigured = (env: Record<string, string | undefined> = process.env): boolean => Boolean(env.JEV_API_KEY || env.JEV_API_URL);
 // Pinned, not jev-latest, so a model update can't silently change how Skynet plays.
 export const JEV_DEFAULT_MODEL = 'jev-1.14.0';
 export const JEV_TIMEOUT_MS = 4_000;
