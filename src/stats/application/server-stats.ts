@@ -118,7 +118,7 @@ export function serverStats(source: StatsSource, now = Date.now()) {
         host: nameOf(source, c.hostId, c.hostName),
         guest: nameOf(source, c.guestId, c.guestName),
         winner: c.winnerId === c.hostId ? 'host' : c.winnerId === c.guestId ? 'guest' : null,
-        mode: c.mode ?? 'team',
+        mode: c.mode,
         levelCap: c.levelCap ?? null,
         turns: c.turns ?? null,
         finishedAt: c.finishedAt ?? c.createdAt,
@@ -161,7 +161,7 @@ export function tournamentStats(source: StatsSource) {
       return {
         id: tournament.id,
         size: tournament.size,
-        mode: tournament.mode ?? 'team',
+        mode: tournament.mode,
         levelCap: tournament.levelCap ?? null,
         humans: humanCount(tournament),
         champion: champ ? nameOf(source, champ.ai ? null : champ.id, champ.name) : '¿?',

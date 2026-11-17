@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openRooms, matchFor, visibilityOf, joinBlocker, HOST_GRACE_MS } from './lobby.js';
+import { openRooms, matchFor, joinBlocker, HOST_GRACE_MS } from './lobby.js';
 
 const now = 1_000_000;
 const room = (id, extra = {}): any => ({ id, hostId: `h-${id}`, status: 'open', mode: 'team', levelCap: null, visibility: 'public', createdAt: now - HOST_GRACE_MS - 1, ...extra });
@@ -18,10 +18,6 @@ test('only public open rooms with a host still waiting are listed, oldest first'
   const waiting = new Set(['a', 'g']);
   const list = openRooms(challenges, { now, hostWaiting: (c) => waiting.has(c.id) });
   assert.deepEqual(list.map((c) => c.id), ['g', 'a', 'b']);
-});
-
-test('rooms made before visibility existed stay private', () => {
-  assert.equal(visibilityOf({}), 'private');
 });
 
 test('a public search joins a rival room with the same mode and level, never its own', () => {

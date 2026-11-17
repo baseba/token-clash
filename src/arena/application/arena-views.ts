@@ -8,7 +8,6 @@ import { SkynetService } from '../../combat/application/skynet.service.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import { TournamentRepository } from '../domain/arena.repositories.js';
 import type { Challenge } from '../domain/challenge.js';
-import { visibilityOf } from '../domain/lobby.js';
 import { humanCount, reachedRound, roundName, type Tournament } from '../domain/tournament.js';
 import { Presence, type CountdownPlayer } from './presence.js';
 
@@ -28,7 +27,7 @@ export class ArenaViews {
 
   challenge(challenge: Challenge, viewerId: string | null = null) {
     const host = this.trainers.byId(challenge.hostId);
-    const hostTeam = (challenge.status === 'finished' || challenge.battleMode !== 'random'
+    const hostTeam = (challenge.status === 'finished' || challenge.mode !== 'random'
       ? challenge.hostTeam
       : []).map((e) => buildFighter(e, { levelCap: challenge.levelCap }));
     const tournament = challenge.tournamentId ? this.tournaments.findById(challenge.tournamentId) : undefined;
@@ -36,15 +35,15 @@ export class ArenaViews {
       id: challenge.id,
       status: challenge.status,
       levelCap: challenge.levelCap,
-      mode: challenge.battleMode,
+      mode: challenge.mode,
       ai: challenge.ai ?? null,
-      visibility: visibilityOf(challenge),
+      visibility: challenge.visibility,
       tournament: tournament?.bracket ? tournament.label({ round: challenge.round!, index: challenge.match! }) : null,
       createdAt: challenge.createdAt,
       host: { id: challenge.hostId, name: host?.name ?? challenge.hostName },
       guest: challenge.guestId ? { id: challenge.guestId, name: this.nameOf(challenge.guestId, challenge.guestName) } : null,
       hostTeam: viewerId === challenge.hostId || challenge.status === 'finished' ? hostTeam : [],
-      hostTeamSize: challenge.battleMode === 'random' ? Math.min(PARTY_SIZE, host?.roster.length ?? 0) : hostTeam.length,
+      hostTeamSize: challenge.mode === 'random' ? Math.min(PARTY_SIZE, host?.roster.length ?? 0) : hostTeam.length,
       winnerId: challenge.winnerId ?? null,
       turns: challenge.turns ?? null,
       final: challenge.final ?? null,
@@ -57,7 +56,7 @@ export class ArenaViews {
     return {
       id: challenge.id,
       kind: 'duel',
-      mode: challenge.battleMode,
+      mode: challenge.mode,
       levelCap: challenge.levelCap ?? null,
       createdAt: challenge.createdAt,
       host: { name: host?.name ?? challenge.hostName, wins: host?.wins ?? 0, losses: host?.losses ?? 0 },
@@ -128,9 +127,9 @@ export class ArenaViews {
       id: challenge.id,
       status: challenge.status,
       levelCap: challenge.levelCap,
-      mode: challenge.battleMode,
+      mode: challenge.mode,
       ai: challenge.ai ?? null,
-      visibility: visibilityOf(challenge),
+      visibility: challenge.visibility,
       createdAt: challenge.createdAt,
       opponent: mine
         ? (challenge.guestId ? (this.nameOf(challenge.guestId, challenge.guestName) ?? null) : null)

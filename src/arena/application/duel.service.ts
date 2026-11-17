@@ -99,13 +99,13 @@ export class DuelService {
 
   /** A random battle rolls the host's party when someone joins: a host with no Pokémon left can't be joined. */
   joinable(challenge: Challenge): boolean {
-    return challenge.battleMode !== 'random' || !!this.trainers.byId(challenge.hostId)?.roster.length;
+    return challenge.mode !== 'random' || !!this.trainers.byId(challenge.hostId)?.roster.length;
   }
 
   /** Someone takes the free seat of an open room. */
   join(challenge: Challenge, guest: Trainer): void {
     if (!this.joinable(challenge)) throw conflict('El anfitrión ya no tiene Pokémon.');
-    if (challenge.battleMode === 'random') {
+    if (challenge.mode === 'random') {
       challenge.join(guest, { hostTeam: randomParty(this.trainers.byId(challenge.hostId)!.roster), guestTeam: randomParty(guest.roster) });
     } else challenge.join(guest, { guestTeam: guest.teamSnapshot() });
     this.challenges.save(challenge);
@@ -268,14 +268,14 @@ export class DuelService {
     if (challenge.status !== 'active') return;
     const preview = createPreview({
       levelCap: challenge.levelCap,
-      mode: challenge.battleMode,
+      mode: challenge.mode,
       sides: [
         { trainerId: challenge.hostId, name: this.views.nameOf(challenge.hostId, challenge.hostName)!, entries: challenge.hostTeam },
         { trainerId: challenge.guestId!, name: this.views.nameOf(challenge.guestId, challenge.guestName)!, entries: challenge.guestTeam! },
       ],
     });
     room.preview = preview;
-    this.armPreviewTimer(challenge.id, room, challenge.battleMode === 'random' ? this.timings.diceRollBonusMs : 0);
+    this.armPreviewTimer(challenge.id, room, challenge.mode === 'random' ? this.timings.diceRollBonusMs : 0);
     this.broadcast(room, { t: 'preview' });
     preview.sides.forEach((side, sideIndex) => {
       const level = aiLevelOf(side.trainerId);

@@ -10,19 +10,17 @@ export const HOST_GRACE_MS = 20_000;
 type RoomLike = Pick<Challenge, 'status' | 'createdAt' | 'hostId' | 'guestId' | 'ai' | 'visibility' | 'mode' | 'levelCap'>;
 type HostWaiting<T> = (room: T) => boolean;
 
-export const visibilityOf = (room: Pick<Challenge, 'visibility'>) => room.visibility ?? 'private';
-
 const hostPresent = <T extends RoomLike>(room: T, now: number, hostWaiting: HostWaiting<T>) =>
   now - room.createdAt < HOST_GRACE_MS || hostWaiting(room);
 
 export function openRooms<T extends RoomLike>(challenges: Record<string, T> | T[], { now = Date.now(), hostWaiting = (() => false) as HostWaiting<T> } = {}): T[] {
   return Object.values(challenges)
-    .filter((c) => c.status === 'open' && !c.ai && visibilityOf(c) === 'public' && hostPresent(c, now, hostWaiting))
+    .filter((c) => c.status === 'open' && !c.ai && c.visibility === 'public' && hostPresent(c, now, hostWaiting))
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export function matchFor<T extends RoomLike>(rooms: T[], { trainerId, mode, levelCap }: { trainerId: string; mode: BattleMode; levelCap: number | null }): { own: T | null; rival: T | null } {
-  const same = rooms.filter((c) => (c.mode ?? 'team') === mode && (c.levelCap ?? null) === levelCap);
+  const same = rooms.filter((c) => c.mode === mode && c.levelCap === levelCap);
   return { own: same.find((c) => c.hostId === trainerId) ?? null, rival: same.find((c) => c.hostId !== trainerId) ?? null };
 }
 
@@ -39,7 +37,7 @@ export function joinBlocker<T extends RoomLike>(
   if (room.status === 'finished') return conflict('Esta sala ya terminó su pelea.');
   if (room.status === 'cancelled') return gone('El anfitrión cerró esta sala.');
   if (room.status !== 'open') return gone('Esta sala se cortó cuando se reinició el servidor.');
-  if (visibilityOf(room) === 'public' && !hostPresent(room, now, hostWaiting))
+  if (room.visibility === 'public' && !hostPresent(room, now, hostWaiting))
     return conflict('El anfitrión ya no está en la sala. Busca otra o abre la tuya.');
   return null;
 }

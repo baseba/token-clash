@@ -30,10 +30,8 @@ export interface ChallengeState {
   levelCap: number | null;
   status: ChallengeStatus;
   createdAt: number;
-  /** Rooms created before modes existed have none: they were team battles. */
-  mode?: BattleMode;
-  /** Rooms created before visibility existed have none: they were private (link only). */
-  visibility?: Visibility;
+  mode: BattleMode;
+  visibility: Visibility;
   /** Difficulty when one side is the AI. */
   ai?: string | null;
   /** Both sides are AIs (a tournament match between two AI seats). */
@@ -63,8 +61,8 @@ export class Challenge implements ChallengeState {
   levelCap: number | null;
   status: ChallengeStatus;
   createdAt: number;
-  mode?: BattleMode;
-  visibility?: Visibility;
+  mode: BattleMode;
+  visibility: Visibility;
   ai?: string | null;
   aiOnly?: boolean;
   guestId?: string;
@@ -91,7 +89,7 @@ export class Challenge implements ChallengeState {
     return new Challenge({ id: input.id, hostId: input.host.id, hostName: input.host.name, hostTeam: input.hostTeam, levelCap: input.levelCap, mode: input.mode, visibility: input.visibility, status: 'open', createdAt: input.at });
   }
 
-  /** A battle against the AI starts at once. */
+  /** A battle against the AI starts at once. Private: nobody else can take its seat. */
   static againstAi(input: { id: string; host: Player; hostTeam: RosterEntry[]; ai: Player & { level: string }; aiTeam: RosterEntry[]; levelCap: number | null; mode: BattleMode; at: number }): Challenge {
     return new Challenge({
       id: input.id,
@@ -103,6 +101,7 @@ export class Challenge implements ChallengeState {
       guestTeam: input.aiTeam,
       levelCap: input.levelCap,
       mode: input.mode,
+      visibility: 'private',
       ai: input.ai.level,
       status: 'active',
       createdAt: input.at,
@@ -141,10 +140,6 @@ export class Challenge implements ChallengeState {
       status: 'active',
       createdAt: input.at,
     });
-  }
-
-  get battleMode(): BattleMode {
-    return this.mode ?? 'team';
   }
 
   /** Only 1v1 battles between people count for the ranking (not the AI, not tournaments). */

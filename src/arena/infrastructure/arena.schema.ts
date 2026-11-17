@@ -10,11 +10,9 @@ export const challenges = sqliteTable(
   {
     id: text().primaryKey(),
     status: text().notNull(),
-    /** NULL in rooms older than modes (they were team battles). */
-    mode: text(),
+    mode: text().notNull(),
     levelCap: integer('level_cap'),
-    /** NULL in rooms older than visibility (they were private). */
-    visibility: text(),
+    visibility: text().notNull(),
     ai: text(),
     aiOnly: integer('ai_only', { mode: 'boolean' }),
     hostId: text('host_id').notNull(),
