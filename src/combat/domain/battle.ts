@@ -30,7 +30,6 @@ const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Ma
 const isSun = (weather: string | null | undefined): boolean => weather === 'sun' || weather === 'harshsun';
 const isRain = (weather: string | null | undefined): boolean => weather === 'rain' || weather === 'heavyrain';
 const poisoned = (status: string | null | undefined): boolean => status === 'psn' || status === 'tox';
-const isAttack = (move: AnyMove): boolean => move.category !== 'status';
 export const STRUGGLE_MOVE = -1;
 const HEALS_WITH_WEATHER: Record<string, string> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
 
@@ -2242,7 +2241,7 @@ function afterTurn(battle: BattleState): void {
   battle.sides.forEach((side, sideIndex) => {
     const fighter = side.team[side.active];
     const escaping = fighter.hp > 0
-      && (fighter.volatiles.exitPending || fighter.volatiles.switchNow)
+      && fighter.volatiles.switchNow
       && side.team.some((o) => o !== fighter && o.hp > 0);
     delete fighter.volatiles.switchNow;
     side.mustSwitch = fighter.hp <= 0 || escaping;
