@@ -2213,7 +2213,7 @@ async function battlePage(id, seq) {
         prep = null;
       }
       if (!battle) {
-        battle = battleUI(c, (action) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'act', action })), (turn) => send({ t: 'seen', turn }), chat, bar);
+        battle = battleUI(c, (action) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'act', action })), (turn) => send({ t: 'seen', turn }), chat, bar, () => send({ t: 'surrender' }));
         music.play(`scene:${sceneFor(c.id).file}`);
       }
       battle.push(msg);
@@ -2459,7 +2459,7 @@ function roomBar(c) {
       h('span', { class: 'room-bar-tag' }, watching ? '👁 Estás mirando' : '⚔︎ Tu pelea'),
       ...(status ? [status.turn, status.vs] : []),
       h('span', { class: 'room-bar-text' }, tour ? `🏆 ${tour.round} · Pelea ${tour.number} de ${tour.total}` : null, tour && vs ? ' · ' : null, vs),
-      ...(status ? [status.field, status.timer] : []),
+      ...(status ? [status.field, status.timer, status.forfeit] : []),
       ...(tour ? [h('a', { class: 'btn sm', href: `/t/${tour.id}`, 'data-link': true }, 'Ver llaves')] : []),
     );
   }
@@ -3307,7 +3307,7 @@ function chatDock(chat) {
   };
 }
 
-function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null) {
+function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, sendSurrender = null) {
   let frame = null; // last frame from the server
   let view = null; // what is on screen (lags behind frame while events play)
   let playing = false;
@@ -3342,7 +3342,20 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null) {
     say: h('div', { class: 'say', 'aria-live': 'polite' }),
     controls: h('div', { class: 'card' }),
     log: h('div', { class: 'card log' }),
+    forfeit: h('button', { class: 'btn sm ghost danger forfeit-btn', type: 'button', hidden: true, 'data-tip': 'Abandonar esta pelea', onclick: () => askForfeit() }, '🏳 Rendirse'),
+    forfeitDlg: h('dialog', { class: 'info-dlg confirm-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() }),
   };
+  function askForfeit() {
+    const consequence = c.tournament ? 'Quedas fuera del torneo y tu rival avanza.' : c.ai ? 'Las peleas contra la IA no cuentan para el ranking.' : 'Cuenta como derrota en el ranking.';
+    const stay = h('button', { class: 'btn', type: 'button', autofocus: true, onclick: () => els.forfeitDlg.close() }, 'Seguir peleando');
+    const give = h('button', { class: 'btn primary danger-fill', type: 'button', onclick: () => {
+      els.forfeitDlg.close();
+      els.forfeit.disabled = true;
+      sendSurrender?.();
+    } }, '🏳 Me rindo');
+    els.forfeitDlg.replaceChildren(h('div', { class: 'confirm-body' }, h('h2', null, '¿Rendirte?'), h('p', null, `Pierdes esta pelea y ${trainerShort(view?.sides[1 - mine]?.name ?? 'tu rival')} gana. `, consequence), h('div', { class: 'row confirm-actions' }, stay, give)));
+    if (!els.forfeitDlg.open) els.forfeitDlg.showModal();
+  }
   const scene = sceneFor(c.id);
   const field = h(
     'div',
@@ -3367,13 +3380,14 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null) {
   resize.observe(arena);
   const fx = createFx(arena, field);
   $app.replaceChildren(
-    ...(bar ? [] : [h('div', { class: 'status-line' }, els.turn, els.vs, els.field, els.timer)]),
+    ...(bar ? [] : [h('div', { class: 'status-line' }, els.turn, els.vs, els.field, els.timer, els.forfeit)]),
     h('div', { class: 'stage battle-stage' }, els.team.me, arena, els.team.foe),
     h('div', { class: 'battle-layout wide' }, els.controls, h('div', { class: 'fixed-slot' }, els.log)),
     els.info,
+    els.forfeitDlg,
   );
   fitField();
-  bar?.setStatus({ turn: els.turn, vs: els.vs, field: els.field, timer: els.timer });
+  bar?.setStatus({ turn: els.turn, vs: els.vs, field: els.field, timer: els.timer, forfeit: els.forfeit });
 
   const tick = setInterval(() => {
     if (!frame?.deadline || frame.state.status !== 'active') {
@@ -3752,6 +3766,8 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null) {
   }
 
   function renderControls() {
+    els.forfeit.hidden = !sendSurrender || frame?.you == null || frame?.state.status !== 'active';
+    if (els.forfeit.hidden && els.forfeitDlg.open) els.forfeitDlg.close();
     paintTeams();
     const st = frame.state;
     const you = frame.you;
@@ -4340,6 +4356,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null) {
       case 'end':
         setActing(null);
         if (ev.reason === 'limit') log('Se llegó al límite de turnos: gana quien conserva más vida.', 'weak');
+        if (ev.reason === 'forfeit' && ev.winner !== null) tell([`🏳 ${isYou(1 - ev.winner) ? 'Te rendiste' : `${trainerShort(sd(1 - ev.winner).name)} se rindió`}.`], { cls: 'weak' });
         tell([ev.winner === null ? 'Empate.' : isYou(ev.winner) ? '¡Ganaste la batalla! 🏆' : `¡${sd(ev.winner).name} gana la batalla!`], { cls: 'win' });
         return (async () => {
           await trainersReturn(ev.winner);

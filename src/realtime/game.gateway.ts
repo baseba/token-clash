@@ -154,6 +154,12 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
     if (connection?.roomId) this.battles.act(connection, msg.action);
   }
 
+  @SubscribeMessage('surrender')
+  onSurrender(@ConnectedSocket() socket: WebSocket): void {
+    const connection = this.conn(socket);
+    if (connection?.roomId) this.battles.surrender(connection);
+  }
+
   @SubscribeMessage('chat')
   onChat(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'chat'>): void {
     const connection = this.conn(socket);

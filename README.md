@@ -41,7 +41,8 @@ En vivo: **https://clash.mirrordev.xyz**
      - Una sala pública deja de aparecer si el anfitrión cierra la página. Cuando alguien entra, los dos se ven en
        la sala y cada uno aprieta **¡Estoy listo!**; con los dos listos parte una cuenta regresiva de 5 s antes de
        elegir sus Pokémon (80 s para elegir). Ningún jugador ve qué eligió el rival ni en qué orden; cuando los dos
-       eligen, pasan 4 s y parte la pelea en vivo (60 s por turno; si alguien no elige, su Pokémon ataca solo).
+       eligen, pasan 4 s y parte la pelea en vivo (60 s por turno; si alguien no elige, su Pokémon ataca solo). Con **🏳 Rendirse**, arriba a la derecha junto
+       al reloj y con confirmación, pierdes al tiro: cuenta como derrota en el ranking y en un torneo avanza el rival.
        Cualquiera más con el link puede mirar: en la preparación ve los dos equipos completos, lo que cada uno va
        marcando mientras elige, los 3 elegidos de cada lado durante esos 4 s y, en cada
        Pokémon, contra cuántos rivales tiene ventaja de tipo (⚔️) y cuántos lo amenazan (⚠️). Las IAs esperan a que

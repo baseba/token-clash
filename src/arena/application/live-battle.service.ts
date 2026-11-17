@@ -3,7 +3,7 @@
 // turns, moves a fighter is locked into, and the result, which is the only thing stored.
 import { Injectable, Logger } from '@nestjs/common';
 import { aiLevelOf, chooseAction, JEV_LEVEL } from '../../combat/domain/ai.js';
-import { autoAction, createBattle, forcedAction, needsAction, publicState, submit, type Action, type BattleEvent, type BattleState } from '../../combat/domain/battle.js';
+import { autoAction, createBattle, forcedAction, forfeit, needsAction, publicState, submit, type Action, type BattleEvent, type BattleState } from '../../combat/domain/battle.js';
 import { chosenEntries, type PreviewState } from '../../combat/domain/team-preview.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
@@ -75,6 +75,16 @@ export class LiveBattleService {
     }
     if (events) this.afterResolve(room, phase, events);
     else broadcast(room, { t: 'ready' });
+  }
+
+  surrender(ws: ClientConnection): void {
+    const room = this.presence.roomOf(ws);
+    if (room?.phase.kind !== 'battle' || room.phase.battle.status !== 'active') return;
+    const { phase } = room;
+    const sideIndex = sideIn(phase.battle.sides, ws.trainerId);
+    if (sideIndex === null) return;
+    clearTimeout(room.timer ?? undefined);
+    this.afterResolve(room, phase, forfeit(phase.battle, sideIndex));
   }
 
   /** The client finished animating this turn (AI vs AI waits for viewers). */

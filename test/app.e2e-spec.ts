@@ -37,7 +37,7 @@ before(async () => {
   jevProxy = createJevProxy({ apiKey: FAKE_JEV_KEY, upstream: `http://127.0.0.1:${(fakeJev.address() as AddressInfo).port}/v1/systemone` });
   await new Promise<void>((r) => jevProxy.listen(0, '127.0.0.1', r));
   const proxyPort = (jevProxy.address() as AddressInfo).port;
-  app = appProcess({ ...FAST_TIMINGS, SEAT_GRACE_MS: '60000', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${proxyPort}/v1/systemone` }, 18000);
+  app = appProcess({ ...FAST_TIMINGS, SEAT_GRACE_MS: '60000', TRUST_CF_CONNECTING_IP: '1', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${proxyPort}/v1/systemone` }, 18000);
   ({ base, port: PORT } = app);
   await app.start();
 });
@@ -47,10 +47,10 @@ after(() => {
   fakeJev.close();
 });
 
-async function call(path: string, { method = 'GET', body = undefined as unknown, token = undefined as string | undefined } = {}): Promise<{ status: number; data: any; headers: Headers }> {
+async function call(path: string, { method = 'GET', body = undefined as unknown, token = undefined as string | undefined, ip = undefined as string | undefined } = {}): Promise<{ status: number; data: any; headers: Headers }> {
   const res = await fetch(base + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(ip ? { 'CF-Connecting-IP': ip } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   return { status: res.status, data: await res.json().catch(() => null), headers: res.headers };
@@ -215,6 +215,36 @@ test('against Skynet, Jev picks the AI\'s actions and the battle ends', async ()
   assert.ok(mine.length > 0, 'Jev was never asked');
   assert.ok(mine.every((c) => c.auth === `Bearer ${FAKE_JEV_KEY}`));
   assert.ok(!JSON.stringify(mine.map((c) => c.body)).includes('Sarah'), 'trainer name sent to Jev');
+});
+
+test('a player who surrenders loses at once, and it counts in the ranking', async () => {
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Rendida', save }, ip: '10.9.0.1' });
+  const b = await call('/api/import', { method: 'POST', body: { name: 'Ganadora', save }, ip: '10.9.0.2' });
+  const id = (await call('/api/challenges', { method: 'POST', token: a.data.token, body: { visibility: 'private' } })).data.challenge.id;
+  await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token });
+  const quitter = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
+  let surrendered = false;
+  const ended = new Promise<any>((r) => quitter.on('message', (raw) => {
+    const m = JSON.parse(String(raw));
+    if (m.state?.status === 'finished') r(m);
+    if (m.t === 'lobby' && !m.players[m.you].ready) quitter.send(JSON.stringify({ t: 'set-ready', ready: true }));
+    const mine = m.preview && m.you != null ? m.preview.sides[m.you] : null;
+    if (mine && !mine.ready) quitter.send(JSON.stringify({ t: 'pick', picks: mine.party.slice(0, mine.needed).map((_, i) => i) }));
+    if (m.actions?.length && !surrendered) {
+      surrendered = true;
+      quitter.send(JSON.stringify({ t: 'surrender' }));
+    }
+  }));
+  quitter.on('open', () => quitter.send(JSON.stringify({ t: 'hello', room: id, token: a.data.token })));
+  const rival = player(id, b.data.token);
+  const end = await ended;
+  assert.equal(end.state.winner, 1);
+  assert.deepEqual(end.events.at(-1), { t: 'end', winner: 1, reason: 'forfeit' });
+  [quitter, rival.ws].forEach((ws) => ws.close());
+  await new Promise<any>((r) => setTimeout(r, 200));
+  assert.equal((await call(`/api/challenges/${id}`)).data.challenge.winnerId, b.data.me.id);
+  assert.equal((await call('/api/me', { token: a.data.token })).data.me.losses, 1);
+  assert.equal((await call('/api/me', { token: b.data.token })).data.me.wins, 1);
 });
 
 test('timeouts auto-play so a battle always ends', async () => {

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseSave } from '../../trainers/domain/save-file.js';
-import { createBattle, submit, autoAction, needsAction, validActions, shownTarget } from './battle.js';
+import { createBattle, submit, autoAction, forfeit, needsAction, validActions, shownTarget } from './battle.js';
 import { rng, species, speciesData, effectiveness, learnedMoves, statsFor } from '../../catalog/domain/creatures.js';
 import { BATTLE_LEVEL, defaultMoveset, validMoveset, movesetFor, buildFighter } from './fighter.js';
 import { moveData } from './moves.js';
@@ -156,4 +156,15 @@ test('a non-ghost Curse is shown on its user, a ghost Curse on the foe', () => {
   assert.equal(shownTarget({ types: ['normal'] }, 'curse', 'foe'), 'self');
   assert.equal(shownTarget({ types: ['ghost', 'poison'] }, 'curse', 'foe'), 'foe');
   assert.equal(shownTarget({ types: ['normal'] }, 'tackle', 'foe'), 'foe');
+});
+
+test('a side that forfeits loses at once, and a finished battle cannot be forfeited', () => {
+  const b = createBattle({ id: 'f', random: rng(1), sides: [{ trainerId: 'a', name: 'A', entries: roster.slice(0, 3) }, { trainerId: 'b', name: 'B', entries: roster.slice(1, 4) }] });
+  submit(b, 0, autoAction(b, 0));
+  const events = forfeit(b, 0);
+  assert.deepEqual(events, [{ t: 'end', winner: 1, reason: 'forfeit' }]);
+  assert.equal(b.status, 'finished');
+  assert.equal(b.winner, 1);
+  assert.equal(b.sides[0].action, null);
+  assert.throws(() => forfeit(b, 1), /ya terminó/);
 });

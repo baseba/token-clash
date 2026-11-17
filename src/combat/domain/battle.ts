@@ -28,7 +28,7 @@ import { abilityKey, run } from './ability-engine.js';
 
 export type * from './battle-types.js';
 export { STRUGGLE_MOVE } from './moves.js';
-export { TURN_LIMIT } from './turn.js';
+export { forfeit, TURN_LIMIT } from './turn.js';
 export { type EventView, viewEvents, type PublicMove, type VisibleFighterView, type HiddenFighterView, type FighterView, shownTarget, publicState } from './battle-view.js';
 
 /** How many Pokémon fight on each side. */

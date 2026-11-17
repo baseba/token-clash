@@ -339,7 +339,7 @@ export type BattleEvent =
       boosts: Record<BoostKey, number>;
     }
   | (About & { t: 'switch'; to: number; from: string; forced: boolean; card: FighterView; seen: FighterView })
-  | { t: 'end'; winner: number | null; reason?: 'limit' };
+  | { t: 'end'; winner: number | null; reason?: 'limit' | 'forfeit' };
 
 /** What an ability shows along with its name: the ability Trace copied, the move Forewarn found… */
 export interface AbilityDetails {
