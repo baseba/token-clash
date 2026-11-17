@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseSave } from '../src/trainers/domain/save-file.js';
-import { rng, learnedMoves, moveData, abilityOptions, validMoveset, abilityFor, movesetFor, usableAbility, buildFighter, MOVES_PER_FIGHTER } from '../src/catalog/domain/creatures.js';
-import { randomParty, randomize, randomAbility, shuffled } from '../src/combat/domain/random-party.js';
-import { PARTY_SIZE } from '../src/combat/domain/team-preview.js';
-import { PROJECT_ROOT } from '../src/shared/paths.js';
+import { parseSave } from '../../trainers/domain/save-file.js';
+import { rng, learnedMoves, moveData, abilityOptions, validMoveset, abilityFor, movesetFor, usableAbility, buildFighter, MOVES_PER_FIGHTER } from '../../catalog/domain/creatures.js';
+import { randomParty, randomize, randomAbility, shuffled } from './random-party.js';
+import { PARTY_SIZE } from './team-preview.js';
+import { PROJECT_ROOT } from '../../shared/paths.js';
 import { join } from 'node:path';
 
 const { roster } = parseSave(readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8'));

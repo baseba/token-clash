@@ -2,18 +2,18 @@
 // everything back through the repositories, and compare with the original.
 //
 // Runs on a synthetic db.json built here. To check a real one (e.g. a copy of production):
-//   LEGACY_DB=/path/to/db.json node --test dist/test/legacy-import.test.js
+//   LEGACY_DB=/path/to/db.json node --test dist/src/legacy/legacy-json-import.spec.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { importLegacyJson } from '../src/legacy/legacy-json-import.js';
-import { openDatabase } from '../src/shared/infrastructure/database/database.js';
-import { DrizzleTrainerRepository } from '../src/trainers/infrastructure/drizzle-trainer.repository.js';
-import { DrizzleChallengeRepository, DrizzleTournamentRepository } from '../src/arena/infrastructure/drizzle-arena.repositories.js';
-import { parseSave } from '../src/trainers/domain/save-file.js';
-import { PROJECT_ROOT } from '../src/shared/paths.js';
+import { importLegacyJson } from './legacy-json-import.js';
+import { openDatabase } from '../shared/infrastructure/database/database.js';
+import { DrizzleTrainerRepository } from '../trainers/infrastructure/drizzle-trainer.repository.js';
+import { DrizzleChallengeRepository, DrizzleTournamentRepository } from '../arena/infrastructure/drizzle-arena.repositories.js';
+import { parseSave } from '../trainers/domain/save-file.js';
+import { PROJECT_ROOT } from '../shared/paths.js';
 
 /** null, undefined and a missing key mean the same thing ("not set"): compare without them. */
 function normalize(v: unknown): unknown {

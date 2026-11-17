@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AI_NAMES, aiName, reachedRound, addSeat, removeSeat, setReady, allReady, nextAiId, shuffledOrder, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor } from '../src/arena/domain/tournament.js';
-import { aiLevelOf } from '../src/combat/domain/ai.js';
+import { AI_NAMES, aiName, reachedRound, addSeat, removeSeat, setReady, allReady, nextAiId, shuffledOrder, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor } from './tournament.js';
+import { aiLevelOf } from '../../combat/domain/ai.js';
 
 const tournament = (size = 4, extra = {}): any => ({ id: 't', hostId: 'h', mode: 'team', levelCap: null, size, seats: [{ id: 'h', name: 'Host', ai: null, ready: false }], ...extra });
 
@@ -82,14 +82,14 @@ test('how far each seat got in the bracket', () => {
 });
 
 test('a match waits for its players and for everyone following the tournament to reach the room', async () => {
-  const { pendingArrivals } = await import('../src/arena/domain/tournament.js');
+  const { pendingArrivals } = await import('./tournament.js');
   assert.deepEqual(pendingArrivals({ players: ['ana'], followers: ['ana', 'beto', 'caro'], present: ['beto'] }), ['ana', 'caro']);
   assert.deepEqual(pendingArrivals({ players: ['ana'], followers: [], present: ['ana'] }), []);
   assert.deepEqual(pendingArrivals({ players: [], followers: ['beto'], present: [] }), ['beto']);
 });
 
 test('an AI-only battle waits for viewers still playing the previous turn', async () => {
-  const { viewersBehind } = await import('../src/arena/domain/tournament.js');
+  const { viewersBehind } = await import('./tournament.js');
   assert.equal(viewersBehind([3, 2], 3), true);
   assert.equal(viewersBehind([3, undefined], 3), true);
   assert.equal(viewersBehind([3, 4], 3), false);

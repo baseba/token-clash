@@ -381,6 +381,21 @@ test('bad uploads get a clear error', async () => {
   assert.equal(traversal.status, 404);
 });
 
+test('requests with the wrong shape get a 400 before reaching the domain', async () => {
+  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Dora', save } })).data;
+  const bad = await call('/api/challenges', { method: 'POST', token, body: { mode: 'chaos' } });
+  assert.equal(bad.status, 400);
+  assert.match(bad.data.error, /^mode: /);
+  const noFile = await call('/api/import', { method: 'POST', body: { name: 'Dora' } });
+  assert.equal(noFile.status, 400);
+  assert.equal(noFile.data.error, 'Falta el archivo.');
+  // Without a session the guard answers first: shape is checked only for whoever may call.
+  assert.equal((await call('/api/challenges', { method: 'POST', body: { mode: 'chaos' } })).status, 401);
+  const unknownAi = await call('/api/challenges', { method: 'POST', token, body: { ai: 'godlike' } });
+  assert.equal(unknownAi.status, 400);
+  assert.equal(unknownAi.data.error, 'Esa dificultad no está disponible.');
+});
+
 test('everything survives a restart: sessions, collections, results and tournaments live in SQLite', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Memoria', save } });
   const token = a.data.token;

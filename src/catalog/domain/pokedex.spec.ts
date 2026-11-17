@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pokedexOf } from '../src/catalog/domain/pokedex.js';
-import { family } from '../src/catalog/domain/creatures.js';
+import { pokedexOf } from './pokedex.js';
+import { family } from './creatures.js';
 
 test('owning a Raichu registers its whole line, and a shiny one makes the line shiny', () => {
   const dex = pokedexOf(<any[]>[{ finalID: 26, level: 40, shiny: true }, { finalID: 26, level: 12 }, { finalID: 133, level: 20 }]);

@@ -5,17 +5,11 @@ import { Authenticated, CurrentTrainer, MaybeAuthenticated } from '../../trainer
 import { ArenaViews } from '../application/arena-views.js';
 import { ChallengesService } from '../application/challenges.service.js';
 import { LobbyService } from '../application/lobby.service.js';
+import { HistoryQueryDto } from './dto/history-query.dto.js';
+import { NewChallengeDto } from './dto/new-challenge.dto.js';
 
 const NO_SESSION = 'Primero importa tu equipo.';
 const ROOM_ID = /^[A-Za-z0-9_-]{4,20}$/;
-
-/** Request body of "new battle". Lenient on purpose: anything unexpected falls back to a default. */
-interface NewChallengeBody {
-  levelCap?: unknown;
-  mode?: unknown;
-  visibility?: unknown;
-  ai?: unknown;
-}
 
 @Controller('api')
 export class ChallengesController {
@@ -29,13 +23,8 @@ export class ChallengesController {
   @HttpCode(200)
   @RateLimit({ bucket: 'challenge', by: 'trainer', max: 30, windowMs: 10 * 60_000, message: 'Demasiados desafíos, espera unos minutos.' })
   @Authenticated(NO_SESSION)
-  create(@CurrentTrainer() t: Trainer, @Body() body: NewChallengeBody) {
-    const { challenge, joined } = this.challenges.create(t, {
-      levelCap: body.levelCap === 50 ? 50 : null,
-      mode: body.mode === 'random' ? 'random' : 'team',
-      visibility: body.visibility === 'private' ? 'private' : 'public',
-      ai: body.ai,
-    });
+  create(@CurrentTrainer() t: Trainer, @Body({ schema: NewChallengeDto }) body: NewChallengeDto) {
+    const { challenge, joined } = this.challenges.create(t, body);
     return { challenge: this.views.challenge(challenge, t.id), ...(joined ? { joined } : {}) };
   }
 
@@ -68,11 +57,8 @@ export class ChallengesController {
   /** Your 1v1 history (paged) and your tournaments. */
   @Get('me/challenges')
   @Authenticated()
-  mine(@CurrentTrainer() t: Trainer, @Query('offset') offset?: string, @Query('limit') limit?: string) {
-    return this.challenges.history(t, {
-      offset: Math.max(0, Math.floor(Number(offset) || 0)),
-      limit: Math.min(50, Math.max(1, Math.floor(Number(limit) || 30))),
-    });
+  mine(@CurrentTrainer() t: Trainer, @Query({ schema: HistoryQueryDto }) page: HistoryQueryDto) {
+    return this.challenges.history(t, page);
   }
 }
 

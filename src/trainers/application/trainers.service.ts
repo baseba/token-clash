@@ -12,9 +12,9 @@ import { TrainerRepository } from '../domain/trainer.repository.js';
 const TOKEN_FORMAT = /^[A-Za-z0-9_-]{20,100}$/;
 
 export interface ProfileChanges {
-  name?: unknown;
-  team?: unknown;
-  nickname?: { id?: unknown; name?: unknown } | null;
+  name?: string;
+  team?: string[];
+  nickname?: { id: string; name: string } | null;
 }
 
 @Injectable()
@@ -72,8 +72,7 @@ export class TrainersService implements OnModuleInit {
    * Imports a save. Without a session it registers a new trainer and returns their token (shown
    * once: only its hash is stored). With a session it updates that trainer's collection.
    */
-  importSave(current: Trainer | undefined, input: { save: unknown; name: unknown }): { token: string | null; trainer: Trainer } {
-    if (typeof input.save !== 'string') throw invalid('Falta el archivo.');
+  importSave(current: Trainer | undefined, input: { save: string; name?: string }): { token: string | null; trainer: Trainer } {
     const parsed = parseSave(input.save);
     const name = cleanName(input.name);
     let trainer = current;
@@ -90,14 +89,14 @@ export class TrainersService implements OnModuleInit {
 
   updateProfile(trainer: Trainer, changes: ProfileChanges): Trainer {
     if (changes.name !== undefined) trainer.rename(changes.name);
-    if (Array.isArray(changes.team)) trainer.chooseTeam(changes.team);
+    if (changes.team) trainer.chooseTeam(changes.team);
     if (changes.nickname) trainer.setNickname(changes.nickname.id, changes.nickname.name);
     trainer.touch(now());
     this.trainers.save(trainer);
     return trainer;
   }
 
-  updateMon(trainer: Trainer, entryId: string, changes: { moves?: unknown; ability?: unknown }): Trainer {
+  updateMon(trainer: Trainer, entryId: string, changes: { moves?: string[]; ability?: string }): Trainer {
     trainer.entry(entryId); // 404 before anything else
     if (changes.moves !== undefined) trainer.chooseMoves(entryId, changes.moves);
     if (changes.ability !== undefined) trainer.chooseAbility(entryId, changes.ability);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lineage, lineageLearnset, learnedMoves, moveOrigins, validMoveset } from '../src/catalog/domain/creatures.js';
+import { lineage, lineageLearnset, learnedMoves, moveOrigins, validMoveset } from './creatures.js';
 
 test('a species carries its whole pre-evolution line', () => {
   assert.deepEqual(lineage(26), [26, 25, 172]);

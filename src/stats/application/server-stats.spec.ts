@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serverStats, rankingOf, playersOf, tournamentStats } from '../src/stats/application/server-stats.js';
+import { serverStats, rankingOf, playersOf, tournamentStats } from './server-stats.js';
 
 const trainer = (id, name, wins, losses, roster, totalTokens = 0) => ({ id, name, wins, losses, roster, totalTokens });
 const fighter = (speciesName, sprite) => ({ speciesName, sprite, types: ['normal'] });

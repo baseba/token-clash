@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createJevProxy } from '../src/combat/infrastructure/jev/jev-proxy.js';
+import { createJevProxy } from './jev-proxy.js';
 
 const KEY = 'proxy-test-key';
 const seen = [];

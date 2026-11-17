@@ -112,11 +112,11 @@ export class TournamentsService implements OnModuleInit {
     this.afterSeatsChange(T);
   }
 
-  addAis(T: Tournament, trainer: Trainer, { level, count }: { level: unknown; count: unknown }): void {
+  addAis(T: Tournament, trainer: Trainer, { level, count }: { level: string; count: number }): void {
     if (T.hostId !== trainer.id) throw forbidden('Solo el dueño puede agregar IAs.');
     T.assertLobby();
-    if (typeof level !== 'string' || !this.skynet.aiLevels.includes(level)) throw invalid('Esa dificultad no está disponible.');
-    T.addAis(level, Number(count) || 1);
+    if (!this.skynet.aiLevels.includes(level)) throw invalid('Esa dificultad no está disponible.');
+    T.addAis(level, count);
     this.afterSeatsChange(T);
   }
 

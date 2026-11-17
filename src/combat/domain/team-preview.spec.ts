@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPreview, pick, previewView } from '../src/combat/domain/team-preview.js';
+import { createPreview, pick, previewView } from './team-preview.js';
 
 const IV = { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 };
 // Fixtures carry only the fields the rules read.

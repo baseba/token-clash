@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBattle, submit, validActions, publicState } from '../src/combat/domain/battle.js';
-import { rng } from '../src/catalog/domain/creatures.js';
+import { createBattle, submit, validActions, publicState } from './battle.js';
+import { rng } from '../../catalog/domain/creatures.js';
 
 const IV = { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 };
 let n = 0;
