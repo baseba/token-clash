@@ -5,7 +5,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.js';
 import { GameWsAdapter } from './realtime/game-ws.adapter.js';
 import { AppConfig } from './shared/config/app-config.js';
-import { MAX_BODY_MB } from './shared/http/body-limit.js';
+import { explainBodyErrors, MAX_BODY_MB } from './shared/http/json-body.js';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
@@ -14,6 +14,7 @@ async function bootstrap() {
   app.set('etag', false);
   // Every request body is JSON (the frontend always sends JSON), whatever its Content-Type says.
   app.useBodyParser('json', { limit: `${MAX_BODY_MB}mb`, type: () => true });
+  app.use(explainBodyErrors);
   // A request without a body reads as {} (the handlers never have to check for undefined).
   app.use((req: { body?: unknown }, _res: unknown, next: () => void) => {
     req.body ??= {};

@@ -377,6 +377,10 @@ test('bad uploads get a clear error', async () => {
   const r = await call('/api/import', { method: 'POST', body: { name: 'X', save: '{"hello":1}' } });
   assert.equal(r.status, 400);
   assert.match(r.data.error, /colección/);
+  const notJson = await fetch(`${base}/api/import`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{bad' });
+  assert.deepEqual([notJson.status, await notJson.json()], [400, { error: 'JSON inválido' }]);
+  const huge = await call('/api/import', { method: 'POST', body: { name: 'X', save: 'x'.repeat(10 * 1024 * 1024) } });
+  assert.deepEqual([huge.status, huge.data], [413, { error: 'El archivo es demasiado grande (máx. 9 MB).' }]);
   const traversal = await fetch(`${base}/..%2fserver%2findex.js`);
   assert.equal(traversal.status, 404);
 });
