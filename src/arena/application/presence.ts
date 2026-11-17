@@ -52,7 +52,7 @@ export interface BattlePhase {
  * breaks up. Rooms against the AI start at the preview; tournament matches at the countdown.
  */
 export type RoomPhase =
-  /** Nothing to play yet: an open room, or one whose battle ended before a restart. */
+  /** Nothing to play: an open room, or a closed one with no battle in memory. */
   | { kind: 'waiting' }
   /** Both players are in the room and press "ready". */
   | { kind: 'readyCheck'; ready: Set<string>; players: CountdownPlayer[] }

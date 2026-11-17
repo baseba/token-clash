@@ -24,12 +24,14 @@ Más tres piezas que no son dominios sino entradas y plomería: `realtime` (el p
                 │            │                      │
                 ▼            ▼                      ▼
    stats ──▶  arena ──────▶ trainers ──────▶ combat ──────▶ catalog
-     │          │              ▲               (puro)         (puro)
-     └──────────┴──────────────┘
+     │         │ │             ▲               (puro)         (puro)
+     │         │ ▼             │
+     │         │ chat          │
+     └─────────┴───────────────┘
 ```
 
-Las flechas son "usa a". Nunca hay una flecha de vuelta: `trainers` no sabe que existen las salas, y `combat` no
-sabe que existen los entrenadores.
+Las flechas son "usa a". Nunca hay una flecha de vuelta: `trainers` no sabe que existen las salas, `combat` no
+sabe que existen los entrenadores, y `chat` guarda mensajes por canal sin saber qué es una sala.
 
 ## 2. Las capas dentro de un dominio
 
@@ -70,7 +72,7 @@ exports: [TrainersService], // ← el repositorio NO se exporta
 
 `combat` y `catalog` son casi solo `domain/`: funciones puras con la aleatoriedad inyectada (`random = Math.random`),
 así que sus tests reproducen una pelea entera con una semilla fija. En general, un dominio tiene solo las capas que
-usa: `chat` no tiene HTTP propio (habla por el socket) y `stats` no guarda nada.
+usa: `chat` no tiene HTTP propio (sus mensajes le llegan por la arena) y `stats` no guarda nada.
 
 Un puerto es opcional: vale la pena cuando el adaptador podría cambiar o hay que reemplazarlo en los tests, como
 el almacenamiento. `SkynetService` (`combat/application`) importa el cliente de Jev de `combat/infrastructure/`
@@ -100,17 +102,18 @@ pelea, un equipo que no repite especie), y para mostrar la regla de dependencia,
    inyectar la base; una consulta escrita a mano contra una tabla ajena tampoco la ve el test, queda a la revisión.
 2. **Si A necesita que cambie algo de B, se lo pide a B.** Al terminar una pelea, `arena` no hace
    `UPDATE trainers SET wins = wins + 1`: llama a `TrainersService.recordRankedResult()`. La regla de qué pelea
-   cuenta para el ranking (no contra la IA, no en torneos) la decide `arena` (`Challenge.ranked`); llevar la cuenta
-   es cosa de `trainers`. Nest hace cumplir esta parte: como `TrainersModule` exporta solo su servicio, inyectar
+   cuenta para el ranking (no contra la IA, no en torneos) la decide `arena` (`isHumanDuel`, en `challenge.ts`, la
+   misma que usan el historial y las stats); llevar la cuenta es cosa de `trainers`. Nest hace cumplir esta parte: como `TrainersModule` exporta solo su servicio, inyectar
    `TrainerRepository` desde `arena` hace que la app no arranque.
 3. **Entre dominios se referencian por id, sin foreign keys.** `challenges.host_id` es un texto. Así cada dominio
    podría vivir en otra base, y además un id de la arena puede ser una IA (`ai:hard`), que no es un entrenador.
    Las foreign keys existen solo *dentro* de un agregado (`roster_entries → trainers`).
 4. **Copias, no referencias, cuando el pasado no debe cambiar.** Una sala guarda una copia del equipo de cada lado
    (`host_team`, un value object en JSON). Si mañana cambias tus movimientos, la pelea de ayer sigue igual.
-5. **Eventos cuando la dependencia iría al revés.** Un torneo usa peleas (`TournamentsService` → `DuelService`).
-   Cuando una pelea de torneo termina, la pelea no llama al torneo: publica `matchFinished` en `ArenaEvents` y el
-   torneo, que está suscrito, avanza la llave.
+5. **Eventos cuando la dependencia iría al revés.** Un torneo usa peleas (`TournamentsService` →
+   `TeamPreviewService`, que arranca la cuenta regresiva de cada partido). Cuando una pelea de torneo termina, la
+   pelea no llama al torneo: `LiveBattleService` publica `matchFinished` en `ArenaEvents` y el torneo, que está
+   suscrito, avanza la llave.
 6. **Los modelos de lectura solo leen.** `stats` arma la página con consultas de solo lectura
    (`TrainersService.all()`, `ArenaQueries`). En un sistema grande tendría su propia proyección alimentada por
    eventos; acá sería exagerado.
@@ -126,10 +129,16 @@ StandardSchemaValidationPipe                         el body cumple su DTO, o 40
 ChallengesController.accept                          lee la URL, llama al caso de uso    (arena/interface)
 ChallengesService.accept                             orquesta                            (arena/application)
   joinBlocker(challenge, …)                          ¿se puede entrar? regla pura        (arena/domain/lobby.ts)
+    Challenge.joinBlocker(trainerId)                   las reglas de la sala misma       (arena/domain)
   DuelService.join → Challenge.join(...)             cambia el agregado                  (arena/domain)
   ChallengeRepository.save(challenge)                lo guarda                           (arena/infrastructure)
 ArenaViews.challenge                                 lo que ve el cliente                (arena/application)
 ```
+
+Cada agregado cuida sus propios cambios de estado. `Challenge.join()` vuelve a preguntar `joinBlocker()` y no
+deja entrar a una sala que no está abierta, `cancel()` solo deja cerrar al anfitrión mientras espera rival o
+durante la confirmación, y `finish()` solo termina una pelea en curso. El diagrama de estados está arriba de
+`challenge.ts`. `lobby.ts` agrega lo único que el agregado no sabe: si el anfitrión sigue conectado.
 
 Si una regla dice que no, el dominio lanza un `DomainError` con un *tipo* (`conflict`, `not-found`…), nunca un
 código HTTP. `DomainErrorFilter` (`shared/http`) traduce el tipo a 409, 404… y responde `{ "error": "…" }`. El
@@ -149,17 +158,32 @@ mensajes del socket tienen sus esquemas en `realtime/client-messages.ts`, y las 
 ## 5. Una pelea en vivo
 
 Las peleas pasan por WebSocket. `GameWsAdapter` (`realtime/`) lee cada mensaje `{ "t": "pick", … }` con su
-esquema, y `GameGateway` lo recibe ya tipado en `@SubscribeMessage('pick')` y se lo pasa a `DuelService`. Si el
-dominio dice que no (un `DomainError`), el cliente recibe `{ "t": "error", "error": "…" }`. Cada sala en curso tiene un `Room` en memoria
-(`arena/application/presence.ts`) que avanza así:
+esquema, y `GameGateway` lo recibe ya tipado en `@SubscribeMessage('pick')` y se lo pasa al servicio de la arena
+que corresponde. Si el dominio dice que no (un `DomainError`), el cliente recibe `{ "t": "error", "error": "…" }`.
+
+Cada sala en curso tiene un `Room` en memoria (`arena/application/presence.ts`) con su `Challenge` y una sola
+fase a la vez. La fase es una unión discriminada por `kind`, y cada una lleva solo sus datos: la confirmación
+sabe quién está listo, la vista previa tiene su reloj y la batalla tiene su `BattleState`. No puede haber una
+cuenta regresiva y una batalla al mismo tiempo. Tres servicios se pasan la sala, cada uno al siguiente:
 
 ```
-sala de espera → cuenta regresiva → elegir 3 de 6 → se revelan → batalla (turnos con timer) → terminada
+waiting → readyCheck → countdown → preview → (se revelan) → battle (turnos con timer) → terminada
+└──── DuelService ───┘ └─────── TeamPreviewService ───────┘ └──────── LiveBattleService ────────┘
 ```
+
+`DuelService` sienta al rival, maneja la confirmación y la gente que entra y sale. `TeamPreviewService` lleva la
+cuenta regresiva (en un torneo espera un rato a los que vienen llegando), el reloj para elegir 3 de 6 y las
+elecciones de la IA. `LiveBattleService` juega los turnos, los de la IA y Skynet, y guarda el resultado. Lo que ve
+cada cliente en cada fase lo arma `room-frames.ts`, con funciones puras: el jugador ve su lado y el espectador ve
+lo que ve el público.
 
 El estado de la batalla (`BattleState`) vive solo en memoria: el motor de `combat` es una función
 `submit(battle, lado, acción) → eventos`. Lo único que se guarda es el resultado, en el agregado `Challenge`. Por
 eso un reinicio corta las peleas en curso (quedan como `abandoned`).
+
+El chat también pasa por la arena. `ArenaChatService` decide en qué canal habla cada conexión (`ChatChannel`: el de
+la sala, o el del torneo, que comparten todas sus salas), si habla como jugador o espectador, y quién escucha.
+`chat` solo guarda los mensajes de cada canal y no sabe qué es una sala.
 
 El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection`
 (`arena/application/connection.ts`) y el gateway envuelve cada socket en uno.
@@ -177,6 +201,10 @@ El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection
 - **Migración desde JSON:** `src/legacy/legacy-json-import.ts` importa `data/db.json` una sola vez, en una
   transacción y con los mappers de cada dominio. `legacy-json-import.spec.ts` comprueba que leerlo de vuelta da
   exactamente los mismos datos.
+- **Datos viejos, normalizados una vez:** las salas anteriores a los modos o a la visibilidad no tenían esos campos.
+  Una migración de `drizzle/` los rellenó con lo que siempre significaron (`team`, `private`) y los dejó `NOT NULL`,
+  así que el dominio los tiene obligatorios y ningún código sigue preguntando por el caso viejo.
+  `arena.migrations.spec.ts` lo prueba sobre una base creada con el primer esquema.
 
 ## 7. Tests
 
@@ -184,8 +212,9 @@ El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection
 | --- | --- | --- |
 | Reglas puras (save, torneo, lobby, chat, stats, motor, IA), DTOs y mensajes del socket | `*.spec.ts` al lado de cada archivo | funciones, sin Nest ni base de datos |
 | Reglas de dependencia | `src/architecture.spec.ts` | lee los imports de cada archivo |
-| Persistencia y migración | `src/legacy/legacy-json-import.spec.ts` | SQLite real en un directorio temporal |
+| Persistencia y migraciones | `src/legacy/legacy-json-import.spec.ts`, `src/arena/infrastructure/arena.migrations.spec.ts` | SQLite real en un directorio temporal |
 | Todo junto | `test/app.e2e-spec.ts` | levanta la app compilada y juega peleas y torneos por HTTP y WebSocket, y la reinicia |
+| Las salas por dentro | `test/rooms.e2e-spec.ts` | los frames que ve cada cliente en cada fase, quién se va y vuelve, y quién escucha cada mensaje del chat |
 | Frontend | `test/web/*.test.js` | JS tal cual, como el navegador (no van en `public/` porque se publicarían) |
 
 Los unitarios viven con su código, así que al mover o borrar un archivo su test lo acompaña. Los e2e prueban la app

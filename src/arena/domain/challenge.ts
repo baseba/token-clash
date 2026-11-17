@@ -1,9 +1,12 @@
-// The Challenge aggregate: one room and the battle played in it. Its status only moves this way,
-// and each method below refuses any other move:
+// The Challenge aggregate: one room and the battle played in it. Its status only moves these
+// ways, and each method refuses any other:
 //
-//   open ──join──▶ active ──finish──▶ finished
-//    │  ◀─reopen──   │ ───abandon──▶ abandoned  (a restart cut the battle)
-//    └──cancel──▶ cancelled ◀──cancel── (only during the ready check)
+//   open   → active      join     a rival takes the free seat
+//   active → open        reopen   the guest left the ready check
+//   open   → cancelled   cancel   the host closes the room
+//   active → cancelled   cancel   the host closes it during the ready check
+//   active → finished    finish   the battle ended
+//   active → abandoned   abandon  a restart cut the battle
 //
 // Rooms against the AI and tournament matches are created active. What it stores of each side is
 // a *copy* of the team at the time (RosterEntry snapshots): later changes to a trainer's
