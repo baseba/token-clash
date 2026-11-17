@@ -27,8 +27,8 @@ export interface TrainerState {
 const RARITY_RANK = { legendary: 3, rare: 2, uncommon: 1, common: 0 } as const;
 
 /** Strips control and bidi characters a name could use to break the UI, and caps its length. */
-export function cleanName(s: string, max = 24): string {
-  return s
+export function cleanName(raw: string, max = 24): string {
+  return raw
     .replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, '')
     .trim()
     .slice(0, max);
@@ -74,9 +74,9 @@ export class Trainer implements TrainerState {
   }
 
   entry(entryId: string): RosterEntry {
-    const e = this.roster.find((x) => x.id === entryId);
-    if (!e) throw notFound('Ese Pokémon no está en tu colección.');
-    return e;
+    const entry = this.roster.find((x) => x.id === entryId);
+    if (!entry) throw notFound('Ese Pokémon no está en tu colección.');
+    return entry;
   }
 
   /** The Pokémon of the team, in order (or the default team if the saved one is empty). */
@@ -92,8 +92,8 @@ export class Trainer implements TrainerState {
   }
 
   rename(name: string): void {
-    const n = cleanName(name);
-    if (n) this.name = n;
+    const clean = cleanName(name);
+    if (clean) this.name = clean;
   }
 
   /**
@@ -103,10 +103,10 @@ export class Trainer implements TrainerState {
   importSave(parsed: ParsedSave, at: number): void {
     const previous = this.roster;
     const kept = new Map(previous.map((e) => [e.id, { nickname: e.nickname, moveset: e.moveset, abilityChoice: e.abilityChoice }]));
-    this.roster = parsed.roster.map((e) => {
-      const k = kept.get(e.id);
-      if (!k) return e;
-      return Object.fromEntries(Object.entries({ ...e, ...k }).filter(([, v]) => v !== undefined)) as unknown as RosterEntry;
+    this.roster = parsed.roster.map((entry) => {
+      const keptFields = kept.get(entry.id);
+      if (!keptFields) return entry;
+      return Object.fromEntries(Object.entries({ ...entry, ...keptFields }).filter(([, v]) => v !== undefined)) as unknown as RosterEntry;
     });
     this.team = carryTeam(this.team, previous, this.roster);
     if (!this.team.length) this.team = defaultTeam(this.roster);
@@ -126,24 +126,24 @@ export class Trainer implements TrainerState {
 
   /** An empty nickname removes it. Unknown Pokémon are ignored. */
   setNickname(entryId: string, name: string): void {
-    const e = this.roster.find((x) => x.id === entryId);
-    if (!e) return;
-    const n = cleanName(name, 16);
-    if (n) e.nickname = n;
-    else delete e.nickname;
+    const entry = this.roster.find((x) => x.id === entryId);
+    if (!entry) return;
+    const clean = cleanName(name, 16);
+    if (clean) entry.nickname = clean;
+    else delete entry.nickname;
   }
 
   chooseMoves(entryId: string, moves: string[]): void {
-    const e = this.entry(entryId);
-    if (!validMoveset(e, moves)) throw invalid(`Elige entre 1 y ${MOVES_PER_FIGHTER} movimientos distintos que conozca.`);
-    e.moveset = [...moves];
+    const entry = this.entry(entryId);
+    if (!validMoveset(entry, moves)) throw invalid(`Elige entre 1 y ${MOVES_PER_FIGHTER} movimientos distintos que conozca.`);
+    entry.moveset = [...moves];
   }
 
   chooseAbility(entryId: string, ability: string): void {
-    const e = this.entry(entryId);
-    if (!abilityOptions(e).some((a) => a.key === ability)) throw invalid('Esa habilidad no es de su especie.');
+    const entry = this.entry(entryId);
+    if (!abilityOptions(entry).some((a) => a.key === ability)) throw invalid('Esa habilidad no es de su especie.');
     if (!usableAbility(ability)) throw invalid('Esa habilidad no tiene efecto en Token Clash.');
-    e.abilityChoice = ability;
+    entry.abilityChoice = ability;
   }
 
   touch(at: number): void {

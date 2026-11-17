@@ -23,42 +23,42 @@ export class ChallengesController {
   @HttpCode(200)
   @RateLimit({ bucket: 'challenge', by: 'trainer', max: 30, windowMs: 10 * 60_000, message: 'Demasiados desafíos, espera unos minutos.' })
   @Authenticated(NO_SESSION)
-  create(@CurrentTrainer() t: Trainer, @Body({ schema: NewChallengeDto }) body: NewChallengeDto) {
-    const { challenge, joined } = this.challenges.create(t, body);
-    return { challenge: this.views.challenge(challenge, t.id), ...(joined ? { joined } : {}) };
+  create(@CurrentTrainer() trainer: Trainer, @Body({ schema: NewChallengeDto }) body: NewChallengeDto) {
+    const { challenge, joined } = this.challenges.create(trainer, body);
+    return { challenge: this.views.challenge(challenge, trainer.id), ...(joined ? { joined } : {}) };
   }
 
   @Get('challenges/:id')
   @MaybeAuthenticated()
-  get(@CurrentTrainer() t: Trainer | undefined, @Param('id') id: string) {
-    return { challenge: this.views.challenge(this.challenges.find(checked(id)), t?.id) };
+  get(@CurrentTrainer() trainer: Trainer | undefined, @Param('id') id: string) {
+    return { challenge: this.views.challenge(this.challenges.find(checked(id)), trainer?.id) };
   }
 
   @Delete('challenges/:id')
   @MaybeAuthenticated()
-  close(@CurrentTrainer() t: Trainer | undefined, @Param('id') id: string) {
-    return { challenge: this.views.challenge(this.challenges.close(t, checked(id)), t!.id) };
+  close(@CurrentTrainer() trainer: Trainer | undefined, @Param('id') id: string) {
+    return { challenge: this.views.challenge(this.challenges.close(trainer, checked(id)), trainer!.id) };
   }
 
   @Post('challenges/:id/accept')
   @HttpCode(200)
   @Authenticated(NO_SESSION)
-  accept(@CurrentTrainer() t: Trainer, @Param('id') id: string) {
-    return { challenge: this.views.challenge(this.challenges.accept(t, checked(id)), t.id) };
+  accept(@CurrentTrainer() trainer: Trainer, @Param('id') id: string) {
+    return { challenge: this.views.challenge(this.challenges.accept(trainer, checked(id)), trainer.id) };
   }
 
   /** Open rooms and tournaments anyone can join (the lobby list, also pushed over the socket). */
   @Get('rooms')
   @MaybeAuthenticated()
-  rooms(@CurrentTrainer() t: Trainer | undefined) {
-    return { rooms: this.lobby.list(t?.id ?? null) };
+  rooms(@CurrentTrainer() trainer: Trainer | undefined) {
+    return { rooms: this.lobby.list(trainer?.id ?? null) };
   }
 
   /** Your 1v1 history (paged) and your tournaments. */
   @Get('me/challenges')
   @Authenticated()
-  mine(@CurrentTrainer() t: Trainer, @Query({ schema: HistoryQueryDto }) page: HistoryQueryDto) {
-    return this.challenges.history(t, page);
+  mine(@CurrentTrainer() trainer: Trainer, @Query({ schema: HistoryQueryDto }) page: HistoryQueryDto) {
+    return this.challenges.history(trainer, page);
   }
 }
 

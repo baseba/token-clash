@@ -44,22 +44,22 @@ export class Presence {
 
   /** The live room of a challenge, created on first use. */
   room(id: string): Room {
-    let r = this.rooms.get(id);
-    if (!r) {
-      r = { battle: null, sockets: new Set(), deadline: null, timer: null };
-      this.rooms.set(id, r);
+    let room = this.rooms.get(id);
+    if (!room) {
+      room = { battle: null, sockets: new Set(), deadline: null, timer: null };
+      this.rooms.set(id, room);
     }
-    return r;
+    return room;
   }
 
-  inRoom(r: Room, trainerId: string | null | undefined): boolean {
-    return [...r.sockets].some((ws) => ws.trainerId === trainerId && ws.open);
+  inRoom(room: Room, trainerId: string | null | undefined): boolean {
+    return [...room.sockets].some((ws) => ws.trainerId === trainerId && ws.open);
   }
 
   /** Is the host of this challenge connected to its room? */
-  hostWaiting = (c: { id: string; hostId: string }): boolean => {
-    const r = this.rooms.get(c.id);
-    return !!r && this.inRoom(r, c.hostId);
+  hostWaiting = (challenge: { id: string; hostId: string }): boolean => {
+    const room = this.rooms.get(challenge.id);
+    return !!room && this.inRoom(room, challenge.hostId);
   };
 
   followTournament(id: string, ws: ClientConnection): void {

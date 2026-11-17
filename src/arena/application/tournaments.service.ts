@@ -52,17 +52,17 @@ export class TournamentsService implements OnModuleInit {
 
   onModuleInit(): void {
     // The bracket's matches lived in memory: a tournament cut by a restart can't go on.
-    for (const T of this.tournaments.all()) {
-      if (T.status !== 'running') continue;
-      T.abandon();
-      this.tournaments.save(T);
+    for (const tournament of this.tournaments.all()) {
+      if (tournament.status !== 'running') continue;
+      tournament.abandon();
+      this.tournaments.save(tournament);
     }
   }
 
   find(id: string): Tournament {
-    const T = this.tournaments.findById(id);
-    if (!T) throw notFound('Ese torneo no existe.');
-    return T;
+    const tournament = this.tournaments.findById(id);
+    if (!tournament) throw notFound('Ese torneo no existe.');
+    return tournament;
   }
 
   /** A public search sits you in a matching tournament (or returns yours); otherwise a new one opens. */
@@ -76,171 +76,171 @@ export class TournamentsService implements OnModuleInit {
         return { tournament: rival, joined: true };
       }
     }
-    const T = Tournament.create({ id: newId(), host: trainer, ...opts, at: now() });
-    this.tournaments.save(T);
-    this.watchSeat(T, trainer.id);
+    const tournament = Tournament.create({ id: newId(), host: trainer, ...opts, at: now() });
+    this.tournaments.save(tournament);
+    this.watchSeat(tournament, trainer.id);
     if (opts.visibility === 'public') this.lobby.notifyAfterGrace();
     this.lobby.notify();
-    return { tournament: T };
+    return { tournament };
   }
 
-  join(T: Tournament, trainer: Trainer): void {
-    if (T.seatOf(trainer.id) !== -1) return;
-    T.join(trainer);
-    this.tournaments.save(T);
-    this.watchSeat(T, trainer.id);
-    this.afterSeatsChange(T);
+  join(tournament: Tournament, trainer: Trainer): void {
+    if (tournament.seatOf(trainer.id) !== -1) return;
+    tournament.join(trainer);
+    this.tournaments.save(tournament);
+    this.watchSeat(tournament, trainer.id);
+    this.afterSeatsChange(tournament);
   }
 
   /** The host closes it, or anyone else gives up their seat (only before it starts). */
-  leave(T: Tournament, trainer: Trainer): void {
-    T.assertLobby();
-    if (T.hostId === trainer.id) return this.close(T);
-    if (!T.leave(trainer.id)) throw conflict('No estás en este torneo.');
-    this.afterSeatsChange(T);
+  leave(tournament: Tournament, trainer: Trainer): void {
+    tournament.assertLobby();
+    if (tournament.hostId === trainer.id) return this.close(tournament);
+    if (!tournament.leave(trainer.id)) throw conflict('No estás en este torneo.');
+    this.afterSeatsChange(tournament);
   }
 
-  closeByHost(T: Tournament, trainer: Trainer): void {
-    T.assertHost(trainer.id, 'cerrar el torneo');
-    T.assertLobby();
-    this.close(T);
+  closeByHost(tournament: Tournament, trainer: Trainer): void {
+    tournament.assertHost(trainer.id, 'cerrar el torneo');
+    tournament.assertLobby();
+    this.close(tournament);
   }
 
-  setReady(T: Tournament, trainer: Trainer, ready: boolean): void {
-    T.assertLobby();
-    T.setReady(trainer.id, ready);
-    this.afterSeatsChange(T);
+  setReady(tournament: Tournament, trainer: Trainer, ready: boolean): void {
+    tournament.assertLobby();
+    tournament.setReady(trainer.id, ready);
+    this.afterSeatsChange(tournament);
   }
 
-  addAis(T: Tournament, trainer: Trainer, { level, count }: { level: string; count: number }): void {
-    T.assertHost(trainer.id, 'agregar IAs');
-    T.assertLobby();
+  addAis(tournament: Tournament, trainer: Trainer, { level, count }: { level: string; count: number }): void {
+    tournament.assertHost(trainer.id, 'agregar IAs');
+    tournament.assertLobby();
     this.skynet.assertOffered(level);
-    T.addAis(level, count);
-    this.afterSeatsChange(T);
+    tournament.addAis(level, count);
+    this.afterSeatsChange(tournament);
   }
 
-  kick(T: Tournament, trainer: Trainer, seat: number): void {
-    T.assertHost(trainer.id, 'quitar jugadores');
-    T.assertLobby();
-    T.kick(seat);
-    this.afterSeatsChange(T);
+  kick(tournament: Tournament, trainer: Trainer, seat: number): void {
+    tournament.assertHost(trainer.id, 'quitar jugadores');
+    tournament.assertLobby();
+    tournament.kick(seat);
+    this.afterSeatsChange(tournament);
   }
 
   /** A client opens the tournament page. Returns it, or null if it doesn't exist. */
   follow(ws: ClientConnection, id: string, token: string | undefined): Tournament | null {
-    const T = this.tournaments.findById(id);
-    if (!T) {
+    const tournament = this.tournaments.findById(id);
+    if (!tournament) {
       ws.send({ t: 'error', error: 'Ese torneo no existe.' });
       return null;
     }
     if (token !== undefined) ws.trainerId = this.trainers.authenticate(token)?.id ?? null;
-    ws.tourId = T.id;
-    this.presence.followTournament(T.id, ws);
-    this.broadcast(T);
-    return T;
+    ws.tourId = tournament.id;
+    this.presence.followTournament(tournament.id, ws);
+    this.broadcast(tournament);
+    return tournament;
   }
 
   unfollow(ws: ClientConnection): void {
-    const T = ws.tourId ? this.tournaments.findById(ws.tourId) : undefined;
-    if (!T) return;
-    this.presence.unfollowTournament(T.id, ws);
-    if (T.seatOf(ws.trainerId) !== -1 && T.status === 'open') {
-      this.watchSeat(T, ws.trainerId!);
-      this.broadcast(T);
+    const tournament = ws.tourId ? this.tournaments.findById(ws.tourId) : undefined;
+    if (!tournament) return;
+    this.presence.unfollowTournament(tournament.id, ws);
+    if (tournament.seatOf(ws.trainerId) !== -1 && tournament.status === 'open') {
+      this.watchSeat(tournament, ws.trainerId!);
+      this.broadcast(tournament);
     }
   }
 
   isPlayer(tournamentId: string, trainerId: string): boolean {
-    const T = this.tournaments.findById(tournamentId);
-    return !!T && T.seatOf(trainerId) !== -1;
+    const tournament = this.tournaments.findById(tournamentId);
+    return !!tournament && tournament.seatOf(trainerId) !== -1;
   }
 
-  broadcast(T: Tournament): void {
-    for (const ws of this.presence.tournamentSockets(T.id)) if (ws.open) ws.send({ t: 'tour', tournament: this.views.tournament(T, ws.trainerId) });
-    if (T.visibility === 'public') this.lobby.notify();
+  broadcast(tournament: Tournament): void {
+    for (const ws of this.presence.tournamentSockets(tournament.id)) if (ws.open) ws.send({ t: 'tour', tournament: this.views.tournament(tournament, ws.trainerId) });
+    if (tournament.visibility === 'public') this.lobby.notify();
   }
 
-  private afterSeatsChange(T: Tournament): void {
-    if (T.everyoneReady) return this.start(T);
-    this.tournaments.save(T);
-    this.broadcast(T);
+  private afterSeatsChange(tournament: Tournament): void {
+    if (tournament.everyoneReady) return this.start(tournament);
+    this.tournaments.save(tournament);
+    this.broadcast(tournament);
   }
 
-  private close(T: Tournament): void {
-    T.close();
-    this.tournaments.save(T);
-    this.broadcast(T);
+  private close(tournament: Tournament): void {
+    tournament.close();
+    this.tournaments.save(tournament);
+    this.broadcast(tournament);
     this.lobby.notify();
   }
 
   /** Someone left the lobby page: their seat (or the whole tournament, for the host) waits a while. */
-  private watchSeat(T: Tournament, trainerId: string): void {
-    const key = `${T.id}:${trainerId}`;
+  private watchSeat(tournament: Tournament, trainerId: string): void {
+    const key = `${tournament.id}:${trainerId}`;
     clearTimeout(this.seatTimers.get(key));
     const timer = setTimeout(() => {
       this.seatTimers.delete(key);
-      if (T.status !== 'open' || this.presence.inTournament(T.id, trainerId)) return;
-      if (trainerId === T.hostId) return this.close(T);
-      if (T.leave(trainerId)) this.afterSeatsChange(T);
+      if (tournament.status !== 'open' || this.presence.inTournament(tournament.id, trainerId)) return;
+      if (trainerId === tournament.hostId) return this.close(tournament);
+      if (tournament.leave(trainerId)) this.afterSeatsChange(tournament);
     }, this.timings.seatGraceMs);
     timer.unref();
     this.seatTimers.set(key, timer);
   }
 
-  private humanAverageLevel(T: Tournament): number {
-    const entries = T.seats.filter((seat) => !seat.ai).flatMap((seat) => this.trainers.byId(seat.id)?.teamEntries() ?? []);
+  private humanAverageLevel(tournament: Tournament): number {
+    const entries = tournament.seats.filter((seat) => !seat.ai).flatMap((seat) => this.trainers.byId(seat.id)?.teamEntries() ?? []);
     return averageLevel(entries);
   }
 
-  private start(T: Tournament): void {
+  private start(tournament: Tournament): void {
     const at = now();
-    T.start({ at, order: shuffledOrder(T.size), aiLevel: T.levelCap ?? this.humanAverageLevel(T), firstMatchAt: at + this.timings.bracketDrawMs });
-    this.tournaments.save(T);
-    this.broadcast(T);
+    tournament.start({ at, order: shuffledOrder(tournament.size), aiLevel: tournament.levelCap ?? this.humanAverageLevel(tournament), firstMatchAt: at + this.timings.bracketDrawMs });
+    this.tournaments.save(tournament);
+    this.broadcast(tournament);
     this.lobby.notify();
-    setTimeout(() => this.startMatch(T), this.timings.bracketDrawMs).unref();
+    setTimeout(() => this.startMatch(tournament), this.timings.bracketDrawMs).unref();
   }
 
-  private seatTeam(T: Tournament, seat: Seat): RosterEntry[] {
-    const level = T.aiLevel!;
-    if (seat.ai) return T.mode === 'random' ? buildAiRandomParty({ level }) : buildAiTeam({ difficulty: seat.ai, level });
-    const t = this.trainers.byId(seat.id);
-    if (!t?.roster.length) return buildAiRandomParty({ level });
-    return T.mode === 'random' ? randomParty(t.roster) : t.teamSnapshot();
+  private seatTeam(tournament: Tournament, seat: Seat): RosterEntry[] {
+    const level = tournament.aiLevel!;
+    if (seat.ai) return tournament.mode === 'random' ? buildAiRandomParty({ level }) : buildAiTeam({ difficulty: seat.ai, level });
+    const trainer = this.trainers.byId(seat.id);
+    if (!trainer?.roster.length) return buildAiRandomParty({ level });
+    return tournament.mode === 'random' ? randomParty(trainer.roster) : trainer.teamSnapshot();
   }
 
-  private startMatch(T: Tournament): void {
-    const next = T.nextMatch();
+  private startMatch(tournament: Tournament): void {
+    const next = tournament.nextMatch();
     if (!next) return;
     // A person always hosts when there is one (the AI side is the guest).
     const [host, guest] = next.a.ai && !next.b.ai ? [next.b, next.a] : [next.a, next.b];
-    const c = Challenge.tournamentMatch({
+    const challenge = Challenge.tournamentMatch({
       id: newId(),
-      host: { id: host.id, name: host.name, team: this.seatTeam(T, host), ai: host.ai },
-      guest: { id: guest.id, name: guest.name, team: this.seatTeam(T, guest), ai: guest.ai },
-      levelCap: T.levelCap,
-      mode: T.mode,
-      tournamentId: T.id,
+      host: { id: host.id, name: host.name, team: this.seatTeam(tournament, host), ai: host.ai },
+      guest: { id: guest.id, name: guest.name, team: this.seatTeam(tournament, guest), ai: guest.ai },
+      levelCap: tournament.levelCap,
+      mode: tournament.mode,
+      tournamentId: tournament.id,
       round: next.round,
       match: next.index,
       at: now(),
     });
-    this.challenges.save(c);
-    T.matchStarted(next, c.id);
-    this.tournaments.save(T);
-    this.duels.startCountdown(c, T.label(next));
-    this.broadcast(T);
+    this.challenges.save(challenge);
+    tournament.matchStarted(next, challenge.id);
+    this.tournaments.save(tournament);
+    this.duels.startCountdown(challenge, tournament.label(next));
+    this.broadcast(tournament);
   }
 
-  private matchFinished({ challenge: c }: MatchFinished): void {
-    const T = c.tournamentId ? this.tournaments.findById(c.tournamentId) : undefined;
-    if (!T || T.status !== 'running') return;
+  private matchFinished({ challenge: challenge }: MatchFinished): void {
+    const tournament = challenge.tournamentId ? this.tournaments.findById(challenge.tournamentId) : undefined;
+    if (!tournament || tournament.status !== 'running') return;
     const at = now();
-    const champion = T.matchFinished({ round: c.round!, index: c.match! }, c.winnerId ?? null, { now: at, nextMatchAt: at + this.timings.betweenMatchesMs });
-    if (champion === null) setTimeout(() => this.startMatch(T), this.timings.betweenMatchesMs).unref();
-    this.tournaments.save(T);
-    this.broadcast(T);
+    const champion = tournament.matchFinished({ round: challenge.round!, index: challenge.match! }, challenge.winnerId ?? null, { now: at, nextMatchAt: at + this.timings.betweenMatchesMs });
+    if (champion === null) setTimeout(() => this.startMatch(tournament), this.timings.betweenMatchesMs).unref();
+    this.tournaments.save(tournament);
+    this.broadcast(tournament);
   }
 }
 

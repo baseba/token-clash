@@ -10,4 +10,4 @@ export const newId = () => randomBytes(6).toString('base64url');
 /** A secret session token. Only its hash is stored. */
 export const newToken = () => randomBytes(24).toString('base64url');
 
-export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
+export const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');

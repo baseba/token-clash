@@ -22,50 +22,50 @@ export interface JevOptions {
 
 type Facts = Record<string, unknown>;
 
-const isVisible = (f: FighterView | null | undefined): f is VisibleFighterView => !!f && !f.hidden;
+const isVisible = (view: FighterView | null | undefined): view is VisibleFighterView => !!view && !view.hidden;
 
 const STATUS_NAME: Record<string, string> = { par: 'paralyzed', brn: 'burned', psn: 'poisoned', tox: 'badly poisoned', slp: 'asleep', frz: 'frozen' };
 
-const nonZero = (o: object = {}): Record<string, unknown> => Object.fromEntries(Object.entries(o).filter(([, v]) => v));
-const pct = (f: VisibleFighterView): number => (f.hpPercent ? f.hp : Math.round((f.hp / f.stats.hp) * 100));
+const nonZero = (values: object = {}): Record<string, unknown> => Object.fromEntries(Object.entries(values).filter(([, v]) => v));
+const pct = (view: VisibleFighterView): number => (view.hpPercent ? view.hp : Math.round((view.hp / view.stats.hp) * 100));
 
-function moveFacts(m: PublicMove, user: VisibleFighterView | null, foe: VisibleFighterView | null, ppLeft: number | null | undefined): Facts {
-  const facts: Facts = { name: m.name, type: m.type, category: m.category };
-  if (m.kind !== 'status') {
-    facts.power = m.power || (m.fixedDamage ? `fixed (${m.fixedDamage})` : null);
-    if (m.type && user?.types.includes(m.type)) facts.sameTypeBonus = true;
-    if (foe && m.type) facts.effectivenessVsOpponent = `x${effectiveness(m.type, foe.types)}`;
+function moveFacts(move: PublicMove, user: VisibleFighterView | null, foe: VisibleFighterView | null, ppLeft: number | null | undefined): Facts {
+  const facts: Facts = { name: move.name, type: move.type, category: move.category };
+  if (move.kind !== 'status') {
+    facts.power = move.power || (move.fixedDamage ? `fixed (${move.fixedDamage})` : null);
+    if (move.type && user?.types.includes(move.type)) facts.sameTypeBonus = true;
+    if (foe && move.type) facts.effectivenessVsOpponent = `x${effectiveness(move.type, foe.types)}`;
   } else {
-    facts.effect = m.desc;
+    facts.effect = move.desc;
   }
-  facts.accuracy = m.accuracy ?? 'never misses';
-  if (m.priority) facts.priority = m.priority;
+  facts.accuracy = move.accuracy ?? 'never misses';
+  if (move.priority) facts.priority = move.priority;
   if (ppLeft != null) facts.ppLeft = ppLeft;
   return facts;
 }
 
-function monFacts(f: FighterView, { own, foe = null }: { own: boolean; foe?: VisibleFighterView | null }): Facts {
-  if (!isVisible(f)) return { unknown: true };
+function monFacts(view: FighterView, { own, foe = null }: { own: boolean; foe?: VisibleFighterView | null }): Facts {
+  if (!isVisible(view)) return { unknown: true };
   const out: Facts = {
-    species: f.speciesName,
-    types: f.types,
-    level: f.level,
-    hpPercent: pct(f),
-    ...(own ? { hp: `${f.hp}/${f.stats.hp}` } : {}),
-    ...(f.status ? { status: STATUS_NAME[f.status] ?? f.status } : {}),
-    ...(Object.keys(nonZero(f.boosts)).length ? { statStages: nonZero(f.boosts) } : {}),
-    ...(Object.keys(f.volatiles ?? {}).length ? { conditions: f.volatiles } : {}),
+    species: view.speciesName,
+    types: view.types,
+    level: view.level,
+    hpPercent: pct(view),
+    ...(own ? { hp: `${view.hp}/${view.stats.hp}` } : {}),
+    ...(view.status ? { status: STATUS_NAME[view.status] ?? view.status } : {}),
+    ...(Object.keys(nonZero(view.boosts)).length ? { statStages: nonZero(view.boosts) } : {}),
+    ...(Object.keys(view.volatiles ?? {}).length ? { conditions: view.volatiles } : {}),
   };
-  if (own) out.stats = { attack: f.stats.atk, defense: f.stats.def, spAttack: f.stats.satk, spDefense: f.stats.sdef, speed: f.stats.spd };
-  if (f.abilityInfo) out.ability = { name: f.abilityInfo.name, effect: f.abilityInfo.desc };
-  if (f.moves.length) out[own ? 'moves' : 'revealedMoves'] = f.moves.map((m) => moveFacts(m, f, foe, own ? f.pp[m.key] : null));
+  if (own) out.stats = { attack: view.stats.atk, defense: view.stats.def, spAttack: view.stats.satk, spDefense: view.stats.sdef, speed: view.stats.spd };
+  if (view.abilityInfo) out.ability = { name: view.abilityInfo.name, effect: view.abilityInfo.desc };
+  if (view.moves.length) out[own ? 'moves' : 'revealedMoves'] = view.moves.map((m) => moveFacts(m, view, foe, own ? view.pp[m.key] : null));
   return out;
 }
 
-export function jevState(b: BattleState, s: number): Facts {
-  const view = publicState(b, s);
-  const mine = view.sides[s];
-  const theirs = view.sides[1 - s];
+export function jevState(battle: BattleState, sideIndex: number): Facts {
+  const view = publicState(battle, sideIndex);
+  const mine = view.sides[sideIndex];
+  const theirs = view.sides[1 - sideIndex];
   const foe = theirs.team[theirs.active];
   const foeActive = isVisible(foe) && foe.hp > 0 ? foe : null;
   // Your own team is always fully visible to you.
@@ -90,33 +90,33 @@ export function jevState(b: BattleState, s: number): Facts {
 }
 
 // The valid actions as Choice criteria. Keys map back to the action the engine expects.
-export function jevOptions(b: BattleState, s: number): { criteria: Record<string, Facts>; actions: Record<string, Action> } {
-  const view = publicState(b, s);
-  const mine = view.sides[s];
-  const theirs = view.sides[1 - s];
+export function jevOptions(battle: BattleState, sideIndex: number): { criteria: Record<string, Facts>; actions: Record<string, Action> } {
+  const view = publicState(battle, sideIndex);
+  const mine = view.sides[sideIndex];
+  const theirs = view.sides[1 - sideIndex];
   const me = mine.team[mine.active] as VisibleFighterView;
   const foeRaw = theirs.team[theirs.active];
   const foe = isVisible(foeRaw) && foeRaw.hp > 0 ? foeRaw : null;
   const criteria: Record<string, Facts> = {};
   const actions: Record<string, Action> = {};
-  for (const a of validActions(b, s)) {
-    if (a.type === 'move') {
-      const key = a.move === STRUGGLE_MOVE ? 'struggle' : `move_${a.move}`;
-      actions[key] = a;
-      criteria[key] = a.move === STRUGGLE_MOVE
+  for (const action of validActions(battle, sideIndex)) {
+    if (action.type === 'move') {
+      const key = action.move === STRUGGLE_MOVE ? 'struggle' : `move_${action.move}`;
+      actions[key] = action;
+      criteria[key] = action.move === STRUGGLE_MOVE
         ? { action: 'Struggle (no PP left in any move): weak attack that also hurts you' }
-        : { action: `Use ${me.moves[a.move].name}`, ...moveFacts(me.moves[a.move], me, foe, me.pp[me.moves[a.move].key]) };
+        : { action: `Use ${me.moves[action.move].name}`, ...moveFacts(me.moves[action.move], me, foe, me.pp[me.moves[action.move].key]) };
     } else {
-      const f = mine.team[a.to] as VisibleFighterView;
-      const key = `switch_${a.to}`;
-      actions[key] = a;
+      const view = mine.team[action.to] as VisibleFighterView;
+      const key = `switch_${action.to}`;
+      actions[key] = action;
       criteria[key] = {
-        action: `Switch to ${f.speciesName}`,
-        types: f.types,
-        hpPercent: pct(f),
-        ...(f.status ? { status: STATUS_NAME[f.status] ?? f.status } : {}),
-        ...(foe ? { worstRivalTypeVsIt: `x${Math.max(...foe.types.map((t) => effectiveness(t, f.types)))}` } : {}),
-        ...(foe ? { bestMoveVsRival: `x${Math.max(0, ...f.moves.filter((m) => m.kind !== 'status' && m.type).map((m) => effectiveness(m.type, foe.types)))}` } : {}),
+        action: `Switch to ${view.speciesName}`,
+        types: view.types,
+        hpPercent: pct(view),
+        ...(view.status ? { status: STATUS_NAME[view.status] ?? view.status } : {}),
+        ...(foe ? { worstRivalTypeVsIt: `x${Math.max(...foe.types.map((t) => effectiveness(t, view.types)))}` } : {}),
+        ...(foe ? { bestMoveVsRival: `x${Math.max(0, ...view.moves.filter((m) => m.kind !== 'status' && m.type).map((m) => effectiveness(m.type, foe.types)))}` } : {}),
       };
     }
   }
@@ -143,8 +143,8 @@ export async function askJev({ url = JEV_DEFAULT_URL, model = JEV_DEFAULT_MODEL,
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
-  } catch (e) {
-    throw new Error((e as Error | null)?.name === 'TimeoutError' ? 'timeout' : 'network');
+  } catch (error) {
+    throw new Error((error as Error | null)?.name === 'TimeoutError' ? 'timeout' : 'network');
   }
   if (!res.ok) throw new Error(`status ${res.status}`);
   const body = (await res.json().catch(() => null)) as { answers?: { action?: { choice?: unknown; confidence?: number } } } | null;
@@ -155,16 +155,16 @@ export async function askJev({ url = JEV_DEFAULT_URL, model = JEV_DEFAULT_MODEL,
 
 // The action Jev picks for side s, or null if Jev can't decide (error, timeout, bad answer).
 // Without apiKey no Authorization is sent: the proxy adds it.
-export async function chooseJevAction(b: BattleState, s: number, { url, model, apiKey, fetchImpl, timeoutMs }: JevOptions = {}): Promise<Action | null> {
+export async function chooseJevAction(battle: BattleState, sideIndex: number, { url, model, apiKey, fetchImpl, timeoutMs }: JevOptions = {}): Promise<Action | null> {
   try {
-    const { criteria, actions } = jevOptions(b, s);
+    const { criteria, actions } = jevOptions(battle, sideIndex);
     const keys = Object.keys(criteria);
     if (!keys.length) return null;
     if (keys.length === 1) return actions[keys[0]];
-    const { key } = await askJev({ url, model, apiKey, state: jevState(b, s), criteria, fetchImpl, timeoutMs });
+    const { key } = await askJev({ url, model, apiKey, state: jevState(battle, sideIndex), criteria, fetchImpl, timeoutMs });
     return actions[key];
-  } catch (e) {
-    console.warn(`Skynet: Jev no respondió (${(e as Error).message}), decide la IA Muy difícil.`);
+  } catch (error) {
+    console.warn(`Skynet: Jev no respondió (${(error as Error).message}), decide la IA Muy difícil.`);
     return null;
   }
 }

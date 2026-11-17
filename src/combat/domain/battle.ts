@@ -25,39 +25,39 @@ const SAND_PROOF = ['rock', 'ground', 'steel'];
 const SCREEN_KINDS = ['reflect', 'lightscreen', 'auroraveil'];
 const VEIL_WEATHER = new Set<string | null>(['hail', 'snow']);
 
-const stageMult = (s: number): number => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s));
-const accuracyMult = (s: number): number => (s >= 0 ? (3 + s) / 3 : 3 / (3 - s));
+const stageMult = (sideIndex: number): number => (sideIndex >= 0 ? (2 + sideIndex) / 2 : 2 / (2 - sideIndex));
+const accuracyMult = (sideIndex: number): number => (sideIndex >= 0 ? (3 + sideIndex) / 3 : 3 / (3 - sideIndex));
 const freshBoosts = (): Record<BoostKey, number> => ({ atk: 0, def: 0, satk: 0, sdef: 0, spd: 0, acc: 0, eva: 0 });
-const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
-const isSun = (w: string | null | undefined): boolean => w === 'sun' || w === 'harshsun';
-const isRain = (w: string | null | undefined): boolean => w === 'rain' || w === 'heavyrain';
+const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
+const isSun = (weather: string | null | undefined): boolean => weather === 'sun' || weather === 'harshsun';
+const isRain = (weather: string | null | undefined): boolean => weather === 'rain' || weather === 'heavyrain';
 const poisoned = (status: string | null | undefined): boolean => status === 'psn' || status === 'tox';
 const isAttack = (move: AnyMove): boolean => move.category !== 'status';
 export const STRUGGLE_MOVE = -1;
 const HEALS_WITH_WEATHER: Record<string, string> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
 
 function prepare(entry: RosterEntry, levelCap: number | null): F {
-  const f = buildFighter(entry, { levelCap });
+  const fighter = buildFighter(entry, { levelCap });
   return {
-    ...f,
-    hp: f.stats.hp,
+    ...fighter,
+    hp: fighter.stats.hp,
     boosts: freshBoosts(),
     status: null,
     statusTurns: 0,
     vol: {},
     activeTurns: 0,
     form: null,
-    baseTypes: [...f.types],
-    baseStats: { ...f.stats },
-    baseSprite: f.sprite,
-    speciesStats: { ...f.stats },
-    speciesTypes: [...f.types],
+    baseTypes: [...fighter.types],
+    baseStats: { ...fighter.stats },
+    baseSprite: fighter.sprite,
+    speciesStats: { ...fighter.stats },
+    speciesTypes: [...fighter.types],
     seen: false,
     seenAs: null,
-    baseAbility: f.ability,
+    baseAbility: fighter.ability,
     revealedAbilities: new Set(),
     revealedMoves: new Set(),
-    pp: Object.fromEntries(f.moves.map((m) => [m.key, m.pp])),
+    pp: Object.fromEntries(fighter.moves.map((m) => [m.key, m.pp])),
   };
 }
 
@@ -88,63 +88,63 @@ export function createBattle({ id, sides, levelCap = null, random = Math.random 
     moved: new Set(),
     mold: null,
   };
-  const b = init as B;
-  b.intro = withEvents(b, () => {
-    const leads = entryOrder(b, [0, 1]);
-    for (const s of leads) prepareEntry(b, s);
-    for (const s of leads) runEntry(b, s);
-    settle(b);
+  const battle = init as B;
+  battle.intro = withEvents(battle, () => {
+    const leads = entryOrder(battle, [0, 1]);
+    for (const sideIndex of leads) prepareEntry(battle, sideIndex);
+    for (const sideIndex of leads) runEntry(battle, sideIndex);
+    settle(battle);
   });
-  return b;
+  return battle;
 }
 
-function withEvents(b: B, fn: () => void): BattleEvent[] {
+function withEvents(battle: B, fn: () => void): BattleEvent[] {
   const events: BattleEvent[] = [];
-  b.ev = events;
+  battle.ev = events;
   fn();
-  b.ev = [];
+  battle.ev = [];
   return events;
 }
 
-const emit = (b: B, ev: BattleEvent): number => b.ev.push(ev);
-const activeOf = (b: B, s: number): F => b.sides[s].team[b.sides[s].active];
-const sideIndex = (b: B, f: F): number => b.sides.findIndex((side) => side.team.includes(f));
-const onField = (b: B, f: F): boolean => f.hp > 0 && activeOf(b, sideIndex(b, f)) === f;
-const activeFighters = (b: B): F[] => [0, 1].map((s) => activeOf(b, s)).filter((f) => f.hp > 0);
-const foeOf = (b: B, f: F): F | null => {
-  const foe = activeOf(b, 1 - sideIndex(b, f));
+const emit = (battle: B, ev: BattleEvent): number => battle.ev.push(ev);
+const activeOf = (battle: B, sideIndex: number): F => battle.sides[sideIndex].team[battle.sides[sideIndex].active];
+const sideIndexOf = (battle: B, fighter: F): number => battle.sides.findIndex((side) => side.team.includes(fighter));
+const onField = (battle: B, fighter: F): boolean => fighter.hp > 0 && activeOf(battle, sideIndexOf(battle, fighter)) === fighter;
+const activeFighters = (battle: B): F[] => [0, 1].map((s) => activeOf(battle, s)).filter((f) => f.hp > 0);
+const foeOf = (battle: B, fighter: F): F | null => {
+  const foe = activeOf(battle, 1 - sideIndexOf(battle, fighter));
   return foe.hp > 0 ? foe : null;
 };
-const nameOf = (f: F): string => f.vol.illusion?.name ?? f.name;
+const nameOf = (fighter: F): string => fighter.vol.illusion?.name ?? fighter.name;
 
 // ---------- abilities ----------
 
-function abilityKey(b: B, f: F): string | null {
-  const key = f.ability;
+function abilityKey(battle: B, fighter: F): string | null {
+  const key = fighter.ability;
   const def = key && ABILITIES[key as string];
   if (!def) return null;
-  if (f.vol.gastroAcid && !def.unsuppressable) return null;
-  if (!def.unsuppressable && activeFighters(b).some((o) => o !== f && o.ability === 'neutralizing-gas')) return null;
-  if (def.breakable && b.mold && b.mold.target === f) return null;
+  if (fighter.vol.gastroAcid && !def.unsuppressable) return null;
+  if (!def.unsuppressable && activeFighters(battle).some((o) => o !== fighter && o.ability === 'neutralizing-gas')) return null;
+  if (def.breakable && battle.mold && battle.mold.target === fighter) return null;
   return key;
 }
 
-const abilityDef = (b: B, f: F): AbilityEffect | null => ABILITIES[abilityKey(b, f) as string] ?? null;
-const run = (b: B, f: F, hook: AbilityHook, ...args: unknown[]): unknown => (abilityDef(b, f)?.[hook] as ((E: AbilityEngine, me: F, ...args: unknown[]) => unknown) | undefined)?.(engine(b), f, ...args);
-const flag = (b: B, f: F, name: keyof AbilityEffect): boolean => !!abilityDef(b, f)?.[name];
+const abilityDef = (battle: B, fighter: F): AbilityEffect | null => ABILITIES[abilityKey(battle, fighter) as string] ?? null;
+const run = (battle: B, fighter: F, hook: AbilityHook, ...args: unknown[]): unknown => (abilityDef(battle, fighter)?.[hook] as ((engine: AbilityEngine, me: F, ...args: unknown[]) => unknown) | undefined)?.(engine(battle), fighter, ...args);
+const flag = (battle: B, fighter: F, name: keyof AbilityEffect): boolean => !!abilityDef(battle, fighter)?.[name];
 
-function mul(b: B, f: F, hook: AbilityHook, ...args: unknown[]): number {
-  const r = run(b, f, hook, ...args);
-  return typeof r === 'number' ? r : 1;
+function mul(battle: B, fighter: F, hook: AbilityHook, ...args: unknown[]): number {
+  const result = run(battle, fighter, hook, ...args);
+  return typeof result === 'number' ? result : 1;
 }
 
-function chain(b: B, f: F, hook: AbilityHook, value: number, ...args: unknown[]): number {
-  const r = run(b, f, hook, ...args, value);
-  return typeof r === 'number' ? r : value;
+function chain(battle: B, fighter: F, hook: AbilityHook, value: number, ...args: unknown[]): number {
+  const result = run(battle, fighter, hook, ...args, value);
+  return typeof result === 'number' ? result : value;
 }
 
-const anyActiveHas = (b: B, key: string): boolean => activeFighters(b).some((f) => abilityKey(b, f) === key);
-const otherActiveHas = (b: B, f: F, key: string): boolean => activeFighters(b).some((o) => o !== f && abilityKey(b, o) === key);
+const anyActiveHas = (battle: B, key: string): boolean => activeFighters(battle).some((f) => abilityKey(battle, f) === key);
+const otherActiveHas = (battle: B, fighter: F, key: string): boolean => activeFighters(battle).some((o) => o !== fighter && abilityKey(battle, o) === key);
 
 interface BoostOptions {
   /** Highest stage a raise may reach (Belly Drum and friends go to +6 anyway). */
@@ -156,887 +156,887 @@ interface BoostOptions {
 }
 
 const engines = new WeakMap<B, AbilityEngine>();
-function engine(b: B): AbilityEngine {
-  let E = engines.get(b);
-  if (E) return E;
-  E = makeEngine(b);
-  engines.set(b, E);
-  return E;
+function engine(battle: B): AbilityEngine {
+  let engine = engines.get(battle);
+  if (engine) return engine;
+  engine = makeEngine(battle);
+  engines.set(battle, engine);
+  return engine;
 }
 
 /** What ability rules may do to the battle (catalog/domain/abilities.ts). */
 export type AbilityEngine = ReturnType<typeof makeEngine>;
 
-function makeEngine(b: B) {
+function makeEngine(battle: B) {
   return {
-    b,
-    rand: () => b.random(),
-    foe: (f: F) => foeOf(b, f),
-    has: (f: F, key: string) => abilityKey(b, f) === key,
-    anyActiveHas: (key: string) => anyActiveHas(b, key),
-    show: (f: F, note?: string | null, extra?: Record<string, unknown>) => showAbility(b, f, note, extra),
-    note: (f: F, kind: string) => emit(b, { t: kind, side: sideIndex(b, f) }),
-    boost: (f: F, changes: Boosts, source?: F | null, opts?: BoostOptions) => boost(b, f, changes, source, opts),
-    damage: (f: F, amount: number, cause?: string) => hurt(b, f, amount, cause),
-    heal: (f: F, amount: number, source?: F | null, opts?: { silent?: boolean }) => heal(b, f, amount, opts),
-    setStatus: (f: F, status: string, source?: F | null, opts?: { ability?: F }) => setStatus(b, f, status, source, opts),
-    addVolatile: (f: F, kind: string, source?: F | null, opts?: { ability?: F; move?: { key: string; name: string } }) => addVolatile(b, f, kind, source, opts),
-    cure: (f: F, announce?: boolean) => cure(b, f, announce),
-    weather: () => weather(b),
-    terrain: () => b.field.terrain,
-    setWeather: (w: string, source: F | null) => setWeather(b, w, source),
-    setTerrain: (t: string, source: F | null) => setTerrain(b, t, source),
-    grounded: (f: F) => grounded(b, f),
-    asleep: (f: F) => f.status === 'slp' || flag(b, f, 'comatose'),
-    effectiveness: (move: AnyMove, attacker: F, target: F) => typeEffectiveness(b, move, attacker, target),
-    setTypes: (f: F, types: readonly string[]) => setTypes(b, f, types),
-    setAbility: (f: F, key: string | null) => setAbility(b, f, key),
-    hasMoved: (f: F) => b.moved.has(f),
-    hasBench: (f: F) => b.sides[sideIndex(b, f)].team.some((o) => o !== f && o.hp > 0),
-    faintedAllies: (f: F) => b.sides[sideIndex(b, f)].team.filter((o) => o !== f && o.hp <= 0).length,
-    addToxicSpikes: (f: F) => addToxicSpikes(b, f),
-    clearScreens: (s: number, cause: string) => clearScreens(b, s, cause),
-    transform: (f: F, into: F) => transform(b, f, into),
-    changeForm: (f: F, form: string | null, opts?: { permanent?: boolean }) => changeForm(b, f, form, opts),
-    breakIllusion: (f: F) => breakIllusion(b, f),
-    look: (f: F) => lookOf(f),
+    b: battle,
+    rand: () => battle.random(),
+    foe: (fighter: F) => foeOf(battle, fighter),
+    has: (fighter: F, key: string) => abilityKey(battle, fighter) === key,
+    anyActiveHas: (key: string) => anyActiveHas(battle, key),
+    show: (fighter: F, note?: string | null, extra?: Record<string, unknown>) => showAbility(battle, fighter, note, extra),
+    note: (fighter: F, kind: string) => emit(battle, { t: kind, side: sideIndexOf(battle, fighter) }),
+    boost: (fighter: F, changes: Boosts, source?: F | null, opts?: BoostOptions) => boost(battle, fighter, changes, source, opts),
+    damage: (fighter: F, amount: number, cause?: string) => hurt(battle, fighter, amount, cause),
+    heal: (fighter: F, amount: number, source?: F | null, opts?: { silent?: boolean }) => heal(battle, fighter, amount, opts),
+    setStatus: (fighter: F, status: string, source?: F | null, opts?: { ability?: F }) => setStatus(battle, fighter, status, source, opts),
+    addVolatile: (fighter: F, kind: string, source?: F | null, opts?: { ability?: F; move?: { key: string; name: string } }) => addVolatile(battle, fighter, kind, source, opts),
+    cure: (fighter: F, announce?: boolean) => cure(battle, fighter, announce),
+    weather: () => currentWeather(battle),
+    terrain: () => battle.field.terrain,
+    setWeather: (weather: string, source: F | null) => setWeather(battle, weather, source),
+    setTerrain: (terrain: string, source: F | null) => setTerrain(battle, terrain, source),
+    grounded: (fighter: F) => grounded(battle, fighter),
+    asleep: (fighter: F) => fighter.status === 'slp' || flag(battle, fighter, 'comatose'),
+    effectiveness: (move: AnyMove, attacker: F, target: F) => typeEffectiveness(battle, move, attacker, target),
+    setTypes: (fighter: F, types: readonly string[]) => setTypes(battle, fighter, types),
+    setAbility: (fighter: F, key: string | null) => setAbility(battle, fighter, key),
+    hasMoved: (fighter: F) => battle.moved.has(fighter),
+    hasBench: (fighter: F) => battle.sides[sideIndexOf(battle, fighter)].team.some((o) => o !== fighter && o.hp > 0),
+    faintedAllies: (fighter: F) => battle.sides[sideIndexOf(battle, fighter)].team.filter((o) => o !== fighter && o.hp <= 0).length,
+    addToxicSpikes: (fighter: F) => addToxicSpikes(battle, fighter),
+    clearScreens: (sideIndex: number, cause: string) => clearScreens(battle, sideIndex, cause),
+    transform: (fighter: F, into: F) => transform(battle, fighter, into),
+    changeForm: (fighter: F, form: string | null, opts?: { permanent?: boolean }) => changeForm(battle, fighter, form, opts),
+    breakIllusion: (fighter: F) => breakIllusion(battle, fighter),
+    look: (fighter: F) => lookOf(fighter),
   };
 }
 
 const moveApis = new WeakMap<B, MoveRuleApi>();
 const HAZARD_MAX: Record<string, number> = { spikes: 3, toxicspikes: 2 };
 
-function moveApi(b: B): MoveRuleApi {
-  let A = moveApis.get(b);
-  if (A) return A;
-  A = makeMoveApi(b);
-  moveApis.set(b, A);
-  return A;
+function moveApi(battle: B): MoveRuleApi {
+  let api = moveApis.get(battle);
+  if (api) return api;
+  api = makeMoveApi(battle);
+  moveApis.set(battle, api);
+  return api;
 }
 
 /** What move rules may do to the battle (catalog/domain/move-rules.ts). */
 export type MoveRuleApi = ReturnType<typeof makeMoveApi>;
 
-function makeMoveApi(b: B) {
-  const sideOfF = (f: F) => sideIndex(b, f);
-  const A = {
-    b,
-    random: () => b.random(),
-    turn: () => b.turn,
-    emit: (ev: BattleEvent) => emit(b, ev),
-    sideOf: sideOfF,
-    side: (s: number) => b.sides[s],
-    actives: () => activeFighters(b),
+function makeMoveApi(battle: B) {
+  const sideOf = (fighter: F) => sideIndexOf(battle, fighter);
+  const api = {
+    b: battle,
+    random: () => battle.random(),
+    turn: () => battle.turn,
+    emit: (ev: BattleEvent) => emit(battle, ev),
+    sideOf,
+    side: (sideIndex: number) => battle.sides[sideIndex],
+    actives: () => activeFighters(battle),
     name: nameOf,
-    hurt: (f: F, amount: number, cause?: string) => hurt(b, f, amount, cause),
-    heal: (f: F, amount: number) => heal(b, f, amount),
-    boost: (f: F, changes: Boosts, source?: F | null) => boost(b, f, changes, source),
-    setStatus: (f: F, status: string, source?: F | null) => setStatus(b, f, status, source),
-    cure: (f: F) => cure(b, f),
-    addVolatile: (f: F, kind: string, source?: F | null, opts?: { ability?: F; move?: { key: string; name: string } }) => addVolatile(b, f, kind, source, opts),
-    setTypes: (f: F, types: readonly string[]) => setTypes(b, f, types),
-    changeAbility: (f: F, key: string | null) => {
-      setAbility(b, f, key);
-      run(b, f, 'onStart');
+    hurt: (fighter: F, amount: number, cause?: string) => hurt(battle, fighter, amount, cause),
+    heal: (fighter: F, amount: number) => heal(battle, fighter, amount),
+    boost: (fighter: F, changes: Boosts, source?: F | null) => boost(battle, fighter, changes, source),
+    setStatus: (fighter: F, status: string, source?: F | null) => setStatus(battle, fighter, status, source),
+    cure: (fighter: F) => cure(battle, fighter),
+    addVolatile: (fighter: F, kind: string, source?: F | null, opts?: { ability?: F; move?: { key: string; name: string } }) => addVolatile(battle, fighter, kind, source, opts),
+    setTypes: (fighter: F, types: readonly string[]) => setTypes(battle, fighter, types),
+    changeAbility: (fighter: F, key: string | null) => {
+      setAbility(battle, fighter, key);
+      run(battle, fighter, 'onStart');
     },
-    transform: (f: F, into: F) => transform(b, f, into),
-    dragOut: (f: F) => dragOut(b, f),
-    faint: (f: F) => {
-      f.hp = 0;
-      faint(b, f);
+    transform: (fighter: F, into: F) => transform(battle, fighter, into),
+    dragOut: (fighter: F) => dragOut(battle, fighter),
+    faint: (fighter: F) => {
+      fighter.hp = 0;
+      faint(battle, fighter);
     },
-    weather: () => weather(b),
-    grounded: (f: F) => grounded(b, f),
+    weather: () => currentWeather(battle),
+    grounded: (fighter: F) => grounded(battle, fighter),
     effectiveness: (type: string | null | undefined, types: readonly string[]) => effectiveness(type, types),
-    speed: (f: F) => speedOf(b, f),
-    flag: (f: F, name: keyof AbilityEffect) => flag(b, f, name),
+    speed: (fighter: F) => speedOf(battle, fighter),
+    flag: (fighter: F, name: keyof AbilityEffect) => flag(battle, fighter, name),
     abilityDef: (key: string | null): AbilityEffect | undefined => ABILITIES[key as string],
     stageMult,
-    weight: (f: F): number => speciesData(f.speciesId)?.weight ?? 50,
-    baseAttack: (f: F): number | undefined => speciesData(f.speciesId)?.stats?.[1],
-    moved: (f: F) => b.moved.has(f),
-    chosen: (s: number): MoveData | null => b.chosen?.[s] ?? null,
-    lastMove: (): string | null => b.lastMove ?? null,
-    nothing: (f: F, reason: string | null = null): false => {
-      emit(b, { t: 'nothing', side: sideOfF(f), ...(reason ? { reason } : {}) });
+    weight: (fighter: F): number => speciesData(fighter.speciesId)?.weight ?? 50,
+    baseAttack: (fighter: F): number | undefined => speciesData(fighter.speciesId)?.stats?.[1],
+    moved: (fighter: F) => battle.moved.has(fighter),
+    chosen: (sideIndex: number): MoveData | null => battle.chosen?.[sideIndex] ?? null,
+    lastMove: (): string | null => battle.lastMove ?? null,
+    nothing: (fighter: F, reason: string | null = null): false => {
+      emit(battle, { t: 'nothing', side: sideOf(fighter), ...(reason ? { reason } : {}) });
       return false;
     },
-    vol: (f: F, kind: string, extra: Record<string, unknown> = {}) => emit(b, { t: 'volatile', side: sideOfF(f), name: nameOf(f), kind, ...extra }),
-    volEnd: (f: F, kind: string, extra: Record<string, unknown> = {}) => emit(b, { t: 'volatileEnd', side: sideOfF(f), name: nameOf(f), kind, ...extra }),
-    sideStart: (s: number, kind: string, extra: Record<string, unknown> = {}) => emit(b, { t: 'sideStart', side: s, kind, ...extra }),
-    fieldStart: (kind: string) => emit(b, { t: 'fieldStart', kind }),
-    fieldEnd: (kind: string) => emit(b, { t: 'fieldEnd', kind }),
-    setBoosts: (f: F, boosts: Boosts): void => {
-      f.boosts = { ...freshBoosts(), ...boosts };
-      emit(b, { t: 'boosts', side: sideOfF(f), name: nameOf(f), boosts: { ...f.boosts } });
+    vol: (fighter: F, kind: string, extra: Record<string, unknown> = {}) => emit(battle, { t: 'volatile', side: sideOf(fighter), name: nameOf(fighter), kind, ...extra }),
+    volEnd: (fighter: F, kind: string, extra: Record<string, unknown> = {}) => emit(battle, { t: 'volatileEnd', side: sideOf(fighter), name: nameOf(fighter), kind, ...extra }),
+    sideStart: (sideIndex: number, kind: string, extra: Record<string, unknown> = {}) => emit(battle, { t: 'sideStart', side: sideIndex, kind, ...extra }),
+    fieldStart: (kind: string) => emit(battle, { t: 'fieldStart', kind }),
+    fieldEnd: (kind: string) => emit(battle, { t: 'fieldEnd', kind }),
+    setBoosts: (fighter: F, boosts: Boosts): void => {
+      fighter.boosts = { ...freshBoosts(), ...boosts };
+      emit(battle, { t: 'boosts', side: sideOf(fighter), name: nameOf(fighter), boosts: { ...fighter.boosts } });
     },
-    setStats: (f: F, stats: Partial<Stats>): void => {
-      f.stats = { ...f.stats, ...stats };
-      emit(b, { t: 'stats', side: sideOfF(f), name: nameOf(f), stats: { ...f.stats } });
+    setStats: (fighter: F, stats: Partial<Stats>): void => {
+      fighter.stats = { ...fighter.stats, ...stats };
+      emit(battle, { t: 'stats', side: sideOf(fighter), name: nameOf(fighter), stats: { ...fighter.stats } });
     },
-    swapBoosts: (a: F, c: F, keys: BoostKey[]): boolean => {
+    swapBoosts: (user: F, target: F, keys: BoostKey[]): boolean => {
       const next = (from: F, to: F) => ({ ...to.boosts, ...Object.fromEntries(keys.map((k) => [k, from.boosts[k]])) });
-      const forA = next(c, a);
-      const forC = next(a, c);
-      A.setBoosts(a, forA);
-      A.setBoosts(c, forC);
+      const forA = next(target, user);
+      const forC = next(user, target);
+      api.setBoosts(user, forA);
+      api.setBoosts(target, forC);
       return true;
     },
-    splitStats: (a: F, c: F, keys: Exclude<keyof Stats, 'hp'>[]): boolean => {
-      const avg = Object.fromEntries(keys.map((k) => [k, Math.floor((a.stats[k] + c.stats[k]) / 2)]));
-      A.setStats(a, avg);
-      A.setStats(c, avg);
+    splitStats: (user: F, target: F, keys: Exclude<keyof Stats, 'hp'>[]): boolean => {
+      const avg = Object.fromEntries(keys.map((k) => [k, Math.floor((user.stats[k] + target.stats[k]) / 2)]));
+      api.setStats(user, avg);
+      api.setStats(target, avg);
       return true;
     },
-    protect: (f: F, kind: string): boolean => {
-      const n = f.vol.stall ?? 0;
-      if (n > 0 && b.random() >= 1 / 3 ** n) {
-        delete f.vol.stall;
-        return A.nothing(f);
+    protect: (fighter: F, kind: string): boolean => {
+      const stalls = fighter.vol.stall ?? 0;
+      if (stalls > 0 && battle.random() >= 1 / 3 ** stalls) {
+        delete fighter.vol.stall;
+        return api.nothing(fighter);
       }
-      f.vol.stall = n + 1;
-      if (kind === 'endure') f.vol.endure = b.turn;
-      else f.vol.protect = { turn: b.turn, kind };
-      emit(b, { t: 'protect', side: sideOfF(f), name: nameOf(f), kind });
+      fighter.vol.stall = stalls + 1;
+      if (kind === 'endure') fighter.vol.endure = battle.turn;
+      else fighter.vol.protect = { turn: battle.turn, kind };
+      emit(battle, { t: 'protect', side: sideOf(fighter), name: nameOf(fighter), kind });
       return true;
     },
-    guard: (f: F, kind: string): boolean => {
-      const conds = b.sides[sideOfF(f)].conds;
+    guard: (fighter: F, kind: string): boolean => {
+      const conds = battle.sides[sideOf(fighter)].conds;
       if (kind === 'quickguard' || kind === 'wideguard') {
-        const n = f.vol.stall ?? 0;
-        if (n > 0 && b.random() >= 1 / 3 ** n) {
-          delete f.vol.stall;
-          return A.nothing(f);
+        const stalls = fighter.vol.stall ?? 0;
+        if (stalls > 0 && battle.random() >= 1 / 3 ** stalls) {
+          delete fighter.vol.stall;
+          return api.nothing(fighter);
         }
-        f.vol.stall = n + 1;
+        fighter.vol.stall = stalls + 1;
       }
-      conds[kind] = b.turn;
-      emit(b, { t: 'sideStart', side: sideOfF(f), kind });
+      conds[kind] = battle.turn;
+      emit(battle, { t: 'sideStart', side: sideOf(fighter), kind });
       return true;
     },
-    hazard: (f: F, kind: string): boolean => {
-      const s = 1 - sideOfF(f);
-      const side = b.sides[s];
+    hazard: (fighter: F, kind: string): boolean => {
+      const sideIndex = 1 - sideOf(fighter);
+      const side = battle.sides[sideIndex];
       if (kind === 'toxicspikes') {
-        if (side.toxicSpikes >= HAZARD_MAX.toxicspikes) return A.nothing(f);
+        if (side.toxicSpikes >= HAZARD_MAX.toxicspikes) return api.nothing(fighter);
         side.toxicSpikes += 1;
-        emit(b, { t: 'hazard', side: s, layers: side.toxicSpikes });
+        emit(battle, { t: 'hazard', side: sideIndex, layers: side.toxicSpikes });
         return true;
       }
       const hazards = side.hazards as unknown as Record<string, number | boolean>;
       const cur = hazards[kind];
-      if (kind === 'spikes' ? (cur as number) >= HAZARD_MAX.spikes : cur) return A.nothing(f);
+      if (kind === 'spikes' ? (cur as number) >= HAZARD_MAX.spikes : cur) return api.nothing(fighter);
       hazards[kind] = kind === 'spikes' ? (cur as number) + 1 : true;
-      emit(b, { t: 'sideStart', side: s, kind, ...(kind === 'spikes' ? { layers: side.hazards.spikes } : {}) });
+      emit(battle, { t: 'sideStart', side: sideIndex, kind, ...(kind === 'spikes' ? { layers: side.hazards.spikes } : {}) });
       return true;
     },
-    clearHazards: (s: number) => clearHazards(b, s),
+    clearHazards: (sideIndex: number) => clearHazards(battle, sideIndex),
     courtChange: (): boolean => {
-      const [x, y] = b.sides;
-      const swap = <K extends 'hazards' | 'conds' | 'screens' | 'toxicSpikes'>(key: K) => ([x[key], y[key]] = [y[key], x[key]]);
+      const [first, second] = battle.sides;
+      const swap = <K extends 'hazards' | 'conds' | 'screens' | 'toxicSpikes'>(key: K) => ([first[key], second[key]] = [second[key], first[key]]);
       for (const key of ['hazards', 'conds', 'screens', 'toxicSpikes'] as const) swap(key);
-      emit(b, { t: 'courtChange' });
+      emit(battle, { t: 'courtChange' });
       return true;
     },
-    cureTeam: (f: F): boolean => {
+    cureTeam: (fighter: F): boolean => {
       let did = false;
-      for (const o of b.sides[sideOfF(f)].team) {
-        if (o.hp > 0 && o.status) {
-          if (o === activeOf(b, sideOfF(f))) cure(b, o);
+      for (const ally of battle.sides[sideOf(fighter)].team) {
+        if (ally.hp > 0 && ally.status) {
+          if (ally === activeOf(battle, sideOf(fighter))) cure(battle, ally);
           else {
-            o.status = null;
-            o.statusTurns = 0;
+            ally.status = null;
+            ally.statusTurns = 0;
           }
           did = true;
         }
       }
-      if (did) emit(b, { t: 'teamCured', side: sideOfF(f) });
-      return did || A.nothing(f);
+      if (did) emit(battle, { t: 'teamCured', side: sideOf(fighter) });
+      return did || api.nothing(fighter);
     },
-    switchOut: (f: F, pass: { boosts?: boolean; volatiles?: boolean; substitute?: number } | null = null): void => {
-      f.vol.switchNow = true;
+    switchOut: (fighter: F, pass: { boosts?: boolean; volatiles?: boolean; substitute?: number } | null = null): void => {
+      fighter.vol.switchNow = true;
       if (pass) {
         const kept: NonNullable<BattleSide['pass']> = {};
-        if (pass.boosts) kept.boosts = { ...f.boosts };
-        if (pass.volatiles) for (const k of ['confusion', 'focusEnergy', 'perish', 'leechSeed', 'curse', 'ingrain', 'aquaRing', 'magnetRise', 'substitute', 'trappedBy', 'gastroAcid']) if (f.vol[k]) kept[k] = f.vol[k];
+        if (pass.boosts) kept.boosts = { ...fighter.boosts };
+        if (pass.volatiles) for (const key of ['confusion', 'focusEnergy', 'perish', 'leechSeed', 'curse', 'ingrain', 'aquaRing', 'magnetRise', 'substitute', 'trappedBy', 'gastroAcid']) if (fighter.vol[key]) kept[key] = fighter.vol[key];
         if (pass.substitute) kept.substitute = pass.substitute;
-        b.sides[sideOfF(f)].pass = kept;
+        battle.sides[sideOf(fighter)].pass = kept;
       }
     },
-    sacrifice: (f: F, kind: string): boolean => {
-      if (!b.sides[sideOfF(f)].team.some((o) => o !== f && o.hp > 0)) return A.nothing(f, 'noBench');
-      b.sides[sideOfF(f)].healingWish = kind;
-      A.faint(f);
+    sacrifice: (fighter: F, kind: string): boolean => {
+      if (!battle.sides[sideOf(fighter)].team.some((o) => o !== fighter && o.hp > 0)) return api.nothing(fighter, 'noBench');
+      battle.sides[sideOf(fighter)].healingWish = kind;
+      api.faint(fighter);
       return true;
     },
-    revive: (f: F): boolean => {
-      const team = b.sides[sideOfF(f)].team;
+    revive: (fighter: F): boolean => {
+      const team = battle.sides[sideOf(fighter)].team;
       const down = team.map((o, i) => i).filter((i) => team[i].hp <= 0);
-      if (!down.length) return A.nothing(f, 'noFainted');
-      const i = down[Math.floor(b.random() * down.length)];
-      const o = team[i];
-      o.hp = Math.floor(o.stats.hp / 2);
-      o.fainted = false;
-      o.status = null;
-      emit(b, { t: 'revive', side: sideOfF(f), index: i, name: o.name, hp: o.hp, max: o.stats.hp });
+      if (!down.length) return api.nothing(fighter, 'noFainted');
+      const slot = down[Math.floor(battle.random() * down.length)];
+      const revived = team[slot];
+      revived.hp = Math.floor(revived.stats.hp / 2);
+      revived.fainted = false;
+      revived.status = null;
+      emit(battle, { t: 'revive', side: sideOf(fighter), index: slot, name: revived.name, hp: revived.hp, max: revived.stats.hp });
       return true;
     },
-    future: (f: F, move: BattleMove): boolean => {
-      const s = 1 - sideOfF(f);
-      if (b.sides[s].future) return A.nothing(f);
-      b.sides[s].future = { at: b.turn + 2, user: f, move: { ...move, flags: [...move.flags] }, name: move.name };
-      emit(b, { t: 'futureStart', side: sideOfF(f), name: nameOf(f), move: move.name });
+    future: (fighter: F, move: BattleMove): boolean => {
+      const sideIndex = 1 - sideOf(fighter);
+      if (battle.sides[sideIndex].future) return api.nothing(fighter);
+      battle.sides[sideIndex].future = { at: battle.turn + 2, user: fighter, move: { ...move, flags: [...move.flags] }, name: move.name };
+      emit(battle, { t: 'futureStart', side: sideOf(fighter), name: nameOf(fighter), move: move.name });
       return true;
     },
-    dropStockpile: (f: F): void => {
-      const pile = f.vol.stockpile;
+    dropStockpile: (fighter: F): void => {
+      const pile = fighter.vol.stockpile;
       if (!pile) return;
-      delete f.vol.stockpile;
-      boost(b, f, { def: -pile.def, sdef: -pile.sdef }, f);
-      emit(b, { t: 'volatileEnd', side: sideOfF(f), name: nameOf(f), kind: 'stockpile' });
+      delete fighter.vol.stockpile;
+      boost(battle, fighter, { def: -pile.def, sdef: -pile.sdef }, fighter);
+      emit(battle, { t: 'volatileEnd', side: sideOf(fighter), name: nameOf(fighter), kind: 'stockpile' });
     },
     copyMove: (me: F, foe: F, move: BattleMove, { permanent }: { permanent?: boolean }): boolean => {
       const last = foe.vol.lastMove && moveData(foe.vol.lastMove);
-      if (!last || !last.supported || me.moves.some((m) => m.key === last.key) || move.slot == null || (permanent ? last.flags.includes('nosketch') : last.flags.includes('failmimic'))) return A.nothing(me);
+      if (!last || !last.supported || me.moves.some((m) => m.key === last.key) || move.slot == null || (permanent ? last.flags.includes('nosketch') : last.flags.includes('failmimic'))) return api.nothing(me);
       if (!permanent) me.vol.mimic = { slot: move.slot, original: me.moves[move.slot] };
       me.moves = me.moves.map((m, i) => (i === move.slot ? last : m));
       me.pp[last.key] = permanent ? last.pp : Math.min(5, last.pp);
-      emit(b, { t: 'learned', side: sideOfF(me), name: nameOf(me), move: last.name });
+      emit(battle, { t: 'learned', side: sideOf(me), name: nameOf(me), move: last.name });
       return true;
     },
-    callMove: (f: F, key: string, opts?: { powerMult?: number; instructed?: boolean }) => runCalled(b, f, key, opts),
+    callMove: (fighter: F, key: string, opts?: { powerMult?: number; instructed?: boolean }) => runCalled(battle, fighter, key, opts),
     metronomePool: () => METRONOME_POOL(),
   };
-  return A;
+  return api;
 }
 
 let metronomePool: string[] | null = null;
 function METRONOME_POOL(): string[] {
   metronomePool ??= Object.keys(MOVE_RULES).concat(ALL_MOVE_IDS()).filter((id, i, all) => all.indexOf(id) === i).filter((id) => {
-    const m = moveData(id);
-    return m && m.supported && m.flags.includes('metronome') && !m.flags.includes('charge');
+    const move = moveData(id);
+    return move && move.supported && move.flags.includes('metronome') && !move.flags.includes('charge');
   });
   return metronomePool;
 }
 
-function showAbility(b: B, f: F, note: string | null = null, extra: Record<string, unknown> & { copied?: string; move?: string } = {}): void {
-  const info = abilityInfo(f.ability);
-  f.revealedAbilities.add(f.ability);
+function showAbility(battle: B, fighter: F, note: string | null = null, extra: Record<string, unknown> & { copied?: string; move?: string } = {}): void {
+  const info = abilityInfo(fighter.ability);
+  fighter.revealedAbilities.add(fighter.ability);
   if (extra.copied) {
-    const foe = foeOf(b, f);
+    const foe = foeOf(battle, fighter);
     if (foe && foe.ability === extra.copied) foe.revealedAbilities.add(extra.copied);
   }
   if (extra.move) {
-    const foe = foeOf(b, f);
+    const foe = foeOf(battle, fighter);
     const known = foe?.moves.find((m) => m.name === extra.move);
     if (known) foe!.revealedMoves.add(known.key);
   }
-  emit(b, { t: 'ability', side: sideIndex(b, f), name: nameOf(f), ability: info?.name ?? f.ability, info, ...(note ? { note } : {}), ...extra, ...(extra.copied ? { copied: abilityInfo(extra.copied)?.name } : {}) });
+  emit(battle, { t: 'ability', side: sideIndexOf(battle, fighter), name: nameOf(fighter), ability: info?.name ?? fighter.ability, info, ...(note ? { note } : {}), ...extra, ...(extra.copied ? { copied: abilityInfo(extra.copied)?.name } : {}) });
 }
 
-function setAbility(b: B, f: F, key: string | null): void {
-  f.ability = key;
-  f.revealedAbilities.add(key);
-  emit(b, { t: 'abilityChange', side: sideIndex(b, f), ability: abilityInfo(key) });
+function setAbility(battle: B, fighter: F, key: string | null): void {
+  fighter.ability = key;
+  fighter.revealedAbilities.add(key);
+  emit(battle, { t: 'abilityChange', side: sideIndexOf(battle, fighter), ability: abilityInfo(key) });
 }
 
 // ---------- stats, boosts and status ----------
 
-function boost(b: B, f: F, changes: Boosts, source: F | null = null, opts: BoostOptions = {}): Boosts {
-  if (f.hp <= 0) return {};
+function boost(battle: B, fighter: F, changes: Boosts, source: F | null = null, opts: BoostOptions = {}): Boosts {
+  if (fighter.hp <= 0) return {};
   const ch: BoostChanges = { ...changes } as BoostChanges;
-  if (source && source !== f && b.sides[sideIndex(b, f)].conds.mist) for (const k of Object.keys(ch)) if (ch[k] < 0) delete ch[k];
-  run(b, f, 'onTryBoost', ch, source, opts.effect);
-  run(b, f, 'onChangeBoost', ch);
+  if (source && source !== fighter && battle.sides[sideIndexOf(battle, fighter)].conds.mist) for (const key of Object.keys(ch)) if (ch[key] < 0) delete ch[key];
+  run(battle, fighter, 'onTryBoost', ch, source, opts.effect);
+  run(battle, fighter, 'onChangeBoost', ch);
   const applied: Boosts = {};
   for (const [stat, by] of Object.entries(ch) as [BoostKey, number][]) {
     if (!by) continue;
-    const cur = f.boosts[stat];
+    const cur = fighter.boosts[stat];
     const next = clamp(cur + by, -STAGE_LIMIT, by > 0 ? (opts.cap ?? STAGE_LIMIT) : STAGE_LIMIT);
     if (next !== cur) applied[stat] = next - cur;
   }
   const stats = Object.keys(applied) as BoostKey[];
-  if (stats.length && opts.ability) showAbility(b, opts.ability);
+  if (stats.length && opts.ability) showAbility(battle, opts.ability);
   for (const stat of stats) {
-    f.boosts[stat] += applied[stat] as number;
-    emit(b, { t: 'boost', side: sideIndex(b, f), stat, by: applied[stat], stage: f.boosts[stat] });
+    fighter.boosts[stat] += applied[stat] as number;
+    emit(battle, { t: 'boost', side: sideIndexOf(battle, fighter), stat, by: applied[stat], stage: fighter.boosts[stat] });
   }
-  if (source && source !== f && ((Object.values(applied) as number[]).some((v) => v < 0) || opts.effect === 'intimidate')) run(b, f, 'onAfterEachBoost', applied, source, opts.effect);
+  if (source && source !== fighter && ((Object.values(applied) as number[]).some((v) => v < 0) || opts.effect === 'intimidate')) run(battle, fighter, 'onAfterEachBoost', applied, source, opts.effect);
   const ups: Boosts = Object.fromEntries((Object.entries(applied) as [BoostKey, number][]).filter(([, v]) => v > 0));
-  const foe = foeOf(b, f);
-  if (foe && Object.keys(ups).length) run(b, foe, 'onFoeBoost', f, ups, opts.effect);
+  const foe = foeOf(battle, fighter);
+  if (foe && Object.keys(ups).length) run(battle, foe, 'onFoeBoost', fighter, ups, opts.effect);
   return applied;
 }
 
-function grounded(b: B, f: F): boolean {
-  if (f.vol.smackedDown || f.vol.ingrain || b.field.rooms.gravity) return true;
-  if (f.vol.magnetRise || f.vol.telekinesis) return false;
-  return !f.types.includes('flying') && !flag(b, f, 'levitates');
+function grounded(battle: B, fighter: F): boolean {
+  if (fighter.vol.smackedDown || fighter.vol.ingrain || battle.field.rooms.gravity) return true;
+  if (fighter.vol.magnetRise || fighter.vol.telekinesis) return false;
+  return !fighter.types.includes('flying') && !flag(battle, fighter, 'levitates');
 }
 
-function weather(b: B): string | null {
-  if (anyActiveHas(b, 'cloud-nine') || anyActiveHas(b, 'air-lock')) return null;
-  return b.field.weather;
+function currentWeather(battle: B): string | null {
+  if (anyActiveHas(battle, 'cloud-nine') || anyActiveHas(battle, 'air-lock')) return null;
+  return battle.field.weather;
 }
 
-function weatherFor(b: B, f: F): string | null {
-  const w = weather(b);
-  return !w && flag(b, f, 'actsInSun') ? 'harshsun' : w;
+function weatherFor(battle: B, fighter: F): string | null {
+  const weather = currentWeather(battle);
+  return !weather && flag(battle, fighter, 'actsInSun') ? 'harshsun' : weather;
 }
 
-function statusImmune(b: B, f: F, status: string, source: F | null): boolean {
-  if (status === 'brn' && f.types.includes('fire')) return true;
-  if (status === 'par' && f.types.includes('electric')) return true;
-  if (status === 'frz' && (f.types.includes('ice') || isSun(weather(b)))) return true;
-  if (poisoned(status) && (f.types.includes('poison') || f.types.includes('steel')) && !(source && flag(b, source, 'corrosion'))) return true;
-  if (grounded(b, f) && b.field.terrain === 'misty') return true;
-  if (status === 'slp' && grounded(b, f) && b.field.terrain === 'electric') return true;
+function statusImmune(battle: B, fighter: F, status: string, source: F | null): boolean {
+  if (status === 'brn' && fighter.types.includes('fire')) return true;
+  if (status === 'par' && fighter.types.includes('electric')) return true;
+  if (status === 'frz' && (fighter.types.includes('ice') || isSun(currentWeather(battle)))) return true;
+  if (poisoned(status) && (fighter.types.includes('poison') || fighter.types.includes('steel')) && !(source && flag(battle, source, 'corrosion'))) return true;
+  if (grounded(battle, fighter) && battle.field.terrain === 'misty') return true;
+  if (status === 'slp' && grounded(battle, fighter) && battle.field.terrain === 'electric') return true;
   return false;
 }
 
-function setStatus(b: B, f: F, status: string, source: F | null = null, opts: { ability?: F } = {}): boolean {
-  if (f.hp <= 0 || f.status || !MAJOR.has(status)) return false;
-  if (statusImmune(b, f, status, source)) return false;
-  if (source && source !== f && b.sides[sideIndex(b, f)].conds.safeguard) return false;
-  if (status === 'slp' && activeFighters(b).some((o) => o.vol.uproar)) return false;
-  if (run(b, f, 'onSetStatus', status, source) === false) return false;
-  if (opts.ability) showAbility(b, opts.ability);
-  f.status = status;
-  f.statusTurns = status === 'slp' ? 1 + Math.floor(b.random() * 3) : 0;
-  emit(b, { t: 'status', side: sideIndex(b, f), name: nameOf(f), status });
-  run(b, f, 'onAfterSetStatus', status, source);
-  if (source && source !== f) run(b, source, 'onInflictStatus', f, status);
+function setStatus(battle: B, fighter: F, status: string, source: F | null = null, opts: { ability?: F } = {}): boolean {
+  if (fighter.hp <= 0 || fighter.status || !MAJOR.has(status)) return false;
+  if (statusImmune(battle, fighter, status, source)) return false;
+  if (source && source !== fighter && battle.sides[sideIndexOf(battle, fighter)].conds.safeguard) return false;
+  if (status === 'slp' && activeFighters(battle).some((o) => o.vol.uproar)) return false;
+  if (run(battle, fighter, 'onSetStatus', status, source) === false) return false;
+  if (opts.ability) showAbility(battle, opts.ability);
+  fighter.status = status;
+  fighter.statusTurns = status === 'slp' ? 1 + Math.floor(battle.random() * 3) : 0;
+  emit(battle, { t: 'status', side: sideIndexOf(battle, fighter), name: nameOf(fighter), status });
+  run(battle, fighter, 'onAfterSetStatus', status, source);
+  if (source && source !== fighter) run(battle, source, 'onInflictStatus', fighter, status);
   return true;
 }
 
-function cure(b: B, f: F, announce = true): void {
-  if (!f.status) return;
-  const status = f.status;
-  f.status = null;
-  f.statusTurns = 0;
-  if (announce) emit(b, { t: 'cure', side: sideIndex(b, f), name: nameOf(f), status });
+function cure(battle: B, fighter: F, announce = true): void {
+  if (!fighter.status) return;
+  const status = fighter.status;
+  fighter.status = null;
+  fighter.statusTurns = 0;
+  if (announce) emit(battle, { t: 'cure', side: sideIndexOf(battle, fighter), name: nameOf(fighter), status });
 }
 
-function addVolatile(b: B, f: F, kind: string, source: F | null = null, opts: { ability?: F; move?: { key: string; name: string } } = {}): boolean {
-  if (f.hp <= 0) return false;
-  if (kind === 'confusion' && (f.vol.confusion || (grounded(b, f) && b.field.terrain === 'misty'))) return false;
-  if (kind === 'attract' && (f.vol.attract || !f.gender || !source?.gender || f.gender === source.gender)) return false;
-  if (kind === 'disable' && (f.vol.disabled || !opts.move?.key)) return false;
-  if (kind === 'perish' && f.vol.perish) return false;
-  if (kind === 'leechseed' && (f.vol.leechSeed || f.types.includes('grass'))) return false;
-  if (run(b, f, 'onSetStatus', kind, source) === false) return false;
-  if (opts.ability) showAbility(b, opts.ability);
-  const side = sideIndex(b, f);
-  if (kind === 'flinch') f.vol.flinch = true;
-  else if (kind === 'confusion') f.vol.confusion = 2 + Math.floor(b.random() * 4);
-  else if (kind === 'attract') f.vol.attract = source;
-  else if (kind === 'disable') f.vol.disabled = { key: opts.move!.key, name: opts.move!.name, turns: 4 };
-  else if (kind === 'perish') f.vol.perish = 4;
-  else if (kind === 'charge') f.vol.charge = true;
-  else if (kind === 'leechseed') f.vol.leechSeed = true;
-  if (kind !== 'flinch') emit(b, { t: 'volatile', side, name: nameOf(f), kind, ...(kind === 'disable' ? { move: opts.move!.name } : {}) });
+function addVolatile(battle: B, fighter: F, kind: string, source: F | null = null, opts: { ability?: F; move?: { key: string; name: string } } = {}): boolean {
+  if (fighter.hp <= 0) return false;
+  if (kind === 'confusion' && (fighter.vol.confusion || (grounded(battle, fighter) && battle.field.terrain === 'misty'))) return false;
+  if (kind === 'attract' && (fighter.vol.attract || !fighter.gender || !source?.gender || fighter.gender === source.gender)) return false;
+  if (kind === 'disable' && (fighter.vol.disabled || !opts.move?.key)) return false;
+  if (kind === 'perish' && fighter.vol.perish) return false;
+  if (kind === 'leechseed' && (fighter.vol.leechSeed || fighter.types.includes('grass'))) return false;
+  if (run(battle, fighter, 'onSetStatus', kind, source) === false) return false;
+  if (opts.ability) showAbility(battle, opts.ability);
+  const sideIndex = sideIndexOf(battle, fighter);
+  if (kind === 'flinch') fighter.vol.flinch = true;
+  else if (kind === 'confusion') fighter.vol.confusion = 2 + Math.floor(battle.random() * 4);
+  else if (kind === 'attract') fighter.vol.attract = source;
+  else if (kind === 'disable') fighter.vol.disabled = { key: opts.move!.key, name: opts.move!.name, turns: 4 };
+  else if (kind === 'perish') fighter.vol.perish = 4;
+  else if (kind === 'charge') fighter.vol.charge = true;
+  else if (kind === 'leechseed') fighter.vol.leechSeed = true;
+  if (kind !== 'flinch') emit(battle, { t: 'volatile', side: sideIndex, name: nameOf(fighter), kind, ...(kind === 'disable' ? { move: opts.move!.name } : {}) });
   return true;
 }
 
-function hurt(b: B, f: F, amount: number, cause?: string | null): number {
-  if (f.hp <= 0) return 0;
-  if (cause !== 'confusion' && flag(b, f, 'noIndirectDamage')) return 0;
-  const dealt = Math.min(f.hp, Math.max(1, Math.floor(amount)));
-  f.hp -= dealt;
-  emit(b, { t: 'hurt', side: sideIndex(b, f), amount: dealt, hp: f.hp, max: f.stats.hp, cause });
+function hurt(battle: B, fighter: F, amount: number, cause?: string | null): number {
+  if (fighter.hp <= 0) return 0;
+  if (cause !== 'confusion' && flag(battle, fighter, 'noIndirectDamage')) return 0;
+  const dealt = Math.min(fighter.hp, Math.max(1, Math.floor(amount)));
+  fighter.hp -= dealt;
+  emit(battle, { t: 'hurt', side: sideIndexOf(battle, fighter), amount: dealt, hp: fighter.hp, max: fighter.stats.hp, cause });
   return dealt;
 }
 
-function heal(b: B, f: F, amount: number, opts: { silent?: boolean } = {}): number {
-  if (f.hp <= 0 || f.hp >= f.stats.hp || f.vol.healBlock) return 0;
-  const healed = Math.min(f.stats.hp - f.hp, Math.max(1, Math.floor(amount)));
-  f.hp += healed;
-  emit(b, { t: 'heal', side: sideIndex(b, f), amount: healed, hp: f.hp, max: f.stats.hp, ...(opts.silent ? { quiet: true } : {}) });
+function heal(battle: B, fighter: F, amount: number, opts: { silent?: boolean } = {}): number {
+  if (fighter.hp <= 0 || fighter.hp >= fighter.stats.hp || fighter.vol.healBlock) return 0;
+  const healed = Math.min(fighter.stats.hp - fighter.hp, Math.max(1, Math.floor(amount)));
+  fighter.hp += healed;
+  emit(battle, { t: 'heal', side: sideIndexOf(battle, fighter), amount: healed, hp: fighter.hp, max: fighter.stats.hp, ...(opts.silent ? { quiet: true } : {}) });
   return healed;
 }
 
-function setTypes(b: B, f: F, types: readonly string[]): void {
-  f.types = [...types];
-  emit(b, { t: 'types', side: sideIndex(b, f), types: f.types });
+function setTypes(battle: B, fighter: F, types: readonly string[]): void {
+  fighter.types = [...types];
+  emit(battle, { t: 'types', side: sideIndexOf(battle, fighter), types: fighter.types });
 }
 
-function setWeather(b: B, w: string, source: F | null): boolean {
-  const cur = b.field.weather;
-  if (cur === w) return false;
-  if (PRIMAL.has(cur) && !PRIMAL.has(w)) return false;
-  if (source) showAbility(b, source);
-  b.field.weather = w;
-  b.field.weatherTurns = PRIMAL.has(w) ? Infinity : FIELD_TURNS;
-  b.field.weatherSetter = PRIMAL.has(w) ? source : null;
-  emit(b, { t: 'weather', weather: w });
-  for (const f of activeFighters(b)) run(b, f, 'onWeatherChange');
+function setWeather(battle: B, weather: string, source: F | null): boolean {
+  const cur = battle.field.weather;
+  if (cur === weather) return false;
+  if (PRIMAL.has(cur) && !PRIMAL.has(weather)) return false;
+  if (source) showAbility(battle, source);
+  battle.field.weather = weather;
+  battle.field.weatherTurns = PRIMAL.has(weather) ? Infinity : FIELD_TURNS;
+  battle.field.weatherSetter = PRIMAL.has(weather) ? source : null;
+  emit(battle, { t: 'weather', weather });
+  for (const fighter of activeFighters(battle)) run(battle, fighter, 'onWeatherChange');
   return true;
 }
 
-function clearWeather(b: B): void {
-  const w = b.field.weather;
-  if (!w) return;
-  b.field.weather = null;
-  b.field.weatherTurns = 0;
-  b.field.weatherSetter = null;
-  emit(b, { t: 'weatherEnd', weather: w });
-  for (const f of activeFighters(b)) run(b, f, 'onWeatherChange');
+function clearWeather(battle: B): void {
+  const weather = battle.field.weather;
+  if (!weather) return;
+  battle.field.weather = null;
+  battle.field.weatherTurns = 0;
+  battle.field.weatherSetter = null;
+  emit(battle, { t: 'weatherEnd', weather });
+  for (const fighter of activeFighters(battle)) run(battle, fighter, 'onWeatherChange');
 }
 
-function setTerrain(b: B, t: string, source: F | null): boolean {
-  if (b.field.terrain === t) return false;
-  if (source) showAbility(b, source);
-  b.field.terrain = t;
-  b.field.terrainTurns = FIELD_TURNS;
-  emit(b, { t: 'terrain', terrain: t });
-  for (const f of activeFighters(b)) run(b, f, 'onTerrainChange');
+function setTerrain(battle: B, terrain: string, source: F | null): boolean {
+  if (battle.field.terrain === terrain) return false;
+  if (source) showAbility(battle, source);
+  battle.field.terrain = terrain;
+  battle.field.terrainTurns = FIELD_TURNS;
+  emit(battle, { t: 'terrain', terrain });
+  for (const fighter of activeFighters(battle)) run(battle, fighter, 'onTerrainChange');
   return true;
 }
 
-function clearTerrain(b: B): void {
-  const t = b.field.terrain;
-  if (!t) return;
-  b.field.terrain = null;
-  b.field.terrainTurns = 0;
-  emit(b, { t: 'terrainEnd', terrain: t });
-  for (const f of activeFighters(b)) run(b, f, 'onTerrainChange');
+function clearTerrain(battle: B): void {
+  const terrain = battle.field.terrain;
+  if (!terrain) return;
+  battle.field.terrain = null;
+  battle.field.terrainTurns = 0;
+  emit(battle, { t: 'terrainEnd', terrain });
+  for (const fighter of activeFighters(battle)) run(battle, fighter, 'onTerrainChange');
 }
 
-function setScreen(b: B, s: number, kind: string): boolean {
-  const side = b.sides[s];
+function setScreen(battle: B, sideIndex: number, kind: string): boolean {
+  const side = battle.sides[sideIndex];
   if (side.screens[kind]) return false;
-  if (kind === 'auroraveil' && !VEIL_WEATHER.has(weather(b))) return false;
+  if (kind === 'auroraveil' && !VEIL_WEATHER.has(currentWeather(battle))) return false;
   side.screens[kind] = FIELD_TURNS;
-  emit(b, { t: 'screen', side: s, screen: kind, turns: FIELD_TURNS });
+  emit(battle, { t: 'screen', side: sideIndex, screen: kind, turns: FIELD_TURNS });
   return true;
 }
 
-function clearScreens(b: B, s: number, cause: string): boolean {
-  const side = b.sides[s];
+function clearScreens(battle: B, sideIndex: number, cause: string): boolean {
+  const side = battle.sides[sideIndex];
   const kinds = SCREEN_KINDS.filter((k) => side.screens[k]);
   for (const kind of kinds) {
     delete side.screens[kind];
-    emit(b, { t: 'screenEnd', side: s, screen: kind, cause });
+    emit(battle, { t: 'screenEnd', side: sideIndex, screen: kind, cause });
   }
   return kinds.length > 0;
 }
 
-function clearHazards(b: B, s: number): boolean {
-  const side = b.sides[s];
-  let did = clearToxicSpikes(b, s);
+function clearHazards(battle: B, sideIndex: number): boolean {
+  const side = battle.sides[sideIndex];
+  let did = clearToxicSpikes(battle, sideIndex);
   for (const kind of ['spikes', 'stealthrock', 'stickyweb']) {
     const hazards = side.hazards as unknown as Record<string, number | boolean>;
     if (!hazards[kind]) continue;
     hazards[kind] = kind === 'spikes' ? 0 : false;
-    emit(b, { t: 'sideEnd', side: s, kind });
+    emit(battle, { t: 'sideEnd', side: sideIndex, kind });
     did = true;
   }
   return did;
 }
 
-function bypassesSub(b: B, me: F, move: AnyMove): boolean {
-  return move.flags.includes('sound') || move.flags.includes('bypasssub') || flag(b, me, 'infiltrates');
+function bypassesSub(battle: B, me: F, move: AnyMove): boolean {
+  return move.flags.includes('sound') || move.flags.includes('bypasssub') || flag(battle, me, 'infiltrates');
 }
 
-function blockedByProtection(b: B, me: F, target: F | null, move: BattleMove): boolean {
+function blockedByProtection(battle: B, me: F, target: F | null, move: BattleMove): boolean {
   if (!target || target === me) return false;
-  const s = sideIndex(b, target);
-  const conds = b.sides[s].conds;
-  const prot = target.vol.protect?.turn === b.turn ? target.vol.protect.kind : null;
+  const sideIndex = sideIndexOf(battle, target);
+  const conds = battle.sides[sideIndex].conds;
+  const prot = target.vol.protect?.turn === battle.turn ? target.vol.protect.kind : null;
   const status = move.kind === 'status';
   const shielded = prot && move.flags.includes('protect') && !(status && ['kings-shield', 'obstruct', 'silk-trap'].includes(prot));
   const guarded =
-    (conds.quickguard === b.turn && move.effectivePriority > 0 && move.flags.includes('protect')) ||
-    (conds.wideguard === b.turn && move.spread) ||
-    (conds.craftyshield === b.turn && status) ||
-    (conds.matblock === b.turn && !status && move.flags.includes('protect'));
+    (conds.quickguard === battle.turn && move.effectivePriority > 0 && move.flags.includes('protect')) ||
+    (conds.wideguard === battle.turn && move.spread) ||
+    (conds.craftyshield === battle.turn && status) ||
+    (conds.matblock === battle.turn && !status && move.flags.includes('protect'));
   if (!shielded && !guarded) return false;
   if (move.breaksProtect) {
     delete target.vol.protect;
-    for (const k of ['quickguard', 'wideguard', 'craftyshield', 'matblock']) delete conds[k];
-    emit(b, { t: 'protectBroken', side: s, name: nameOf(target) });
+    for (const key of ['quickguard', 'wideguard', 'craftyshield', 'matblock']) delete conds[key];
+    emit(battle, { t: 'protectBroken', side: sideIndex, name: nameOf(target) });
     return false;
   }
-  emit(b, { t: 'protected', side: s, name: nameOf(target) });
+  emit(battle, { t: 'protected', side: sideIndex, name: nameOf(target) });
   if (shielded && move.flags.includes('contact') && me.hp > 0) {
-    if (prot === 'spiky-shield') hurt(b, me, me.stats.hp / 8, 'spikyshield');
-    if (prot === 'kings-shield') boost(b, me, { atk: -1 }, target);
-    if (prot === 'obstruct') boost(b, me, { def: -2 }, target);
-    if (prot === 'silk-trap') boost(b, me, { spd: -1 }, target);
-    if (prot === 'baneful-bunker') setStatus(b, me, 'psn', target);
-    if (prot === 'burning-bulwark') setStatus(b, me, 'brn', target);
+    if (prot === 'spiky-shield') hurt(battle, me, me.stats.hp / 8, 'spikyshield');
+    if (prot === 'kings-shield') boost(battle, me, { atk: -1 }, target);
+    if (prot === 'obstruct') boost(battle, me, { def: -2 }, target);
+    if (prot === 'silk-trap') boost(battle, me, { spd: -1 }, target);
+    if (prot === 'baneful-bunker') setStatus(battle, me, 'psn', target);
+    if (prot === 'burning-bulwark') setStatus(battle, me, 'brn', target);
   }
-  if (move.crashes && me.hp > 0) hurt(b, me, me.stats.hp / 2, 'crash');
+  if (move.crashes && me.hp > 0) hurt(battle, me, me.stats.hp / 2, 'crash');
   return true;
 }
 
-function clearToxicSpikes(b: B, s: number): boolean {
-  if (!b.sides[s].toxicSpikes) return false;
-  b.sides[s].toxicSpikes = 0;
-  emit(b, { t: 'hazardEnd', side: s });
+function clearToxicSpikes(battle: B, sideIndex: number): boolean {
+  if (!battle.sides[sideIndex].toxicSpikes) return false;
+  battle.sides[sideIndex].toxicSpikes = 0;
+  emit(battle, { t: 'hazardEnd', side: sideIndex });
   return true;
 }
 
-function screened(b: B, me: F, target: F, move: AnyMove): boolean {
-  if (flag(b, me, 'infiltrates')) return false;
-  const screens = b.sides[sideIndex(b, target)].screens;
+function screened(battle: B, me: F, target: F, move: AnyMove): boolean {
+  if (flag(battle, me, 'infiltrates')) return false;
+  const screens = battle.sides[sideIndexOf(battle, target)].screens;
   if (screens.auroraveil) return true;
   return move.category === 'physical' ? !!screens.reflect : !!screens.lightscreen;
 }
 
-function addToxicSpikes(b: B, f: F): boolean {
-  const side = b.sides[sideIndex(b, f)];
+function addToxicSpikes(battle: B, fighter: F): boolean {
+  const side = battle.sides[sideIndexOf(battle, fighter)];
   if (side.toxicSpikes >= 2) return false;
   side.toxicSpikes += 1;
-  emit(b, { t: 'hazard', side: sideIndex(b, f), layers: side.toxicSpikes });
+  emit(battle, { t: 'hazard', side: sideIndexOf(battle, fighter), layers: side.toxicSpikes });
   return true;
 }
 
-function lookOf(f: F): Look {
-  return { name: f.name, speciesName: f.speciesName, sprite: f.sprite, floats: f.floats, types: f.types, shiny: f.shiny, rarity: f.rarity };
+function lookOf(fighter: F): Look {
+  return { name: fighter.name, speciesName: fighter.speciesName, sprite: fighter.sprite, floats: fighter.floats, types: fighter.types, shiny: fighter.shiny, rarity: fighter.rarity };
 }
 
-function transform(b: B, f: F, into: F): void {
-  f.vol.transformed = { types: f.types, stats: f.stats, moves: f.moves, sprite: f.sprite, floats: f.floats, pp: f.pp };
-  f.types = [...into.types];
-  f.stats = { ...into.stats, hp: f.stats.hp };
-  f.moves = into.moves.map((m) => ({ ...m, flags: [...m.flags] }));
-  f.pp = Object.fromEntries(f.moves.map((m) => [m.key, 5]));
-  f.sprite = into.sprite;
-  f.floats = into.floats;
-  f.boosts = { ...into.boosts };
-  f.ability = into.ability;
-  emit(b, { t: 'transform', side: sideIndex(b, f), into: nameOf(into), sprite: f.sprite, floats: f.floats, types: f.types, stats: f.stats, moves: publicMoves(f), boosts: f.boosts });
+function transform(battle: B, fighter: F, into: F): void {
+  fighter.vol.transformed = { types: fighter.types, stats: fighter.stats, moves: fighter.moves, sprite: fighter.sprite, floats: fighter.floats, pp: fighter.pp };
+  fighter.types = [...into.types];
+  fighter.stats = { ...into.stats, hp: fighter.stats.hp };
+  fighter.moves = into.moves.map((m) => ({ ...m, flags: [...m.flags] }));
+  fighter.pp = Object.fromEntries(fighter.moves.map((m) => [m.key, 5]));
+  fighter.sprite = into.sprite;
+  fighter.floats = into.floats;
+  fighter.boosts = { ...into.boosts };
+  fighter.ability = into.ability;
+  emit(battle, { t: 'transform', side: sideIndexOf(battle, fighter), into: nameOf(into), sprite: fighter.sprite, floats: fighter.floats, types: fighter.types, stats: fighter.stats, moves: publicMoves(fighter), boosts: fighter.boosts });
 }
 
-function changeForm(b: B, f: F, form: string | null, { permanent = false }: { permanent?: boolean } = {}): void {
+function changeForm(battle: B, fighter: F, form: string | null, { permanent = false }: { permanent?: boolean } = {}): void {
   const data = form ? formData(form) : null;
   if (form && !data) return;
-  const stats = data ? statsFor(data.base, f.ivs, f.level) : { ...f.speciesStats };
-  const gained = stats.hp - f.stats.hp;
-  f.stats = stats;
-  f.hp = f.hp > 0 ? clamp(f.hp + gained, 1, stats.hp) : 0;
-  f.types = data ? [...data.types] : [...f.speciesTypes];
-  f.sprite = data ? data.sprite : String(f.speciesId);
-  f.form = form;
+  const stats = data ? statsFor(data.base, fighter.ivs, fighter.level) : { ...fighter.speciesStats };
+  const gained = stats.hp - fighter.stats.hp;
+  fighter.stats = stats;
+  fighter.hp = fighter.hp > 0 ? clamp(fighter.hp + gained, 1, stats.hp) : 0;
+  fighter.types = data ? [...data.types] : [...fighter.speciesTypes];
+  fighter.sprite = data ? data.sprite : String(fighter.speciesId);
+  fighter.form = form;
   if (permanent) {
-    f.baseStats = { ...stats };
-    f.baseTypes = [...f.types];
-    f.baseSprite = f.sprite;
-    f.permanentForm = form;
+    fighter.baseStats = { ...stats };
+    fighter.baseTypes = [...fighter.types];
+    fighter.baseSprite = fighter.sprite;
+    fighter.permanentForm = form;
   }
-  emit(b, { t: 'form', side: sideIndex(b, f), form, stats, types: f.types, sprite: f.sprite, hp: f.hp, max: stats.hp });
+  emit(battle, { t: 'form', side: sideIndexOf(battle, fighter), form, stats, types: fighter.types, sprite: fighter.sprite, hp: fighter.hp, max: stats.hp });
 }
 
-function breakIllusion(b: B, f: F): boolean {
-  if (!f.vol.illusion) return false;
-  delete f.vol.illusion;
-  f.seenAs = null;
+function breakIllusion(battle: B, fighter: F): boolean {
+  if (!fighter.vol.illusion) return false;
+  delete fighter.vol.illusion;
+  fighter.seenAs = null;
   return true;
 }
 
-function typeEffectiveness(b: B, move: AnyMove, attacker: F, target: F): number {
+function typeEffectiveness(battle: B, move: AnyMove, attacker: F, target: F): number {
   if (!move.type) return 1;
   let eff = 1;
   for (const type of target.types) {
-    let e = effectiveness(move.type, [type]);
-    if (move.extraType) e *= effectiveness(move.extraType, [type]);
-    if (e === 0 && type === 'flying' && move.type === 'ground' && (move.hitsAirborne || target.vol.smackedDown || target.vol.ingrain || b.field.rooms.gravity)) e = 1;
-    if (e === 0 && type === 'ghost' && (move.type === 'normal' || move.type === 'fighting') && target.vol.foresight) e = 1;
-    if (e === 0 && type === 'dark' && move.type === 'psychic' && target.vol.miracleEye) e = 1;
-    if (e === 0 && type === 'ghost' && (move.type === 'normal' || move.type === 'fighting') && flag(b, attacker, 'hitsGhost')) e = 1;
-    if (e > 1 && type === 'flying' && weather(b) === 'winds') e = 1;
-    eff *= e;
+    let multiplier = effectiveness(move.type, [type]);
+    if (move.extraType) multiplier *= effectiveness(move.extraType, [type]);
+    if (multiplier === 0 && type === 'flying' && move.type === 'ground' && (move.hitsAirborne || target.vol.smackedDown || target.vol.ingrain || battle.field.rooms.gravity)) multiplier = 1;
+    if (multiplier === 0 && type === 'ghost' && (move.type === 'normal' || move.type === 'fighting') && target.vol.foresight) multiplier = 1;
+    if (multiplier === 0 && type === 'dark' && move.type === 'psychic' && target.vol.miracleEye) multiplier = 1;
+    if (multiplier === 0 && type === 'ghost' && (move.type === 'normal' || move.type === 'fighting') && flag(battle, attacker, 'hitsGhost')) multiplier = 1;
+    if (multiplier > 1 && type === 'flying' && currentWeather(battle) === 'winds') multiplier = 1;
+    eff *= multiplier;
   }
   return eff;
 }
 
-function speedOf(b: B, f: F): number {
-  let spd = f.stats.spd * stageMult(f.boosts.spd);
-  if (b.sides[sideIndex(b, f)]?.conds.tailwind) spd *= 2;
-  spd = chain(b, f, 'onSpeed', spd);
-  if (f.status === 'par' && !flag(b, f, 'ignoresParalysisSpeed')) spd *= 0.5;
+function speedOf(battle: B, fighter: F): number {
+  let spd = fighter.stats.spd * stageMult(fighter.boosts.spd);
+  if (battle.sides[sideIndexOf(battle, fighter)]?.conds.tailwind) spd *= 2;
+  spd = chain(battle, fighter, 'onSpeed', spd);
+  if (fighter.status === 'par' && !flag(battle, fighter, 'ignoresParalysisSpeed')) spd *= 0.5;
   return spd;
 }
 
 // ---------- switching ----------
 
-function prepareEntry(b: B, s: number): void {
-  const f = activeOf(b, s);
-  f.vol = { enteredTurn: b.turn };
-  f.activeTurns = 0;
-  if (flag(b, f, 'disguisesOnEntry')) {
-    const mate = [...b.sides[s].team].reverse().find((o) => o !== f && o.hp > 0);
-    if (mate) f.vol.illusion = lookOf(mate);
+function prepareEntry(battle: B, sideIndex: number): void {
+  const fighter = activeOf(battle, sideIndex);
+  fighter.vol = { enteredTurn: battle.turn };
+  fighter.activeTurns = 0;
+  if (flag(battle, fighter, 'disguisesOnEntry')) {
+    const mate = [...battle.sides[sideIndex].team].reverse().find((o) => o !== fighter && o.hp > 0);
+    if (mate) fighter.vol.illusion = lookOf(mate);
   }
-  f.seen = true;
-  f.seenAs = f.vol.illusion ?? null;
+  fighter.seen = true;
+  fighter.seenAs = fighter.vol.illusion ?? null;
 }
 
-function runEntry(b: B, s: number): void {
-  const f = activeOf(b, s);
-  if (f.hp <= 0) return;
-  const side = b.sides[s];
+function runEntry(battle: B, sideIndex: number): void {
+  const fighter = activeOf(battle, sideIndex);
+  if (fighter.hp <= 0) return;
+  const side = battle.sides[sideIndex];
   if (side.healingWish) {
     const kind = side.healingWish;
     delete side.healingWish;
-    if (f.hp < f.stats.hp || f.status) {
-      emit(b, { t: 'healingWish', side: s, name: nameOf(f), kind });
-      heal(b, f, f.stats.hp);
-      cure(b, f);
-      if (kind === 'lunardance') f.pp = Object.fromEntries(f.moves.map((m) => [m.key, m.pp]));
+    if (fighter.hp < fighter.stats.hp || fighter.status) {
+      emit(battle, { t: 'healingWish', side: sideIndex, name: nameOf(fighter), kind });
+      heal(battle, fighter, fighter.stats.hp);
+      cure(battle, fighter);
+      if (kind === 'lunardance') fighter.pp = Object.fromEntries(fighter.moves.map((m) => [m.key, m.pp]));
     }
   }
   const hz = side.hazards;
-  if (hz.stealthrock && !flag(b, f, 'noIndirectDamage')) hurt(b, f, (f.stats.hp * effectiveness('rock', f.types)) / 8, 'stealthrock');
-  if (hz.spikes && grounded(b, f) && f.hp > 0) hurt(b, f, f.stats.hp / [8, 6, 4][hz.spikes - 1], 'spikes');
-  if (hz.stickyweb && grounded(b, f) && f.hp > 0) {
-    emit(b, { t: 'stickyWeb', side: s, name: nameOf(f) });
-    boost(b, f, { spd: -1 }, null);
+  if (hz.stealthrock && !flag(battle, fighter, 'noIndirectDamage')) hurt(battle, fighter, (fighter.stats.hp * effectiveness('rock', fighter.types)) / 8, 'stealthrock');
+  if (hz.spikes && grounded(battle, fighter) && fighter.hp > 0) hurt(battle, fighter, fighter.stats.hp / [8, 6, 4][hz.spikes - 1], 'spikes');
+  if (hz.stickyweb && grounded(battle, fighter) && fighter.hp > 0) {
+    emit(battle, { t: 'stickyWeb', side: sideIndex, name: nameOf(fighter) });
+    boost(battle, fighter, { spd: -1 }, null);
   }
-  if (f.hp <= 0) return;
-  if (side.toxicSpikes && grounded(b, f)) {
-    if (f.types.includes('poison')) {
+  if (fighter.hp <= 0) return;
+  if (side.toxicSpikes && grounded(battle, fighter)) {
+    if (fighter.types.includes('poison')) {
       side.toxicSpikes = 0;
-      emit(b, { t: 'hazardEnd', side: s });
-    } else setStatus(b, f, side.toxicSpikes >= 2 ? 'tox' : 'psn', null);
+      emit(battle, { t: 'hazardEnd', side: sideIndex });
+    } else setStatus(battle, fighter, side.toxicSpikes >= 2 ? 'tox' : 'psn', null);
   }
-  run(b, f, 'onStart');
+  run(battle, fighter, 'onStart');
 }
 
-function leave(b: B, f: F): boolean {
-  const hadGas = f.ability === 'neutralizing-gas';
-  if (f.hp > 0) run(b, f, 'onSwitchOut');
-  if (f.vol.mimic) f.moves = f.moves.map((m, i) => (i === f.vol.mimic.slot ? f.vol.mimic.original : m));
-  if (f.vol.powerTrick) f.stats = { ...f.stats, atk: f.stats.def, def: f.stats.atk };
-  if (f.vol.transformed) Object.assign(f, f.vol.transformed);
-  f.boosts = freshBoosts();
-  f.vol = {};
-  f.types = [...f.baseTypes];
-  f.ability = f.baseAbility;
-  if (f.form !== (f.permanentForm ?? null)) {
-    const max = f.stats.hp;
-    f.stats = { ...f.baseStats };
-    f.sprite = f.baseSprite;
-    if (f.hp > 0) f.hp = clamp(f.hp + f.stats.hp - max, 1, f.stats.hp);
-    f.form = f.permanentForm ?? null;
+function leave(battle: B, fighter: F): boolean {
+  const hadGas = fighter.ability === 'neutralizing-gas';
+  if (fighter.hp > 0) run(battle, fighter, 'onSwitchOut');
+  if (fighter.vol.mimic) fighter.moves = fighter.moves.map((m, i) => (i === fighter.vol.mimic.slot ? fighter.vol.mimic.original : m));
+  if (fighter.vol.powerTrick) fighter.stats = { ...fighter.stats, atk: fighter.stats.def, def: fighter.stats.atk };
+  if (fighter.vol.transformed) Object.assign(fighter, fighter.vol.transformed);
+  fighter.boosts = freshBoosts();
+  fighter.vol = {};
+  fighter.types = [...fighter.baseTypes];
+  fighter.ability = fighter.baseAbility;
+  if (fighter.form !== (fighter.permanentForm ?? null)) {
+    const max = fighter.stats.hp;
+    fighter.stats = { ...fighter.baseStats };
+    fighter.sprite = fighter.baseSprite;
+    if (fighter.hp > 0) fighter.hp = clamp(fighter.hp + fighter.stats.hp - max, 1, fighter.stats.hp);
+    fighter.form = fighter.permanentForm ?? null;
   }
-  if (b.field.weatherSetter === f) clearWeather(b);
+  if (battle.field.weatherSetter === fighter) clearWeather(battle);
   return hadGas;
 }
 
-function doSwitch(b: B, s: number, to: number): boolean {
-  const side = b.sides[s];
-  const old = activeOf(b, s);
+function doSwitch(battle: B, sideIndex: number, to: number): boolean {
+  const side = battle.sides[sideIndex];
+  const old = activeOf(battle, sideIndex);
   const pass = old.hp > 0 ? side.pass : null;
   delete side.pass;
-  const hadGas = leave(b, old);
+  const hadGas = leave(battle, old);
   side.active = to;
-  prepareEntry(b, s);
-  const f = activeOf(b, s);
+  prepareEntry(battle, sideIndex);
+  const fighter = activeOf(battle, sideIndex);
   if (pass) {
     const { boosts, ...vols } = pass;
-    if (boosts) f.boosts = { ...boosts };
-    Object.assign(f.vol, vols);
+    if (boosts) fighter.boosts = { ...boosts };
+    Object.assign(fighter.vol, vols);
   }
-  emit(b, { t: 'switch', side: s, to, name: nameOf(f), from: old.seenAs?.name ?? old.name, forced: old.hp <= 0, card: fighterView(b, s, to, true), seen: fighterView(b, s, to, false) });
+  emit(battle, { t: 'switch', side: sideIndex, to, name: nameOf(fighter), from: old.seenAs?.name ?? old.name, forced: old.hp <= 0, card: fighterView(battle, sideIndex, to, true), seen: fighterView(battle, sideIndex, to, false) });
   return hadGas;
 }
 
-function entryOrder(b: B, sides: number[]): number[] {
-  const gas = (s: number) => (activeOf(b, s).ability === 'neutralizing-gas' ? 1 : 0);
-  return [...sides].sort((x, y) => gas(y) - gas(x) || speedOf(b, activeOf(b, y)) - speedOf(b, activeOf(b, x)));
+function entryOrder(battle: B, sides: number[]): number[] {
+  const gas = (sideIndex: number) => (activeOf(battle, sideIndex).ability === 'neutralizing-gas' ? 1 : 0);
+  return [...sides].sort((x, y) => gas(y) - gas(x) || speedOf(battle, activeOf(battle, y)) - speedOf(battle, activeOf(battle, x)));
 }
 
-function wakeAbilities(b: B, except: F): void {
-  for (const f of activeFighters(b)) if (f !== except) run(b, f, 'onStart');
+function wakeAbilities(battle: B, except: F): void {
+  for (const fighter of activeFighters(battle)) if (fighter !== except) run(battle, fighter, 'onStart');
 }
 
 // ---------- faints ----------
 
-function faint(b: B, f: F, by: F | null = null, move: BattleMove | null = null, lastHit = 0): void {
-  if (f.fainted || f.hp > 0) return;
-  f.fainted = true;
-  b.sides[sideIndex(b, f)].faintedTurn = b.turn;
-  const hadGas = f.ability === 'neutralizing-gas';
-  emit(b, { t: 'faint', side: sideIndex(b, f), name: nameOf(f) });
-  if (by && by !== f && by.hp > 0 && f.vol.destinyBond) {
-    emit(b, { t: 'destinyBond', side: sideIndex(b, by), name: nameOf(by), from: nameOf(f) });
+function faint(battle: B, fighter: F, by: F | null = null, move: BattleMove | null = null, lastHit = 0): void {
+  if (fighter.fainted || fighter.hp > 0) return;
+  fighter.fainted = true;
+  battle.sides[sideIndexOf(battle, fighter)].faintedTurn = battle.turn;
+  const hadGas = fighter.ability === 'neutralizing-gas';
+  emit(battle, { t: 'faint', side: sideIndexOf(battle, fighter), name: nameOf(fighter) });
+  if (by && by !== fighter && by.hp > 0 && fighter.vol.destinyBond) {
+    emit(battle, { t: 'destinyBond', side: sideIndexOf(battle, by), name: nameOf(by), from: nameOf(fighter) });
     by.hp = 0;
-    faint(b, by);
+    faint(battle, by);
   }
-  if (by && by !== f && move && f.vol.grudge && by.pp[move.key] > 0) {
+  if (by && by !== fighter && move && fighter.vol.grudge && by.pp[move.key] > 0) {
     by.pp[move.key] = 0;
-    emit(b, { t: 'grudge', side: sideIndex(b, by), name: nameOf(by), move: move.name });
+    emit(battle, { t: 'grudge', side: sideIndexOf(battle, by), name: nameOf(by), move: move.name });
   }
-  run(b, f, 'onFaint', by, move, lastHit);
-  if (by && by.hp > 0 && move) run(b, by, 'onFoeFaint', f);
-  for (const o of activeFighters(b)) if (o !== f) run(b, o, 'onAnyFaint', f);
-  if (b.field.weatherSetter === f) clearWeather(b);
-  if (hadGas) wakeAbilities(b, f);
+  run(battle, fighter, 'onFaint', by, move, lastHit);
+  if (by && by.hp > 0 && move) run(battle, by, 'onFoeFaint', fighter);
+  for (const other of activeFighters(battle)) if (other !== fighter) run(battle, other, 'onAnyFaint', fighter);
+  if (battle.field.weatherSetter === fighter) clearWeather(battle);
+  if (hadGas) wakeAbilities(battle, fighter);
 }
 
-function settle(b: B): void {
-  for (const s of [0, 1]) {
-    const f = activeOf(b, s);
-    if (f.hp <= 0 && !f.fainted) faint(b, f);
+function settle(battle: B): void {
+  for (const sideIndex of [0, 1]) {
+    const fighter = activeOf(battle, sideIndex);
+    if (fighter.hp <= 0 && !fighter.fainted) faint(battle, fighter);
   }
 }
 
 // ---------- actions ----------
 
-export function needsAction(b: B, s: number): boolean {
-  if (b.status !== 'active') return false;
-  const side = b.sides[s];
+export function needsAction(battle: B, sideIndex: number): boolean {
+  if (battle.status !== 'active') return false;
+  const side = battle.sides[sideIndex];
   if (side.action) return false;
-  return b.phase === 'choose' ? true : side.mustSwitch;
+  return battle.phase === 'choose' ? true : side.mustSwitch;
 }
 
-function trapped(b: B, s: number): boolean {
-  const me = activeOf(b, s);
-  const foe = foeOf(b, me);
+function trapped(battle: B, sideIndex: number): boolean {
+  const me = activeOf(battle, sideIndex);
+  const foe = foeOf(battle, me);
   if (!foe || me.types.includes('ghost')) return false;
-  if (me.vol.noRetreat || me.vol.bound || me.vol.ingrain || b.field.rooms.fairylock) return true;
-  if (me.vol.trappedBy && onField(b, me.vol.trappedBy)) return true;
-  return run(b, foe, 'onTrapFoe', me) === true;
+  if (me.vol.noRetreat || me.vol.bound || me.vol.ingrain || battle.field.rooms.fairylock) return true;
+  if (me.vol.trappedBy && onField(battle, me.vol.trappedBy)) return true;
+  return run(battle, foe, 'onTrapFoe', me) === true;
 }
 
-function moveBlocked(b: B, f: F, m: AnyMove): string | null {
-  if (f.vol.taunt && m.kind === 'status') return 'taunt';
-  if (f.vol.torment && f.vol.lastMove === m.key && m.key !== STRUGGLE.key) return 'torment';
-  if (f.vol.healBlock && (m.flags.includes('heal') || m.heal)) return 'healBlock';
-  if (b.field.rooms.gravity && m.flags.includes('gravity')) return 'gravity';
-  const foe = foeOf(b, f);
-  if (foe?.vol.imprison && foe.moves.some((x) => x.key === m.key)) return 'imprison';
-  if (m.flags.includes('cantusetwice') && f.vol.lastMove === m.key) return 'twice';
+function moveBlocked(battle: B, fighter: F, move: AnyMove): string | null {
+  if (fighter.vol.taunt && move.kind === 'status') return 'taunt';
+  if (fighter.vol.torment && fighter.vol.lastMove === move.key && move.key !== STRUGGLE.key) return 'torment';
+  if (fighter.vol.healBlock && (move.flags.includes('heal') || move.heal)) return 'healBlock';
+  if (battle.field.rooms.gravity && move.flags.includes('gravity')) return 'gravity';
+  const foe = foeOf(battle, fighter);
+  if (foe?.vol.imprison && foe.moves.some((x) => x.key === move.key)) return 'imprison';
+  if (move.flags.includes('cantusetwice') && fighter.vol.lastMove === move.key) return 'twice';
   return null;
 }
 
-function userCantUse(b: B, f: F, m: AnyMove): boolean {
-  if (m.id === 'last-resort') {
-    const others = f.moves.filter((o) => o.key !== 'last-resort');
-    return !others.length || others.some((o) => !f.vol.usedMoves?.has(o.key));
+function userCantUse(battle: B, fighter: F, move: AnyMove): boolean {
+  if (move.id === 'last-resort') {
+    const others = fighter.moves.filter((o) => o.key !== 'last-resort');
+    return !others.length || others.some((o) => !fighter.vol.usedMoves?.has(o.key));
   }
-  if (m.id === 'snore' || m.id === 'sleep-talk') return !asleep(b, f);
-  if (m.id === 'spit-up' || m.id === 'swallow') return !f.vol.stockpile?.count;
-  if (m.firstTurnOnly) return !!f.vol.acted;
-  if (m.losesType) return !f.types.includes(m.losesType);
-  if (m.selfCost) return f.hp <= Math.floor(f.stats.hp * m.selfCost);
+  if (move.id === 'snore' || move.id === 'sleep-talk') return !asleep(battle, fighter);
+  if (move.id === 'spit-up' || move.id === 'swallow') return !fighter.vol.stockpile?.count;
+  if (move.firstTurnOnly) return !!fighter.vol.acted;
+  if (move.losesType) return !fighter.types.includes(move.losesType);
+  if (move.selfCost) return fighter.hp <= Math.floor(fighter.stats.hp * move.selfCost);
   return false;
 }
 
-function usableMoves(b: B, f: F): { m: MoveData; i: number }[] {
-  const ok = f.moves.map((m, i) => ({ m, i })).filter(({ m }) => (f.pp[m.key] ?? 0) > 0 && f.vol.disabled?.key !== m.key && !moveBlocked(b, f, m) && !userCantUse(b, f, m));
-  const lock = f.vol.lockedMove;
-  if (lock != null && abilityKey(b, f) === 'gorilla-tactics') {
+function usableMoves(battle: B, fighter: F): { m: MoveData; i: number }[] {
+  const ok = fighter.moves.map((m, i) => ({ m, i })).filter(({ m }) => (fighter.pp[m.key] ?? 0) > 0 && fighter.vol.disabled?.key !== m.key && !moveBlocked(battle, fighter, m) && !userCantUse(battle, fighter, m));
+  const lock = fighter.vol.lockedMove;
+  if (lock != null && abilityKey(battle, fighter) === 'gorilla-tactics') {
     const locked = ok.filter(({ m }) => m.key === lock);
     if (locked.length) return locked;
   }
   return ok;
 }
 
-function encoreMove(f: F): number | undefined {
-  if (!f.vol.encore) return undefined;
-  const i = f.moves.findIndex((m) => m.key === f.vol.encore.key);
-  return i >= 0 && (f.pp[f.vol.encore.key] ?? 0) > 0 ? i : undefined;
+function encoreMove(fighter: F): number | undefined {
+  if (!fighter.vol.encore) return undefined;
+  const slot = fighter.moves.findIndex((m) => m.key === fighter.vol.encore.key);
+  return slot >= 0 && (fighter.pp[fighter.vol.encore.key] ?? 0) > 0 ? slot : undefined;
 }
 
-export function forcedAction(b: B, s: number): Action | null {
-  if (!needsAction(b, s) || b.phase !== 'choose') return null;
-  const f = activeOf(b, s);
-  const forced = f.vol.mustRecharge ?? f.vol.charging ?? f.vol.rampage?.move ?? f.vol.locked?.move;
+export function forcedAction(battle: B, sideIndex: number): Action | null {
+  if (!needsAction(battle, sideIndex) || battle.phase !== 'choose') return null;
+  const fighter = activeOf(battle, sideIndex);
+  const forced = fighter.vol.mustRecharge ?? fighter.vol.charging ?? fighter.vol.rampage?.move ?? fighter.vol.locked?.move;
   return forced == null ? null : { type: 'move', move: forced };
 }
 
-export function validActions(b: B, s: number): Action[] {
-  if (!needsAction(b, s)) return [];
-  const side = b.sides[s];
+export function validActions(battle: B, sideIndex: number): Action[] {
+  if (!needsAction(battle, sideIndex)) return [];
+  const side = battle.sides[sideIndex];
   const switches = side.team.map((f, i): SwitchAction => ({ type: 'switch', to: i })).filter((a) => a.to !== side.active && side.team[a.to].hp > 0);
-  if (b.phase === 'replace' || b.phase === 'switchout') return switches;
-  const f = side.team[side.active];
-  const forced = f.vol.mustRecharge ?? f.vol.charging ?? f.vol.rampage?.move ?? f.vol.locked?.move;
+  if (battle.phase === 'replace' || battle.phase === 'switchout') return switches;
+  const fighter = side.team[side.active];
+  const forced = fighter.vol.mustRecharge ?? fighter.vol.charging ?? fighter.vol.rampage?.move ?? fighter.vol.locked?.move;
   if (forced != null) return [{ type: 'move', move: forced }];
-  const encored = encoreMove(f);
-  const usable: Action[] = encored != null ? [{ type: 'move', move: encored }] : usableMoves(b, f).map(({ i }): Action => ({ type: 'move', move: i }));
+  const encored = encoreMove(fighter);
+  const usable: Action[] = encored != null ? [{ type: 'move', move: encored }] : usableMoves(battle, fighter).map(({ i }): Action => ({ type: 'move', move: i }));
   const moves: Action[] = usable.length ? usable : [{ type: 'move', move: STRUGGLE_MOVE }];
-  return moves.concat(trapped(b, s) ? [] : switches);
+  return moves.concat(trapped(battle, sideIndex) ? [] : switches);
 }
 
 const sameAction = (a: Action, b: Action): boolean => a.type === b.type && (a.type === 'move' ? a.move === (b as MoveAction).move : a.to === (b as SwitchAction).to);
 
 // Returns the events of the resolved turn, or null if still waiting on the other side.
-export function submit(b: B, s: number, action: Action | null | undefined): BattleEvent[] | null {
-  if (!action || !validActions(b, s).some((v) => sameAction(v, action))) throw invalid('Acción inválida');
-  b.sides[s].action = action.type === 'move' ? { type: 'move', move: action.move } : { type: 'switch', to: action.to };
-  if (b.sides.some((_, i) => needsAction(b, i))) return null;
-  if (b.phase === 'switchout') return resolveSwitchOut(b);
-  return b.phase === 'choose' ? resolveTurn(b) : resolveReplacements(b);
+export function submit(battle: B, sideIndex: number, action: Action | null | undefined): BattleEvent[] | null {
+  if (!action || !validActions(battle, sideIndex).some((v) => sameAction(v, action))) throw invalid('Acción inválida');
+  battle.sides[sideIndex].action = action.type === 'move' ? { type: 'move', move: action.move } : { type: 'switch', to: action.to };
+  if (battle.sides.some((_, i) => needsAction(battle, i))) return null;
+  if (battle.phase === 'switchout') return resolveSwitchOut(battle);
+  return battle.phase === 'choose' ? resolveTurn(battle) : resolveReplacements(battle);
 }
 
-export function autoAction(b: B, s: number): Action | null {
-  const opts = validActions(b, s);
+export function autoAction(battle: B, sideIndex: number): Action | null {
+  const opts = validActions(battle, sideIndex);
   if (!opts.length) return null;
   const moves = opts.filter((o) => o.type === 'move');
   if (moves.length) {
-    const side = b.sides[s];
+    const side = battle.sides[sideIndex];
     const me = side.team[side.active];
-    const foe = b.sides[1 - s].team[b.sides[1 - s].active];
+    const foe = battle.sides[1 - sideIndex].team[battle.sides[1 - sideIndex].active];
     let best = moves[0];
     let bestScore = -1;
-    for (const o of moves) {
-      const m = o.move === STRUGGLE_MOVE ? STRUGGLE : me.moves[o.move];
-      const score = m.kind === 'status' ? 15 + b.random() * 30 : (m.power || 60) * effectiveness(m.type, foe.types) * ((m.accuracy ?? 100) / 100) * (m.type && me.types.includes(m.type) ? 1.5 : 1) + b.random() * 10;
-      if (score > bestScore) [best, bestScore] = [o, score];
+    for (const action of moves) {
+      const move = action.move === STRUGGLE_MOVE ? STRUGGLE : me.moves[action.move];
+      const score = move.kind === 'status' ? 15 + battle.random() * 30 : (move.power || 60) * effectiveness(move.type, foe.types) * ((move.accuracy ?? 100) / 100) * (move.type && me.types.includes(move.type) ? 1.5 : 1) + battle.random() * 10;
+      if (score > bestScore) [best, bestScore] = [action, score];
     }
     return best;
   }
-  return opts[Math.floor(b.random() * opts.length)];
+  return opts[Math.floor(battle.random() * opts.length)];
 }
 
-function canAct(b: B, me: F, move: BattleMove): boolean {
-  const side = sideIndex(b, me);
+function canAct(battle: B, me: F, move: BattleMove): boolean {
+  const sideIndex = sideIndexOf(battle, me);
   const cant = (reason: string) => {
-    emit(b, { t: 'cant', side, name: nameOf(me), reason });
+    emit(battle, { t: 'cant', side: sideIndex, name: nameOf(me), reason });
     return false;
   };
   if (me.status === 'slp') {
-    me.statusTurns -= flag(b, me, 'wakesFaster') ? 2 : 1;
+    me.statusTurns -= flag(battle, me, 'wakesFaster') ? 2 : 1;
     if (me.statusTurns > 0) {
       if (!move.usableAsleep && !move.sleepUsable) return cant('slp');
-    } else cure(b, me);
+    } else cure(battle, me);
   }
   if (me.status === 'frz') {
-    if (!move.thaws && b.random() >= 0.2) return cant('frz');
-    cure(b, me);
+    if (!move.thaws && battle.random() >= 0.2) return cant('frz');
+    cure(battle, me);
   }
   if (me.vol.flinch) {
     delete me.vol.flinch;
     cant('flinch');
-    run(b, me, 'onFlinch');
+    run(battle, me, 'onFlinch');
     return false;
   }
-  if (run(b, me, 'onBeforeMove', move) === false) return cant('truant');
+  if (run(battle, me, 'onBeforeMove', move) === false) return cant('truant');
   if (me.vol.confusion) {
     me.vol.confusion -= 1;
-    if (!me.vol.confusion) emit(b, { t: 'volatileEnd', side, name: nameOf(me), kind: 'confusion' });
+    if (!me.vol.confusion) emit(battle, { t: 'volatileEnd', side: sideIndex, name: nameOf(me), kind: 'confusion' });
     else {
-      emit(b, { t: 'confused', side, name: nameOf(me) });
-      if (b.random() < 1 / 3) {
-        const a = me.stats.atk * stageMult(me.boosts.atk);
-        const d = me.stats.def * stageMult(me.boosts.def);
-        hurt(b, me, (((2 * me.level) / 5 + 2) * 40 * (a / d)) / 50 + 2, 'confusion');
+      emit(battle, { t: 'confused', side: sideIndex, name: nameOf(me) });
+      if (battle.random() < 1 / 3) {
+        const attack = me.stats.atk * stageMult(me.boosts.atk);
+        const defense = me.stats.def * stageMult(me.boosts.def);
+        hurt(battle, me, (((2 * me.level) / 5 + 2) * 40 * (attack / defense)) / 50 + 2, 'confusion');
         return false;
       }
     }
   }
   if (me.vol.attract) {
-    if (!onField(b, me.vol.attract)) delete me.vol.attract;
+    if (!onField(battle, me.vol.attract)) delete me.vol.attract;
     else {
-      emit(b, { t: 'infatuated', side, name: nameOf(me), by: nameOf(me.vol.attract) });
-      if (b.random() < 0.5) return cant('attract');
+      emit(battle, { t: 'infatuated', side: sideIndex, name: nameOf(me), by: nameOf(me.vol.attract) });
+      if (battle.random() < 0.5) return cant('attract');
     }
   }
-  if (me.status === 'par' && b.random() < 0.25) return cant('par');
+  if (me.status === 'par' && battle.random() < 0.25) return cant('par');
   return true;
 }
 
@@ -1051,10 +1051,10 @@ function statusEffectOf(move: AnyMove): { effect: string; stat?: string } {
   return { effect: 'debuff' };
 }
 
-function spendPP(b: B, me: F, move: AnyMove): void {
+function spendPP(battle: B, me: F, move: AnyMove): void {
   if (move.key === STRUGGLE.key) return;
-  const foe = foeOf(b, me);
-  me.pp[move.key] = Math.max(0, (me.pp[move.key] ?? 0) - (foe && abilityKey(b, foe) === 'pressure' ? 2 : 1));
+  const foe = foeOf(battle, me);
+  me.pp[move.key] = Math.max(0, (me.pp[move.key] ?? 0) - (foe && abilityKey(battle, foe) === 'pressure' ? 2 : 1));
 }
 
 const FOCUS_MOVES = new Set(['focus-punch', 'shell-trap', 'beak-blast']);
@@ -1062,19 +1062,19 @@ const STATUSED = new Set<string | null>(['brn', 'par', 'psn', 'tox']);
 const WEATHER_BALL: Record<string, string> = { sun: 'fire', harshsun: 'fire', rain: 'water', heavyrain: 'water', sand: 'rock', hail: 'ice', snow: 'ice' };
 const TERRAIN_PULSE: Record<string, string> = { electric: 'electric', grassy: 'grass', misty: 'fairy', psychic: 'psychic' };
 
-function moveOfAction(b: B, s: number, idx: number): MoveData {
-  const f = activeOf(b, s);
-  return idx === STRUGGLE_MOVE ? STRUGGLE : f.moves[idx];
+function moveOfAction(battle: B, sideIndex: number, idx: number): MoveData {
+  const fighter = activeOf(battle, sideIndex);
+  return idx === STRUGGLE_MOVE ? STRUGGLE : fighter.moves[idx];
 }
 
-const asleep = (b: B, f: F): boolean => f.status === 'slp' || flag(b, f, 'comatose');
+const asleep = (battle: B, fighter: F): boolean => fighter.status === 'slp' || flag(battle, fighter, 'comatose');
 
-function failReason(b: B, me: F, foe: F | null, move: AnyMove, firstAction: boolean): string | null {
-  const s = sideIndex(b, me);
+function failReason(battle: B, me: F, foe: F | null, move: AnyMove, firstAction: boolean): string | null {
+  const sideIndex = sideIndexOf(battle, me);
   if (move.firstTurnOnly && !firstAction) return 'notFirstTurn';
   if (move.id === 'sucker-punch' || move.id === 'thunderclap') {
-    const theirs = b.chosen?.[1 - s];
-    if (!foe || b.moved.has(foe) || !theirs || theirs.kind === 'status') return 'suckerPunch';
+    const theirs = battle.chosen?.[1 - sideIndex];
+    if (!foe || battle.moved.has(foe) || !theirs || theirs.kind === 'status') return 'suckerPunch';
   }
   if (move.id === 'focus-punch' && me.turnHit) return 'lostFocus';
   if (move.id === 'shell-trap' && !me.turnHit?.physical) return 'shellTrap';
@@ -1082,9 +1082,9 @@ function failReason(b: B, me: F, foe: F | null, move: AnyMove, firstAction: bool
     const others = me.moves.filter((m) => m.key !== 'last-resort');
     if (!others.length || others.some((m) => !me.vol.usedMoves?.has(m.key))) return 'lastResort';
   }
-  if (move.id === 'dream-eater' && (!foe || !asleep(b, foe))) return 'notAsleep';
-  if (move.id === 'snore' && !asleep(b, me)) return 'notAsleepSelf';
-  if (move.id === 'steel-roller' && !b.field.terrain) return 'noTerrain';
+  if (move.id === 'dream-eater' && (!foe || !asleep(battle, foe))) return 'notAsleep';
+  if (move.id === 'snore' && !asleep(battle, me)) return 'notAsleepSelf';
+  if (move.id === 'steel-roller' && !battle.field.terrain) return 'noTerrain';
   if (move.losesType && !me.types.includes(move.losesType)) return 'noType';
   if (move.id === 'synchronoise' && foe && !foe.types.some((t) => me.types.includes(t))) return 'noSharedType';
   if (move.id === 'captivate' && foe && (!foe.gender || !me.gender || foe.gender === me.gender)) return !foe.gender || !me.gender ? 'genderless' : 'sameGender';
@@ -1092,157 +1092,157 @@ function failReason(b: B, me: F, foe: F | null, move: AnyMove, firstAction: bool
   return null;
 }
 
-export function moveWillFail(b: B, s: number, idx: number): boolean {
+export function moveWillFail(battle: B, sideIndex: number, idx: number): boolean {
   if (idx === STRUGGLE_MOVE) return false;
-  const me = activeOf(b, s);
+  const me = activeOf(battle, sideIndex);
   const move = me.moves[idx];
   if (!move || move.id === 'sucker-punch' || move.id === 'thunderclap' || move.id === 'focus-punch' || move.id === 'shell-trap') return false;
-  return failReason(b, me, foeOf(b, me), move, !me.vol.acted) !== null;
+  return failReason(battle, me, foeOf(battle, me), move, !me.vol.acted) !== null;
 }
 
-function adaptMove(b: B, me: F, move: BattleMove): void {
-  const w = weather(b);
-  if (move.id === 'weather-ball' && WEATHER_BALL[w as string]) {
-    move.type = WEATHER_BALL[w as string];
+function adaptMove(battle: B, me: F, move: BattleMove): void {
+  const weather = currentWeather(battle);
+  if (move.id === 'weather-ball' && WEATHER_BALL[weather as string]) {
+    move.type = WEATHER_BALL[weather as string];
     move.power = 100;
   }
-  if (move.id === 'terrain-pulse' && b.field.terrain && grounded(b, me)) {
-    move.type = TERRAIN_PULSE[b.field.terrain];
+  if (move.id === 'terrain-pulse' && battle.field.terrain && grounded(battle, me)) {
+    move.type = TERRAIN_PULSE[battle.field.terrain];
     move.power = 100;
   }
   if (move.id === 'revelation-dance') move.type = me.types[0];
   if (move.id === 'photon-geyser' && me.stats.atk * stageMult(me.boosts.atk) > me.stats.satk * stageMult(me.boosts.satk)) move.category = 'physical';
 }
 
-function basePower(b: B, me: F, target: F, move: BattleMove): number {
-  const s = sideIndex(b, me);
-  const side = b.sides[s];
-  const p = move.power;
+function basePower(battle: B, me: F, target: F, move: BattleMove): number {
+  const sideIndex = sideIndexOf(battle, me);
+  const side = battle.sides[sideIndex];
+  const power = move.power;
   switch (move.id) {
     case 'eruption':
     case 'water-spout':
     case 'dragon-energy':
       return Math.max(1, Math.floor((150 * me.hp) / me.stats.hp));
     case 'facade':
-      return STATUSED.has(me.status) ? p * 2 : p;
+      return STATUSED.has(me.status) ? power * 2 : power;
     case 'hex':
-      return target.status || flag(b, target, 'comatose') ? p * 2 : p;
+      return target.status || flag(battle, target, 'comatose') ? power * 2 : power;
     case 'venoshock':
-      return poisoned(target.status) ? p * 2 : p;
+      return poisoned(target.status) ? power * 2 : power;
     case 'brine':
-      return target.hp * 2 <= target.stats.hp ? p * 2 : p;
+      return target.hp * 2 <= target.stats.hp ? power * 2 : power;
     case 'acrobatics':
-      return p * 2;
+      return power * 2;
     case 'payback':
-      return b.moved.has(target) ? p * 2 : p;
+      return battle.moved.has(target) ? power * 2 : power;
     case 'avalanche':
     case 'revenge':
-      return me.turnHit?.by === target ? p * 2 : p;
+      return me.turnHit?.by === target ? power * 2 : power;
     case 'assurance':
-      return target.turnHit ? p * 2 : p;
+      return target.turnHit ? power * 2 : power;
     case 'stored-power':
     case 'power-trip':
-      return p + 20 * Object.values(me.boosts).reduce((sum, v) => sum + Math.max(0, v), 0);
+      return power + 20 * Object.values(me.boosts).reduce((sum, v) => sum + Math.max(0, v), 0);
     case 'fury-cutter':
-      return Math.min(160, p * 2 ** (me.vol.furyCutter ?? 0));
+      return Math.min(160, power * 2 ** (me.vol.furyCutter ?? 0));
     case 'echoed-voice':
-      return Math.min(200, p * (b.echo?.turn === b.turn ? b.echo.count : 1));
+      return Math.min(200, power * (battle.echo?.turn === battle.turn ? battle.echo.count : 1));
     case 'retaliate':
-      return side.faintedTurn === b.turn - 1 ? p * 2 : p;
+      return side.faintedTurn === battle.turn - 1 ? power * 2 : power;
     case 'last-respects':
-      return p + 50 * side.team.filter((o) => o !== me && o.hp <= 0).length;
+      return power + 50 * side.team.filter((o) => o !== me && o.hp <= 0).length;
     case 'rage-fist':
-      return Math.min(350, p + 50 * (me.timesHit ?? 0));
+      return Math.min(350, power + 50 * (me.timesHit ?? 0));
     case 'rising-voltage':
-      return b.field.terrain === 'electric' && grounded(b, target) ? p * 2 : p;
+      return battle.field.terrain === 'electric' && grounded(battle, target) ? power * 2 : power;
     case 'expanding-force':
-      return b.field.terrain === 'psychic' && grounded(b, me) ? p * 1.5 : p;
+      return battle.field.terrain === 'psychic' && grounded(battle, me) ? power * 1.5 : power;
     case 'psyblade':
-      return b.field.terrain === 'electric' ? p * 1.5 : p;
+      return battle.field.terrain === 'electric' ? power * 1.5 : power;
     case 'smelling-salts':
-      return target.status === 'par' ? p * 2 : p;
+      return target.status === 'par' ? power * 2 : power;
     case 'wake-up-slap':
-      return asleep(b, target) ? p * 2 : p;
+      return asleep(battle, target) ? power * 2 : power;
     case 'bolt-beak':
     case 'fishious-rend':
-      return b.moved.has(target) ? p : p * 2;
+      return battle.moved.has(target) ? power : power * 2;
     case 'stomping-tantrum':
     case 'temper-flare':
-      return me.vol.lastFailed ? p * 2 : p;
+      return me.vol.lastFailed ? power * 2 : power;
     case 'fickle-beam':
-      return b.random() < 0.3 ? p * 2 : p;
+      return battle.random() < 0.3 ? power * 2 : power;
     default:
-      return p;
+      return power;
   }
 }
 
-function afterHit(b: B, me: F, target: F, move: BattleMove, total: number): void {
-  const s = sideIndex(b, me);
+function afterHit(battle: B, me: F, target: F, move: BattleMove, total: number): void {
+  const sideIndex = sideIndexOf(battle, me);
   if (target.hp > 0) {
-    if (move.id === 'smelling-salts' && target.status === 'par') cure(b, target);
-    if (move.id === 'wake-up-slap' && target.status === 'slp') cure(b, target);
+    if (move.id === 'smelling-salts' && target.status === 'par') cure(battle, target);
+    if (move.id === 'wake-up-slap' && target.status === 'slp') cure(battle, target);
     if (move.id === 'clear-smog' && Object.values(target.boosts).some(Boolean)) {
       target.boosts = freshBoosts();
-      emit(b, { t: 'boostsReset', side: 1 - s, name: nameOf(target) });
+      emit(battle, { t: 'boostsReset', side: 1 - sideIndex, name: nameOf(target) });
     }
-    if (move.grounds && !target.vol.smackedDown && (target.types.includes('flying') || flag(b, target, 'levitates'))) {
+    if (move.grounds && !target.vol.smackedDown && (target.types.includes('flying') || flag(battle, target, 'levitates'))) {
       target.vol.smackedDown = true;
-      emit(b, { t: 'volatile', side: 1 - s, name: nameOf(target), kind: 'smackdown' });
+      emit(battle, { t: 'volatile', side: 1 - sideIndex, name: nameOf(target), kind: 'smackdown' });
     }
     if (move.binds && !target.vol.bound) {
-      target.vol.bound = { turns: 4 + Math.floor(b.random() * 2), by: me, move: move.name };
-      emit(b, { t: 'volatile', side: 1 - s, name: nameOf(target), kind: 'bound', move: move.name });
+      target.vol.bound = { turns: 4 + Math.floor(battle.random() * 2), by: me, move: move.name };
+      emit(battle, { t: 'volatile', side: 1 - sideIndex, name: nameOf(target), kind: 'bound', move: move.name });
     }
     if (move.traps && !target.vol.trappedBy) {
       target.vol.trappedBy = me;
-      emit(b, { t: 'volatile', side: 1 - s, name: nameOf(target), kind: 'trapped' });
+      emit(battle, { t: 'volatile', side: 1 - sideIndex, name: nameOf(target), kind: 'trapped' });
       if (move.id === 'jaw-lock' && !me.vol.trappedBy) me.vol.trappedBy = target;
     }
     if (move.id === 'salt-cure' && !target.vol.saltCure) {
       target.vol.saltCure = true;
-      emit(b, { t: 'volatile', side: 1 - s, name: nameOf(target), kind: 'saltcure' });
+      emit(battle, { t: 'volatile', side: 1 - sideIndex, name: nameOf(target), kind: 'saltcure' });
     }
   }
-  if (move.id === 'fell-stinger' && target.hp <= 0 && me.hp > 0) boost(b, me, { atk: 3 }, me);
-  afterSelf(b, me, move);
-  if (move.forceSwitch && target.hp > 0 && total > 0) dragOut(b, target);
+  if (move.id === 'fell-stinger' && target.hp <= 0 && me.hp > 0) boost(battle, me, { atk: 3 }, me);
+  afterSelf(battle, me, move);
+  if (move.forceSwitch && target.hp > 0 && total > 0) dragOut(battle, target);
 }
 
-function afterSelf(b: B, me: F, move: BattleMove): void {
-  const s = sideIndex(b, me);
-  if (move.losesType && me.hp > 0) setTypes(b, me, me.types.filter((t) => t !== move.losesType));
-  if (move.id === 'steel-roller' && b.field.terrain) clearTerrain(b);
-  if (move.id === 'glaive-rush') me.vol.glaiveRush = b.turn;
-  if (move.selfSwitch && me.hp > 0 && b.sides[s].team.some((o) => o !== me && o.hp > 0)) me.vol.switchNow = true;
+function afterSelf(battle: B, me: F, move: BattleMove): void {
+  const sideIndex = sideIndexOf(battle, me);
+  if (move.losesType && me.hp > 0) setTypes(battle, me, me.types.filter((t) => t !== move.losesType));
+  if (move.id === 'steel-roller' && battle.field.terrain) clearTerrain(battle);
+  if (move.id === 'glaive-rush') me.vol.glaiveRush = battle.turn;
+  if (move.selfSwitch && me.hp > 0 && battle.sides[sideIndex].team.some((o) => o !== me && o.hp > 0)) me.vol.switchNow = true;
 }
 
-function stealBoosts(b: B, me: F, target: F): void {
+function stealBoosts(battle: B, me: F, target: F): void {
   const stolen: Boosts = Object.fromEntries((Object.entries(target.boosts) as [BoostKey, number][]).filter(([, v]) => v > 0));
   if (!Object.keys(stolen).length) return;
-  const s = sideIndex(b, target);
-  for (const [k, v] of Object.entries(stolen) as [BoostKey, number][]) {
-    target.boosts[k] = 0;
-    emit(b, { t: 'boost', side: s, name: nameOf(target), stat: k, by: -v, stage: 0 });
+  const sideIndex = sideIndexOf(battle, target);
+  for (const [stat, stages] of Object.entries(stolen) as [BoostKey, number][]) {
+    target.boosts[stat] = 0;
+    emit(battle, { t: 'boost', side: sideIndex, name: nameOf(target), stat, by: -stages, stage: 0 });
   }
-  boost(b, me, stolen, me);
+  boost(battle, me, stolen, me);
 }
 
-function dragOut(b: B, target: F): boolean {
-  const s = sideIndex(b, target);
-  const bench = b.sides[s].team.map((f, i) => i).filter((i) => i !== b.sides[s].active && b.sides[s].team[i].hp > 0);
-  if (!bench.length || flag(b, target, 'suctionCups') || target.vol.ingrain) return false;
-  const to = bench[Math.floor(b.random() * bench.length)];
-  emit(b, { t: 'dragged', side: s, name: nameOf(target) });
-  if (doSwitch(b, s, to)) wakeAbilities(b, activeOf(b, s));
-  runEntry(b, s);
+function dragOut(battle: B, target: F): boolean {
+  const sideIndex = sideIndexOf(battle, target);
+  const bench = battle.sides[sideIndex].team.map((f, i) => i).filter((i) => i !== battle.sides[sideIndex].active && battle.sides[sideIndex].team[i].hp > 0);
+  if (!bench.length || flag(battle, target, 'suctionCups') || target.vol.ingrain) return false;
+  const to = bench[Math.floor(battle.random() * bench.length)];
+  emit(battle, { t: 'dragged', side: sideIndex, name: nameOf(target) });
+  if (doSwitch(battle, sideIndex, to)) wakeAbilities(battle, activeOf(battle, sideIndex));
+  runEntry(battle, sideIndex);
   return true;
 }
 
-function perform(b: B, s: number, me: F, foe: F | null, base: MoveData, move: BattleMove, moveIdx: number | null, firstAction: boolean, opts: { called?: boolean } = {}): void {
+function perform(battle: B, sideIndex: number, me: F, foe: F | null, base: MoveData, move: BattleMove, moveIdx: number | null, firstAction: boolean, opts: { called?: boolean } = {}): void {
   const rules = MOVE_RULES[base.id];
-  const failed = failReason(b, me, foe, move, firstAction) ?? rules?.fail?.(moveApi(b), me, foe as F, move) ?? null;
+  const failed = failReason(battle, me, foe, move, firstAction) ?? rules?.fail?.(moveApi(battle), me, foe as F, move) ?? null;
   if (failed) {
-    emit(b, { t: 'nothing', side: s, reason: failed });
+    emit(battle, { t: 'nothing', side: sideIndex, reason: failed });
     me.vol.lastFailed = true;
     delete me.vol.rampage;
     delete me.vol.furyCutter;
@@ -1250,65 +1250,65 @@ function perform(b: B, s: number, me: F, foe: F | null, base: MoveData, move: Ba
     return;
   }
   if (rules?.call) {
-    const called = rules.call(moveApi(b), me, foe as F, move);
+    const called = rules.call(moveApi(battle), me, foe as F, move);
     if (!called?.key) {
-      emit(b, { t: 'nothing', side: s, ...(called?.fail ? { reason: called.fail } : {}) });
+      emit(battle, { t: 'nothing', side: sideIndex, ...(called?.fail ? { reason: called.fail } : {}) });
       me.vol.lastFailed = true;
       return;
     }
-    runCalled(b, me, called.key, { powerMult: called.powerMult });
+    runCalled(battle, me, called.key, { powerMult: called.powerMult });
     return;
   }
-  if (rules?.before && rules.before(moveApi(b), me, foe as F, move) === 'skip') return;
-  if (base.id === 'echoed-voice') b.echo = b.echo?.turn === b.turn ? b.echo : { turn: b.turn, count: b.echo?.turn === b.turn - 1 ? Math.min(5, b.echo.count + 1) : 1 };
+  if (rules?.before && rules.before(moveApi(battle), me, foe as F, move) === 'skip') return;
+  if (base.id === 'echoed-voice') battle.echo = battle.echo?.turn === battle.turn ? battle.echo : { turn: battle.turn, count: battle.echo?.turn === battle.turn - 1 ? Math.min(5, battle.echo.count + 1) : 1 };
   if (!opts.called) (me.vol.usedMoves ??= new Set()).add(base.key);
-  if (!move.flags.includes('failcopycat')) b.lastMove = base.key;
+  if (!move.flags.includes('failcopycat')) battle.lastMove = base.key;
   if (move.curls) me.vol.defenseCurl = true;
   let dealt = 0;
-  if (move.kind === 'status') statusMove(b, me, foe, move);
+  if (move.kind === 'status') statusMove(battle, me, foe, move);
   else {
-    dealt = attack(b, me, foe, move) || 0;
+    dealt = attack(battle, me, foe, move) || 0;
     if (dealt && move.flags.includes('recharge') && me.hp > 0 && moveIdx != null) me.vol.mustRecharge = moveIdx;
-    if (move.recoilMaxHp && me.hp > 0) hurt(b, me, me.stats.hp * move.recoilMaxHp, 'recoil');
+    if (move.recoilMaxHp && me.hp > 0) hurt(battle, me, me.stats.hp * move.recoilMaxHp, 'recoil');
     me.vol.lastFailed = !dealt;
   }
-  rules?.after?.(moveApi(b), me, foe as F, move, dealt);
+  rules?.after?.(moveApi(battle), me, foe as F, move, dealt);
   if (base.id === 'fury-cutter' && dealt) me.vol.furyCutter = Math.min(2, (me.vol.furyCutter ?? 0) + 1);
   else delete me.vol.furyCutter;
   if (base.rampage && me.hp > 0 && moveIdx != null) {
-    if (!me.vol.rampage) me.vol.rampage = { move: moveIdx, left: 1 + Math.floor(b.random() * 2) };
+    if (!me.vol.rampage) me.vol.rampage = { move: moveIdx, left: 1 + Math.floor(battle.random() * 2) };
     else me.vol.rampage.left -= 1;
     if (me.vol.rampage.left <= 0) {
       delete me.vol.rampage;
-      addVolatile(b, me, 'confusion', me);
+      addVolatile(battle, me, 'confusion', me);
     }
   }
   if (move.selfDestruct && me.hp > 0) {
     me.hp = 0;
-    faint(b, me);
+    faint(battle, me);
   }
 }
 
-function runCalled(b: B, me: F, key: string, opts: { powerMult?: number; instructed?: boolean } = {}): void {
+function runCalled(battle: B, me: F, key: string, opts: { powerMult?: number; instructed?: boolean } = {}): void {
   const base = moveData(key);
   if (!base || me.hp <= 0) return;
-  const s = sideIndex(b, me);
+  const sideIndex = sideIndexOf(battle, me);
   const move = { ...base, flags: [...base.flags], effectivePriority: base.priority, slot: null };
   if (opts.powerMult && move.power) move.power = Math.floor(move.power * opts.powerMult);
-  adaptMove(b, me, move);
-  run(b, me, 'onModifyMove', move);
+  adaptMove(battle, me, move);
+  run(battle, me, 'onModifyMove', move);
   const status = move.kind === 'status' ? statusEffectOf(move) : {};
-  emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind, key: base.key, category: move.category, target: shownTarget(me, base.key, move.target), flags: move.flags, called: true, ...status, ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}) });
-  perform(b, s, me, foeOf(b, me), base, move, null, false, { called: true });
+  emit(battle, { t: 'move', side: sideIndex, name: nameOf(me), move: move.name, type: move.type, kind: move.kind, key: base.key, category: move.category, target: shownTarget(me, base.key, move.target), flags: move.flags, called: true, ...status, ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}) });
+  perform(battle, sideIndex, me, foeOf(battle, me), base, move, null, false, { called: true });
 }
 
-function useMove(b: B, s: number, moveIdx: number, priority: number, why: string | null = null): void {
-  const me = activeOf(b, s);
+function useMove(battle: B, sideIndex: number, moveIdx: number, priority: number, why: string | null = null): void {
+  const me = activeOf(battle, sideIndex);
   if (me.hp <= 0) return;
-  b.moved.add(me);
+  battle.moved.add(me);
   if (me.vol.mustRecharge != null) {
     delete me.vol.mustRecharge;
-    emit(b, { t: 'cant', side: s, name: nameOf(me), reason: 'recharge' });
+    emit(battle, { t: 'cant', side: sideIndex, name: nameOf(me), reason: 'recharge' });
     return;
   }
   const base = moveIdx === STRUGGLE_MOVE ? STRUGGLE : me.moves[moveIdx];
@@ -1321,178 +1321,178 @@ function useMove(b: B, s: number, moveIdx: number, priority: number, why: string
   delete me.vol.destinyBond;
   if (!move.stalling) delete me.vol.stall;
   if (base.id !== 'rage') delete me.vol.rage;
-  const blocked = moveIdx === STRUGGLE_MOVE ? null : moveBlocked(b, me, base);
+  const blocked = moveIdx === STRUGGLE_MOVE ? null : moveBlocked(battle, me, base);
   if (blocked) {
-    emit(b, { t: 'cant', side: s, name: nameOf(me), reason: blocked, move: base.name });
+    emit(battle, { t: 'cant', side: sideIndex, name: nameOf(me), reason: blocked, move: base.name });
     return;
   }
-  if (!canAct(b, me, move)) {
+  if (!canAct(battle, me, move)) {
     delete me.vol.charging;
     delete me.vol.rampage;
     delete me.vol.furyCutter;
     return;
   }
-  run(b, me, 'onBeforeMoveForm', move);
-  adaptMove(b, me, move);
-  if (me.vol.electrify === b.turn) move.type = 'electric';
-  run(b, me, 'onModifyMove', move);
-  run(b, me, 'onPrepareMove', move);
+  run(battle, me, 'onBeforeMoveForm', move);
+  adaptMove(battle, me, move);
+  if (me.vol.electrify === battle.turn) move.type = 'electric';
+  run(battle, me, 'onModifyMove', move);
+  run(battle, me, 'onPrepareMove', move);
   me.revealedMoves.add(base.key);
   me.vol.prevMove = me.vol.lastMove;
   me.vol.lastMove = base.key;
   const status = move.kind === 'status' ? statusEffectOf(move) : {};
-  const startsCharge = move.flags.includes('charge') && !charged && !(isSun(weather(b)) && (base.id === 'solar-beam' || base.id === 'solar-blade'));
+  const startsCharge = move.flags.includes('charge') && !charged && !(isSun(currentWeather(battle)) && (base.id === 'solar-beam' || base.id === 'solar-blade'));
   if (startsCharge) {
-    spendPP(b, me, move);
+    spendPP(battle, me, move);
     me.vol.charging = moveIdx;
-    emit(b, { t: 'charging', side: s, name: nameOf(me), move: move.name, key: base.key, hidden: !!HIDDEN_BY[base.id] });
+    emit(battle, { t: 'charging', side: sideIndex, name: nameOf(me), move: move.name, key: base.key, hidden: !!HIDDEN_BY[base.id] });
     return;
   }
-  emit(b, { t: 'move', side: s, name: nameOf(me), move: move.name, type: move.type, kind: move.kind, key: base.key, category: move.category, target: shownTarget(me, base.key, move.target), flags: move.flags, ...status, ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}), ...(why ? { why } : {}) });
+  emit(battle, { t: 'move', side: sideIndex, name: nameOf(me), move: move.name, type: move.type, kind: move.kind, key: base.key, category: move.category, target: shownTarget(me, base.key, move.target), flags: move.flags, ...status, ...(move.multihit ? { multihit: true } : {}), ...(move.drain ? { drain: true } : {}), ...(why ? { why } : {}) });
 
-  const foe = foeOf(b, me);
+  const foe = foeOf(battle, me);
   delete me.vol.charging;
-  if (!charged && !continuing) spendPP(b, me, move);
+  if (!charged && !continuing) spendPP(battle, me, move);
 
-  if (move.selfDestruct && move.kind !== 'status' && anyActiveHas(b, 'damp')) {
-    emit(b, { t: 'nothing', side: s });
+  if (move.selfDestruct && move.kind !== 'status' && anyActiveHas(battle, 'damp')) {
+    emit(battle, { t: 'nothing', side: sideIndex });
     return;
   }
-  perform(b, s, me, foe, base, move, moveIdx, firstAction);
+  perform(battle, sideIndex, me, foe, base, move, moveIdx, firstAction);
 
-  run(b, me, 'onAfterMove', move);
+  run(battle, me, 'onAfterMove', move);
   if (move.flags.includes('dance')) {
-    const other = foeOf(b, me);
-    if (other) run(b, other, 'onFoeMove', me, move);
+    const other = foeOf(battle, me);
+    if (other) run(battle, other, 'onFoeMove', me, move);
   }
 }
 
-function selfStatus(b: B, me: F, move: BattleMove): void {
-  const s = sideIndex(b, me);
-  const snatcher = foeOf(b, me);
-  if (snatcher && snatcher.vol.snatch === b.turn && move.flags.includes('snatch')) {
+function selfStatus(battle: B, me: F, move: BattleMove): void {
+  const sideIndex = sideIndexOf(battle, me);
+  const snatcher = foeOf(battle, me);
+  if (snatcher && snatcher.vol.snatch === battle.turn && move.flags.includes('snatch')) {
     delete snatcher.vol.snatch;
-    emit(b, { t: 'snatched', side: 1 - s, name: nameOf(snatcher), move: move.name });
-    return selfStatus(b, snatcher, move);
+    emit(battle, { t: 'snatched', side: 1 - sideIndex, name: nameOf(snatcher), move: move.name });
+    return selfStatus(battle, snatcher, move);
   }
   const rules = MOVE_RULES[move.id];
   if (rules?.use) {
-    rules.use(moveApi(b), me, foeOf(b, me) as F, move);
+    rules.use(moveApi(battle), me, foeOf(battle, me) as F, move);
     return;
   }
   let did = false;
-  if (move.selfCost) hurt(b, me, me.stats.hp * move.selfCost, 'cost');
+  if (move.selfCost) hurt(battle, me, me.stats.hp * move.selfCost, 'cost');
   if (move.id === 'no-retreat') {
     if (me.vol.noRetreat) {
-      emit(b, { t: 'nothing', side: sideIndex(b, me) });
+      emit(battle, { t: 'nothing', side: sideIndexOf(battle, me) });
       return;
     }
     me.vol.noRetreat = true;
   }
   if (move.id === 'charge' && !me.vol.charge) {
     me.vol.charge = true;
-    emit(b, { t: 'volatile', side: sideIndex(b, me), name: nameOf(me), kind: 'charge' });
+    emit(battle, { t: 'volatile', side: sideIndexOf(battle, me), name: nameOf(me), kind: 'charge' });
     did = true;
   }
-  if (move.id === 'growth' && isSun(weather(b))) move = { ...move, boosts: { atk: 2, satk: 2 } };
-  if (move.weather) did = setWeather(b, move.weather, null) || did;
-  if (move.terrain) did = setTerrain(b, move.terrain, null) || did;
-  if (move.screen) did = setScreen(b, sideIndex(b, me), move.screen) || did;
-  if (move.boosts) did = Object.keys(boost(b, me, move.boosts, me)).length > 0 || did;
-  if (move.heal) did = heal(b, me, me.stats.hp * move.heal) > 0 || did;
+  if (move.id === 'growth' && isSun(currentWeather(battle))) move = { ...move, boosts: { atk: 2, satk: 2 } };
+  if (move.weather) did = setWeather(battle, move.weather, null) || did;
+  if (move.terrain) did = setTerrain(battle, move.terrain, null) || did;
+  if (move.screen) did = setScreen(battle, sideIndexOf(battle, me), move.screen) || did;
+  if (move.boosts) did = Object.keys(boost(battle, me, move.boosts, me)).length > 0 || did;
+  if (move.heal) did = heal(battle, me, me.stats.hp * move.heal) > 0 || did;
   const weatherHeal = HEALS_WITH_WEATHER[move.id];
   if (weatherHeal) {
-    const w = weather(b);
-    const share = w === weatherHeal || (weatherHeal === 'sun' && isSun(w)) ? 2 / 3 : w && w !== 'winds' ? 1 / 4 : 1 / 2;
-    did = heal(b, me, me.stats.hp * share) > 0 || did;
+    const weather = currentWeather(battle);
+    const share = weather === weatherHeal || (weatherHeal === 'sun' && isSun(weather)) ? 2 / 3 : weather && weather !== 'winds' ? 1 / 4 : 1 / 2;
+    did = heal(battle, me, me.stats.hp * share) > 0 || did;
   }
-  if (move.id === 'rest' && me.hp < me.stats.hp && me.status !== 'slp' && run(b, me, 'onSetStatus', 'slp', me) !== false && !statusImmune(b, me, 'slp', me)) {
+  if (move.id === 'rest' && me.hp < me.stats.hp && me.status !== 'slp' && run(battle, me, 'onSetStatus', 'slp', me) !== false && !statusImmune(battle, me, 'slp', me)) {
     me.status = 'slp';
     me.statusTurns = 3;
-    emit(b, { t: 'status', side: sideIndex(b, me), name: nameOf(me), status: 'slp' });
-    heal(b, me, me.stats.hp);
+    emit(battle, { t: 'status', side: sideIndexOf(battle, me), name: nameOf(me), status: 'slp' });
+    heal(battle, me, me.stats.hp);
     did = true;
   }
-  if (!did) emit(b, { t: 'nothing', side: sideIndex(b, me) });
+  if (!did) emit(battle, { t: 'nothing', side: sideIndexOf(battle, me) });
 }
 
-function statusMove(b: B, me: F, foe: F | null, move: BattleMove): void {
-  if (move.target !== 'foe') return selfStatus(b, me, move);
-  const s = sideIndex(b, me);
+function statusMove(battle: B, me: F, foe: F | null, move: BattleMove): void {
+  if (move.target !== 'foe') return selfStatus(battle, me, move);
+  const sideIndex = sideIndexOf(battle, me);
   if (!foe) {
-    emit(b, { t: 'notarget', side: s });
+    emit(battle, { t: 'notarget', side: sideIndex });
     return;
   }
-  if (blockedByProtection(b, me, foe, move)) return;
-  if (foe.vol.substitute && !bypassesSub(b, me, move)) {
-    emit(b, { t: 'nothing', side: s, reason: 'substitute' });
+  if (blockedByProtection(battle, me, foe, move)) return;
+  if (foe.vol.substitute && !bypassesSub(battle, me, move)) {
+    emit(battle, { t: 'nothing', side: sideIndex, reason: 'substitute' });
     return;
   }
   let target = foe;
-  b.mold = flag(b, me, 'moldBreaker') ? { target: foe } : null;
+  battle.mold = flag(battle, me, 'moldBreaker') ? { target: foe } : null;
   try {
     if (move.effectivePriority > move.priority && foe.types.includes('dark')) {
-      emit(b, { t: 'immune', side: 1 - s });
+      emit(battle, { t: 'immune', side: 1 - sideIndex });
       return;
     }
-    if (move.id === 'thunder-wave' && typeEffectiveness(b, move, me, foe) === 0) {
-      emit(b, { t: 'immune', side: 1 - s });
+    if (move.id === 'thunder-wave' && typeEffectiveness(battle, move, me, foe) === 0) {
+      emit(battle, { t: 'immune', side: 1 - sideIndex });
       return;
     }
-    if (run(b, foe, 'onTryHit', move, me)) return;
-    if (flag(b, foe, 'blocksStatusMoves')) {
-      showAbility(b, foe);
-      emit(b, { t: 'immune', side: 1 - s });
+    if (run(battle, foe, 'onTryHit', move, me)) return;
+    if (flag(battle, foe, 'blocksStatusMoves')) {
+      showAbility(battle, foe);
+      emit(battle, { t: 'immune', side: 1 - sideIndex });
       return;
     }
-    if ((move.accuracy != null || hiddenFrom(foe, move)) && !hits(b, me, foe, move)) {
-      emit(b, { t: 'miss', side: s });
+    if ((move.accuracy != null || hiddenFrom(foe, move)) && !hits(battle, me, foe, move)) {
+      emit(battle, { t: 'miss', side: sideIndex });
       return;
     }
-    if (flag(b, foe, 'bouncesStatus') && move.flags.includes('reflectable')) {
-      showAbility(b, foe, 'bounce');
+    if (flag(battle, foe, 'bouncesStatus') && move.flags.includes('reflectable')) {
+      showAbility(battle, foe, 'bounce');
       target = me;
-    } else if (foe.vol.magicCoat === b.turn && move.flags.includes('reflectable')) {
-      emit(b, { t: 'bounced', side: 1 - s, name: nameOf(foe), move: move.name });
+    } else if (foe.vol.magicCoat === battle.turn && move.flags.includes('reflectable')) {
+      emit(battle, { t: 'bounced', side: 1 - sideIndex, name: nameOf(foe), move: move.name });
       target = me;
     }
   } finally {
-    b.mold = null;
+    battle.mold = null;
   }
   const source = target === me ? foe : me;
   const rules = MOVE_RULES[move.id];
   if (rules?.use) {
-    rules.use(moveApi(b), source, target, move);
+    rules.use(moveApi(battle), source, target, move);
     return;
   }
   let did = false;
-  if (move.boosts) did = Object.keys(boost(b, target, move.boosts, source)).length > 0 || did;
-  if (move.status) did = setStatus(b, target, move.status, source) || did;
-  if (move.volatile === 'confusion') did = addVolatile(b, target, 'confusion', source) || did;
-  if (move.volatile === 'attract') did = addVolatile(b, target, 'attract', source) || did;
-  if (move.volatile === 'leechseed') did = addVolatile(b, target, 'leechseed', source) || did;
-  if (move.self) did = Object.keys(boost(b, source, move.self, source)).length > 0 || did;
+  if (move.boosts) did = Object.keys(boost(battle, target, move.boosts, source)).length > 0 || did;
+  if (move.status) did = setStatus(battle, target, move.status, source) || did;
+  if (move.volatile === 'confusion') did = addVolatile(battle, target, 'confusion', source) || did;
+  if (move.volatile === 'attract') did = addVolatile(battle, target, 'attract', source) || did;
+  if (move.volatile === 'leechseed') did = addVolatile(battle, target, 'leechseed', source) || did;
+  if (move.self) did = Object.keys(boost(battle, source, move.self, source)).length > 0 || did;
   if (!did && move.volatile === 'attract' && (!target.gender || !source.gender || target.gender === source.gender)) {
-    emit(b, { t: 'nothing', side: s, reason: !target.gender || !source.gender ? 'genderless' : 'sameGender' });
+    emit(battle, { t: 'nothing', side: sideIndex, reason: !target.gender || !source.gender ? 'genderless' : 'sameGender' });
     return;
   }
   if (move.clearsScreens) {
-    did = clearScreens(b, sideIndex(b, target), 'defog') || did;
-    for (const side of [0, 1]) did = clearHazards(b, side) || did;
+    did = clearScreens(battle, sideIndexOf(battle, target), 'defog') || did;
+    for (const side of [0, 1]) did = clearHazards(battle, side) || did;
   }
-  if (!did) emit(b, { t: 'nothing', side: s });
+  if (!did) emit(battle, { t: 'nothing', side: sideIndex });
 }
 
-function rollHits(b: B, me: F, move: BattleMove): number {
+function rollHits(battle: B, me: F, move: BattleMove): number {
   if (move.multihit) {
     const [lo, hi] = move.multihit;
     if (lo === hi) return lo;
-    if (flag(b, me, 'maxHits')) return hi;
-    const r = b.random();
-    if (lo === 2 && hi === 5) return r < 0.35 ? 2 : r < 0.7 ? 3 : r < 0.85 ? 4 : 5;
-    return lo + Math.floor(r * (hi - lo + 1));
+    if (flag(battle, me, 'maxHits')) return hi;
+    const roll = battle.random();
+    if (lo === 2 && hi === 5) return roll < 0.35 ? 2 : roll < 0.7 ? 3 : roll < 0.85 ? 4 : 5;
+    return lo + Math.floor(roll * (hi - lo + 1));
   }
-  return flag(b, me, 'parentalBond') ? 2 : 1;
+  return flag(battle, me, 'parentalBond') ? 2 : 1;
 }
 
 const HIDDEN_BY: Record<string, string> = { fly: 'air', bounce: 'air', 'sky-drop': 'air', dig: 'ground', dive: 'water', 'phantom-force': 'vanished', 'shadow-force': 'vanished' };
@@ -1504,95 +1504,95 @@ export function hiddenFrom(target: F, move: AnyMove): boolean {
   return !!place && !REACHES_HIDDEN[place].includes(move.id);
 }
 
-function hits(b: B, me: F, target: F, move: BattleMove): boolean {
-  if (hiddenFrom(target, move)) return flag(b, me, 'alwaysHits') || flag(b, target, 'alwaysHits');
-  if (move.ohko) return b.random() * 100 < 30 + me.level - target.level;
-  if (move.accuracy == null || flag(b, me, 'alwaysHits') || flag(b, target, 'alwaysHits')) return true;
+function hits(battle: B, me: F, target: F, move: BattleMove): boolean {
+  if (hiddenFrom(target, move)) return flag(battle, me, 'alwaysHits') || flag(battle, target, 'alwaysHits');
+  if (move.ohko) return battle.random() * 100 < 30 + me.level - target.level;
+  if (move.accuracy == null || flag(battle, me, 'alwaysHits') || flag(battle, target, 'alwaysHits')) return true;
   if (target.vol.telekinesis || me.vol.lockOn === target) return true;
-  const w = weather(b);
-  if (move.id === 'blizzard' && (w === 'hail' || w === 'snow')) return true;
-  if ((move.id === 'thunder' || move.id === 'hurricane') && isRain(w)) return true;
-  if ((move.id === 'thunder' || move.id === 'hurricane') && isSun(w)) return b.random() * 100 < 50;
-  if (move.kind === 'status' && flag(b, target, 'wonderSkin')) return b.random() < 0.5;
-  const accStage = flag(b, target, 'unaware') ? 0 : me.boosts.acc;
-  const evaStage = flag(b, me, 'unaware') || flag(b, me, 'ignoresEvasion') || target.vol.foresight || target.vol.miracleEye ? Math.min(0, target.boosts.eva) : target.boosts.eva;
+  const weather = currentWeather(battle);
+  if (move.id === 'blizzard' && (weather === 'hail' || weather === 'snow')) return true;
+  if ((move.id === 'thunder' || move.id === 'hurricane') && isRain(weather)) return true;
+  if ((move.id === 'thunder' || move.id === 'hurricane') && isSun(weather)) return battle.random() * 100 < 50;
+  if (move.kind === 'status' && flag(battle, target, 'wonderSkin')) return battle.random() < 0.5;
+  const accStage = flag(battle, target, 'unaware') ? 0 : me.boosts.acc;
+  const evaStage = flag(battle, me, 'unaware') || flag(battle, me, 'ignoresEvasion') || target.vol.foresight || target.vol.miracleEye ? Math.min(0, target.boosts.eva) : target.boosts.eva;
   let acc = move.accuracy * accuracyMult(clamp(accStage - evaStage, -STAGE_LIMIT, STAGE_LIMIT));
-  if (b.field.rooms.gravity) acc *= 5 / 3;
-  acc = chain(b, me, 'onAccuracy', acc, move, target);
-  acc = chain(b, target, 'onEvasion', acc, move, me);
-  return b.random() * 100 < acc;
+  if (battle.field.rooms.gravity) acc *= 5 / 3;
+  acc = chain(battle, me, 'onAccuracy', acc, move, target);
+  acc = chain(battle, target, 'onEvasion', acc, move, me);
+  return battle.random() * 100 < acc;
 }
 
-function rollCrit(b: B, me: F, target: F, move: BattleMove): boolean {
-  if (flag(b, target, 'critImmune') || b.sides[sideIndex(b, target)].conds.luckychant) return false;
-  if (me.vol.laserFocus != null && me.vol.laserFocus >= b.turn) return true;
-  const stage = chain(b, me, 'onCritStage', (move.crit || 0) + (me.vol.focusEnergy ? 2 : 0), move, target);
-  return b.random() < [1 / 16, 1 / 8, 1 / 2, 1][clamp(stage, 0, 3)];
+function rollCrit(battle: B, me: F, target: F, move: BattleMove): boolean {
+  if (flag(battle, target, 'critImmune') || battle.sides[sideIndexOf(battle, target)].conds.luckychant) return false;
+  if (me.vol.laserFocus != null && me.vol.laserFocus >= battle.turn) return true;
+  const stage = chain(battle, me, 'onCritStage', (move.crit || 0) + (me.vol.focusEnergy ? 2 : 0), move, target);
+  return battle.random() < [1 / 16, 1 / 8, 1 / 2, 1][clamp(stage, 0, 3)];
 }
 
-function ruin(b: B, f: F, key: string): number {
-  return otherActiveHas(b, f, key) ? 0.75 : 1;
+function ruin(battle: B, fighter: F, key: string): number {
+  return otherActiveHas(battle, fighter, key) ? 0.75 : 1;
 }
 
-function powerMods(b: B, me: F, target: F, move: BattleMove): number {
-  let m = mul(b, me, 'onBasePower', move, target) * mul(b, target, 'onIncoming', move, me);
-  if ((move.type === 'dark' && anyActiveHas(b, 'dark-aura')) || (move.type === 'fairy' && anyActiveHas(b, 'fairy-aura'))) m *= anyActiveHas(b, 'aura-break') ? 0.75 : 4 / 3;
-  const t = b.field.terrain;
-  if (grounded(b, me) && ((t === 'electric' && move.type === 'electric') || (t === 'grassy' && move.type === 'grass') || (t === 'psychic' && move.type === 'psychic'))) m *= 1.3;
-  if (grounded(b, target) && t === 'misty' && move.type === 'dragon') m *= 0.5;
-  if (grounded(b, target) && t === 'grassy' && move.weakenedByGrassyTerrain) m *= 0.5;
-  if (me.vol.charge && move.type === 'electric') m *= 2;
-  if (b.field.rooms.mudsport && move.type === 'electric') m /= 3;
-  if (b.field.rooms.watersport && move.type === 'fire') m /= 3;
-  return m;
+function powerMods(battle: B, me: F, target: F, move: BattleMove): number {
+  let multiplier = mul(battle, me, 'onBasePower', move, target) * mul(battle, target, 'onIncoming', move, me);
+  if ((move.type === 'dark' && anyActiveHas(battle, 'dark-aura')) || (move.type === 'fairy' && anyActiveHas(battle, 'fairy-aura'))) multiplier *= anyActiveHas(battle, 'aura-break') ? 0.75 : 4 / 3;
+  const terrain = battle.field.terrain;
+  if (grounded(battle, me) && ((terrain === 'electric' && move.type === 'electric') || (terrain === 'grassy' && move.type === 'grass') || (terrain === 'psychic' && move.type === 'psychic'))) multiplier *= 1.3;
+  if (grounded(battle, target) && terrain === 'misty' && move.type === 'dragon') multiplier *= 0.5;
+  if (grounded(battle, target) && terrain === 'grassy' && move.weakenedByGrassyTerrain) multiplier *= 0.5;
+  if (me.vol.charge && move.type === 'electric') multiplier *= 2;
+  if (battle.field.rooms.mudsport && move.type === 'electric') multiplier /= 3;
+  if (battle.field.rooms.watersport && move.type === 'fire') multiplier /= 3;
+  return multiplier;
 }
 
-function computeDamage(b: B, me: F, target: F, move: BattleMove, eff: number, hitPower: number): { dmg: number; crit: boolean } {
-  const crit = rollCrit(b, me, target, move);
+function computeDamage(battle: B, me: F, target: F, move: BattleMove, eff: number, hitPower: number): { dmg: number; crit: boolean } {
+  const crit = rollCrit(battle, me, target, move);
   const physical = move.category === 'physical';
   const atkKey = move.usesDefense ? 'def' : physical ? 'atk' : 'satk';
   const defKey = physical || move.hitsPhysicalDef ? 'def' : 'sdef';
   const attacker = move.usesTargetAttack ? target : me;
-  let atkStage = flag(b, target, 'unaware') ? 0 : attacker.boosts[atkKey];
+  let atkStage = flag(battle, target, 'unaware') ? 0 : attacker.boosts[atkKey];
   if (crit && atkStage < 0) atkStage = 0;
-  let defStage = flag(b, me, 'unaware') || move.ignoresDefBoosts ? 0 : target.boosts[defKey];
+  let defStage = flag(battle, me, 'unaware') || move.ignoresDefBoosts ? 0 : target.boosts[defKey];
   if (crit && defStage > 0) defStage = 0;
-  const w = weather(b);
+  const weather = currentWeather(battle);
 
-  const a = attacker.stats[atkKey] * stageMult(atkStage) * mul(b, me, 'onAttack', move, target) * ruin(b, me, physical ? 'tablets-of-ruin' : 'vessel-of-ruin');
-  const defStat = b.field.rooms.wonderroom ? (defKey === 'def' ? 'sdef' : 'def') : defKey;
-  let d = target.stats[defStat] * stageMult(defStage) * mul(b, target, 'onDefense', move, me) * ruin(b, target, physical ? 'sword-of-ruin' : 'beads-of-ruin');
-  if (w === 'sand' && !physical && target.types.includes('rock')) d *= 1.5;
-  if (w === 'snow' && physical && target.types.includes('ice')) d *= 1.5;
+  const attack = attacker.stats[atkKey] * stageMult(atkStage) * mul(battle, me, 'onAttack', move, target) * ruin(battle, me, physical ? 'tablets-of-ruin' : 'vessel-of-ruin');
+  const defStat = battle.field.rooms.wonderroom ? (defKey === 'def' ? 'sdef' : 'def') : defKey;
+  let defense = target.stats[defStat] * stageMult(defStage) * mul(battle, target, 'onDefense', move, me) * ruin(battle, target, physical ? 'sword-of-ruin' : 'beads-of-ruin');
+  if (weather === 'sand' && !physical && target.types.includes('rock')) defense *= 1.5;
+  if (weather === 'snow' && physical && target.types.includes('ice')) defense *= 1.5;
 
-  let dmg = (((2 * me.level) / 5 + 2) * hitPower * powerMods(b, me, target, move) * (a / d)) / 50 + 2;
-  const mw = weatherFor(b, me);
+  let dmg = (((2 * me.level) / 5 + 2) * hitPower * powerMods(battle, me, target, move) * (attack / defense)) / 50 + 2;
+  const mw = weatherFor(battle, me);
   if (isSun(mw)) dmg *= move.type === 'fire' || move.id === 'hydro-steam' ? 1.5 : move.type === 'water' ? 0.5 : 1;
   if (isRain(mw)) dmg *= move.type === 'water' ? 1.5 : move.type === 'fire' ? 0.5 : 1;
-  if (move.type && me.types.includes(move.type)) dmg *= flag(b, me, 'stab') ? (abilityDef(b, me)!.stab as number) : 1.5;
-  dmg *= eff * (0.85 + b.random() * 0.15) * (crit ? 1.5 : 1);
-  if (me.status === 'brn' && physical && !flag(b, me, 'ignoresBurn') && move.id !== 'facade') dmg *= 0.5;
-  if (!crit && screened(b, me, target, move)) dmg *= 0.5;
+  if (move.type && me.types.includes(move.type)) dmg *= flag(battle, me, 'stab') ? (abilityDef(battle, me)!.stab as number) : 1.5;
+  dmg *= eff * (0.85 + battle.random() * 0.15) * (crit ? 1.5 : 1);
+  if (me.status === 'brn' && physical && !flag(battle, me, 'ignoresBurn') && move.id !== 'facade') dmg *= 0.5;
+  if (!crit && screened(battle, me, target, move)) dmg *= 0.5;
   if ((move.id === 'collision-course' || move.id === 'electro-drift') && eff > 1) dmg *= 5461 / 4096;
-  if (target.vol.glaiveRush != null && b.turn - target.vol.glaiveRush <= 1) dmg *= 2;
-  dmg *= mul(b, me, 'onAttackerFinal', move, target, { eff, crit }) * mul(b, target, 'onDefenderFinal', move, me, { eff, crit });
+  if (target.vol.glaiveRush != null && battle.turn - target.vol.glaiveRush <= 1) dmg *= 2;
+  dmg *= mul(battle, me, 'onAttackerFinal', move, target, { eff, crit }) * mul(battle, target, 'onDefenderFinal', move, me, { eff, crit });
   return { dmg: Math.max(1, Math.round(dmg)), crit };
 }
 
-function applySecondaries(b: B, me: F, target: F, move: BattleMove): void {
-  if (!move.secondary?.length || flag(b, me, 'sheerForce')) return;
-  const odds = flag(b, me, 'doublesSecondaries') ? 2 : 1;
+function applySecondaries(battle: B, me: F, target: F, move: BattleMove): void {
+  if (!move.secondary?.length || flag(battle, me, 'sheerForce')) return;
+  const odds = flag(battle, me, 'doublesSecondaries') ? 2 : 1;
   for (const sec of move.secondary) {
-    if (b.random() * 100 >= sec.chance * odds) continue;
+    if (battle.random() * 100 >= sec.chance * odds) continue;
     if (sec.self) {
-      if (me.hp > 0) boost(b, me, sec.self, me);
+      if (me.hp > 0) boost(battle, me, sec.self, me);
       continue;
     }
-    if (target.hp <= 0 || flag(b, target, 'blocksSecondaries')) continue;
-    if (sec.status) setStatus(b, target, sec.status, me);
-    if (sec.flinch) addVolatile(b, target, 'flinch', me);
-    if (sec.confuse) addVolatile(b, target, 'confusion', me);
-    if (sec.boosts) boost(b, target, sec.boosts, me);
+    if (target.hp <= 0 || flag(battle, target, 'blocksSecondaries')) continue;
+    if (sec.status) setStatus(battle, target, sec.status, me);
+    if (sec.flinch) addVolatile(battle, target, 'flinch', me);
+    if (sec.confuse) addVolatile(battle, target, 'confusion', me);
+    if (sec.boosts) boost(battle, target, sec.boosts, me);
   }
 }
 
@@ -1602,123 +1602,123 @@ function fixedDamage(me: F, target: F, move: AnyMove): number {
   return Number(move.fixedDamage);
 }
 
-function attack(b: B, me: F, target: F | null, move: BattleMove): number | undefined {
-  const s = sideIndex(b, me);
+function attack(battle: B, me: F, target: F | null, move: BattleMove): number | undefined {
+  const sideIndex = sideIndexOf(battle, me);
   if (!target) {
-    emit(b, { t: 'notarget', side: s });
+    emit(battle, { t: 'notarget', side: sideIndex });
     return 0;
   }
   if (move.ohko && target.level > me.level) {
-    emit(b, { t: 'nothing', side: s });
+    emit(battle, { t: 'nothing', side: sideIndex });
     return 0;
   }
-  const w = weather(b);
-  if ((w === 'heavyrain' && move.type === 'fire') || (w === 'harshsun' && move.type === 'water')) {
-    emit(b, { t: 'fizzle', side: s, weather: w });
+  const weather = currentWeather(battle);
+  if ((weather === 'heavyrain' && move.type === 'fire') || (weather === 'harshsun' && move.type === 'water')) {
+    emit(battle, { t: 'fizzle', side: sideIndex, weather });
     return;
   }
-  if (blockedByProtection(b, me, target, move)) return 0;
+  if (blockedByProtection(battle, me, target, move)) return 0;
   const rules = MOVE_RULES[move.id];
-  const typeEff = typeEffectiveness(b, move, me, target);
-  const crash = () => move.crashes && me.hp > 0 && hurt(b, me, me.stats.hp / 2, 'crash');
-  b.mold = flag(b, me, 'moldBreaker') ? { target } : null;
+  const typeEff = typeEffectiveness(battle, move, me, target);
+  const crash = () => move.crashes && me.hp > 0 && hurt(battle, me, me.stats.hp / 2, 'crash');
+  battle.mold = flag(battle, me, 'moldBreaker') ? { target } : null;
   try {
-    if (run(b, target, 'onTryHit', move, me)) {
+    if (run(battle, target, 'onTryHit', move, me)) {
       crash();
       return;
     }
     if (typeEff === 0 && !move.ignoresImmunity) {
-      emit(b, { t: 'immune', side: 1 - s });
+      emit(battle, { t: 'immune', side: 1 - sideIndex });
       crash();
       return;
     }
-    if (b.field.terrain === 'psychic' && move.effectivePriority > 0 && grounded(b, target)) {
-      emit(b, { t: 'immune', side: 1 - s, terrain: 'psychic' });
+    if (battle.field.terrain === 'psychic' && move.effectivePriority > 0 && grounded(battle, target)) {
+      emit(battle, { t: 'immune', side: 1 - sideIndex, terrain: 'psychic' });
       return;
     }
-    if (!hits(b, me, target, move)) {
-      emit(b, { t: 'miss', side: s });
+    if (!hits(battle, me, target, move)) {
+      emit(battle, { t: 'miss', side: sideIndex });
       crash();
       return;
     }
-    const fixed = rules?.damage ? rules.damage(moveApi(b), me, target, move) : undefined;
+    const fixed = rules?.damage ? rules.damage(moveApi(battle), me, target, move) : undefined;
     if (fixed === null) {
-      emit(b, { t: 'nothing', side: s });
+      emit(battle, { t: 'nothing', side: sideIndex });
       return 0;
     }
-    if (move.breaksScreens) clearScreens(b, sideIndex(b, target), 'broken');
-    move.power = rules?.power ? rules.power(moveApi(b), me, target, move) : basePower(b, me, target, move);
-    if (move.id === 'spectral-thief') stealBoosts(b, me, target);
-    const eff = chain(b, target, 'onEffectiveness', typeEff || 1, move, me);
-    const count = rules?.hits ? rules.hits(moveApi(b), me) : rollHits(b, me, move);
+    if (move.breaksScreens) clearScreens(battle, sideIndexOf(battle, target), 'broken');
+    move.power = rules?.power ? rules.power(moveApi(battle), me, target, move) : basePower(battle, me, target, move);
+    if (move.id === 'spectral-thief') stealBoosts(battle, me, target);
+    const eff = chain(battle, target, 'onEffectiveness', typeEff || 1, move, me);
+    const count = rules?.hits ? rules.hits(moveApi(battle), me) : rollHits(battle, me, move);
     let total = 0;
     let lastHit = 0;
     let landed = 0;
     let toSub = false;
     for (let i = 0; i < count && target.hp > 0 && me.hp > 0; i++) {
-      const hitPower = rules?.hitPower ? rules.hitPower(moveApi(b), me, i) : i > 0 && !move.multihit ? move.power * 0.25 : move.power;
-      const { dmg, crit } = fixed !== undefined ? { dmg: fixed, crit: false } : move.ohko || move.fixedDamage ? { dmg: fixedDamage(me, target, move), crit: false } : computeDamage(b, me, target, move, eff, hitPower);
-      if (target.vol.substitute && !bypassesSub(b, me, move)) {
+      const hitPower = rules?.hitPower ? rules.hitPower(moveApi(battle), me, i) : i > 0 && !move.multihit ? move.power * 0.25 : move.power;
+      const { dmg, crit } = fixed !== undefined ? { dmg: fixed, crit: false } : move.ohko || move.fixedDamage ? { dmg: fixedDamage(me, target, move), crit: false } : computeDamage(battle, me, target, move, eff, hitPower);
+      if (target.vol.substitute && !bypassesSub(battle, me, move)) {
         const absorbed = Math.min(target.vol.substitute, dmg);
         target.vol.substitute -= absorbed;
         total += absorbed;
         landed += 1;
         toSub = true;
-        emit(b, { t: 'subDamage', side: 1 - s, name: nameOf(target), amount: absorbed, eff, crit });
+        emit(battle, { t: 'subDamage', side: 1 - sideIndex, name: nameOf(target), amount: absorbed, eff, crit });
         if (target.vol.substitute <= 0) {
           delete target.vol.substitute;
-          emit(b, { t: 'volatileEnd', side: 1 - s, name: nameOf(target), kind: 'substitute' });
+          emit(battle, { t: 'volatileEnd', side: 1 - sideIndex, name: nameOf(target), kind: 'substitute' });
         }
         continue;
       }
-      let dealt = Math.min(target.hp, chain(b, target, 'onDamage', dmg, move, me));
+      let dealt = Math.min(target.hp, chain(battle, target, 'onDamage', dmg, move, me));
       if (move.leavesOne && dealt >= target.hp) dealt = Math.max(0, target.hp - 1);
-      const endured = target.vol.endure === b.turn && dealt >= target.hp && target.hp > 0;
+      const endured = target.vol.endure === battle.turn && dealt >= target.hp && target.hp > 0;
       if (endured) dealt = target.hp - 1;
       const before = target.hp;
       target.hp -= dealt;
       total += dealt;
       lastHit = dealt;
       landed += 1;
-      emit(b, { t: 'damage', side: 1 - s, amount: dealt, hp: target.hp, max: target.stats.hp, eff, crit });
-      if (endured) emit(b, { t: 'endured', side: 1 - s, name: nameOf(target) });
+      emit(battle, { t: 'damage', side: 1 - sideIndex, amount: dealt, hp: target.hp, max: target.stats.hp, eff, crit });
+      if (endured) emit(battle, { t: 'endured', side: 1 - sideIndex, name: nameOf(target) });
       if (dealt > 0) {
         const prev = target.turnHit?.by === me ? target.turnHit.amount : 0;
         target.turnHit = { by: me, physical: move.category === 'physical', special: move.category === 'special', amount: prev + dealt };
         target.timesHit = (target.timesHit ?? 0) + 1;
         if (target.vol.locked?.kind === 'bide') target.vol.locked.damage += dealt;
-        if (target.vol.rage && target.hp > 0) boost(b, target, { atk: 1 }, target);
+        if (target.vol.rage && target.hp > 0) boost(battle, target, { atk: 1 }, target);
       }
-      if (target.status === 'frz' && (move.type === 'fire' || move.flags.includes('defrost')) && target.hp > 0) cure(b, target);
-      if (target.vol.focusing === 'beak-blast' && move.flags.includes('contact') && me.hp > 0) setStatus(b, me, 'brn', target);
-      run(b, target, 'onDamagingHit', move, me, { crit, before, dmg: dealt });
+      if (target.status === 'frz' && (move.type === 'fire' || move.flags.includes('defrost')) && target.hp > 0) cure(battle, target);
+      if (target.vol.focusing === 'beak-blast' && move.flags.includes('contact') && me.hp > 0) setStatus(battle, me, 'brn', target);
+      run(battle, target, 'onDamagingHit', move, me, { crit, before, dmg: dealt });
     }
-    if (landed > 1) emit(b, { t: 'hits', side: 1 - s, count: landed });
+    if (landed > 1) emit(battle, { t: 'hits', side: 1 - sideIndex, count: landed });
     if (me.vol.charge && move.type === 'electric') delete me.vol.charge;
 
-    if (!toSub) applySecondaries(b, me, target, move);
-    if (move.self && me.hp > 0) boost(b, me, move.self, me);
-    if (move.recoil && total > 0 && !flag(b, me, 'noRecoil')) hurt(b, me, total * move.recoil, 'recoil');
+    if (!toSub) applySecondaries(battle, me, target, move);
+    if (move.self && me.hp > 0) boost(battle, me, move.self, me);
+    if (move.recoil && total > 0 && !flag(battle, me, 'noRecoil')) hurt(battle, me, total * move.recoil, 'recoil');
     if (move.drain && total > 0 && me.hp > 0) {
       const amount = Math.max(1, Math.round(total * move.drain));
-      if (flag(b, target, 'oozes')) {
-        showAbility(b, target);
-        hurt(b, me, amount, 'ooze');
-      } else heal(b, me, amount);
+      if (flag(battle, target, 'oozes')) {
+        showAbility(battle, target);
+        hurt(battle, me, amount, 'ooze');
+      } else heal(battle, me, amount);
     }
-    if (me.hp > 0 && !toSub) run(b, me, 'onAfterMoveHit', move, target, total);
-    if (target.hp <= 0) faint(b, target, me, move, lastHit);
-    if (!toSub) afterHit(b, me, target, move, total);
-    else afterSelf(b, me, move);
+    if (me.hp > 0 && !toSub) run(battle, me, 'onAfterMoveHit', move, target, total);
+    if (target.hp <= 0) faint(battle, target, me, move, lastHit);
+    if (!toSub) afterHit(battle, me, target, move, total);
+    else afterSelf(battle, me, move);
     if ((move.id === 'rapid-spin' || move.id === 'mortal-spin') && me.hp > 0) {
-      clearHazards(b, s);
+      clearHazards(battle, sideIndex);
       delete me.vol.bound;
       delete me.vol.leechSeed;
     }
-    rules?.hit?.(moveApi(b), me, target, move, total);
+    rules?.hit?.(moveApi(battle), me, target, move, total);
     return total;
   } finally {
-    b.mold = null;
+    battle.mold = null;
   }
 }
 
@@ -1726,16 +1726,16 @@ function alive(side: BattleSide): boolean {
   return side.team.some((f) => f.hp > 0);
 }
 
-function finish(b: B, winner: number | null, reason: string | null = null): void {
-  b.status = 'finished';
-  b.winner = winner;
-  emit(b, { t: 'end', winner, ...(reason ? { reason } : {}) });
+function finish(battle: B, winner: number | null, reason: string | null = null): void {
+  battle.status = 'finished';
+  battle.winner = winner;
+  emit(battle, { t: 'end', winner, ...(reason ? { reason } : {}) });
 }
 
-function checkEnd(b: B): boolean {
-  const lost = b.sides.map((side) => !alive(side));
+function checkEnd(battle: B): boolean {
+  const lost = battle.sides.map((side) => !alive(side));
   if (!lost[0] && !lost[1]) return false;
-  finish(b, lost[0] && lost[1] ? null : lost[0] ? 1 : 0);
+  finish(battle, lost[0] && lost[1] ? null : lost[0] ? 1 : 0);
   return true;
 }
 
@@ -1743,399 +1743,399 @@ function hpShare(side: BattleSide): number {
   return side.team.reduce((sum, f) => sum + f.hp / f.stats.hp, 0);
 }
 
-function resolveTurn(b: B): BattleEvent[] {
-  const events: BattleEvent[] = [{ t: 'turn', turn: b.turn }];
-  b.ev = events;
-  b.moved = new Set();
-  for (const f of activeFighters(b)) f.activeTurns += 1;
+function resolveTurn(battle: B): BattleEvent[] {
+  const events: BattleEvent[] = [{ t: 'turn', turn: battle.turn }];
+  battle.ev = events;
+  battle.moved = new Set();
+  for (const fighter of activeFighters(battle)) fighter.activeTurns += 1;
   // Both sides have chosen by now (submit() only resolves then).
-  const acts = b.sides.map((side, s) => ({ s, ...(side.action as SideAction) }));
-  b.chosen = acts.map((a) => (a.type === 'move' ? moveOfAction(b, a.s, a.move) : null));
-  for (const side of b.sides) side.action = null;
-  for (const side of b.sides) for (const f of side.team) delete f.turnHit;
+  const acts = battle.sides.map((side, s) => ({ s, ...(side.action as SideAction) }));
+  battle.chosen = acts.map((a) => (a.type === 'move' ? moveOfAction(battle, a.s, a.move) : null));
+  for (const side of battle.sides) side.action = null;
+  for (const side of battle.sides) for (const fighter of side.team) delete fighter.turnHit;
 
   const entered: number[] = [];
-  for (const a of acts) {
-    if (a.type !== 'switch') continue;
-    if (doSwitch(b, a.s, a.to)) wakeAbilities(b, activeOf(b, a.s));
-    entered.push(a.s);
+  for (const action of acts) {
+    if (action.type !== 'switch') continue;
+    if (doSwitch(battle, action.s, action.to)) wakeAbilities(battle, activeOf(battle, action.s));
+    entered.push(action.s);
   }
-  for (const s of entryOrder(b, entered)) runEntry(b, s);
-  settle(b);
-  if (checkEnd(b)) return done(b, events);
+  for (const sideIndex of entryOrder(battle, entered)) runEntry(battle, sideIndex);
+  settle(battle);
+  if (checkEnd(battle)) return done(battle, events);
 
   const movers: Mover[] = acts
     .filter((a): a is { s: number } & MoveAction & { auto?: boolean } => a.type === 'move')
-    .map((a) => {
-      const f = activeOf(b, a.s);
-      const move = a.move === STRUGGLE_MOVE ? STRUGGLE : f.moves[a.move];
-      const frac = run(b, f, 'onFractionalPriority', move);
-      return { ...a, f, prio: chain(b, f, 'onModifyPriority', move.priority, move), frac: typeof frac === 'number' ? frac : 0, spd: speedOf(b, f), tie: b.random() };
+    .map((action) => {
+      const fighter = activeOf(battle, action.s);
+      const move = action.move === STRUGGLE_MOVE ? STRUGGLE : fighter.moves[action.move];
+      const frac = run(battle, fighter, 'onFractionalPriority', move);
+      return { ...action, f: fighter, prio: chain(battle, fighter, 'onModifyPriority', move.priority, move), frac: typeof frac === 'number' ? frac : 0, spd: speedOf(battle, fighter), tie: battle.random() };
     })
-    .sort((x, y) => y.prio - x.prio || y.frac - x.frac || (b.field.rooms.trickroom ? x.spd - y.spd : y.spd - x.spd) || y.tie - x.tie);
+    .sort((x, y) => y.prio - x.prio || y.frac - x.frac || (battle.field.rooms.trickroom ? x.spd - y.spd : y.spd - x.spd) || y.tie - x.tie);
 
   // When both attack, say why the first one went first (priority move, faster, or a coin flip).
   const why = movers.length === 2 ? (movers[0].prio !== movers[1].prio || movers[0].frac !== movers[1].frac ? 'priority' : movers[0].spd !== movers[1].spd ? 'speed' : 'tie') : null;
   movers.forEach((a, i) => (a.why = i === 0 ? why : null));
 
-  for (const a of movers) {
-    const move = moveOfAction(b, a.s, a.move);
-    if (FOCUS_MOVES.has(move.id) && a.f.hp > 0) {
-      a.f.vol.focusing = move.id;
-      emit(b, { t: 'focus', side: a.s, name: nameOf(a.f), move: move.name, key: move.id });
+  for (const mover of movers) {
+    const move = moveOfAction(battle, mover.s, mover.move);
+    if (FOCUS_MOVES.has(move.id) && mover.f.hp > 0) {
+      mover.f.vol.focusing = move.id;
+      emit(battle, { t: 'focus', side: mover.s, name: nameOf(mover.f), move: move.name, key: move.id });
     }
   }
 
-  return continueTurn(b, events, movers, 0);
+  return continueTurn(battle, events, movers, 0);
 }
 
-function continueTurn(b: B, events: BattleEvent[], movers: Mover[], from: number): BattleEvent[] {
+function continueTurn(battle: B, events: BattleEvent[], movers: Mover[], from: number): BattleEvent[] {
   for (let i = from; i < movers.length; i++) {
-    const a = movers[i];
-    if (activeOf(b, a.s) !== a.f) continue;
-    useMove(b, a.s, a.move, a.prio, a.why);
-    settle(b);
-    if (checkEnd(b)) return done(b, events);
-    if (pauseForSwitch(b, [a.s, 1 - a.s], movers, i + 1)) return done(b, events);
+    const mover = movers[i];
+    if (activeOf(battle, mover.s) !== mover.f) continue;
+    useMove(battle, mover.s, mover.move, mover.prio, mover.why);
+    settle(battle);
+    if (checkEnd(battle)) return done(battle, events);
+    if (pauseForSwitch(battle, [mover.s, 1 - mover.s], movers, i + 1)) return done(battle, events);
   }
-  residual(b);
-  settle(b);
-  if (checkEnd(b)) return done(b, events);
-  b.turn += 1;
-  if (b.turn > TURN_LIMIT) {
-    const [h0, h1] = b.sides.map(hpShare);
-    finish(b, h0 === h1 ? null : h0 > h1 ? 0 : 1, 'limit');
-    return done(b, events);
+  residual(battle);
+  settle(battle);
+  if (checkEnd(battle)) return done(battle, events);
+  battle.turn += 1;
+  if (battle.turn > TURN_LIMIT) {
+    const [h0, h1] = battle.sides.map(hpShare);
+    finish(battle, h0 === h1 ? null : h0 > h1 ? 0 : 1, 'limit');
+    return done(battle, events);
   }
-  afterTurn(b);
-  return done(b, events);
+  afterTurn(battle);
+  return done(battle, events);
 }
 
-function pauseForSwitch(b: B, sides: number[], movers: Mover[], next: number): boolean {
-  for (const s of sides) {
-    if (switchNow(b, s)) {
-      b.pending = { movers, next };
-      b.phase = 'switchout';
+function pauseForSwitch(battle: B, sides: number[], movers: Mover[], next: number): boolean {
+  for (const sideIndex of sides) {
+    if (switchNow(battle, sideIndex)) {
+      battle.pending = { movers, next };
+      battle.phase = 'switchout';
       return true;
     }
   }
   return false;
 }
 
-function switchNow(b: B, s: number): boolean {
-  const side = b.sides[s];
-  const f = activeOf(b, s);
-  if (!f.vol.switchNow) return false;
-  delete f.vol.switchNow;
+function switchNow(battle: B, sideIndex: number): boolean {
+  const side = battle.sides[sideIndex];
+  const fighter = activeOf(battle, sideIndex);
+  if (!fighter.vol.switchNow) return false;
+  delete fighter.vol.switchNow;
   const options = side.team.map((o, i) => i).filter((i) => i !== side.active && side.team[i].hp > 0);
-  if (f.hp <= 0 || !options.length) {
+  if (fighter.hp <= 0 || !options.length) {
     delete side.pass;
     return false;
   }
-  emit(b, { t: 'switchOut', side: s, name: nameOf(f) });
+  emit(battle, { t: 'switchOut', side: sideIndex, name: nameOf(fighter) });
   if (options.length === 1) {
-    selfSwitch(b, s, options[0]);
+    selfSwitch(battle, sideIndex, options[0]);
     return false;
   }
   side.mustSwitch = true;
   return true;
 }
 
-function selfSwitch(b: B, s: number, to: number): void {
-  if (doSwitch(b, s, to)) wakeAbilities(b, activeOf(b, s));
-  runEntry(b, s);
-  settle(b);
+function selfSwitch(battle: B, sideIndex: number, to: number): void {
+  if (doSwitch(battle, sideIndex, to)) wakeAbilities(battle, activeOf(battle, sideIndex));
+  runEntry(battle, sideIndex);
+  settle(battle);
 }
 
-function resolveSwitchOut(b: B): BattleEvent[] {
+function resolveSwitchOut(battle: B): BattleEvent[] {
   const events: BattleEvent[] = [];
-  b.ev = events;
-  const s = b.sides.findIndex((side) => side.mustSwitch);
-  const side = b.sides[s];
+  battle.ev = events;
+  const sideIndex = battle.sides.findIndex((side) => side.mustSwitch);
+  const side = battle.sides[sideIndex];
   const to = (side.action as SwitchAction).to;
-  for (const x of b.sides) x.action = null;
+  for (const side of battle.sides) side.action = null;
   side.mustSwitch = false;
-  const { movers, next } = b.pending!;
-  delete b.pending;
-  b.phase = 'choose';
-  selfSwitch(b, s, to);
-  if (checkEnd(b)) return done(b, events);
-  if (pauseForSwitch(b, [0, 1], movers, next)) return done(b, events);
-  return continueTurn(b, events, movers, next);
+  const { movers, next } = battle.pending!;
+  delete battle.pending;
+  battle.phase = 'choose';
+  selfSwitch(battle, sideIndex, to);
+  if (checkEnd(battle)) return done(battle, events);
+  if (pauseForSwitch(battle, [0, 1], movers, next)) return done(battle, events);
+  return continueTurn(battle, events, movers, next);
 }
 
-function done(b: B, events: BattleEvent[]): BattleEvent[] {
-  b.ev = [];
+function done(battle: B, events: BattleEvent[]): BattleEvent[] {
+  battle.ev = [];
   return events;
 }
 
-function statusDamage(b: B, f: F): void {
-  if (f.status !== 'brn' && !poisoned(f.status)) return;
+function statusDamage(battle: B, fighter: F): void {
+  if (fighter.status !== 'brn' && !poisoned(fighter.status)) return;
   let amount: number;
-  if (f.status === 'brn') amount = f.stats.hp / (flag(b, f, 'halvesBurn') ? 32 : 16);
-  else if (f.status === 'psn') amount = f.stats.hp / 8;
+  if (fighter.status === 'brn') amount = fighter.stats.hp / (flag(battle, fighter, 'halvesBurn') ? 32 : 16);
+  else if (fighter.status === 'psn') amount = fighter.stats.hp / 8;
   else {
-    f.statusTurns = Math.min(15, f.statusTurns + 1);
-    amount = (f.stats.hp * f.statusTurns) / 16;
+    fighter.statusTurns = Math.min(15, fighter.statusTurns + 1);
+    amount = (fighter.stats.hp * fighter.statusTurns) / 16;
   }
-  amount = chain(b, f, 'onStatusDamage', Math.max(1, Math.floor(amount)), f.status);
-  if (amount > 0) hurt(b, f, amount, f.status);
+  amount = chain(battle, fighter, 'onStatusDamage', Math.max(1, Math.floor(amount)), fighter.status);
+  if (amount > 0) hurt(battle, fighter, amount, fighter.status);
 }
 
-function residual(b: B): void {
-  const order = () => activeFighters(b).sort((x, y) => speedOf(b, y) - speedOf(b, x));
-  const w = weather(b);
-  for (const f of order()) {
-    if (w === 'sand' && !f.types.some((t) => SAND_PROOF.includes(t)) && !abilityDef(b, f)?.weatherImmune?.includes('sand')) hurt(b, f, f.stats.hp / 16, 'sand');
-    if (w === 'hail' && !f.types.includes('ice') && !abilityDef(b, f)?.weatherImmune?.includes('hail')) hurt(b, f, f.stats.hp / 16, 'hail');
-    if (f.hp > 0 && b.field.terrain === 'grassy' && grounded(b, f)) heal(b, f, f.stats.hp / 16);
-    if (f.hp > 0) statusDamage(b, f);
-    if (f.hp > 0 && f.vol.leechSeed) {
-      const seeder = foeOf(b, f);
-      const drained = hurt(b, f, f.stats.hp / 8, 'leechseed');
+function residual(battle: B): void {
+  const order = () => activeFighters(battle).sort((x, y) => speedOf(battle, y) - speedOf(battle, x));
+  const weather = currentWeather(battle);
+  for (const fighter of order()) {
+    if (weather === 'sand' && !fighter.types.some((t) => SAND_PROOF.includes(t)) && !abilityDef(battle, fighter)?.weatherImmune?.includes('sand')) hurt(battle, fighter, fighter.stats.hp / 16, 'sand');
+    if (weather === 'hail' && !fighter.types.includes('ice') && !abilityDef(battle, fighter)?.weatherImmune?.includes('hail')) hurt(battle, fighter, fighter.stats.hp / 16, 'hail');
+    if (fighter.hp > 0 && battle.field.terrain === 'grassy' && grounded(battle, fighter)) heal(battle, fighter, fighter.stats.hp / 16);
+    if (fighter.hp > 0) statusDamage(battle, fighter);
+    if (fighter.hp > 0 && fighter.vol.leechSeed) {
+      const seeder = foeOf(battle, fighter);
+      const drained = hurt(battle, fighter, fighter.stats.hp / 8, 'leechseed');
       if (seeder && drained) {
-        if (flag(b, f, 'oozes')) hurt(b, seeder, drained, 'ooze');
-        else heal(b, seeder, drained);
+        if (flag(battle, fighter, 'oozes')) hurt(battle, seeder, drained, 'ooze');
+        else heal(battle, seeder, drained);
       }
     }
-    if (f.hp > 0 && f.vol.bound) {
-      const bound = f.vol.bound;
-      if (!onField(b, bound.by) || --bound.turns <= 0) {
-        delete f.vol.bound;
-        emit(b, { t: 'volatileEnd', side: sideIndex(b, f), name: nameOf(f), kind: 'bound', move: bound.move });
-      } else hurt(b, f, f.stats.hp / 8, 'bound');
+    if (fighter.hp > 0 && fighter.vol.bound) {
+      const bound = fighter.vol.bound;
+      if (!onField(battle, bound.by) || --bound.turns <= 0) {
+        delete fighter.vol.bound;
+        emit(battle, { t: 'volatileEnd', side: sideIndexOf(battle, fighter), name: nameOf(fighter), kind: 'bound', move: bound.move });
+      } else hurt(battle, fighter, fighter.stats.hp / 8, 'bound');
     }
-    if (f.hp > 0 && f.vol.saltCure) hurt(b, f, f.stats.hp / (f.types.includes('water') || f.types.includes('steel') ? 4 : 8), 'saltcure');
-    if (f.hp > 0 && f.vol.aquaRing) heal(b, f, f.stats.hp / 16);
-    if (f.hp > 0 && f.vol.ingrain) heal(b, f, f.stats.hp / 16);
-    if (f.hp > 0 && f.vol.curse) hurt(b, f, f.stats.hp / 4, 'curse');
-    if (f.hp > 0 && f.vol.nightmare) {
-      if (f.status === 'slp') hurt(b, f, f.stats.hp / 4, 'nightmare');
-      else delete f.vol.nightmare;
+    if (fighter.hp > 0 && fighter.vol.saltCure) hurt(battle, fighter, fighter.stats.hp / (fighter.types.includes('water') || fighter.types.includes('steel') ? 4 : 8), 'saltcure');
+    if (fighter.hp > 0 && fighter.vol.aquaRing) heal(battle, fighter, fighter.stats.hp / 16);
+    if (fighter.hp > 0 && fighter.vol.ingrain) heal(battle, fighter, fighter.stats.hp / 16);
+    if (fighter.hp > 0 && fighter.vol.curse) hurt(battle, fighter, fighter.stats.hp / 4, 'curse');
+    if (fighter.hp > 0 && fighter.vol.nightmare) {
+      if (fighter.status === 'slp') hurt(battle, fighter, fighter.stats.hp / 4, 'nightmare');
+      else delete fighter.vol.nightmare;
     }
-    if (f.hp > 0 && f.vol.octolock) {
-      if (onField(b, f.vol.octolock)) boost(b, f, { def: -1, sdef: -1 }, f.vol.octolock);
-      else delete f.vol.octolock;
+    if (fighter.hp > 0 && fighter.vol.octolock) {
+      if (onField(battle, fighter.vol.octolock)) boost(battle, fighter, { def: -1, sdef: -1 }, fighter.vol.octolock);
+      else delete fighter.vol.octolock;
     }
   }
-  settle(b);
-  for (const f of order()) {
-    if (f.vol.yawn && --f.vol.yawn <= 0) {
-      delete f.vol.yawn;
-      setStatus(b, f, 'slp', null);
+  settle(battle);
+  for (const fighter of order()) {
+    if (fighter.vol.yawn && --fighter.vol.yawn <= 0) {
+      delete fighter.vol.yawn;
+      setStatus(battle, fighter, 'slp', null);
     }
     for (const [key, kind] of [['taunt', 'taunt'], ['encore', 'encore'], ['healBlock', 'healblock'], ['telekinesis', 'telekinesis'], ['magnetRise', 'magnetrise']]) {
-      const v = f.vol[key];
-      if (!v) continue;
-      if (--v.turns <= 0 || (key === 'encore' && !(f.pp[v.key] > 0))) {
-        delete f.vol[key];
-        emit(b, { t: 'volatileEnd', side: sideIndex(b, f), name: nameOf(f), kind });
+      const effect = fighter.vol[key];
+      if (!effect) continue;
+      if (--effect.turns <= 0 || (key === 'encore' && !(fighter.pp[effect.key] > 0))) {
+        delete fighter.vol[key];
+        emit(battle, { t: 'volatileEnd', side: sideIndexOf(battle, fighter), name: nameOf(fighter), kind });
       }
     }
   }
-  b.sides.forEach((side, s) => {
-    const f = activeOf(b, s);
-    if (side.wish && side.wish.at <= b.turn) {
+  battle.sides.forEach((side, sideIndex) => {
+    const fighter = activeOf(battle, sideIndex);
+    if (side.wish && side.wish.at <= battle.turn) {
       const wish = side.wish;
       delete side.wish;
-      if (f.hp > 0) {
-        emit(b, { t: 'wish', side: s, name: wish.name });
-        heal(b, f, wish.amount);
+      if (fighter.hp > 0) {
+        emit(battle, { t: 'wish', side: sideIndex, name: wish.name });
+        heal(battle, fighter, wish.amount);
       }
     }
-    if (side.future && side.future.at <= b.turn) {
+    if (side.future && side.future.at <= battle.turn) {
       const future = side.future;
       delete side.future;
-      if (f.hp > 0) {
-        emit(b, { t: 'futureHit', side: s, name: nameOf(f), move: future.name });
-        const eff = typeEffectiveness(b, future.move, future.user, f);
-        if (eff === 0) emit(b, { t: 'immune', side: s });
+      if (fighter.hp > 0) {
+        emit(battle, { t: 'futureHit', side: sideIndex, name: nameOf(fighter), move: future.name });
+        const eff = typeEffectiveness(battle, future.move, future.user, fighter);
+        if (eff === 0) emit(battle, { t: 'immune', side: sideIndex });
         else {
-          const { dmg } = computeDamage(b, future.user, f, future.move, eff, future.move.power);
-          hurt(b, f, dmg, 'future');
+          const { dmg } = computeDamage(battle, future.user, fighter, future.move, eff, future.move.power);
+          hurt(battle, fighter, dmg, 'future');
         }
       }
     }
     for (const key of Object.keys(side.conds)) {
-      const v = side.conds[key];
+      const turns = side.conds[key];
       if (['quickguard', 'wideguard', 'craftyshield', 'matblock'].includes(key)) {
-        if (v < b.turn + 1) delete side.conds[key];
+        if (turns < battle.turn + 1) delete side.conds[key];
         continue;
       }
       if (--side.conds[key] <= 0) {
         delete side.conds[key];
-        emit(b, { t: 'sideEnd', side: s, kind: key });
+        emit(battle, { t: 'sideEnd', side: sideIndex, kind: key });
       }
     }
   });
-  settle(b);
-  for (const key of Object.keys(b.field.rooms)) {
-    if (--b.field.rooms[key] <= 0) {
-      delete b.field.rooms[key];
-      emit(b, { t: 'fieldEnd', kind: key });
+  settle(battle);
+  for (const key of Object.keys(battle.field.rooms)) {
+    if (--battle.field.rooms[key] <= 0) {
+      delete battle.field.rooms[key];
+      emit(battle, { t: 'fieldEnd', kind: key });
     }
   }
-  for (const f of order()) run(b, f, 'onEndTurn');
-  settle(b);
-  for (const f of order()) {
-    if (f.vol.perish) {
-      f.vol.perish -= 1;
-      emit(b, { t: 'perish', side: sideIndex(b, f), name: nameOf(f), count: f.vol.perish });
-      if (!f.vol.perish) {
-        f.hp = 0;
-        faint(b, f);
+  for (const fighter of order()) run(battle, fighter, 'onEndTurn');
+  settle(battle);
+  for (const fighter of order()) {
+    if (fighter.vol.perish) {
+      fighter.vol.perish -= 1;
+      emit(battle, { t: 'perish', side: sideIndexOf(battle, fighter), name: nameOf(fighter), count: fighter.vol.perish });
+      if (!fighter.vol.perish) {
+        fighter.hp = 0;
+        faint(battle, fighter);
         continue;
       }
     }
-    if (f.vol.disabled && --f.vol.disabled.turns <= 0) {
-      emit(b, { t: 'volatileEnd', side: sideIndex(b, f), name: nameOf(f), kind: 'disable', move: f.vol.disabled.name });
-      delete f.vol.disabled;
+    if (fighter.vol.disabled && --fighter.vol.disabled.turns <= 0) {
+      emit(battle, { t: 'volatileEnd', side: sideIndexOf(battle, fighter), name: nameOf(fighter), kind: 'disable', move: fighter.vol.disabled.name });
+      delete fighter.vol.disabled;
     }
-    delete f.vol.flinch;
+    delete fighter.vol.flinch;
   }
-  b.sides.forEach((side, s) => {
+  battle.sides.forEach((side, sideIndex) => {
     for (const kind of SCREEN_KINDS) {
       if (!side.screens[kind] || --side.screens[kind] > 0) continue;
       delete side.screens[kind];
-      emit(b, { t: 'screenEnd', side: s, screen: kind, cause: 'time' });
+      emit(battle, { t: 'screenEnd', side: sideIndex, screen: kind, cause: 'time' });
     }
   });
-  if (b.field.weather && --b.field.weatherTurns <= 0) clearWeather(b);
-  if (b.field.terrain && --b.field.terrainTurns <= 0) clearTerrain(b);
+  if (battle.field.weather && --battle.field.weatherTurns <= 0) clearWeather(battle);
+  if (battle.field.terrain && --battle.field.terrainTurns <= 0) clearTerrain(battle);
 }
 
-function afterTurn(b: B): void {
+function afterTurn(battle: B): void {
   let anyReplace = false;
-  b.sides.forEach((side, s) => {
-    const f = side.team[side.active];
-    const escaping = f.hp > 0 && (f.vol.exitPending || f.vol.switchNow) && side.team.some((o) => o !== f && o.hp > 0);
-    delete f.vol.switchNow;
-    side.mustSwitch = f.hp <= 0 || escaping;
+  battle.sides.forEach((side, sideIndex) => {
+    const fighter = side.team[side.active];
+    const escaping = fighter.hp > 0 && (fighter.vol.exitPending || fighter.vol.switchNow) && side.team.some((o) => o !== fighter && o.hp > 0);
+    delete fighter.vol.switchNow;
+    side.mustSwitch = fighter.hp <= 0 || escaping;
     if (side.mustSwitch) {
       anyReplace = true;
-      emit(b, { t: 'replace', side: s });
+      emit(battle, { t: 'replace', side: sideIndex });
     }
   });
-  b.phase = anyReplace ? 'replace' : 'choose';
+  battle.phase = anyReplace ? 'replace' : 'choose';
 }
 
-function resolveReplacements(b: B): BattleEvent[] {
+function resolveReplacements(battle: B): BattleEvent[] {
   const events: BattleEvent[] = [];
-  b.ev = events;
+  battle.ev = events;
   const entered: number[] = [];
-  b.sides.forEach((side, s) => {
+  battle.sides.forEach((side, sideIndex) => {
     if (side.mustSwitch && side.action) {
-      if (doSwitch(b, s, (side.action as SwitchAction).to)) wakeAbilities(b, activeOf(b, s));
-      entered.push(s);
+      if (doSwitch(battle, sideIndex, (side.action as SwitchAction).to)) wakeAbilities(battle, activeOf(battle, sideIndex));
+      entered.push(sideIndex);
     }
     side.action = null;
     side.mustSwitch = false;
   });
-  for (const s of entryOrder(b, entered)) runEntry(b, s);
-  settle(b);
-  b.phase = 'choose';
-  if (!checkEnd(b)) {
-    const pending = [0, 1].some((s) => activeOf(b, s).hp <= 0);
-    if (pending) afterTurn(b);
+  for (const sideIndex of entryOrder(battle, entered)) runEntry(battle, sideIndex);
+  settle(battle);
+  battle.phase = 'choose';
+  if (!checkEnd(battle)) {
+    const pending = [0, 1].some((s) => activeOf(battle, s).hp <= 0);
+    if (pending) afterTurn(battle);
   }
-  return done(b, events);
+  return done(battle, events);
 }
 
 // ---------- what clients see ----------
 
-function publicMove(m: MoveData) {
+function publicMove(move: MoveData) {
   return {
-    name: m.name,
-    type: m.type,
-    power: m.power,
-    accuracy: m.accuracy,
-    priority: m.priority,
-    kind: m.kind || 'attack',
-    category: m.category,
-    desc: m.desc,
-    key: m.key,
-    contact: m.flags.includes('contact'),
-    pp: m.pp,
-    target: m.target,
-    ...(m.boosts ? { boosts: m.boosts } : {}),
-    ...(m.status ? { status: m.status } : {}),
-    ...(m.heal ? { heal: m.heal } : {}),
-    ...(m.weather ? { weather: m.weather } : {}),
-    ...(m.screen ? { screen: m.screen } : {}),
-    ...(m.breaksScreens ? { breaksScreens: true } : {}),
-    ...(m.fixedDamage ? { fixedDamage: m.fixedDamage } : {}),
-    ...(m.ohko ? { ohko: true } : {}),
-    ...(m.flags.includes('charge') ? { charge: true } : {}),
-    ...(m.flags.includes('recharge') ? { recharge: true } : {}),
-    ...(m.secondary ? { secondary: m.secondary } : {}),
-    ...(m.self ? { self: m.self } : {}),
-    ...(m.recoil ? { recoil: m.recoil } : {}),
-    ...(m.drain ? { drain: m.drain } : {}),
-    ...(m.crit ? { crit: m.crit } : {}),
-    ...(m.multihit ? { multihit: true } : {}),
+    name: move.name,
+    type: move.type,
+    power: move.power,
+    accuracy: move.accuracy,
+    priority: move.priority,
+    kind: move.kind || 'attack',
+    category: move.category,
+    desc: move.desc,
+    key: move.key,
+    contact: move.flags.includes('contact'),
+    pp: move.pp,
+    target: move.target,
+    ...(move.boosts ? { boosts: move.boosts } : {}),
+    ...(move.status ? { status: move.status } : {}),
+    ...(move.heal ? { heal: move.heal } : {}),
+    ...(move.weather ? { weather: move.weather } : {}),
+    ...(move.screen ? { screen: move.screen } : {}),
+    ...(move.breaksScreens ? { breaksScreens: true } : {}),
+    ...(move.fixedDamage ? { fixedDamage: move.fixedDamage } : {}),
+    ...(move.ohko ? { ohko: true } : {}),
+    ...(move.flags.includes('charge') ? { charge: true } : {}),
+    ...(move.flags.includes('recharge') ? { recharge: true } : {}),
+    ...(move.secondary ? { secondary: move.secondary } : {}),
+    ...(move.self ? { self: move.self } : {}),
+    ...(move.recoil ? { recoil: move.recoil } : {}),
+    ...(move.drain ? { drain: move.drain } : {}),
+    ...(move.crit ? { crit: move.crit } : {}),
+    ...(move.multihit ? { multihit: true } : {}),
   };
 }
 
-function publicMoves(f: F, known: Set<string> | null = null) {
-  return f.moves.filter((m) => !known || known.has(m.key)).map(publicMove);
+function publicMoves(fighter: F, known: Set<string> | null = null) {
+  return fighter.moves.filter((m) => !known || known.has(m.key)).map(publicMove);
 }
 
-function publicVolatiles(f: F) {
-  const v = f.vol;
+function publicVolatiles(fighter: F) {
+  const volatiles = fighter.vol;
   return {
-    ...(v.confusion ? { confusion: true } : {}),
-    ...(v.attract ? { attract: true } : {}),
-    ...(v.perish ? { perish: v.perish } : {}),
-    ...(v.charge ? { charge: true } : {}),
-    ...(v.flashFire ? { flashFire: true } : {}),
-    ...(v.disabled ? { disabled: v.disabled.name } : {}),
-    ...(v.slowStart ? { slowStart: v.slowStart } : {}),
-    ...(v.bound ? { bound: v.bound.move } : {}),
-    ...(v.trappedBy ? { trapped: true } : {}),
-    ...(v.saltCure ? { saltcure: true } : {}),
-    ...(v.smackedDown ? { smackdown: true } : {}),
-    ...(v.noRetreat ? { noRetreat: true } : {}),
-    ...(v.substitute ? { substitute: true } : {}),
-    ...(v.taunt ? { taunt: v.taunt.turns } : {}),
-    ...(v.encore ? { encore: v.encore.key } : {}),
-    ...(v.torment ? { torment: true } : {}),
-    ...(v.healBlock ? { healblock: v.healBlock.turns } : {}),
-    ...(v.yawn ? { yawn: true } : {}),
-    ...(v.nightmare ? { nightmare: true } : {}),
-    ...(v.curse ? { curse: true } : {}),
-    ...(v.focusEnergy ? { focusenergy: true } : {}),
-    ...(v.ingrain ? { ingrain: true } : {}),
-    ...(v.aquaRing ? { aquaring: true } : {}),
-    ...(v.magnetRise ? { magnetrise: v.magnetRise.turns } : {}),
-    ...(v.telekinesis ? { telekinesis: v.telekinesis.turns } : {}),
-    ...(v.foresight ? { foresight: true } : {}),
-    ...(v.miracleEye ? { miracleeye: true } : {}),
-    ...(v.stockpile ? { stockpile: v.stockpile.count } : {}),
-    ...(v.gastroAcid ? { gastroacid: true } : {}),
-    ...(v.uproar ? { uproar: true } : {}),
-    ...(v.imprison ? { imprison: true } : {}),
+    ...(volatiles.confusion ? { confusion: true } : {}),
+    ...(volatiles.attract ? { attract: true } : {}),
+    ...(volatiles.perish ? { perish: volatiles.perish } : {}),
+    ...(volatiles.charge ? { charge: true } : {}),
+    ...(volatiles.flashFire ? { flashFire: true } : {}),
+    ...(volatiles.disabled ? { disabled: volatiles.disabled.name } : {}),
+    ...(volatiles.slowStart ? { slowStart: volatiles.slowStart } : {}),
+    ...(volatiles.bound ? { bound: volatiles.bound.move } : {}),
+    ...(volatiles.trappedBy ? { trapped: true } : {}),
+    ...(volatiles.saltCure ? { saltcure: true } : {}),
+    ...(volatiles.smackedDown ? { smackdown: true } : {}),
+    ...(volatiles.noRetreat ? { noRetreat: true } : {}),
+    ...(volatiles.substitute ? { substitute: true } : {}),
+    ...(volatiles.taunt ? { taunt: volatiles.taunt.turns } : {}),
+    ...(volatiles.encore ? { encore: volatiles.encore.key } : {}),
+    ...(volatiles.torment ? { torment: true } : {}),
+    ...(volatiles.healBlock ? { healblock: volatiles.healBlock.turns } : {}),
+    ...(volatiles.yawn ? { yawn: true } : {}),
+    ...(volatiles.nightmare ? { nightmare: true } : {}),
+    ...(volatiles.curse ? { curse: true } : {}),
+    ...(volatiles.focusEnergy ? { focusenergy: true } : {}),
+    ...(volatiles.ingrain ? { ingrain: true } : {}),
+    ...(volatiles.aquaRing ? { aquaring: true } : {}),
+    ...(volatiles.magnetRise ? { magnetrise: volatiles.magnetRise.turns } : {}),
+    ...(volatiles.telekinesis ? { telekinesis: volatiles.telekinesis.turns } : {}),
+    ...(volatiles.foresight ? { foresight: true } : {}),
+    ...(volatiles.miracleEye ? { miracleeye: true } : {}),
+    ...(volatiles.stockpile ? { stockpile: volatiles.stockpile.count } : {}),
+    ...(volatiles.gastroAcid ? { gastroacid: true } : {}),
+    ...(volatiles.uproar ? { uproar: true } : {}),
+    ...(volatiles.imprison ? { imprison: true } : {}),
   };
 }
 
 // What a client may see. Pending choices stay hidden; only "ready" is shown.
 const percentOf = (hp: number, max: number): number => (hp <= 0 ? 0 : Math.max(1, Math.round((hp / max) * 100)));
 
-function hiddenHp(e: BattleEvent): BattleEvent {
-  if (e.max == null) return e.stats ? { ...e, stats: { hp: 100 } } : e;
-  const before = e.t === 'damage' || e.t === 'hurt' ? e.hp! + e.amount! : e.hp! - e.amount!;
-  const hp = percentOf(e.hp!, e.max);
-  const out = { ...e, hp, max: 100, pct: true };
-  if (e.amount != null) out.amount = e.amount > 0 ? Math.max(1, Math.abs(percentOf(before, e.max) - hp)) : 0;
-  if (e.stats) out.stats = { hp: 100 };
+function hiddenHp(event: BattleEvent): BattleEvent {
+  if (event.max == null) return event.stats ? { ...event, stats: { hp: 100 } } : event;
+  const before = event.t === 'damage' || event.t === 'hurt' ? event.hp! + event.amount! : event.hp! - event.amount!;
+  const hp = percentOf(event.hp!, event.max);
+  const out = { ...event, hp, max: 100, pct: true };
+  if (event.amount != null) out.amount = event.amount > 0 ? Math.max(1, Math.abs(percentOf(before, event.max) - hp)) : 0;
+  if (event.stats) out.stats = { hp: 100 };
   return out;
 }
 
-function viewEvent(e: BattleEvent, viewer: number | null): BattleEvent {
-  if (e.card) {
-    const { card, seen, ...rest } = e;
-    return { ...rest, mon: e.side === viewer ? card : seen };
+function viewEvent(event: BattleEvent, viewer: number | null): BattleEvent {
+  if (event.card) {
+    const { card, seen, ...rest } = event;
+    return { ...rest, mon: event.side === viewer ? card : seen };
   }
-  return e.side == null || e.side === viewer || (e.max == null && !e.stats) ? e : hiddenHp(e);
+  return event.side == null || event.side === viewer || (event.max == null && !event.stats) ? event : hiddenHp(event);
 }
 
 export function viewEvents(events: BattleEvent[], viewer: number | null = null): BattleEvent[] {
@@ -2174,32 +2174,32 @@ export type HiddenFighterView = { uid: string; hidden: true } & { [K in Exclude<
 
 export type FighterView = VisibleFighterView | HiddenFighterView;
 
-function fighterView(b: B, s: number, i: number, own: boolean, spectator = false): FighterView {
-  const side = b.sides[s];
-  const f = side.team[i];
-  if (!own && !spectator && !f.seen) return { uid: `hidden-${s}-${i}`, hidden: true };
-  const disguise = i === side.active && f.hp > 0 && f.vol.illusion ? f.vol.illusion : own ? null : f.seenAs;
-  const abilityKnown = own || f.revealedAbilities.has(f.ability);
+function fighterView(battle: B, sideIndex: number, slot: number, own: boolean, spectator = false): FighterView {
+  const side = battle.sides[sideIndex];
+  const fighter = side.team[slot];
+  if (!own && !spectator && !fighter.seen) return { uid: `hidden-${sideIndex}-${slot}`, hidden: true };
+  const disguise = slot === side.active && fighter.hp > 0 && fighter.vol.illusion ? fighter.vol.illusion : own ? null : fighter.seenAs;
+  const abilityKnown = own || fighter.revealedAbilities.has(fighter.ability);
   return {
-    uid: f.uid,
-    name: f.name,
-    speciesName: f.speciesName,
-    types: f.types,
-    rarity: f.rarity,
-    shiny: f.shiny,
-    level: f.level,
-    stats: own ? f.stats : { hp: 100 },
-    hp: own ? f.hp : percentOf(f.hp, f.stats.hp),
+    uid: fighter.uid,
+    name: fighter.name,
+    speciesName: fighter.speciesName,
+    types: fighter.types,
+    rarity: fighter.rarity,
+    shiny: fighter.shiny,
+    level: fighter.level,
+    stats: own ? fighter.stats : { hp: 100 },
+    hp: own ? fighter.hp : percentOf(fighter.hp, fighter.stats.hp),
     ...(own ? {} : { hpPercent: true }),
-    boosts: f.boosts,
-    pp: own ? f.pp : {},
-    gender: f.gender,
-    sprite: f.sprite,
-    floats: f.floats,
-    status: f.status,
-    volatiles: publicVolatiles(f),
-    abilityInfo: abilityKnown ? abilityInfo(f.ability) : null,
-    moves: publicMoves(f, own ? null : f.revealedMoves),
+    boosts: fighter.boosts,
+    pp: own ? fighter.pp : {},
+    gender: fighter.gender,
+    sprite: fighter.sprite,
+    floats: fighter.floats,
+    status: fighter.status,
+    volatiles: publicVolatiles(fighter),
+    abilityInfo: abilityKnown ? abilityInfo(fighter.ability) : null,
+    moves: publicMoves(fighter, own ? null : fighter.revealedMoves),
     ...(disguise ?? {}),
   };
 }
@@ -2208,21 +2208,21 @@ export function shownTarget(me: Pick<F, 'types'>, key: string, target: string): 
   return key === 'curse' && !me.types.includes('ghost') ? 'self' : target;
 }
 
-export function publicState(b: B, viewer: number | null = null) {
+export function publicState(battle: B, viewer: number | null = null) {
   return {
-    id: b.id,
-    status: b.status,
-    phase: b.phase,
-    turn: b.turn,
-    winner: b.winner,
-    levelCap: b.levelCap,
-    field: { weather: b.field.weather, terrain: b.field.terrain, weatherSuppressed: !!b.field.weather && !weather(b), rooms: { ...b.field.rooms } },
-    intro: b.turn === 1 && b.phase === 'choose' ? viewEvents(b.intro, viewer) : [],
-    sides: b.sides.map((side, s) => ({
+    id: battle.id,
+    status: battle.status,
+    phase: battle.phase,
+    turn: battle.turn,
+    winner: battle.winner,
+    levelCap: battle.levelCap,
+    field: { weather: battle.field.weather, terrain: battle.field.terrain, weatherSuppressed: !!battle.field.weather && !currentWeather(battle), rooms: { ...battle.field.rooms } },
+    intro: battle.turn === 1 && battle.phase === 'choose' ? viewEvents(battle.intro, viewer) : [],
+    sides: battle.sides.map((side, s) => ({
       trainerId: side.trainerId,
       name: side.name,
       active: side.active,
-      ready: !needsAction(b, s),
+      ready: !needsAction(battle, s),
       mustSwitch: side.mustSwitch,
       toxicSpikes: side.toxicSpikes,
       screens: { ...side.screens },
@@ -2230,7 +2230,7 @@ export function publicState(b: B, viewer: number | null = null) {
       conds: Object.fromEntries(Object.entries(side.conds).filter(([k]) => ['tailwind', 'safeguard', 'mist', 'luckychant'].includes(k))),
       ...(side.wish ? { wish: true } : {}),
       ...(side.future ? { future: side.future.name } : {}),
-      team: side.team.map((f, i) => fighterView(b, s, i, viewer === s || b.status === 'finished', viewer === null)),
+      team: side.team.map((f, i) => fighterView(battle, s, i, viewer === s || battle.status === 'finished', viewer === null)),
     })),
   };
 }

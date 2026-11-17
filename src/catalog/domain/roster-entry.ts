@@ -43,15 +43,15 @@ export interface RosterEntry {
   active?: boolean;
 }
 
-const variantKey = (e: Pick<RosterEntry, 'finalID' | 'shiny'>) => `${e.finalID}:${e.shiny ? 'shiny' : 'plain'}`;
+const variantKey = (entry: Pick<RosterEntry, 'finalID' | 'shiny'>) => `${entry.finalID}:${entry.shiny ? 'shiny' : 'plain'}`;
 export { variantKey };
 
-function firstBy<T>(list: T[], key: (e: T) => string | number): T[] {
+function firstBy<T>(list: T[], key: (item: T) => string | number): T[] {
   const seen = new Set<string | number>();
-  return list.filter((e) => {
-    const k = key(e);
-    if (seen.has(k)) return false;
-    seen.add(k);
+  return list.filter((item) => {
+    const itemKey = key(item);
+    if (seen.has(itemKey)) return false;
+    seen.add(itemKey);
     return true;
   });
 }

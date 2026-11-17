@@ -36,21 +36,21 @@ export class ChallengesService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    for (const c of this.challenges.all()) {
+    for (const challenge of this.challenges.all()) {
       // Battles live in memory: whatever a restart left mid-fight is closed for good.
-      if (c.status === 'active') {
-        c.abandon();
-        this.challenges.save(c);
+      if (challenge.status === 'active') {
+        challenge.abandon();
+        this.challenges.save(challenge);
       }
       // Older versions allowed repeated species in a team.
-      if (c.dropRepeatedSpecies(uniqueSpecies)) this.challenges.save(c);
+      if (challenge.dropRepeatedSpecies(uniqueSpecies)) this.challenges.save(challenge);
     }
   }
 
   find(id: string): Challenge {
-    const c = this.challenges.findById(id);
-    if (!c) throw notFound('Ese desafío no existe.');
-    return c;
+    const challenge = this.challenges.findById(id);
+    if (!challenge) throw notFound('Ese desafío no existe.');
+    return challenge;
   }
 
   /**
@@ -71,30 +71,30 @@ export class ChallengesService implements OnModuleInit {
       }
       if (own) return { challenge: own };
     }
-    const c = Challenge.open({ id: newId(), host: trainer, hostTeam: input.mode === 'random' ? [] : trainer.teamSnapshot(), levelCap: input.levelCap, mode: input.mode, visibility: input.visibility, at: now() });
-    this.challenges.save(c);
+    const challenge = Challenge.open({ id: newId(), host: trainer, hostTeam: input.mode === 'random' ? [] : trainer.teamSnapshot(), levelCap: input.levelCap, mode: input.mode, visibility: input.visibility, at: now() });
+    this.challenges.save(challenge);
     if (input.visibility === 'public') {
       this.lobby.notify();
       this.lobby.notifyAfterGrace();
     }
-    return { challenge: c };
+    return { challenge };
   }
 
   /** The host closes their room (while it waits, or during the ready check). */
   close(trainer: Trainer | undefined, id: string): Challenge {
-    const c = this.find(id);
-    const checking = c.status === 'active' && !!this.presence.rooms.get(c.id)?.readyCheck;
-    if (!trainer || c.hostId !== trainer.id || (c.status !== 'open' && !checking) || c.tournamentId) throw forbidden('No puedes cerrar esta sala.');
-    this.duels.close(c);
-    return c;
+    const challenge = this.find(id);
+    const checking = challenge.status === 'active' && !!this.presence.rooms.get(challenge.id)?.readyCheck;
+    if (!trainer || challenge.hostId !== trainer.id || (challenge.status !== 'open' && !checking) || challenge.tournamentId) throw forbidden('No puedes cerrar esta sala.');
+    this.duels.close(challenge);
+    return challenge;
   }
 
   accept(trainer: Trainer, id: string): Challenge {
-    const c = this.challenges.findById(id);
-    const blocked = joinBlocker<Challenge>(c, { trainerId: trainer.id, hostWaiting: this.presence.hostWaiting });
+    const challenge = this.challenges.findById(id);
+    const blocked = joinBlocker<Challenge>(challenge, { trainerId: trainer.id, hostWaiting: this.presence.hostWaiting });
     if (blocked) throw blocked;
-    this.duels.join(c!, trainer);
-    return c!;
+    this.duels.join(challenge!, trainer);
+    return challenge!;
   }
 
   /** Your 1v1 battles (newest first, paged) and your recent tournaments. */

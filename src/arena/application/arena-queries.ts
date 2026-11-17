@@ -32,9 +32,9 @@ export class ArenaQueries {
 
   /** Every live room with its challenge and connections (the chat fans messages out with it). */
   *roomConnections(): Iterable<[Challenge, ReadonlySet<ClientConnection>]> {
-    for (const [id, r] of this.presence.rooms) {
-      const c = this.challenges.findById(id);
-      if (c) yield [c, r.sockets];
+    for (const [id, room] of this.presence.rooms) {
+      const challenge = this.challenges.findById(id);
+      if (challenge) yield [challenge, room.sockets];
     }
   }
 

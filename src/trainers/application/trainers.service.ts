@@ -26,9 +26,9 @@ export class TrainersService implements OnModuleInit {
   onModuleInit(): void {
     // Saves imported by older versions kept repeated species: tidy them once at startup.
     let fixed = 0;
-    for (const t of this.trainers.all()) {
-      if (t.dropRepeatedSpecies()) {
-        this.trainers.save(t);
+    for (const trainer of this.trainers.all()) {
+      if (trainer.dropRepeatedSpecies()) {
+        this.trainers.save(trainer);
         fixed += 1;
       }
     }
@@ -50,18 +50,18 @@ export class TrainersService implements OnModuleInit {
 
   /** Who owns a session token, and mark them as seen now (feeds "active now" in the stats). */
   authenticate(token: string): Trainer | undefined {
-    const t = this.peekToken(token);
-    if (t) {
-      t.lastSeen = now();
-      this.trainers.saveLastSeen(t);
+    const trainer = this.peekToken(token);
+    if (trainer) {
+      trainer.lastSeen = now();
+      this.trainers.saveLastSeen(trainer);
     }
-    return t;
+    return trainer;
   }
 
   /** Same, from an `Authorization: Bearer <token>` header. */
   authenticateHeader(header: string | undefined): Trainer | undefined {
-    const m = /^Bearer (.+)$/.exec(header ?? '');
-    return m && TOKEN_FORMAT.test(m[1]) ? this.authenticate(m[1]) : undefined;
+    const match = /^Bearer (.+)$/.exec(header ?? '');
+    return match && TOKEN_FORMAT.test(match[1]) ? this.authenticate(match[1]) : undefined;
   }
 
   /**
@@ -103,15 +103,15 @@ export class TrainersService implements OnModuleInit {
 
   /** A ranked 1v1 ended. The arena decides whether a match is ranked; trainers keep the score. */
   recordRankedResult(winnerId: string, loserId: string): void {
-    const w = this.trainers.findById(winnerId);
-    const l = this.trainers.findById(loserId);
-    if (w) {
-      w.recordWin();
-      this.trainers.save(w);
+    const winner = this.trainers.findById(winnerId);
+    const loser = this.trainers.findById(loserId);
+    if (winner) {
+      winner.recordWin();
+      this.trainers.save(winner);
     }
-    if (l) {
-      l.recordLoss();
-      this.trainers.save(l);
+    if (loser) {
+      loser.recordLoss();
+      this.trainers.save(loser);
     }
   }
 }

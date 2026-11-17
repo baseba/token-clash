@@ -55,7 +55,7 @@ export function aiName(level: string, taken: string[] = [], random = Math.random
   return { base, name: `${base} - ${DIFFICULTY_NAMES[level] ?? level}` };
 }
 
-export const humanCount = (t: Pick<Seated, 'seats'>) => t.seats.filter((s) => !s.ai).length;
+export const humanCount = (tournament: Pick<Seated, 'seats'>) => tournament.seats.filter((s) => !s.ai).length;
 
 export const isAiSeat = (seat: Partial<Seat> | null | undefined) => !!seat?.ai;
 
@@ -70,36 +70,36 @@ export function viewersBehind(seenTurns: (number | undefined)[], turn: number): 
   return seenTurns.some((seen) => (seen ?? 0) < turn);
 }
 
-export const isFull = (t: Seated) => t.seats.length >= t.size;
-export const allReady = (t: Seated) => isFull(t) && t.seats.every((s) => s.ready);
-export const seatOf = (t: Pick<Seated, 'seats'>, trainerId: string | null | undefined) => t.seats.findIndex((s) => s.id === trainerId);
+export const isFull = (tournament: Seated) => tournament.seats.length >= tournament.size;
+export const allReady = (tournament: Seated) => isFull(tournament) && tournament.seats.every((s) => s.ready);
+export const seatOf = (tournament: Pick<Seated, 'seats'>, trainerId: string | null | undefined) => tournament.seats.findIndex((s) => s.id === trainerId);
 
 export function roundName(size: number, round: number): string {
   const matches = size / 2 ** (round + 1);
   return ROUND_NAMES[matches] ?? `Ronda ${round + 1}`;
 }
 
-export function addSeat(t: Seated, seat: Omit<Seat, 'ready'> & { ready?: boolean }): void {
-  if (isFull(t)) throw conflict('El torneo ya está lleno.');
-  if (seatOf(t, seat.id) !== -1) throw conflict('Ya estás en este torneo.');
-  t.seats.push({ ...seat, ready: isAiSeat(seat) });
+export function addSeat(tournament: Seated, seat: Omit<Seat, 'ready'> & { ready?: boolean }): void {
+  if (isFull(tournament)) throw conflict('El torneo ya está lleno.');
+  if (seatOf(tournament, seat.id) !== -1) throw conflict('Ya estás en este torneo.');
+  tournament.seats.push({ ...seat, ready: isAiSeat(seat) });
 }
 
-export function removeSeat(t: Seated, index: number): void {
-  if (index <= 0 || index >= t.seats.length) throw conflict('Ese asiento no se puede quitar.');
-  t.seats.splice(index, 1);
+export function removeSeat(tournament: Seated, index: number): void {
+  if (index <= 0 || index >= tournament.seats.length) throw conflict('Ese asiento no se puede quitar.');
+  tournament.seats.splice(index, 1);
 }
 
-export function setReady(t: Seated, trainerId: string, ready: boolean): void {
-  const i = seatOf(t, trainerId);
-  if (i === -1) throw conflict('No estás en este torneo.');
-  t.seats[i].ready = !!ready;
+export function setReady(tournament: Seated, trainerId: string, ready: boolean): void {
+  const seatIndex = seatOf(tournament, trainerId);
+  if (seatIndex === -1) throw conflict('No estás en este torneo.');
+  tournament.seats[seatIndex].ready = !!ready;
 }
 
-export function nextAiId(t: Pick<Seated, 'seats'>, level: string): { id: string; n: number } {
-  let n = 1;
-  while (t.seats.some((s) => s.id === aiSeatId(level, n))) n += 1;
-  return { id: aiSeatId(level, n), n };
+export function nextAiId(tournament: Pick<Seated, 'seats'>, level: string): { id: string; n: number } {
+  let seatNumber = 1;
+  while (tournament.seats.some((s) => s.id === aiSeatId(level, seatNumber))) seatNumber += 1;
+  return { id: aiSeatId(level, seatNumber), n: seatNumber };
 }
 
 export function shuffledOrder(count: number, random = Math.random): number[] {
@@ -211,9 +211,9 @@ export class Tournament implements TournamentState {
 
   /** A new tournament, with its creator in the first seat (the host seat can't be removed). */
   static create(input: { id: string; host: { id: string; name: string }; mode: BattleMode; levelCap: number | null; size: number; visibility: Visibility; at: number }): Tournament {
-    const t = new Tournament({ id: input.id, hostId: input.host.id, mode: input.mode, levelCap: input.levelCap, size: input.size, visibility: input.visibility, status: 'open', createdAt: input.at, seats: [] });
-    addSeat(t, { id: input.host.id, name: input.host.name, ai: null });
-    return t;
+    const tournament = new Tournament({ id: input.id, hostId: input.host.id, mode: input.mode, levelCap: input.levelCap, size: input.size, visibility: input.visibility, status: 'open', createdAt: input.at, seats: [] });
+    addSeat(tournament, { id: input.host.id, name: input.host.name, ai: null });
+    return tournament;
   }
 
   get full(): boolean {
@@ -245,9 +245,9 @@ export class Tournament implements TournamentState {
 
   /** Removes a seat by trainer id (someone left or lost their seat). Returns whether they sat here. */
   leave(trainerId: string): boolean {
-    const i = this.seatOf(trainerId);
-    if (i <= 0) return false;
-    this.seats.splice(i, 1);
+    const seatIndex = this.seatOf(trainerId);
+    if (seatIndex <= 0) return false;
+    this.seats.splice(seatIndex, 1);
     return true;
   }
 
@@ -262,8 +262,8 @@ export class Tournament implements TournamentState {
   /** Fills free seats with AIs of a difficulty, each with a name not yet used here. */
   addAis(level: string, count: number): void {
     if (this.full) throw conflict('El torneo ya está lleno.');
-    const n = Math.max(1, Math.min(this.size - this.seats.length, count));
-    for (let i = 0; i < n; i++) {
+    const added = Math.max(1, Math.min(this.size - this.seats.length, count));
+    for (let i = 0; i < added; i++) {
       const { id } = nextAiId(this, level);
       const { base, name } = aiName(level, this.seats.map((seat) => seat.aiBase).filter((b): b is string => !!b));
       addSeat(this, { id, name, aiBase: base, ai: level });
@@ -293,8 +293,8 @@ export class Tournament implements TournamentState {
     if (this.status !== 'running' || !this.bracket) return null;
     const at = nextMatch(this.bracket);
     if (!at) return null;
-    const m = this.bracket[at.round][at.index];
-    return { ...at, a: this.seats[m.a!], b: this.seats[m.b!] };
+    const match = this.bracket[at.round][at.index];
+    return { ...at, a: this.seats[match.a!], b: this.seats[match.b!] };
   }
 
   matchStarted(at: MatchRef, challengeId: string): void {
@@ -308,11 +308,11 @@ export class Tournament implements TournamentState {
    * when it was the final; otherwise schedules the next match at `nextMatchAt`.
    */
   matchFinished(at: MatchRef, winnerId: string | null, { now, nextMatchAt, random = Math.random }: { now: number; nextMatchAt: number; random?: () => number }): number | null {
-    const m = this.bracket![at.round][at.index];
+    const match = this.bracket![at.round][at.index];
     let winner = this.seats.findIndex((seat) => seat.id === winnerId);
     if (winnerId === null || winner === -1) {
-      winner = (random() < 0.5 ? m.a : m.b)!;
-      m.coinFlip = true;
+      winner = (random() < 0.5 ? match.a : match.b)!;
+      match.coinFlip = true;
     }
     const champion = recordWinner(this.bracket!, at, winner);
     this.current = null;

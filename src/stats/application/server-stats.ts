@@ -25,18 +25,18 @@ const nameOf = (source: StatsSource, id: string | null | undefined, fallback?: s
 export function rankingOf(trainers: TrainerLike[]) {
   return trainers
     .filter((t) => t.wins + t.losses > 0)
-    .map((t) => {
-      const games = t.wins + t.losses;
+    .map((trainer) => {
+      const games = trainer.wins + trainer.losses;
       return {
-        id: t.id,
-        name: t.name,
-        wins: t.wins,
-        losses: t.losses,
+        id: trainer.id,
+        name: trainer.name,
+        wins: trainer.wins,
+        losses: trainer.losses,
         games,
-        winRate: games ? t.wins / games : null,
-        rosterSize: t.roster.length,
-        shinies: t.roster.filter((e) => e.shiny).length,
-        totalTokens: t.totalTokens ?? 0,
+        winRate: games ? trainer.wins / games : null,
+        rosterSize: trainer.roster.length,
+        shinies: trainer.roster.filter((e) => e.shiny).length,
+        totalTokens: trainer.totalTokens ?? 0,
       };
     })
     .sort(byRanking);
@@ -45,13 +45,13 @@ export function rankingOf(trainers: TrainerLike[]) {
 /** Groups accounts that imported the same save (they share Pokémon instance ids): one person each. */
 export function playersOf<T extends TrainerLike>(trainers: T[]): T[][] {
   const parent = trainers.map((_, i) => i);
-  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const find = (node: number): number => (parent[node] === node ? node : (parent[node] = find(parent[node])));
   const ownerOf = new Map<string, number>();
-  trainers.forEach((t, i) => {
-    for (const e of t.roster) {
-      if (!e.id) continue;
-      if (ownerOf.has(e.id)) parent[find(i)] = find(ownerOf.get(e.id)!);
-      else ownerOf.set(e.id, i);
+  trainers.forEach((trainer, i) => {
+    for (const entry of trainer.roster) {
+      if (!entry.id) continue;
+      if (ownerOf.has(entry.id)) parent[find(i)] = find(ownerOf.get(entry.id)!);
+      else ownerOf.set(entry.id, i);
     }
   });
   const groups = new Map<number, T[]>();
@@ -61,7 +61,7 @@ export function playersOf<T extends TrainerLike>(trainers: T[]): T[][] {
 
 function uniqueEntries(trainers: TrainerLike[]) {
   const byKey = new Map<string, TrainerLike['roster'][number]>();
-  for (const t of trainers) t.roster.forEach((e, i) => byKey.set(e.id ?? `${t.id}:${i}`, e));
+  for (const trainer of trainers) trainer.roster.forEach((e, i) => byKey.set(e.id ?? `${trainer.id}:${i}`, e));
   return [...byKey.values()];
 }
 
@@ -69,14 +69,14 @@ const activeSince = (players: TrainerLike[][], since: number) => players.filter(
 
 function monUsage(battles: ChallengeState[]) {
   const usage = new Map<string, { name: string; sprite?: string; types?: string[]; uses: number; wins: number }>();
-  for (const c of battles) {
-    c.final!.sides.forEach((side, s) => {
-      for (const f of side.team) {
-        if (!f.speciesName || f.hidden) continue;
-        const key = f.speciesName;
-        const row = usage.get(key) ?? { name: f.speciesName, sprite: f.sprite, types: f.types, uses: 0, wins: 0 };
+  for (const challenge of battles) {
+    challenge.final!.sides.forEach((side, sideIndex) => {
+      for (const fighter of side.team) {
+        if (!fighter.speciesName || fighter.hidden) continue;
+        const key = fighter.speciesName;
+        const row = usage.get(key) ?? { name: fighter.speciesName, sprite: fighter.sprite, types: fighter.types, uses: 0, wins: 0 };
         row.uses += 1;
-        if (c.final!.winner === s) row.wins += 1;
+        if (challenge.final!.winner === sideIndex) row.wins += 1;
         usage.set(key, row);
       }
     });
@@ -137,18 +137,18 @@ export function tournamentStats(source: StatsSource) {
     if (!rows.has(key)) rows.set(key, { id: seat.id, name: nameOf(source, seat.id, seat.name), titles: 0, finals: 0, played: 0, wins: 0, losses: 0 });
     return rows.get(key)!;
   };
-  for (const t of done) {
-    t.seats.forEach((seat, i) => {
+  for (const tournament of done) {
+    tournament.seats.forEach((seat, i) => {
       if (seat.ai) return;
-      const r = row(seat);
-      r.played += 1;
-      if (t.champion === i) r.titles += 1;
-      const final = t.bracket!.at(-1)![0];
-      if (final.a === i || final.b === i) r.finals += 1;
-      for (const m of t.bracket!.flat()) {
-        if (m.winner === null || (m.a !== i && m.b !== i)) continue;
-        if (m.winner === i) r.wins += 1;
-        else r.losses += 1;
+      const stats = row(seat);
+      stats.played += 1;
+      if (tournament.champion === i) stats.titles += 1;
+      const final = tournament.bracket!.at(-1)![0];
+      if (final.a === i || final.b === i) stats.finals += 1;
+      for (const match of tournament.bracket!.flat()) {
+        if (match.winner === null || (match.a !== i && match.b !== i)) continue;
+        if (match.winner === i) stats.wins += 1;
+        else stats.losses += 1;
       }
     });
   }
@@ -156,9 +156,9 @@ export function tournamentStats(source: StatsSource) {
   const recent = done
     .sort((a, b) => (b.finishedAt ?? b.createdAt) - (a.finishedAt ?? a.createdAt))
     .slice(0, RECENT)
-    .map((t) => {
-      const champ = t.seats[t.champion!];
-      return { id: t.id, size: t.size, mode: t.mode ?? 'team', levelCap: t.levelCap ?? null, humans: humanCount(t), champion: champ ? nameOf(source, champ.ai ? null : champ.id, champ.name) : '¿?', championAi: !!champ?.ai, finishedAt: t.finishedAt ?? t.createdAt };
+    .map((tournament) => {
+      const champ = tournament.seats[tournament.champion!];
+      return { id: tournament.id, size: tournament.size, mode: tournament.mode ?? 'team', levelCap: tournament.levelCap ?? null, humans: humanCount(tournament), champion: champ ? nameOf(source, champ.ai ? null : champ.id, champ.name) : '¿?', championAi: !!champ?.ai, finishedAt: tournament.finishedAt ?? tournament.createdAt };
     });
   return {
     totals: { tournaments: done.length, matches: done.reduce((n, t) => n + t.size - 1, 0), aiTitles: done.filter((t) => t.seats[t.champion!]?.ai).length },

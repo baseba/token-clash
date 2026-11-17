@@ -37,12 +37,12 @@ export const INERT: Record<string, string> = {
 
 export function abilityInfo(key: string | null | undefined): AbilityInfo | null {
   if (!key) return null;
-  const c = CATALOG[key];
+  const info = CATALOG[key];
   const inert = INERT[key];
   return {
     key,
-    name: c?.name ?? key,
-    desc: c?.desc ?? '',
+    name: info?.name ?? key,
+    desc: info?.desc ?? '',
     ...(inert ? { inert: INERT_REASONS[inert] } : {}),
   };
 }

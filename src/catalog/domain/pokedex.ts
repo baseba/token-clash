@@ -43,22 +43,22 @@ export interface Pokedex {
 
 export function pokedexOf(roster: RosterEntry[]): Pokedex {
   const rows = new Map<number, Omit<PokedexEntry, 'family'>>();
-  for (const e of roster) {
-    lineage(e.finalID).forEach((id, depth) => {
-      const d = speciesData(id);
-      if (!d || id > DEX_LIMIT) return;
+  for (const entry of roster) {
+    lineage(entry.finalID).forEach((id, depth) => {
+      const species = speciesData(id);
+      if (!species || id > DEX_LIMIT) return;
       if (!rows.has(id)) {
         rows.set(id, {
           id,
-          name: d.name,
-          types: d.types,
-          stats: d.stats,
-          genus: d.genus ?? null,
-          entry: d.dexEntry ?? null,
-          height: d.height ?? null,
-          weight: d.weight ?? null,
-          genderRate: d.genderRate ?? null,
-          abilities: [...(d.abilities ?? []).map((key) => ({ name: abilityInfo(key)?.name ?? key, hidden: false })), ...(d.hiddenAbility && !(d.abilities ?? []).includes(d.hiddenAbility) ? [{ name: abilityInfo(d.hiddenAbility)?.name ?? d.hiddenAbility, hidden: true }] : [])],
+          name: species.name,
+          types: species.types,
+          stats: species.stats,
+          genus: species.genus ?? null,
+          entry: species.dexEntry ?? null,
+          height: species.height ?? null,
+          weight: species.weight ?? null,
+          genderRate: species.genderRate ?? null,
+          abilities: [...(species.abilities ?? []).map((key) => ({ name: abilityInfo(key)?.name ?? key, hidden: false })), ...(species.hiddenAbility && !(species.abilities ?? []).includes(species.hiddenAbility) ? [{ name: abilityInfo(species.hiddenAbility)?.name ?? species.hiddenAbility, hidden: true }] : [])],
           owned: 0,
           shiny: false,
           levels: [],
@@ -67,9 +67,9 @@ export function pokedexOf(roster: RosterEntry[]): Pokedex {
       const row = rows.get(id)!;
       if (depth === 0) {
         row.owned += 1;
-        row.levels.push(e.level);
+        row.levels.push(entry.level);
       }
-      if (e.shiny) row.shiny = true;
+      if (entry.shiny) row.shiny = true;
     });
   }
   const entries = [...rows.values()]

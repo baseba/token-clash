@@ -32,43 +32,43 @@ export function createPreview({ sides, levelCap = null, mode = 'team' }: { sides
   };
 }
 
-export const picksNeeded = (p: PreviewState, s: number): number => Math.min(BATTLE_SIZE, p.sides[s].entries.length);
+export const picksNeeded = (preview: PreviewState, sideIndex: number): number => Math.min(BATTLE_SIZE, preview.sides[sideIndex].entries.length);
 
-function validPicks(p: PreviewState, s: number, picks: number[]): boolean {
-  const n = picksNeeded(p, s);
-  return picks.length === n && new Set(picks).size === n && picks.every((i) => Number.isInteger(i) && i >= 0 && i < p.sides[s].entries.length);
+function validPicks(preview: PreviewState, sideIndex: number, picks: number[]): boolean {
+  const needed = picksNeeded(preview, sideIndex);
+  return picks.length === needed && new Set(picks).size === needed && picks.every((i) => Number.isInteger(i) && i >= 0 && i < preview.sides[sideIndex].entries.length);
 }
 
-export function pick(p: PreviewState, s: number, picks: number[]): void {
-  if (p.sides[s].picks) throw conflict('Ya elegiste tu equipo.');
-  if (!validPicks(p, s, picks)) throw invalid(`Elige ${picksNeeded(p, s)} Pokémon distintos.`);
-  p.sides[s].picks = [...picks];
+export function pick(preview: PreviewState, sideIndex: number, picks: number[]): void {
+  if (preview.sides[sideIndex].picks) throw conflict('Ya elegiste tu equipo.');
+  if (!validPicks(preview, sideIndex, picks)) throw invalid(`Elige ${picksNeeded(preview, sideIndex)} Pokémon distintos.`);
+  preview.sides[sideIndex].picks = [...picks];
 }
 
-export function randomPicks(p: PreviewState, s: number, random: () => number = Math.random): number[] {
-  const order = p.sides[s].entries.map((_, i) => i);
+export function randomPicks(preview: PreviewState, sideIndex: number, random: () => number = Math.random): number[] {
+  const order = preview.sides[sideIndex].entries.map((_, i) => i);
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [order[i], order[j]] = [order[j], order[i]];
   }
-  return order.slice(0, picksNeeded(p, s));
+  return order.slice(0, picksNeeded(preview, sideIndex));
 }
 
-export function fillMissing(p: PreviewState, random: () => number = Math.random): void {
-  p.sides.forEach((side, s) => {
-    if (!side.picks) side.picks = randomPicks(p, s, random);
+export function fillMissing(preview: PreviewState, random: () => number = Math.random): void {
+  preview.sides.forEach((side, sideIndex) => {
+    if (!side.picks) side.picks = randomPicks(preview, sideIndex, random);
   });
 }
 
-export const previewReady = (p: PreviewState): boolean => p.sides.every((s) => s.picks);
+export const previewReady = (preview: PreviewState): boolean => preview.sides.every((s) => s.picks);
 
-export const chosenEntries = (p: PreviewState, s: number): RosterEntry[] => p.sides[s].picks!.map((i) => p.sides[s].entries[i]);
+export const chosenEntries = (preview: PreviewState, sideIndex: number): RosterEntry[] => preview.sides[sideIndex].picks!.map((i) => preview.sides[sideIndex].entries[i]);
 
 /** What a rival sees of a Pokémon in your party: no stats, moves or ability. */
 export type SeenCard = Pick<Fighter, 'name' | 'speciesName' | 'sprite' | 'shiny' | 'floats' | 'rarity' | 'types' | 'gender'>;
 
-function seenCard(f: Fighter): SeenCard {
-  return { name: f.name, speciesName: f.speciesName, sprite: f.sprite, shiny: f.shiny, floats: f.floats, rarity: f.rarity, types: f.types, gender: f.gender };
+function seenCard(fighter: Fighter): SeenCard {
+  return { name: fighter.name, speciesName: fighter.speciesName, sprite: fighter.sprite, shiny: fighter.shiny, floats: fighter.floats, rarity: fighter.rarity, types: fighter.types, gender: fighter.gender };
 }
 
 export interface PreviewSideView {
@@ -90,25 +90,25 @@ export interface PreviewView {
 }
 
 /** The preview as `viewer` (a side index, or null for a spectator) may see it. */
-export function previewView(p: PreviewState, viewer: number | null = null): PreviewView {
+export function previewView(preview: PreviewState, viewer: number | null = null): PreviewView {
   return {
-    levelCap: p.levelCap,
-    mode: p.mode ?? 'team',
-    sides: p.sides.map((side, s) => {
-      const fighters = side.entries.map((e) => buildFighter(e, { levelCap: p.levelCap }));
-      const own = viewer === s;
+    levelCap: preview.levelCap,
+    mode: preview.mode ?? 'team',
+    sides: preview.sides.map((side, sideIndex) => {
+      const fighters = side.entries.map((e) => buildFighter(e, { levelCap: preview.levelCap }));
+      const own = viewer === sideIndex;
       const watching = viewer === null;
       return {
         trainerId: side.trainerId,
         name: side.name,
         ready: !!side.picks,
-        needed: picksNeeded(p, s),
+        needed: picksNeeded(preview, sideIndex),
         party: own || watching ? fighters : fighters.map(seenCard),
-        picks: own || (watching && p.revealed) ? side.picks : null,
+        picks: own || (watching && preview.revealed) ? side.picks : null,
         draft: watching && !side.picks ? side.draft ?? [] : null,
         locked: watching && !!side.picks ? side.picks : null,
       };
     }),
-    revealed: !!p.revealed,
+    revealed: !!preview.revealed,
   };
 }

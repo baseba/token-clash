@@ -28,8 +28,8 @@ export class SkynetService {
   }
 
   /** Jev's pick for side `s`, or null when it doesn't answer in time (the caller falls back). */
-  choose(battle: BattleState, s: number): Promise<Action | null> {
+  choose(battle: BattleState, sideIndex: number): Promise<Action | null> {
     const { apiKey, url, model } = this.config.jev;
-    return chooseJevAction(battle, s, { apiKey, ...(url ? { url } : {}), ...(model ? { model } : {}) });
+    return chooseJevAction(battle, sideIndex, { apiKey, ...(url ? { url } : {}), ...(model ? { model } : {}) });
   }
 }
