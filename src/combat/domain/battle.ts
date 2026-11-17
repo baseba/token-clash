@@ -1,19 +1,17 @@
 // Turn-based battle engine. Pure: no I/O, randomness injected, so it can be tested and replayed.
 import { effectiveness, formData, statsFor, speciesData, ALL_MOVE_IDS, type BoostKey, type Boosts, type MajorStatus, type Stats, type Weather } from '../../catalog/domain/creatures.js';
 import { buildFighter } from './fighter.js';
-import { moveData, STRUGGLE, type MoveData } from './moves.js';
+import { moveAt, moveData, STRUGGLE, STRUGGLE_MOVE, type MoveData } from './moves.js';
 import { MOVE_RULES } from './move-rules.js';
 import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
 import { ABILITIES, type AbilityEffect, type AbilityHook, type BoostChanges } from './ability-effects.js';
 import { isRain, isSun, poisoned, stageMult } from './conditions.js';
 import type { Gender, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { invalid } from '../../shared/domain/errors.js';
-import type { Action, SwitchAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, AbilityDetails, Guard, Hazards, Look, MoveEvent, Mover, OrderReason, SideCondition, Volatiles } from './battle-types.js';
+import type { Action, AnyMove, SwitchAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, AbilityDetails, Guard, Hazards, Look, MoveEvent, Mover, OrderReason, SideCondition, Volatiles } from './battle-types.js';
 
 export type * from './battle-types.js';
-
-/** A move as functions below accept it: a catalog move, or the copy being used this turn. */
-type AnyMove = MoveData | BattleMove;
+export { STRUGGLE_MOVE } from './moves.js';
 
 /** How many Pokémon fight on each side. */
 export const BATTLE_SIZE = 3;
@@ -28,9 +26,6 @@ const VEIL_WEATHER = new Set<Weather | null>(['hail', 'snow']);
 const accuracyMult = (stage: number): number => (stage >= 0 ? (3 + stage) / 3 : 3 / (3 - stage));
 const freshBoosts = (): Record<BoostKey, number> => ({ atk: 0, def: 0, satk: 0, sdef: 0, spd: 0, acc: 0, eva: 0 });
 const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
-export const STRUGGLE_MOVE = -1;
-/** The move in a fighter's slot, or Struggle. */
-export const moveAt = (fighter: BattleFighter, slot: number): MoveData => (slot === STRUGGLE_MOVE ? STRUGGLE : fighter.moves[slot]);
 const HEALS_WITH_WEATHER: Record<string, Weather> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
 
 function prepare(entry: RosterEntry, levelCap: number | null): BattleFighter {

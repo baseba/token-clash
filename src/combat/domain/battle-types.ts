@@ -196,6 +196,9 @@ export interface BattleMove extends MoveData {
   bideDamage?: number;
 }
 
+/** A move as engine functions take it: a catalog move, or the copy being used this turn. */
+export type AnyMove = MoveData | BattleMove;
+
 export interface FieldState {
   weather: Weather | null;
   weatherTurns: number;

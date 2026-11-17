@@ -57,10 +57,15 @@ const HITS_PHYSICAL_DEF = new Set(['psyshock', 'psystrike', 'secret-sword']);
 const LOSES_TYPE: Record<string, string> = { 'burn-up': 'fire', 'double-shock': 'electric' };
 const SELF_COST: Record<string, number> = { 'fillet-away': 1 / 2, 'clangorous-soul': 1 / 3 };
 
+/** What a fighter uses when it has no move left to use. STRUGGLE_MOVE stands for it in an action. */
+export const STRUGGLE_MOVE = -1;
 export const STRUGGLE: MoveData = {
   key: 'struggle', id: 'struggle', name: 'Forcejeo', desc: 'Ataque desesperado que solo se usa cuando no quedan PP; daña también al usuario.',
   type: null, category: 'physical', power: 50, accuracy: null, pp: 1, priority: 0, target: 'foe', flags: ['contact'], kind: 'attack', recoilMaxHp: 1 / 4, supported: true,
 };
+
+/** The move in a fighter's slot, or Struggle. */
+export const moveAt = (fighter: { moves: MoveData[] }, slot: number): MoveData => (slot === STRUGGLE_MOVE ? STRUGGLE : fighter.moves[slot]);
 
 function supportedMove(move: MoveData): boolean {
   if (move.category !== 'status') return move.power > 0 || !!move.fixedDamage || !!move.ohko;
