@@ -115,7 +115,7 @@ function setVol<K extends keyof Volatiles>(
   key: K,
   value: Volatiles[K],
   kind: string = key,
-  extra: Record<string, unknown> = {},
+  extra: { move?: string } = {},
 ): boolean {
   if (fighter.volatiles[key]) return false;
   fighter.volatiles[key] = value;

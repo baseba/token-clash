@@ -1,8 +1,10 @@
 // The shapes the battle engine works on. The engine (battle.ts) mutates these in place; the rules of
 // abilities (catalog/domain/abilities.ts) and moves (catalog/domain/move-rules.ts) receive them
 // through the APIs battle.ts hands them (AbilityEngine and MoveRuleApi).
-import type { BoostKey, Fighter, MajorStatus, MoveData, StatKey, Stats, Weather } from '../../catalog/domain/creatures.js';
+import type { AbilityInfo } from '../../catalog/domain/abilities.js';
+import type { BoostKey, Fighter, MajorStatus, MoveCategory, MoveData, StatKey, Stats, Weather } from '../../catalog/domain/creatures.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
+import type { FighterView, PublicMove } from './battle.js';
 
 export interface MoveAction {
   type: 'move';
@@ -235,19 +237,109 @@ export interface BattleSide {
   future?: { at: number; user: BattleFighter; move: BattleMove; name: string };
 }
 
+/** The fighter an event is about: its side, and its name as the rival sees it (Illusion's, when disguised). */
+interface About {
+  side: number;
+  name: string;
+}
+
+/** An HP change: `hp` and `max` are exact here; viewEvents() turns a rival's into percentages. */
+interface HpChange {
+  side: number;
+  hp: number;
+  max: number;
+}
+
+/** Why the first of two attackers went first. */
+export type OrderReason = 'priority' | 'speed' | 'tie';
+
+export interface MoveEvent extends About {
+  t: 'move';
+  move: string;
+  type: string | null;
+  kind: MoveData['kind'];
+  key: string;
+  category: MoveCategory;
+  target: string;
+  flags: string[];
+  /** What a status move does, for the animation. */
+  effect?: 'heal' | 'weather' | 'boost' | 'debuff';
+  stat?: string;
+  multihit?: true;
+  drain?: true;
+  /** Another move called it (Metronome, Sleep Talk…). */
+  called?: true;
+  why?: OrderReason;
+}
+
 /**
- * One thing that happened, for the browser to animate. `t` says what; the other fields depend on it
- * (side, name, amount, hp/max, status…). Events about HP carry `hp`/`max`; viewEvents() turns them
- * into percentages for whoever must not see exact numbers.
+ * One thing that happened, for the browser to animate (public/app.js reads each by its `t`). These
+ * are the exact shapes sent over the wire; viewEvents() adapts them for each client.
  */
-export interface BattleEvent {
-  t: string;
-  side?: number | null;
-  hp?: number;
-  max?: number;
-  amount?: number;
-  stats?: unknown;
-  [field: string]: unknown;
+export type BattleEvent =
+  | { t: 'turn'; turn: number }
+  | MoveEvent
+  | (About & { t: 'charging'; move: string; key: string; hidden: boolean })
+  | (About & { t: 'focus'; move: string; key: string })
+  | (About & { t: 'cant'; reason: string; move?: string })
+  | { t: 'nothing'; side: number; reason?: string }
+  | { t: 'notarget' | 'miss'; side: number }
+  | { t: 'immune'; side: number; terrain?: string }
+  | { t: 'fizzle'; side: number; weather: Weather }
+  | (About & { t: 'protected' | 'protectBroken' | 'endured' | 'faint' | 'confused' | 'stickyWeb' | 'switchOut' | 'dragged' | 'boostsReset' | 'bide' | 'wish' })
+  | (About & { t: 'bounced' | 'snatched' | 'grudge' | 'learned' | 'futureStart' | 'futureHit'; move: string })
+  | (HpChange & { t: 'damage'; amount: number; eff: number; crit: boolean })
+  | (About & { t: 'subDamage'; amount: number; eff: number; crit: boolean })
+  | (HpChange & { t: 'hurt'; amount: number; cause?: string | null })
+  | (HpChange & { t: 'heal'; amount: number; quiet?: true })
+  | (HpChange & { t: 'revive'; index: number; name: string })
+  | (HpChange & { t: 'form'; form: string | null; stats: Stats; types: string[]; sprite: string })
+  | { t: 'hits'; side: number; count: number }
+  | (About & { t: 'destinyBond'; from: string })
+  | (About & { t: 'infatuated'; by: string })
+  | (About & { t: 'perish'; count: number })
+  | (About & { t: 'pp'; move?: string; lost: number })
+  | (About & { t: 'status' | 'cure'; status: MajorStatus })
+  | { t: 'boost'; side: number; name?: string; stat: BoostKey; by: number; stage: number }
+  | (About & { t: 'boosts'; boosts: Record<BoostKey, number> })
+  | (About & { t: 'stats'; stats: Stats })
+  | (About & { t: 'volatile'; kind: string; move?: string; count?: number })
+  | (About & { t: 'volatileEnd'; kind: string; move?: string })
+  | (About & { t: 'protect' | 'healingWish'; kind: string })
+  | { t: 'sideStart'; side: number; kind: string; layers?: number; name?: string }
+  | { t: 'sideEnd'; side: number; kind: string }
+  | { t: 'hazard'; side: number; layers: number }
+  | { t: 'hazardEnd' | 'teamCured' | 'replace'; side: number }
+  | { t: 'screen'; side: number; screen: string; turns: number }
+  | { t: 'screenEnd'; side: number; screen: string; cause: string }
+  | { t: 'fieldStart' | 'fieldEnd'; kind: string }
+  | { t: 'weather' | 'weatherEnd'; weather: Weather }
+  | { t: 'terrain' | 'terrainEnd'; terrain: string }
+  | { t: 'courtChange' }
+  | { t: 'magnitude'; side: number; n: number }
+  | (About & { t: 'ability'; ability: string | null; info: AbilityInfo | null; note?: string } & AbilityDetails)
+  | { t: 'abilityChange'; side: number; ability: AbilityInfo | null }
+  | { t: 'types'; side: number; types: string[] }
+  | {
+      t: 'transform';
+      side: number;
+      into: string;
+      sprite: string;
+      floats: boolean;
+      types: string[];
+      stats: Stats;
+      moves: PublicMove[];
+      boosts: Record<BoostKey, number>;
+    }
+  | (About & { t: 'switch'; to: number; from: string; forced: boolean; card: FighterView; seen: FighterView })
+  | { t: 'end'; winner: number | null; reason?: 'limit' };
+
+/** What an ability shows along with its name: the ability Trace copied, the move Forewarn found… */
+export interface AbilityDetails {
+  copied?: string;
+  move?: string;
+  look?: Look;
+  stat?: StatKey;
 }
 
 /** A fighter about to use its move this turn, with what decides the order. */
@@ -259,7 +351,7 @@ export interface Mover extends MoveAction {
   frac: number;
   spd: number;
   tie: number;
-  why?: string | null;
+  why?: OrderReason | null;
 }
 
 export interface BattleState {

@@ -163,7 +163,7 @@ const absorb = (type: string, effect: { heal?: number; boost?: Boosts; flashFire
   onTryHit(engine, me, move) {
     if (move.type !== type) return false;
     engine.show(me);
-    if (effect.heal && !engine.heal(me, fraction(me, effect.heal))) engine.note(me, 'immune');
+    if (effect.heal && !engine.heal(me, fraction(me, effect.heal))) engine.immune(me);
     if (effect.boost) engine.boost(me, effect.boost, me);
     if (effect.flashFire) me.volatiles.flashFire = true;
     return true;
@@ -331,7 +331,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
     onTryHit(engine, me, move, attacker) {
       if (!isAttack(move) || !move.type || engine.effectiveness(move, attacker, me) > 1) return false;
       engine.show(me);
-      engine.note(me, 'immune');
+      engine.immune(me);
       return true;
     },
   },
@@ -341,7 +341,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
     onTryHit(engine, me, move) {
       if (move.type !== 'ground' || !isAttack(move)) return false;
       engine.show(me);
-      engine.note(me, 'immune');
+      engine.immune(me);
       return true;
     },
   },
@@ -391,7 +391,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
     onTryHit(engine, me, move) {
       if (!has(move, 'sound')) return false;
       engine.show(me);
-      engine.note(me, 'immune');
+      engine.immune(me);
       return true;
     },
   },
@@ -737,7 +737,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
     onTryHit(engine, me, move) {
       if (!has(move, 'bullet')) return false;
       engine.show(me);
-      engine.note(me, 'immune');
+      engine.immune(me);
       return true;
     },
   },
@@ -1202,7 +1202,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
       onTryHit(engine, me, move) {
         if (move.type !== 'ground' || !isAttack(move)) return false;
         engine.show(me);
-        engine.note(me, 'immune');
+        engine.immune(me);
         return true;
       },
     },
@@ -1256,7 +1256,7 @@ function blocksPriority(): AbilityEffect {
     onTryHit(engine, me, move, attacker) {
       if (move.effectivePriority <= 0 || attacker === me) return false;
       engine.show(me);
-      engine.note(me, 'immune');
+      engine.immune(me);
       return true;
     },
   };

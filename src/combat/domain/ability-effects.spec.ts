@@ -207,15 +207,15 @@ test('the rival ability and moves stay hidden until they show up in battle', () 
 test('the rival HP is only seen as a percentage', () => {
   const b = duel(mon(9, 'torrent'), mon(436, 'levitate'));
   const ev = turn(b, attackOfType(b, 0, 'water'), idle(b, 1));
-  const real = ev.find((e) => e.t === 'damage' && e.side === 1);
+  const real = ev.filter((e) => e.t === 'damage').find((e) => e.side === 1);
   const foe = fighter(b, 1);
   const pct = Math.round((real.hp / real.max) * 100);
   const now = Math.round((foe.hp / foe.stats.hp) * 100);
 
-  const mine = viewEvents(ev, 1).find((e) => e.t === 'damage' && e.side === 1);
-  assert.deepEqual([mine.hp, mine.amount, mine.pct], [real.hp, real.amount, undefined]);
-  const theirs = viewEvents(ev, 0).find((e) => e.t === 'damage' && e.side === 1);
-  assert.deepEqual([theirs.hp, theirs.max, theirs.pct], [pct, 100, true]);
+  const mine = viewEvents(ev, 1).filter((e) => e.t === 'damage').find((e) => e.side === 1);
+  assert.deepEqual([mine.hp, mine.amount, 'pct' in mine], [real.hp, real.amount, false]);
+  const theirs = viewEvents(ev, 0).filter((e) => e.t === 'damage').find((e) => e.side === 1);
+  assert.deepEqual([theirs.hp, theirs.max, 'pct' in theirs && theirs.pct], [pct, 100, true]);
   assert.equal(theirs.amount, 100 - pct);
 
   const seen = publicState(b, 0).sides[1].team[0];
@@ -240,7 +240,7 @@ test('physical moves use Attack/Defense and special moves Sp. Atk/Sp. Def', () =
     const b = duel(mon(6, 'blaze'), mon(143, 'thick-fat'));
     tweak(fighter(b, 0), fighter(b, 1));
     const i = moveIndex(b, 0, (m) => m.category === 'special');
-    return turn(b, { type: 'move', move: i }, idle(b, 1)).find((e) => e.t === 'damage' && e.side === 1).amount;
+    return turn(b, { type: 'move', move: i }, idle(b, 1)).filter((e) => e.t === 'damage').find((e) => e.side === 1).amount;
   };
   const base = special(() => {});
   assert.equal(special((me) => (me.stats.atk *= 10)), base);
@@ -293,7 +293,7 @@ test('Nevada invoca granizo antiguo: daña 1/16 por turno a quien no es Hielo y 
   const snorlax = fighter(b, 1);
   const abomasnow = fighter(b, 0);
   const ev = turn(b, idle(b, 0), idle(b, 1));
-  const hail = ev.filter((e) => e.t === 'hurt' && e.cause === 'hail');
+  const hail = ev.filter((e) => e.t === 'hurt').filter((e) => e.cause === 'hail');
   assert.deepEqual(hail.map((e) => e.side), [1]);
   assert.equal(hail[0].amount, Math.floor(snorlax.stats.hp / 16));
   assert.equal(abomasnow.hp, abomasnow.stats.hp);
