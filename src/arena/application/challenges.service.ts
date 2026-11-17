@@ -8,8 +8,8 @@ import { forbidden, notFound } from '../../shared/domain/errors.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
 import { Challenge, type BattleMode, type Visibility } from '../domain/challenge.js';
-import { joinBlocker, matchFor, visibilityOf } from '../domain/lobby.js';
-import { humanCount, reachedRound, roundName } from '../domain/tournament.js';
+import { joinBlocker, matchFor } from '../domain/lobby.js';
+import { humanCount } from '../domain/tournament.js';
 import { ArenaViews } from './arena-views.js';
 import { DuelService } from './duel.service.js';
 import { LobbyService } from './lobby.service.js';
@@ -103,28 +103,15 @@ export class ChallengesService implements OnModuleInit {
       .all()
       .filter((c) => !c.ai && !c.tournamentId && (c.hostId === trainer.id || c.guestId === trainer.id))
       .sort((a, b) => b.createdAt - a.createdAt);
-    const list = mine.slice(offset, offset + limit).map((c) => ({
-      id: c.id,
-      status: c.status,
-      levelCap: c.levelCap,
-      mode: c.battleMode,
-      ai: c.ai ?? null,
-      visibility: visibilityOf(c),
-      createdAt: c.createdAt,
-      opponent: c.hostId === trainer.id ? (c.guestId ? (this.views.nameOf(c.guestId, c.guestName) ?? null) : null) : this.views.nameOf(c.hostId, c.hostName),
-      won: c.status === 'finished' ? c.winnerId === trainer.id : null,
-      mine: c.hostId === trainer.id,
-    }));
     const tournaments = this.tournaments
       .all()
       .filter((T) => T.seatOf(trainer.id) !== -1 && (T.status === 'open' || T.status === 'running' || (T.status === 'finished' && humanCount(T) >= 2)))
       .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 15)
-      .map((T) => {
-        const seat = T.seatOf(trainer.id);
-        const reached = T.bracket ? reachedRound(T.bracket, seat) : -1;
-        return { id: T.id, size: T.size, mode: T.mode, levelCap: T.levelCap ?? null, status: T.status, humans: humanCount(T), createdAt: T.createdAt, champion: T.champion === seat, reached: reached === -1 ? null : roundName(T.size, reached) };
-      });
-    return { challenges: list, hasMore: offset + limit < mine.length, tournaments };
+      .slice(0, 15);
+    return {
+      challenges: mine.slice(offset, offset + limit).map((c) => this.views.pastChallenge(c, trainer.id)),
+      hasMore: offset + limit < mine.length,
+      tournaments: tournaments.map((T) => this.views.pastTournament(T, trainer.id)),
+    };
   }
 }

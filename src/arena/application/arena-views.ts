@@ -9,7 +9,7 @@ import { TrainersService } from '../../trainers/application/trainers.service.js'
 import { TournamentRepository } from '../domain/arena.repositories.js';
 import type { Challenge } from '../domain/challenge.js';
 import { visibilityOf } from '../domain/lobby.js';
-import { roundName, type Tournament } from '../domain/tournament.js';
+import { humanCount, reachedRound, roundName, type Tournament } from '../domain/tournament.js';
 import { Presence, type CountdownPlayer } from './presence.js';
 
 @Injectable()
@@ -88,6 +88,30 @@ export class ArenaViews {
       aiLevels: this.skynet.aiLevels,
       serverNow: Date.now(),
     };
+  }
+
+  /** A 1v1 in `trainerId`'s history. */
+  pastChallenge(c: Challenge, trainerId: string) {
+    const mine = c.hostId === trainerId;
+    return {
+      id: c.id,
+      status: c.status,
+      levelCap: c.levelCap,
+      mode: c.battleMode,
+      ai: c.ai ?? null,
+      visibility: visibilityOf(c),
+      createdAt: c.createdAt,
+      opponent: mine ? (c.guestId ? (this.nameOf(c.guestId, c.guestName) ?? null) : null) : this.nameOf(c.hostId, c.hostName),
+      won: c.status === 'finished' ? c.winnerId === trainerId : null,
+      mine,
+    };
+  }
+
+  /** A tournament in `trainerId`'s history: how far they got. */
+  pastTournament(T: Tournament, trainerId: string) {
+    const seat = T.seatOf(trainerId);
+    const reached = T.bracket ? reachedRound(T.bracket, seat) : -1;
+    return { id: T.id, size: T.size, mode: T.mode, levelCap: T.levelCap ?? null, status: T.status, humans: humanCount(T), createdAt: T.createdAt, champion: T.champion === seat, reached: reached === -1 ? null : roundName(T.size, reached) };
   }
 
   countdownPlayer(id: string, fallbackName: string): CountdownPlayer {
