@@ -1,6 +1,7 @@
 // Team preview: each side sees the rival's party (up to 6) and secretly picks the 3 that fight.
 import { buildFighter, type Fighter } from '../../catalog/domain/creatures.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { conflict, invalid } from '../../shared/domain/errors.js';
 import { BATTLE_SIZE } from './battle.js';
 
 export const PARTY_SIZE = 6;
@@ -39,8 +40,8 @@ function validPicks(p: PreviewState, s: number, picks: number[]): boolean {
 }
 
 export function pick(p: PreviewState, s: number, picks: number[]): void {
-  if (p.sides[s].picks) throw new Error('Ya elegiste tu equipo.');
-  if (!validPicks(p, s, picks)) throw new Error(`Elige ${picksNeeded(p, s)} Pokémon distintos.`);
+  if (p.sides[s].picks) throw conflict('Ya elegiste tu equipo.');
+  if (!validPicks(p, s, picks)) throw invalid(`Elige ${picksNeeded(p, s)} Pokémon distintos.`);
   p.sides[s].picks = [...picks];
 }
 

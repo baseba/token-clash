@@ -5,7 +5,7 @@ import { uniqueSpecies } from '../../catalog/domain/roster-entry.js';
 import { JEV_LEVEL } from '../../combat/domain/ai.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { newId, now } from '../../shared/domain/clock.js';
-import { conflict, forbidden, invalid, notFound, unavailable } from '../../shared/domain/errors.js';
+import { forbidden, invalid, notFound, unavailable } from '../../shared/domain/errors.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
 import { Challenge, type BattleMode, type Visibility } from '../domain/challenge.js';
@@ -64,7 +64,8 @@ export class ChallengesService implements OnModuleInit {
     if (input.ai !== undefined) return { challenge: this.duels.startAgainstAi(trainer, { mode: input.mode, levelCap: input.levelCap, level: input.ai }) };
     if (input.visibility === 'public') {
       const { own, rival } = matchFor(this.lobby.publicRooms(), { trainerId: trainer.id, mode: input.mode, levelCap: input.levelCap });
-      if (rival && !this.duels.join(rival, trainer)) {
+      if (rival) {
+        this.duels.join(rival, trainer);
         if (own) this.duels.close(own);
         return { challenge: rival, joined: true };
       }
@@ -92,8 +93,7 @@ export class ChallengesService implements OnModuleInit {
     const c = this.challenges.findById(id);
     const blocked = joinBlocker<Challenge>(c, { trainerId: trainer.id, hostWaiting: this.presence.hostWaiting });
     if (blocked) throw blocked;
-    const failed = this.duels.join(c!, trainer);
-    if (failed) throw conflict(failed);
+    this.duels.join(c!, trainer);
     return c!;
   }
 

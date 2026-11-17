@@ -162,6 +162,8 @@ function expectedMoves(speciesId: number, level: number): MoveData[] {
       const probe = { id: `guess-${speciesId}`, finalID: speciesId, baseID: speciesId, level, ivs: GUESS_IVS, learned: [] } as unknown as RosterEntry;
       moves = pickMoveset(probe, 'hard', () => 0.5).map(moveData) as MoveData[];
     } catch {
+      // The probe is a bare entry, not a real Pokémon: if the catalog can't build one for this
+      // species, the AI guesses no moves rather than stalling the turn timer with a throw.
       moves = [];
     }
     guesses.set(key, moves);

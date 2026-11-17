@@ -16,6 +16,7 @@ import { SkynetService } from '../../combat/application/skynet.service.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { newId, now } from '../../shared/domain/clock.js';
+import { conflict, DomainError } from '../../shared/domain/errors.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository } from '../domain/arena.repositories.js';
@@ -87,11 +88,11 @@ export class DuelService {
     return c;
   }
 
-  /** Someone takes the free seat of an open room. Returns why not, or null. */
-  join(c: Challenge, guest: Trainer): string | null {
+  /** Someone takes the free seat of an open room. */
+  join(c: Challenge, guest: Trainer): void {
     const host = this.trainers.byId(c.hostId);
-    if (c.mode === 'random') {
-      if (!host?.roster.length) return 'El anfitrión ya no tiene Pokémon.';
+    if (c.battleMode === 'random') {
+      if (!host?.roster.length) throw conflict('El anfitrión ya no tiene Pokémon.');
       c.join(guest, { hostTeam: randomParty(host.roster), guestTeam: randomParty(guest.roster) });
     } else c.join(guest, { guestTeam: guest.teamSnapshot() });
     this.challenges.save(c);
@@ -99,7 +100,6 @@ export class DuelService {
     r.readyCheck = { ready: new Set(), players: [this.views.countdownPlayer(c.hostId, c.hostName), this.views.countdownPlayer(guest.id, guest.name)] };
     this.broadcast(r, { t: 'lobby' });
     this.lobby.notify();
-    return null;
   }
 
   /** The host closes the room (or leaves it): everyone inside is told. */
@@ -363,7 +363,9 @@ export class DuelService {
     let events: BattleEvent[] | null;
     try {
       events = submit(b, s, action);
-    } catch {
+    } catch (e) {
+      // The turn timer still plays for Skynet.
+      this.logger.warn(`Skynet eligió una acción que el motor no acepta: ${e}`);
       return;
     }
     if (events) this.afterResolve(id, r, events);
@@ -514,7 +516,8 @@ export class DuelService {
     try {
       pick(r.preview, s, picks);
     } catch (e) {
-      return ws.send({ t: 'error', error: (e as Error).message });
+      if (e instanceof DomainError) return ws.send({ t: 'error', error: e.message });
+      throw e;
     }
     if (previewReady(r.preview)) this.revealPicks(ws.roomId!, r);
     else this.broadcast(r, { t: 'preview' });
@@ -529,7 +532,8 @@ export class DuelService {
     try {
       events = submit(r.battle, s, action);
     } catch (e) {
-      return ws.send({ t: 'error', error: (e as Error).message });
+      if (e instanceof DomainError) return ws.send({ t: 'error', error: e.message });
+      throw e;
     }
     if (events) this.afterResolve(ws.roomId!, r, events);
     else this.broadcast(r, { t: 'ready' });
