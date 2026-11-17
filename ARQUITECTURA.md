@@ -72,7 +72,9 @@ exports: [TrainersService], // ← el repositorio NO se exporta
 ```
 
 `combat` y `catalog` son casi solo `domain/`: funciones puras con la aleatoriedad inyectada (`random = Math.random`),
-así que sus tests reproducen una pelea entera con una semilla fija. En general, un dominio tiene solo las capas que
+así que sus tests reproducen una pelea entera con una semilla fija. La única lectura es la del catálogo: sus JSON
+se leen una vez, al cargar el módulo, y la tabla de tipos es `public/types.js`, la misma que usa el navegador
+(`catalog/domain/type-chart.ts` explica cómo). En general, un dominio tiene solo las capas que
 usa: `chat` no tiene HTTP propio (sus mensajes le llegan por la arena) y `stats` no guarda nada.
 
 Un puerto es opcional: vale la pena cuando el adaptador podría cambiar o hay que reemplazarlo en los tests, como

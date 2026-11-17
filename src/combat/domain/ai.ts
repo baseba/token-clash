@@ -161,7 +161,6 @@ export function aiPicks({ difficulty: level, own, random = Math.random }: { diff
     .map((x) => x.index);
 }
 
-// ---------- what the AI may know ----------
 // The AI decides on its belief of the battle, built only from what a human on its side sees:
 // the rival's revealed moves and ability, its HP as a percentage, and its Pokémon once they've
 // been out. The rest is a guess from the species, never the real thing. Its pending choice is
