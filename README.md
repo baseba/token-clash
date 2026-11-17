@@ -68,11 +68,11 @@ En vivo: **https://clash.mirrordev.xyz**
 
 ## Combate
 
-El motor (`server/battle.js`) sigue las reglas de los juegos para combates individuales: daño con STAB,
+El motor (`src/combat/domain/battle.ts`) sigue las reglas de los juegos para combates individuales: daño con STAB,
 efectividad, críticos y variación; estados y volátiles (confusión, atracción, drenadoras, apresado…); clima,
 campos, barreras (Reflejo, Pantalla de Luz, Velo Aurora), trampas de campo, Protección, Sustituto, prioridad,
 golpes múltiples y movimientos de cambio, que cambian al Pokémon en el momento. Las habilidades están en
-`server/abilities.js` y las reglas especiales de cada movimiento en `server/moves.js`.
+`src/combat/domain/ability-effects.ts` y las reglas especiales de cada movimiento en `src/catalog/domain/move-rules.ts`.
 
 No hay objetos ni combates dobles: los movimientos y habilidades que dependen de eso no tienen efecto en Token
 Clash y no se pueden elegir. Si un save trae uno, se reemplaza por otro al azar de los que sí funcionan; si no
@@ -90,12 +90,12 @@ defecto, cada Pokémon usa los últimos movimientos que aprendió hasta su nivel
 Pokémon evolucionado también puede usar lo que aprendían sus preevoluciones hasta ese nivel (Raichu tiene los de
 Pichu, Pikachu y Raichu).
 
-Los datos viven en `server/pokeapi.json`, `server/movedex.json` y `server/abilities.json`. Los sprites y los gritos no
+Los datos viven en `src/catalog/data/` (`pokeapi.json`, `movedex.json` y `abilities.json`). Los sprites y los gritos no
 se versionan: `npm install` descarga los sprites en `public/sprites/` (o `npm run sprites`) y los gritos reales
 de [PokeAPI/cries](https://github.com/PokeAPI/cries) en `public/cries/` (o `npm run cries`).
 Las animaciones de batalla y sus sonidos vienen de [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets):
 `npm install` (o `npm run anims`; `-- --refresh` para bajar todo de nuevo) descarga la animación de cada movimiento
-de `server/movedex.json`, las de estados, ataduras, protección, clima, campos y cargas, sus hojas de sprites y
+de `src/catalog/data/movedex.json`, las de estados, ataduras, protección, clima, campos y cargas, sus hojas de sprites y
 fondos (`public/anims/`), sus sonidos y los efectos de Poké Ball, golpes, debilitado y stats (`public/sfx/`).
 El mismo script baja la música de PokeRogue a `public/music/` con sus puntos de loop: cada escena de batalla toca
 un tema de combate contra entrenadores acorde a lo que muestra (Alola en la playa, el gimnasio de Sinnoh en la cueva,
@@ -111,7 +111,7 @@ estilo del resto de la app, y los mismos tiempos de golpe
 PokeAPI (en producción no tiene salida a internet). Para refrescar los datos, con Node 22 o más:
 
 ```sh
-node scripts/import-pokeapi.mjs   # ~2-3 min, reescribe los JSON de server/ y los sprites
+node scripts/import-pokeapi.mjs   # ~2-3 min, reescribe los JSON de src/catalog/data/ y los sprites
 ```
 
 Las especies que la PokeAPI no conoce quedan como tipo Normal, con stats según su rareza.
@@ -140,42 +140,63 @@ GAME FREAK inc.
 
 ## Desarrollo
 
+Backend en [NestJS](https://nestjs.com) con TypeScript, organizado por dominios; datos en SQLite con
+[Drizzle](https://orm.drizzle.team). El frontend (`public/`) sigue siendo JS de módulos sin build. Cómo está
+armado y por qué: [ARQUITECTURA.md](ARQUITECTURA.md).
+
 ```sh
 npm install
-npm run dev     # http://localhost:8080, datos en ./data
-npm test        # parser, motor de batalla, IA, stats y flujo completo con WebSocket
+npm run dev          # compila y levanta http://localhost:8080 (recompila al guardar), datos en ./data
+npm test             # typecheck estricto + 200 tests: reglas, motor, IA, persistencia y flujo completo por WebSocket
+npm run build        # TypeScript → dist/
+npm run db:generate  # tras cambiar un *.schema.ts: genera la migración SQL en drizzle/
 ```
 
-- `server/save.js`: lee el export (`format: "poketokenbar.save"`) o el estado crudo.
-- `server/creatures.js`: especie → datos de PokeAPI (nombre, stats, tipos, género) y sus movimientos.
-- `scripts/import-pokeapi.mjs`: genera `server/pokeapi.json`, `server/movedex.json` y `server/abilities.json`.
+Node 22.13 o más (usa `node:sqlite`, que viene con Node: no hay módulos nativos que compilar).
+
+| Carpeta | Qué hay |
+| --- | --- |
+| `src/catalog/` | Especies, movimientos, habilidades y tipos de PokeAPI (`data/*.json`) y la Pokédex. Solo datos y reglas puras. |
+| `src/combat/` | El motor de batalla, la elección de 3, el sorteo aleatorio, la IA y Skynet (cliente y proxy de Jev). |
+| `src/trainers/` | Entrenadores: importar el save, la colección, el equipo, la sesión. Dueño de `trainers` y `roster_entries`. |
+| `src/arena/` | Salas 1 contra 1, emparejamiento, peleas en vivo y torneos. Dueño de `challenges` y `tournament*`. |
+| `src/chat/` | El chat de salas y torneos (en memoria). |
+| `src/stats/` | La página de stats: solo lee de los otros dominios. |
+| `src/realtime/` | El protocolo WebSocket (`/ws`). |
+| `src/web/` | El frontend estático y los health checks. |
+| `src/shared/` | Configuración, errores de dominio, HTTP (guards, filtro de errores) y la base de datos. |
+| `src/legacy/` | La migración única desde `data/db.json`. |
+| `drizzle/` | Migraciones SQL generadas por drizzle-kit; la app las aplica al arrancar. |
+| `test/` | Tests en TypeScript (`node:test`); `test/web/` son los del frontend, en JS. |
+
+Datos externos:
+
+- `scripts/import-pokeapi.mjs`: genera `src/catalog/data/pokeapi.json`, `movedex.json` y `abilities.json`.
 - `scripts/sprites.mjs`: descarga los sprites a `public/sprites/` (corre solo en `npm install`).
 - `scripts/sync-battle-anims.js`: compacta las animaciones de PokeRogue en `public/anims/<clave>.json` (versión del jugador y del rival cuando difieren), baja sus imágenes y sonidos y arma `public/sfx/moves/moves.json` con los tiempos de cada sonido (corre solo en `npm install`).
-- `public/battle-anims.js`: intérprete propio del formato de animación de PokeRogue (cuadros de 50 ms, focos en atacante, objetivo o pantalla, fondos).
 - `scripts/sync-cries.js`: descarga los gritos (`latest` y `legacy`) a `public/cries/` y escribe `cries.json`, que el navegador usa para elegir el archivo según el sprite (corre solo en `npm install`).
-- `public/types.js`: tipos y tabla de efectividad.
-- `server/battle.js`: motor puro de batalla (aleatoriedad inyectada).
-- `server/moves.js` y `server/abilities.js`: reglas especiales de movimientos y habilidades.
-- `server/stats.js`: ranking y totales de la página de stats.
-- `server/ai.js`: la IA: arma su equipo y elige qué hacer cada turno (aleatoriedad inyectada).
-- `server/jev.js`: Skynet. Le pasa a Jev solo lo que vería un jugador de ese lado (sin nombres de entrenador ni
-  apodos) y las acciones válidas como una pregunta Choice. Si Jev no responde en 4 s o falla, decide la IA Muy difícil.
-  Variables: `JEV_API_URL` (en producción, el proxy) o `JEV_API_KEY` para llamar directo a TypeSafe; sin ninguna
-  de las dos no hay Skynet. `JEV_MODEL` fija la versión (por defecto `jev-1.14.0`).
-- `server/jev-proxy.js`: el proxy de salida de Skynet (ver Deploy).
-- `server/random.js`: sorteo de la batalla aleatoria (equipo, movimientos y habilidad; aleatoriedad inyectada).
-- `server/lobby.js`: salas abiertas y emparejamiento (qué salas se listan y a cuál entra una búsqueda pública).
-- `server/tournament.js`: asientos, llaves y avance del torneo.
-- `server/pokedex.js`: qué especies tiene registradas cada jugador.
-- `server/index.js`: HTTP + WebSocket, desafíos, ranking. Persistencia en `data/db.json`.
-- `public/`: frontend sin build (JS de módulos); `public/fx.js` dibuja los efectos de los movimientos y estados.
+- `public/battle-anims.js`: intérprete propio del formato de animación de PokeRogue (cuadros de 50 ms, focos en atacante, objetivo o pantalla, fondos).
+- `public/types.js`: tipos y tabla de efectividad, compartidos por el navegador y el servidor.
+- Skynet (`src/combat/infrastructure/jev/`) le pasa a Jev solo lo que vería un jugador de ese lado (sin nombres de
+  entrenador ni apodos) y las acciones válidas como una pregunta Choice. Si Jev no responde en 4 s o falla, decide la IA
+  Muy difícil. Variables: `JEV_API_URL` (en producción, el proxy) o `JEV_API_KEY` para llamar directo a TypeSafe; sin
+  ninguna de las dos no hay Skynet. `JEV_MODEL` fija la versión (por defecto `jev-1.14.0`).
+
+### Datos
+
+Todo vive en `DATA_DIR/token-clash.db` (SQLite, modo WAL). Nada se borra: los desafíos y torneos quedan para siempre.
+Hasta la versión 0.1 los datos estaban en `data/db.json`: el primer arranque con SQLite lo importa entero en una
+transacción y lo deja intacto como respaldo (si un deploy vuelve a la imagen anterior, esa sigue encontrando sus datos).
+No se vuelve a importar. Para comprobar una copia real sin tocar nada:
+`LEGACY_DB=/ruta/a/db.json node --test dist/test/legacy-import.test.js` (tras `npm test` o `npm run build`).
 
 Las batallas en curso viven en memoria: reiniciar el servicio corta las peleas activas (quedan como "cortadas").
 
 ## Deploy (Podman + Cloudflare Tunnel)
 
 La app corre en un contenedor sin puertos publicados, solo lectura, sin capabilities, en una red interna
-sin salida. Solo `cloudflared` (en esa red y en una con salida) la alcanza. Los datos viven en `./data`.
+sin salida. Solo `cloudflared` (en esa red y en una con salida) la alcanza. Los datos viven en `./data`
+(`token-clash.db`, más el `db.json` de antes de SQLite como respaldo).
 Para Skynet, la app le pregunta a Jev a través de `token-clash-jev`, un proxy en las mismas dos redes que solo
 reenvía `POST /v1/systemone` a TypeSafe y le agrega la clave: la app sigue sin salida y sin la clave.
 

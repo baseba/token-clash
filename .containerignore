@@ -1,0 +1,9 @@
+node_modules
+dist
+data
+.git
+public/sprites
+public/cries
+public/sfx
+public/anims
+public/music

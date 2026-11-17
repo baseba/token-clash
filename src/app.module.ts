@@ -1,0 +1,48 @@
+// The application: one Nest module per bounded context, plus shared infrastructure.
+//
+//   catalog   species, moves, abilities, types (static data + pure rules; no module needed)
+//   combat    battle engine, team preview, AI, Skynet
+//   trainers  players, their collection and team          ← owns tables trainers, roster_entries
+//   arena     duel rooms, live matches, tournaments        ← owns challenges, tournaments, seats, matches
+//   chat      room and tournament chat (in memory)
+//   stats     read model for /stats
+//   realtime  the WebSocket protocol (/ws)
+//   web       the static frontend and health checks
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
+import { ArenaModule } from './arena/arena.module.js';
+import { ChatModule } from './chat/chat.module.js';
+import { CombatModule } from './combat/combat.module.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
+import { ConfigModule } from './shared/config/config.module.js';
+import { ApiProtectionMiddleware } from './shared/http/api-protection.middleware.js';
+import { DomainErrorFilter } from './shared/http/domain-error.filter.js';
+import { HttpModule } from './shared/http/http.module.js';
+import { SecurityHeadersMiddleware } from './shared/http/security-headers.middleware.js';
+import { DatabaseModule } from './shared/infrastructure/database/database.module.js';
+import { StatsModule } from './stats/stats.module.js';
+import { TrainersModule } from './trainers/trainers.module.js';
+import { WebRoutesModule } from './web/web-routes.module.js';
+
+@Module({
+  imports: [
+    ConfigModule,
+    HttpModule,
+    DatabaseModule,
+    CombatModule,
+    TrainersModule,
+    ArenaModule,
+    ChatModule,
+    StatsModule,
+    RealtimeModule,
+    // Last: its catch-all route serves the frontend and must not shadow anything above.
+    WebRoutesModule,
+  ],
+  providers: [{ provide: APP_FILTER, useClass: DomainErrorFilter }],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(SecurityHeadersMiddleware).forRoutes('{*path}');
+    consumer.apply(ApiProtectionMiddleware).forRoutes('api/{*path}');
+  }
+}

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Downloads every species from PokeAPI (https://pokeapi.co) into the game's data:
-// - server/pokeapi.json: name, base stats, real types, abilities, every move it can learn (by level,
+// - src/catalog/data/pokeapi.json: name, base stats, real types, abilities, every move it can learn (by level,
 //   TM/HM, tutor, egg or other means) and where it sits in its evolution chain.
-// - server/abilities.json: Spanish name and description of every main-series ability.
-// - server/movedex.json: every learnable move, with its Spanish name and description from PokeAPI and
+// - src/catalog/data/abilities.json: Spanish name and description of every main-series ability.
+// - src/catalog/data/movedex.json: every learnable move, with its Spanish name and description from PokeAPI and
 //   its battle data from Pokémon Showdown's MIT-licensed server data.
 // - public/sprites/: the official sprites of every species and battle form, via scripts/sprites.mjs.
 //
@@ -15,9 +15,9 @@ import { writeFileSync } from 'node:fs';
 import { syncSprites } from './sprites.mjs';
 
 const API = 'https://pokeapi.co/api/v2';
-const OUT = new URL('../server/pokeapi.json', import.meta.url);
-const ABILITIES_OUT = new URL('../server/abilities.json', import.meta.url);
-const MOVEDEX_OUT = new URL('../server/movedex.json', import.meta.url);
+const OUT = new URL('../src/catalog/data/pokeapi.json', import.meta.url);
+const ABILITIES_OUT = new URL('../src/catalog/data/abilities.json', import.meta.url);
+const MOVEDEX_OUT = new URL('../src/catalog/data/movedex.json', import.meta.url);
 const SHOWDOWN_MOVES = 'https://play.pokemonshowdown.com/data/moves.json';
 const LEARNSET_GROUPS = ['black-2-white-2', 'scarlet-violet', 'sword-shield', 'ultra-sun-ultra-moon', 'sun-moon', 'omega-ruby-alpha-sapphire', 'x-y'];
 const CONCURRENCY = 8;
@@ -159,7 +159,7 @@ const abilityLines = Object.keys(abilities)
     return `  "${k}": ${JSON.stringify(a)}`;
   });
 writeFileSync(ABILITIES_OUT, `{\n${abilityLines.join(',\n')}\n}\n`);
-console.error(`Listo: ${abilityLines.length} habilidades en server/abilities.json`);
+console.error(`Listo: ${abilityLines.length} habilidades en src/catalog/data/abilities.json`);
 
 const STAT_KEY = { atk: 'atk', def: 'def', spa: 'satk', spd: 'sdef', spe: 'spd', accuracy: 'acc', evasion: 'eva' };
 const statBoosts = (boosts) => (boosts ? Object.fromEntries(Object.entries(boosts).map(([k, v]) => [STAT_KEY[k], v])) : null);
@@ -263,7 +263,7 @@ const moveLines = Object.keys(movedex)
   .sort()
   .map((k) => `  "${k}": ${JSON.stringify(movedex[k])}`);
 writeFileSync(MOVEDEX_OUT, `{\n${moveLines.join(',\n')}\n}\n`);
-console.error(`Listo: ${moveLines.length} movimientos en server/movedex.json`);
+console.error(`Listo: ${moveLines.length} movimientos en src/catalog/data/movedex.json`);
 
 const lines = Object.keys(species)
   .map(Number)
@@ -278,5 +278,5 @@ const header = { source: 'https://pokeapi.co', fetchedAt: new Date().toISOString
 const head = JSON.stringify(header, null, 1).slice(0, -2);
 const formLines = BATTLE_FORMS.filter((n) => forms[n]).map((n) => `  "${n}": ${JSON.stringify(forms[n])}`);
 writeFileSync(OUT, `${head},\n "species": {\n${lines.join(',\n')}\n },\n "forms": {\n${formLines.join(',\n')}\n }\n}\n`);
-console.error(`Listo: ${lines.length} especies en server/pokeapi.json`);
+console.error(`Listo: ${lines.length} especies en src/catalog/data/pokeapi.json`);
 await syncSprites();
