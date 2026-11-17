@@ -22,7 +22,8 @@ export type BoostKey = 'atk' | 'def' | 'satk' | 'sdef' | 'spd' | 'acc' | 'eva';
 export type Boosts = Partial<Record<BoostKey, number>>;
 export type MoveCategory = 'physical' | 'special' | 'status';
 /** The status a Pokémon keeps until cured (burn, paralysis, poison, bad poison, sleep, freeze). */
-export type MajorStatus = 'brn' | 'par' | 'psn' | 'tox' | 'slp' | 'frz';
+export const MAJOR_STATUSES = ['brn', 'par', 'psn', 'tox', 'slp', 'frz'] as const;
+export type MajorStatus = (typeof MAJOR_STATUSES)[number];
 /** The primal ones (harshsun, heavyrain, winds) only come from abilities, and last while their setter stays. */
 export type Weather = 'sun' | 'rain' | 'sand' | 'hail' | 'snow' | 'harshsun' | 'heavyrain' | 'winds';
 

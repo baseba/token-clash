@@ -1,9 +1,10 @@
 // The AI: builds its team, picks its three, and chooses what to do each turn. Randomness is injected.
-import { buildFighter, speciesData, formData, statsFor, effectiveness, usableMovepool, moveData, shuffled, rng, STRUGGLE, MOVES_PER_FIGHTER, type MoveData, type Random, type SpeciesData } from '../../catalog/domain/creatures.js';
+import { buildFighter, speciesData, formData, statsFor, effectiveness, usableMovepool, moveData, shuffled, rng, MOVES_PER_FIGHTER, type MoveData, type Random, type SpeciesData } from '../../catalog/domain/creatures.js';
 import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { validActions, submit, needsAction, moveWillFail, BATTLE_SIZE, STRUGGLE_MOVE } from './battle.js';
+import { validActions, submit, needsAction, moveWillFail, moveAt, BATTLE_SIZE } from './battle.js';
 import type { Action, BattleFighter, BattleSide, BattleState, MoveAction, SwitchAction } from './battle-types.js';
+import { isRain, isSun, stageMult } from './conditions.js';
 import { randomize } from './random-party.js';
 import { PARTY_SIZE } from './team-preview.js';
 
@@ -36,7 +37,6 @@ const STATUS_VALUE: Record<string, number> = { slp: 70, par: 55, tox: 52, psn: 3
 
 const lastSwitchTurn = new WeakMap<BattleSide, number>();
 const pickOne = <T>(list: readonly T[], random: Random): T => list[Math.floor(random() * list.length)];
-const stageMult = (stage = 0): number => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
 const bst = (data: { stats: readonly number[] }): number => data.stats.reduce((a, b) => a + b, 0);
 const fullyEvolved = (data: SpeciesData): boolean => data.chainLen == null || data.stage == null || data.stage >= data.chainLen - 1;
 const hpShare = (fighter: BattleFighter): number => fighter.hp / fighter.stats.hp;
@@ -227,10 +227,6 @@ export function beliefOf(battle: BattleState, sideIndex: number): BattleState {
   return copy;
 }
 
-function moveOf(fighter: BattleFighter, idx: number): MoveData {
-  return idx === STRUGGLE_MOVE ? STRUGGLE : fighter.moves[idx];
-}
-
 function typeEffect(move: MoveData, target: BattleFighter, knowsAbilities: boolean): number {
   if (!move.type) return 1;
   let multiplier = effectiveness(move.type, target.types);
@@ -239,7 +235,7 @@ function typeEffect(move: MoveData, target: BattleFighter, knowsAbilities: boole
 }
 
 function speedOf(fighter: BattleFighter): number {
-  return fighter.stats.spd * stageMult(fighter.boosts?.spd) * (fighter.status === 'par' ? 0.5 : 1);
+  return fighter.stats.spd * stageMult(fighter.boosts.spd) * (fighter.status === 'par' ? 0.5 : 1);
 }
 
 export function estimateDamage(
@@ -255,16 +251,16 @@ export function estimateDamage(
   if (move.ohko) return target.level > attacker.level ? 0 : target.hp * ((move.accuracy ?? 30) / 100);
   if (move.fixedDamage) return move.fixedDamage === 'level' ? attacker.level : Number(move.fixedDamage) || 0;
   const physical = move.category === 'physical';
-  const attack = (physical ? attacker.stats.atk : attacker.stats.satk) * stageMult(attacker.boosts?.[physical ? 'atk' : 'satk']);
-  const defense = (physical ? target.stats.def : target.stats.sdef) * stageMult(target.boosts?.[physical ? 'def' : 'sdef']);
+  const attack = (physical ? attacker.stats.atk : attacker.stats.satk) * stageMult(attacker.boosts[physical ? 'atk' : 'satk']);
+  const defense = (physical ? target.stats.def : target.stats.sdef) * stageMult(target.boosts[physical ? 'def' : 'sdef']);
   let power = move.power || 0;
   if (move.multihit) power *= (move.multihit[0] + move.multihit[1]) / 2;
   let dmg = (((2 * attacker.level) / 5 + 2) * power * (attack / Math.max(1, defense))) / 50 + 2;
   if (move.type && attacker.types.includes(move.type)) dmg *= attacker.ability === 'adaptability' ? 2 : 1.5;
   dmg *= eff * 0.925 * ((move.accuracy ?? 100) / 100);
   const weather = battle.field?.weather;
-  if (weather === 'sun' || weather === 'harshsun') dmg *= move.type === 'fire' ? 1.5 : move.type === 'water' ? 0.5 : 1;
-  if (weather === 'rain' || weather === 'heavyrain') dmg *= move.type === 'water' ? 1.5 : move.type === 'fire' ? 0.5 : 1;
+  if (isSun(weather)) dmg *= move.type === 'fire' ? 1.5 : move.type === 'water' ? 0.5 : 1;
+  if (isRain(weather)) dmg *= move.type === 'water' ? 1.5 : move.type === 'fire' ? 0.5 : 1;
   if (attacker.status === 'brn' && physical && attacker.ability !== 'guts') dmg *= 0.5;
   const screens: Record<string, number> = battle.sides[battle.sides.findIndex((s) => s.team.includes(target))]?.screens ?? {};
   if (screens.auroraveil || (physical ? screens.reflect : screens.lightscreen)) dmg *= 0.5;
@@ -287,7 +283,7 @@ export function scoreMove(battle: BattleState, sideIndex: number, idx: number, k
   const me = side.team[side.active];
   const foeSide = battle.sides[1 - sideIndex];
   const foe = foeSide.team[foeSide.active];
-  const move = moveOf(me, idx);
+  const move = moveAt(me, idx);
   if (!foe || foe.hp <= 0) return 1;
   if (moveWillFail(battle, sideIndex, idx)) return 0;
   if (move.kind !== 'status' && move.category !== 'status') {
@@ -445,7 +441,7 @@ export function chooseAction(battle: BattleState, sideIndex: number, level: AiLe
   if (switches.length) {
     const canKo = foe
       && foe.hp > 0
-      && scored.some((x) => moveOf(me, x.action.move).kind !== 'status' && estimateDamage(belief, me, foe, moveOf(me, x.action.move)) >= foe.hp);
+      && scored.some((x) => moveAt(me, x.action.move).kind !== 'status' && estimateDamage(belief, me, foe, moveAt(me, x.action.move)) >= foe.hp);
     const doomed = foe && foe.hp > 0 && bestDamage(belief, foe, me, true) >= me.hp && speedOf(foe) > speedOf(me);
     const stuck = best.score < 15;
     const lastSwitched = lastSwitchTurn.get(memory) === belief.turn - 1;

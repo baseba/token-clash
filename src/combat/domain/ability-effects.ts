@@ -3,6 +3,7 @@
 // battle state directly. Names and descriptions are catalog data: catalog/domain/abilities.ts.
 import type { Boosts, BoostKey, MajorStatus, MoveData, StatKey, Weather } from '../../catalog/domain/creatures.js';
 import type { AbilityEngine } from './battle.js';
+import { isIcy, isMajorStatus, isRain, isSun, poisoned, stageMult } from './conditions.js';
 import type { BattleFighter, BattleMove } from './battle-types.js';
 
 /** Stat stage changes about to apply, which onTryBoost/onChangeBoost may edit in place. */
@@ -120,21 +121,15 @@ const full = (fighter: BattleFighter): boolean => fighter.hp === fighter.stats.h
 const fraction = (fighter: BattleFighter, share: number): number => Math.max(1, Math.floor(fighter.stats.hp * share));
 const droppedBelowHalf = (fighter: BattleFighter, before: number): boolean =>
   before > fighter.stats.hp / 2 && fighter.hp > 0 && fighter.hp <= fighter.stats.hp / 2;
-const STATUS_NAMES = new Set<string | null>(['brn', 'par', 'psn', 'tox', 'slp', 'frz']);
-const isMajor = (status: string | null): boolean => STATUS_NAMES.has(status);
-const poison = (status: string | null): boolean => status === 'psn' || status === 'tox';
 const highestStat = (fighter: BattleFighter): StatKey =>
   (['atk', 'def', 'satk', 'sdef', 'spd'] as const).reduce<StatKey>((best, k) => (fighter.stats[k] > fighter.stats[best] ? k : best), 'atk');
 
 const typePower = (type: string, mult: number): AbilityEffect => ({ onBasePower: (engine, me, move) => (move.type === type ? mult : 1) });
 const flagPower = (flag: string, mult: number): AbilityEffect => ({ onBasePower: (engine, me, move) => (has(move, flag) ? mult : 1) });
 const pinch = (type: string): AbilityEffect => ({ onBasePower: (engine, me, move) => (move.type === type && me.hp <= me.stats.hp / 3 ? 1.5 : 1) });
-const weatherSpeed = (test: (weather: string | null) => boolean): AbilityEffect => ({
+const weatherSpeed = (test: (weather: Weather | null) => boolean): AbilityEffect => ({
   onSpeed: (engine, me, spd) => (test(engine.weather()) ? spd * 2 : spd),
 });
-const isSun = (weather: string | null): boolean => weather === 'sun' || weather === 'harshsun';
-const isRain = (weather: string | null): boolean => weather === 'rain' || weather === 'heavyrain';
-const isIcy = (weather: string | null): boolean => weather === 'snow' || weather === 'hail';
 
 const skin = (type: string): AbilityEffect => ({
   onModifyMove(engine, me, move) {
@@ -259,7 +254,6 @@ const formChanger = (decide: (engine: AbilityEngine, me: BattleFighter) => void)
   onEndTurn: (engine, me) => decide(engine, me),
 });
 
-const stageMult = (stage: number): number => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
 const MINIOR_CORES = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'violet'];
 const miniorCore = (fighter: BattleFighter): string =>
   `minior-${MINIOR_CORES[[...String(fighter.uid)].reduce((n, ch) => n + ch.charCodeAt(0), 0) % MINIOR_CORES.length]}`;
@@ -309,7 +303,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
       }
     },
   },
-  immunity: blockStatus(poison),
+  immunity: blockStatus(poisoned),
   'flash-fire': merge(absorb('fire', { flashFire: true }), {
     onBasePower: (engine, me, move) => (me.volatiles.flashFire && move.type === 'fire' ? 1.5 : 1),
   }),
@@ -395,7 +389,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
       return true;
     },
   },
-  'rain-dish': { onEndTurn: (engine, me) => isRain(engine.weather()) && engine.heal(me, fraction(me, 1 / 16), me) },
+  'rain-dish': { onEndTurn: (engine, me) => isRain(engine.weather()) && engine.heal(me, fraction(me, 1 / 16)) },
   'sand-stream': setsWeather('sand'),
   pressure: announce('pressure'),
   'thick-fat': { breakable: true, onIncoming: (engine, me, move) => (move.type === 'fire' || move.type === 'ice' ? 0.5 : 1) },
@@ -483,7 +477,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
     onIncoming: (engine, me, move) => (move.type === 'fire' ? 1.25 : 1),
     onEndTurn(engine, me) {
       const weather = engine.weather();
-      if (isRain(weather)) engine.heal(me, fraction(me, 1 / 8), me);
+      if (isRain(weather)) engine.heal(me, fraction(me, 1 / 8));
       else if (isSun(weather)) {
         engine.show(me);
         engine.damage(me, fraction(me, 1 / 8), 'ability');
@@ -504,10 +498,10 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'wonder-skin': { breakable: true, wonderSkin: true },
   'poison-heal': {
     onStatusDamage(engine, me, status, amount) {
-      if (!poison(status)) return amount;
+      if (!poisoned(status)) return amount;
       if (!full(me)) {
         engine.show(me);
-        engine.heal(me, fraction(me, 1 / 8), me);
+        engine.heal(me, fraction(me, 1 / 8));
       }
       return 0;
     },
@@ -546,7 +540,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'no-guard': { alwaysHits: true },
   stall: { onFractionalPriority: () => -1 },
   technician: { onBasePower: (engine, me, move) => (move.power <= 60 ? 1.5 : 1) },
-  'leaf-guard': blockStatus((s, E) => isMajor(s) && isSun(E.weather())),
+  'leaf-guard': blockStatus((s, E) => isMajorStatus(s) && isSun(E.weather())),
   'mold-breaker': merge(announce('moldBreaker'), { moldBreaker: true }),
   'super-luck': { onCritStage: (engine, me, move, target, stage) => stage + 1 },
   aftermath: {
@@ -590,7 +584,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'storm-drain': absorb('water', { boost: { satk: 1 } }),
   'ice-body': {
     weatherImmune: ['snow', 'hail'],
-    onEndTurn: (engine, me) => isIcy(engine.weather()) && engine.heal(me, fraction(me, 1 / 16), me),
+    onEndTurn: (engine, me) => isIcy(engine.weather()) && engine.heal(me, fraction(me, 1 / 16)),
   },
   'solid-rock': { breakable: true, onDefenderFinal: (engine, me, move, attacker, { eff }) => (eff > 1 ? 0.75 : 1) },
   'snow-warning': setsWeather('hail'),
@@ -632,7 +626,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   },
   'weak-armor': hitBoost(physical, { def: -1, spd: 2 }),
   multiscale: { breakable: true, onDefenderFinal: (engine, me) => (full(me) ? 0.5 : 1) },
-  'toxic-boost': { onBasePower: (engine, me, move) => (poison(me.status) && physical(move) ? 1.5 : 1) },
+  'toxic-boost': { onBasePower: (engine, me, move) => (poisoned(me.status) && physical(move) ? 1.5 : 1) },
   'flare-boost': { onBasePower: (engine, me, move) => (me.status === 'brn' && special(move) ? 1.5 : 1) },
   moody: {
     onEndTurn(engine, me) {
@@ -652,7 +646,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
       if (target.hp > 0 && contact(engine, move, me) && engine.rand() < 0.3) engine.setStatus(target, 'psn', me, { ability: me });
     },
   },
-  regenerator: { onSwitchOut: (engine, me) => me.hp > 0 && engine.heal(me, fraction(me, 1 / 3), null, { silent: true }) },
+  regenerator: { onSwitchOut: (engine, me) => me.hp > 0 && engine.heal(me, fraction(me, 1 / 3), { silent: true }) },
   'big-pecks': blockDrops(['def']),
   'sand-rush': merge(weatherSpeed((w) => w === 'sand'), { weatherImmune: ['sand'] }),
   analytic: { onBasePower: (engine, me, move, target) => (engine.hasMoved(target) ? 1.3 : 1) },
@@ -711,7 +705,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
     {
       breakable: true,
       onSetStatus(engine, me, status, source) {
-        if (!me.types.includes('grass') || !isMajor(status) || !source || source === me) return true;
+        if (!me.types.includes('grass') || !isMajorStatus(status) || !source || source === me) return true;
         engine.show(me);
         return false;
       },
@@ -782,7 +776,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'wimp-out': escapesBelowHalf(),
   'emergency-exit': escapesBelowHalf(),
   'water-compaction': hitBoost((m) => m.type === 'water', { def: 2 }),
-  merciless: { onCritStage: (engine, me, move, target, stage) => (poison(target.status) ? 3 : stage) },
+  merciless: { onCritStage: (engine, me, move, target, stage) => (poisoned(target.status) ? 3 : stage) },
   'shields-down': merge(
     formChanger((engine, me) => {
       if (me.speciesId !== 774 || me.hp <= 0) return;
@@ -794,7 +788,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
     }),
     {
       onSetStatus(engine, me, status) {
-        if (me.speciesId !== 774 || me.form || !isMajor(status)) return true;
+        if (me.speciesId !== 774 || me.form || !isMajorStatus(status)) return true;
         engine.show(me);
         return false;
       },
@@ -871,7 +865,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
     comatose: true,
     onStart: (engine, me) => engine.show(me, 'comatose'),
     onSetStatus(engine, me, status) {
-      if (!isMajor(status)) return true;
+      if (!isMajorStatus(status)) return true;
       engine.show(me);
       return false;
     },
@@ -1032,7 +1026,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
     },
   },
   'neutralizing-gas': { unsuppressable: true, noTrace: true, onStart: (engine, me) => engine.show(me, 'neutralizingGas') },
-  'pastel-veil': blockStatus(poison),
+  'pastel-veil': blockStatus(poisoned),
   'quick-draw': {
     onFractionalPriority(engine, me, move) {
       if (!isAttack(move) || engine.rand() >= 0.3) return 0;
@@ -1071,7 +1065,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
       }
     },
   },
-  'purifying-salt': merge(blockStatus(isMajor), { onIncoming: (engine, me, move) => (move.type === 'ghost' ? 0.5 : 1) }),
+  'purifying-salt': merge(blockStatus(isMajorStatus), { onIncoming: (engine, me, move) => (move.type === 'ghost' ? 0.5 : 1) }),
   'well-baked-body': absorb('fire', { boost: { def: 2 } }),
   'wind-rider': {
     breakable: true,
@@ -1185,7 +1179,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'poison-puppeteer': {
     noTrace: true,
     onInflictStatus(engine, me, target, status) {
-      if (poison(status) && target.hp > 0) engine.addVolatile(target, 'confusion', me);
+      if (poisoned(status) && target.hp > 0) engine.addVolatile(target, 'confusion', me);
     },
   },
   dragonize: skin('dragon'),
