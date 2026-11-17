@@ -1952,7 +1952,7 @@ function resolveTurn(battle: BattleState): BattleEvent[] {
   for (const fighter of activeFighters(battle)) fighter.activeTurns += 1;
   // Both sides have chosen by now (submit() only resolves then).
   const acts = battle.sides.flatMap((side, sideIndex) => (side.action ? [{ sideIndex, ...side.action }] : []));
-  battle.chosen = acts.map((a) => (a.type === 'move' ? moveOfAction(battle, a.sideIndex, a.move) : null));
+  battle.chosen = battle.sides.map((side, sideIndex) => (side.action?.type === 'move' ? moveOfAction(battle, sideIndex, side.action.move) : null));
   for (const side of battle.sides) side.action = null;
   for (const side of battle.sides) for (const fighter of side.team) delete fighter.turnHit;
 
