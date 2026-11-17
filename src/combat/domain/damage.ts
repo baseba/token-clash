@@ -6,7 +6,7 @@ import { MOVE_RULES } from './move-rules.js';
 import { isRain, isSun, poisoned, stageMult } from './conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState } from './battle-types.js';
 import { dragOut, faint } from './switching.js';
-import { addVolatile, asleep, boost, clamp, clearHazards, clearScreens, clearTerrain, cure, currentWeather, emit, freshBoosts, grounded, hasBench, heal, hurt, nameOf, setStatus, setTypes, sideIndexOf, STAGE_LIMIT, weatherFor } from './effects.js';
+import { addVolatile, asleep, boost, clamp, defendingTypes, clearHazards, clearScreens, clearTerrain, cure, currentWeather, emit, freshBoosts, grounded, hasBench, heal, hurt, nameOf, setStatus, setTypes, sideIndexOf, STAGE_LIMIT, weatherFor } from './effects.js';
 import { abilityDef, anyActiveHas, chain, flag, mul, otherActiveHas, run, showAbility } from './ability-engine.js';
 import { moveApi } from './move-rule-api.js';
 
@@ -57,8 +57,9 @@ function screened(battle: BattleState, me: BattleFighter, target: BattleFighter,
 
 export function typeEffectiveness(battle: BattleState, move: AnyMove, attacker: BattleFighter, target: BattleFighter): number {
   if (!move.type) return 1;
+  if (move.type === 'ground' && !move.hitsAirborne && (target.volatiles.magnetRise || target.volatiles.telekinesis) && !grounded(battle, target)) return 0;
   let eff = 1;
-  for (const type of target.types) {
+  for (const type of defendingTypes(battle, target)) {
     let multiplier = effectiveness(move.type, [type]);
     if (move.extraType) multiplier *= effectiveness(move.extraType, [type]);
     if (multiplier === 0
@@ -151,8 +152,10 @@ function afterHit(battle: BattleState, me: BattleFighter, target: BattleFighter,
       target.boosts = freshBoosts();
       emit(battle, { t: 'boostsReset', side: 1 - sideIndex, name: nameOf(target) });
     }
-    if (move.grounds && !target.volatiles.smackedDown && (target.types.includes('flying') || flag(battle, target, 'levitates'))) {
+    if (move.grounds && !target.volatiles.smackedDown && (target.types.includes('flying') || flag(battle, target, 'levitates') || target.volatiles.magnetRise || target.volatiles.telekinesis)) {
       target.volatiles.smackedDown = true;
+      delete target.volatiles.magnetRise;
+      delete target.volatiles.telekinesis;
       emit(battle, { t: 'volatile', side: 1 - sideIndex, name: nameOf(target), kind: 'smackdown' });
     }
     if (move.binds && !target.volatiles.bound) {

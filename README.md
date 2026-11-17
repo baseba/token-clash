@@ -116,8 +116,10 @@ El mismo script baja la música de PokeRogue a `public/music/` con sus puntos de
 un tema de combate contra entrenadores acorde a lo que muestra (Alola en la playa, el gimnasio de Sinnoh en la cueva,
 el Team Aqua en el océano, la campeona de Sinnoh en la nieve, etc.; la lista está en `public/music.js`), los menús
 tocan las pistas tranquilas de bioma (`town`, `tall_grass`, `laboratory`, `plains`), la preparación
-`menu` y al ganar suena `bw/victory_trainer` (o `bw/victory_champion` en un torneo). No hay
-música sintética. `public/battle-anims.js` las reproduce cuadro a cuadro sobre el campo; lo que no tenga animación usa los efectos
+`menu`, el perfil `title` (el tema original de PokeRogue) y al ganar suena `bw/victory_trainer` (o
+`bw/victory_champion` en un torneo). No hay música sintética. La **📻 radio** de la cabecera trae las 175 pistas
+de PokeRogue (`public/radio.js`), filtrables por batalla u otras, por región o generación y por las originales de
+PokeRogue; mientras está encendida suena en vez de la música de cada pantalla, en todo el sitio y entre recargas. `public/battle-anims.js` las reproduce cuadro a cuadro sobre el campo; lo que no tenga animación usa los efectos
 sintéticos de `public/fx.js` y `public/music.js`. El campo de batalla replica el de PokeRogue: un escenario lógico de
 320×180 escalado al ancho disponible, con nuestros fondos (`public/backgrounds/`) escalados al ancho del campo y
 sus plataformas, los Pokémon anclados en (106, 142) y (236, 84) a tamaño de sprite real, cajas y cuadro de texto con el

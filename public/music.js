@@ -1,4 +1,5 @@
 import { causeAnim, chargeAnim, conditionAnim, statusAnim, terrainAnim, weatherAnim } from './battle-anims.js?v=dev';
+import { radioTrack, RADIO_TRACKS } from './radio.js?v=dev';
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
@@ -53,16 +54,19 @@ const SCREEN_TRACKS = {
   'tab:collection': 'tall_grass',
   'tab:pokedex': 'laboratory',
   'tab:stats': 'plains',
+  'tab:profile': 'title',
   prep: 'menu',
   'victory:win': 'bw/victory_trainer',
   'victory:champion': 'bw/victory_champion',
 };
 
-export const MUSIC_TRACKS = [...new Set([...Object.values(SCENE_TRACKS), ...Object.values(SCREEN_TRACKS)])];
+export const MUSIC_TRACKS = [...new Set([...Object.values(SCENE_TRACKS), ...Object.values(SCREEN_TRACKS), ...RADIO_TRACKS.map((track) => track.id)])];
 
 export const musicFile = (track) => `/music/${track.replace('/', '-')}.mp3`;
 
 export function trackFor(id) {
+  const radio = /^radio:(.+)$/.exec(id ?? '')?.[1];
+  if (radio) return radioTrack(radio)?.id ?? null;
   const scene = /^scene:(.+)$/.exec(id ?? '')?.[1];
   return scene ? SCENE_TRACKS[scene] ?? null : SCREEN_TRACKS[id] ?? null;
 }
@@ -125,6 +129,7 @@ export function createPlayer({ storage = null } = {}) {
   let current = null;
   let wanted = null;
   let lastSfxAt = -Infinity;
+  let radio = null;
   const read = (k, d) => {
     try {
       const v = storage?.getItem(k);
@@ -141,6 +146,8 @@ export function createPlayer({ storage = null } = {}) {
   const VOLUME_KEYS = { music: 'tc_music_level', sfx: 'tc_sfx_level' };
   const volumes = { music: read(VOLUME_KEYS.music, 0.5), sfx: read(VOLUME_KEYS.sfx, 0.15) };
   let muted = read('tc_music_muted', false);
+  radio = radioTrack(read('tc_radio', null)) ? read('tc_radio', null) : null;
+  const shown = () => (radio ? `radio:${radio}` : wanted);
   let musicGain = null;
   const LEVEL = { music: 1.6, sfx: 2.8 };
   const STREAM_LEVEL = 0.55;
@@ -411,6 +418,7 @@ export function createPlayer({ storage = null } = {}) {
   }
 
   function start(id) {
+    if (radio) id = `radio:${radio}`;
     if (!ensure() || current?.id === id) return;
     const track = trackFor(id);
     const gain = fadeOutCurrent();
@@ -426,12 +434,12 @@ export function createPlayer({ storage = null } = {}) {
     unlock() {
       if (!ensure()) return;
       for (const kind of UI_SOUND_KINDS) loadBuffer(uiSampleFor(kind).url);
-      if (ctx.state === 'suspended') ctx.resume().then(() => wanted && start(wanted));
-      else if (wanted) start(wanted);
+      if (ctx.state === 'suspended') ctx.resume().then(() => shown() && start(shown()));
+      else if (shown()) start(shown());
     },
     stop() {
       wanted = null;
-      if (!ctx || !trackGain) return;
+      if (radio || !ctx || !trackGain) return;
       trackGain.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
       const source = current?.source;
       if (source) setTimeout(() => source.stop(), 1000);
@@ -476,6 +484,22 @@ export function createPlayer({ storage = null } = {}) {
     },
     get wanted() {
       return wanted;
+    },
+    get radio() {
+      return radio;
+    },
+    setRadio(track) {
+      radio = track && radioTrack(track) ? track : null;
+      write('tc_radio', radio);
+      if (!ctx || ctx.state !== 'running') return;
+      if (radio) start(`radio:${radio}`);
+      else if (wanted) {
+        current = null;
+        start(wanted);
+      } else {
+        fadeOutCurrent();
+        current = null;
+      }
     },
     get muted() {
       return muted;

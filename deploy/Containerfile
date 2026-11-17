@@ -21,7 +21,7 @@ RUN node scripts/sprites.mjs
 COPY scripts/sync-cries.js ./scripts/sync-cries.js
 RUN node scripts/sync-cries.js
 COPY scripts/sync-battle-anims.js ./scripts/sync-battle-anims.js
-COPY public/music.js public/battle-anims.js ./public/
+COPY public/music.js public/battle-anims.js public/radio.js ./public/
 COPY src/catalog/data/movedex.json ./src/catalog/data/movedex.json
 RUN node scripts/sync-battle-anims.js
 COPY scripts/sync-trainers.js ./scripts/sync-trainers.js
