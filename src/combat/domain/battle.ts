@@ -5,7 +5,7 @@ import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js
 import { ABILITIES, type AbilityEffect, type AbilityHook, type BoostChanges } from './ability-effects.js';
 import type { Gender, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { invalid } from '../../shared/domain/errors.js';
-import type { Action, MoveAction, SwitchAction, SideAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, Look, Mover, Volatiles } from './battle-types.js';
+import type { Action, MoveAction, SwitchAction, SideAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, Guard, Look, Mover, SideCondition, Volatiles } from './battle-types.js';
 
 export type * from './battle-types.js';
 
@@ -79,6 +79,7 @@ export function createBattle({ id, sides, levelCap = null, random = Math.random 
       screens: {},
       hazards: { spikes: 0, stealthrock: false, stickyweb: false },
       conds: {},
+      guards: new Set(),
     })),
     events: [],
     moved: new Set(),
@@ -322,8 +323,7 @@ function makeMoveApi(battle: BattleState) {
       emit(battle, { t: 'protect', side: sideOf(fighter), name: nameOf(fighter), kind });
       return true;
     },
-    guard: (fighter: BattleFighter, kind: string): boolean => {
-      const conds = battle.sides[sideOf(fighter)].conds;
+    guard: (fighter: BattleFighter, kind: Guard): boolean => {
       if (kind === 'quickguard' || kind === 'wideguard') {
         const stalls = fighter.volatiles.stall ?? 0;
         if (stalls > 0 && battle.random() >= 1 / 3 ** stalls) {
@@ -332,7 +332,7 @@ function makeMoveApi(battle: BattleState) {
         }
         fighter.volatiles.stall = stalls + 1;
       }
-      conds[kind] = battle.turn;
+      battle.sides[sideOf(fighter)].guards.add(kind);
       emit(battle, { t: 'sideStart', side: sideOf(fighter), kind });
       return true;
     },
@@ -355,8 +355,8 @@ function makeMoveApi(battle: BattleState) {
     clearHazards: (sideIndex: number) => clearHazards(battle, sideIndex),
     courtChange: (): boolean => {
       const [first, second] = battle.sides;
-      const swap = <K extends 'hazards' | 'conds' | 'screens' | 'toxicSpikes'>(key: K) => ([first[key], second[key]] = [second[key], first[key]]);
-      for (const key of ['hazards', 'conds', 'screens', 'toxicSpikes'] as const) swap(key);
+      const swap = <K extends 'hazards' | 'conds' | 'guards' | 'screens' | 'toxicSpikes'>(key: K) => ([first[key], second[key]] = [second[key], first[key]]);
+      for (const key of ['hazards', 'conds', 'guards', 'screens', 'toxicSpikes'] as const) swap(key);
       emit(battle, { t: 'courtChange' });
       return true;
     },
@@ -706,19 +706,19 @@ function bypassesSub(battle: BattleState, me: BattleFighter, move: AnyMove): boo
 function blockedByProtection(battle: BattleState, me: BattleFighter, target: BattleFighter | null, move: BattleMove): boolean {
   if (!target || target === me) return false;
   const sideIndex = sideIndexOf(battle, target);
-  const conds = battle.sides[sideIndex].conds;
+  const guards = battle.sides[sideIndex].guards;
   const prot = target.volatiles.protect?.turn === battle.turn ? target.volatiles.protect.kind : null;
   const status = move.kind === 'status';
   const shielded = prot && move.flags.includes('protect') && !(status && ['kings-shield', 'obstruct', 'silk-trap'].includes(prot));
   const guarded =
-    (conds.quickguard === battle.turn && move.effectivePriority > 0 && move.flags.includes('protect')) ||
-    (conds.wideguard === battle.turn && move.spread) ||
-    (conds.craftyshield === battle.turn && status) ||
-    (conds.matblock === battle.turn && !status && move.flags.includes('protect'));
+    (guards.has('quickguard') && move.effectivePriority > 0 && move.flags.includes('protect')) ||
+    (guards.has('wideguard') && move.spread) ||
+    (guards.has('craftyshield') && status) ||
+    (guards.has('matblock') && !status && move.flags.includes('protect'));
   if (!shielded && !guarded) return false;
   if (move.breaksProtect) {
     delete target.volatiles.protect;
-    for (const key of ['quickguard', 'wideguard', 'craftyshield', 'matblock']) delete conds[key];
+    guards.clear();
     emit(battle, { t: 'protectBroken', side: sideIndex, name: nameOf(target) });
     return false;
   }
@@ -2172,15 +2172,12 @@ function residual(battle: BattleState): void {
         }
       }
     }
-    for (const key of Object.keys(side.conds)) {
-      const turns = side.conds[key];
-      if (['quickguard', 'wideguard', 'craftyshield', 'matblock'].includes(key)) {
-        if (turns < battle.turn + 1) delete side.conds[key];
-        continue;
-      }
-      if (--side.conds[key] <= 0) {
-        delete side.conds[key];
-        emit(battle, { t: 'sideEnd', side: sideIndex, kind: key });
+    side.guards.clear();
+    for (const [kind, turns] of Object.entries(side.conds) as [SideCondition, number][]) {
+      if (turns > 1) side.conds[kind] = turns - 1;
+      else {
+        delete side.conds[kind];
+        emit(battle, { t: 'sideEnd', side: sideIndex, kind });
       }
     }
   });
@@ -2456,7 +2453,7 @@ export function publicState(battle: BattleState, viewer: number | null = null) {
       toxicSpikes: side.toxicSpikes,
       screens: { ...side.screens },
       hazards: { ...side.hazards },
-      conds: Object.fromEntries(Object.entries(side.conds).filter(([k]) => ['tailwind', 'safeguard', 'mist', 'luckychant'].includes(k))),
+      conds: { ...side.conds },
       ...(side.wish ? { wish: true } : {}),
       ...(side.future ? { future: side.future.name } : {}),
       team: side.team.map((f, i) => fighterView(battle, s, i, viewer === s || battle.status === 'finished', viewer === null)),

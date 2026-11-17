@@ -4,7 +4,7 @@
 import { moveData, type BoostKey, type Boosts, type MoveData } from './creatures.js';
 import { TYPES } from './type-chart.js';
 import type { MoveRuleApi } from '../../combat/domain/battle.js';
-import type { BattleFighter, BattleMove, Volatiles } from '../../combat/domain/battle-types.js';
+import type { BattleFighter, BattleMove, SideCondition, Volatiles } from '../../combat/domain/battle-types.js';
 
 /** What a calling move (Metronome, Copycat…) asks the engine to use instead. */
 export interface CalledMove {
@@ -77,7 +77,7 @@ function weightPower(kg: number): number {
   return 120;
 }
 
-function setSide(api: MoveRuleApi, me: BattleFighter, key: string, turns: number, target: BattleFighter = me): boolean {
+function setSide(api: MoveRuleApi, me: BattleFighter, key: SideCondition, turns: number, target: BattleFighter = me): boolean {
   const sideIndex = api.sideOf(target);
   const conds = api.side(sideIndex).conds;
   if (conds[key]) return false;

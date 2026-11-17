@@ -208,6 +208,11 @@ export interface Hazards {
   stickyweb: boolean;
 }
 
+/** What a side's own moves set up for several turns (Tailwind, Safeguard, Mist, Lucky Chant). */
+export type SideCondition = 'tailwind' | 'safeguard' | 'mist' | 'luckychant';
+/** A guard shields its side for the turn it is raised (Quick Guard, Wide Guard, Crafty Shield, Mat Block). */
+export type Guard = 'quickguard' | 'wideguard' | 'craftyshield' | 'matblock';
+
 export interface BattleSide {
   trainerId: string;
   name: string;
@@ -218,8 +223,10 @@ export interface BattleSide {
   toxicSpikes: number;
   screens: Record<string, number>;
   hazards: Hazards;
-  /** Side conditions (tailwind, safeguard, quickguard…) → turns left or the turn they were set. */
-  conds: Record<string, number>;
+  /** Turns left of each side condition. */
+  conds: Partial<Record<SideCondition, number>>;
+  /** Guards raised this turn. */
+  guards: Set<Guard>;
   /** What Baton Pass and friends hand to the next fighter. */
   pass?: Volatiles & { boosts?: Record<BoostKey, number> };
   healingWish?: string;
