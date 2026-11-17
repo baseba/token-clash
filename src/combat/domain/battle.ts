@@ -1392,7 +1392,7 @@ function perform(
   opts: { called?: boolean } = {},
 ): void {
   const rules = MOVE_RULES[base.id];
-  const failed = failReason(battle, me, foe, move, firstAction) ?? rules?.fail?.(moveApi(battle), me, foe as BattleFighter, move) ?? null;
+  const failed = failReason(battle, me, foe, move, firstAction) ?? rules?.fail?.(moveApi(battle), me, foe, move) ?? null;
   if (failed) {
     emit(battle, { t: 'nothing', side: sideIndex, reason: failed });
     me.volatiles.lastFailed = true;
@@ -1402,7 +1402,7 @@ function perform(
     return;
   }
   if (rules?.call) {
-    const called = rules.call(moveApi(battle), me, foe as BattleFighter, move);
+    const called = rules.call(moveApi(battle), me, foe, move);
     if (!called?.key) {
       emit(battle, { t: 'nothing', side: sideIndex, ...(called?.fail ? { reason: called.fail } : {}) });
       me.volatiles.lastFailed = true;
@@ -1411,7 +1411,7 @@ function perform(
     runCalled(battle, me, called.key, { powerMult: called.powerMult });
     return;
   }
-  if (rules?.before && rules.before(moveApi(battle), me, foe as BattleFighter, move) === 'skip') return;
+  if (rules?.before?.(moveApi(battle), me, foe, move) === 'skip') return;
   if (base.id === 'echoed-voice')
     battle.echo = battle.echo?.turn === battle.turn
       ? battle.echo
@@ -1427,7 +1427,7 @@ function perform(
     if (move.recoilMaxHp && me.hp > 0) hurt(battle, me, me.stats.hp * move.recoilMaxHp, 'recoil');
     me.volatiles.lastFailed = !dealt;
   }
-  rules?.after?.(moveApi(battle), me, foe as BattleFighter, move, dealt);
+  rules?.after?.(moveApi(battle), me, foe, move, dealt);
   if (base.id === 'fury-cutter' && dealt) me.volatiles.furyCutter = Math.min(2, (me.volatiles.furyCutter ?? 0) + 1);
   else delete me.volatiles.furyCutter;
   if (base.rampage && me.hp > 0 && moveIdx != null) {
@@ -1564,7 +1564,7 @@ function selfStatus(battle: BattleState, me: BattleFighter, move: BattleMove): v
   }
   const rules = MOVE_RULES[move.id];
   if (rules?.use) {
-    rules.use(moveApi(battle), me, foeOf(battle, me) as BattleFighter, move);
+    rules.use(moveApi(battle), me, foeOf(battle, me), move);
     return;
   }
   let did = false;
@@ -1652,8 +1652,8 @@ function statusMove(battle: BattleState, me: BattleFighter, foe: BattleFighter |
   }
   const source = target === me ? foe : me;
   const rules = MOVE_RULES[move.id];
-  if (rules?.use) {
-    rules.use(moveApi(battle), source, target, move);
+  if (rules?.useOn) {
+    rules.useOn(moveApi(battle), source, target, move);
     return;
   }
   let did = false;
