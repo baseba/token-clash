@@ -77,6 +77,8 @@ test('Último Recurso needs every other move used first', () => {
 
 function damageWith(user, foe, key, setup: (b: any) => unknown = () => {}, seed = 3) {
   const b = battle(user, foe, seed);
+  const target = b.sides[1].team[0];
+  target.stats.hp = target.hp = 10_000;
   setup(b);
   return hitOn(turn(b, key, 'growl'), 1)[0]?.amount ?? 0;
 }
@@ -101,7 +103,8 @@ test('power that depends on the battle: Erupción, Imagen, Infortunio, Acróbata
 });
 
 test('Falsotortazo always leaves the rival with at least 1 HP', () => {
-  const b = battle(mon('s', 212, ['false-swipe'], { level: 100 }), mon('c', 10, ['string-shot'], { level: 5 }));
+  const b = battle(mon('s', 212, ['false-swipe']), mon('c', 10, ['string-shot']));
+  b.sides[1].team[0].hp = 5;
   turn(b, 'false-swipe', 'string-shot');
   assert.equal(b.sides[1].team[0].hp, 1);
 });
@@ -114,7 +117,8 @@ test('Patada Salto Alta hurts the user when it does not connect', () => {
 });
 
 test('Enfado locks the user for 2 or 3 turns and then confuses it', () => {
-  const b = battle(mon('d', 149, ['outrage', 'dragon-dance'], { level: 30 }), wall(undefined, { level: 100 }));
+  const b = battle(mon('d', 149, ['outrage', 'dragon-dance']), wall());
+  b.sides[1].team[0].stats.hp = b.sides[1].team[0].hp = 10_000;
   turn(b, 'outrage', 'growl');
   assert.deepEqual(validActions(b, 0), [{ type: 'move', move: idx(b, 0, 'outrage') }]);
   let confused = false;
@@ -220,7 +224,8 @@ test('spectators see both whole teams, while a player only sees the foes that ca
 
 test('Present with its rival already fainted reports no target instead of throwing', () => {
   for (let seed = 1; seed <= 30; seed++) {
-    const b = battle([mon('e', 101, ['explosion']), mon('q', 68, ['tackle'])], mon('d', 225, ['present'], { level: 70 }), seed);
+    const b = battle([mon('e', 101, ['explosion']), mon('q', 68, ['tackle'])], mon('d', 225, ['present']), seed);
+    b.sides[1].team[0].stats.hp = b.sides[1].team[0].hp = 10_000;
     const events = turn(b, 'explosion', 'present');
     assert.ok(events.some((e) => e.t === 'notarget' && e.side === 1), `seed ${seed}`);
   }

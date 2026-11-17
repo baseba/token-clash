@@ -37,8 +37,8 @@ export class TeamPreviewService {
       startedAt: now(),
       endsAt: now() + this.timings.countdownMs,
       players: [
-        this.views.countdownPlayer(challenge.hostId, challenge.hostName),
-        this.views.countdownPlayer(challenge.guestId!, challenge.guestName!),
+        this.views.countdownPlayer(challenge.hostId, challenge.hostName, challenge),
+        this.views.countdownPlayer(challenge.guestId!, challenge.guestName!, challenge),
       ],
       tournament,
       waiting: null,
@@ -54,11 +54,10 @@ export class TeamPreviewService {
     const phase: PreviewPhase = {
       kind: 'preview',
       preview: createPreview({
-        levelCap: challenge.levelCap,
         mode: challenge.mode,
         sides: [
-          { trainerId: challenge.hostId, name: this.views.nameOf(challenge.hostId, challenge.hostName)!, entries: challenge.hostTeam },
-          { trainerId: challenge.guestId!, name: this.views.nameOf(challenge.guestId, challenge.guestName)!, entries: challenge.guestTeam! },
+          { trainerId: challenge.hostId, name: this.views.nameOf(challenge.hostId, challenge.hostName)!, avatar: this.views.avatarOf(challenge.hostId, challenge), entries: challenge.hostTeam },
+          { trainerId: challenge.guestId!, name: this.views.nameOf(challenge.guestId, challenge.guestName)!, avatar: this.views.avatarOf(challenge.guestId!, challenge), entries: challenge.guestTeam! },
         ],
       }),
       deadline: null,

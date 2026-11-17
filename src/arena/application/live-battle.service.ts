@@ -3,7 +3,7 @@
 // turns, moves a fighter is locked into, and the result, which is the only thing stored.
 import { Injectable, Logger } from '@nestjs/common';
 import { aiLevelOf, chooseAction, JEV_LEVEL } from '../../combat/domain/ai.js';
-import { autoAction, createBattle, forcedAction, needsAction, publicState, submit, type Action, type BattleEvent, type BattleState } from '../../combat/domain/battle.js';
+import { autoAction, createBattle, forcedAction, forfeit, needsAction, publicState, submit, type Action, type BattleEvent, type BattleState } from '../../combat/domain/battle.js';
 import { chosenEntries, type PreviewState } from '../../combat/domain/team-preview.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
@@ -13,7 +13,9 @@ import { ChallengeRepository } from '../domain/arena.repositories.js';
 import { isHumanDuel } from '../domain/challenge.js';
 import { viewersBehind } from '../domain/tournament.js';
 import { ArenaEvents } from './arena-events.js';
+import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
+import { LobbyService } from './lobby.service.js';
 import { Presence, someoneAbsent, type BattlePhase, type Room } from './presence.js';
 import { broadcast, refuse, sideIn } from './room-frames.js';
 
@@ -34,6 +36,8 @@ export class LiveBattleService {
     private readonly presence: Presence,
     private readonly events: ArenaEvents,
     private readonly skynet: SkynetService,
+    private readonly lobby: LobbyService,
+    private readonly views: ArenaViews,
   ) {
     this.timings = config.timings;
   }
@@ -44,15 +48,16 @@ export class LiveBattleService {
       kind: 'battle',
       battle: createBattle({
         id: room.challenge.id,
-        levelCap: preview.levelCap,
-        sides: preview.sides.map((side, sideIndex) => ({ trainerId: side.trainerId, name: side.name, entries: chosenEntries(preview, sideIndex) })),
+        sides: preview.sides.map((side, sideIndex) => ({ trainerId: side.trainerId, name: side.name, avatar: side.avatar ?? this.views.avatarOf(side.trainerId, room.challenge), entries: chosenEntries(preview, sideIndex) })),
       }),
+      startedAt: now(),
       deadline: null,
       jevAsked: new Set(),
     };
     room.phase = phase;
     this.armTimer(room, phase);
     broadcast(room, { t: 'start' });
+    this.lobby.notify();
     this.nextAiTurn(room, phase);
   }
 
@@ -70,6 +75,16 @@ export class LiveBattleService {
     }
     if (events) this.afterResolve(room, phase, events);
     else broadcast(room, { t: 'ready' });
+  }
+
+  surrender(ws: ClientConnection): void {
+    const room = this.presence.roomOf(ws);
+    if (room?.phase.kind !== 'battle' || room.phase.battle.status !== 'active') return;
+    const { phase } = room;
+    const sideIndex = sideIn(phase.battle.sides, ws.trainerId);
+    if (sideIndex === null) return;
+    clearTimeout(room.timer ?? undefined);
+    this.afterResolve(room, phase, forfeit(phase.battle, sideIndex));
   }
 
   /** The client finished animating this turn (AI vs AI waits for viewers). */
@@ -196,6 +211,7 @@ export class LiveBattleService {
     if (battle.winner !== null && isHumanDuel(challenge))
       this.trainers.recordRankedResult(battle.sides[battle.winner].trainerId, battle.sides[1 - battle.winner].trainerId);
     this.challenges.save(challenge);
+    this.lobby.notify();
     if (challenge.tournamentId) this.events.matchFinished({ challenge, winnerSide: battle.winner });
     // Keep the finished room a while for late viewers, then drop it.
     setTimeout(() => {

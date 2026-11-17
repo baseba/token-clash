@@ -17,14 +17,12 @@ import { shuffledOrder, tournamentMatchFor, type Seat, Tournament } from '../dom
 import { ArenaEvents, type MatchFinished } from './arena-events.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
-import { averageLevel } from './duel.service.js';
 import { LobbyService } from './lobby.service.js';
 import { Presence } from './presence.js';
 import { TeamPreviewService } from './team-preview.service.js';
 
 export interface NewTournament {
   mode: BattleMode;
-  levelCap: number | null;
   size: number;
   visibility: Visibility;
 }
@@ -185,17 +183,11 @@ export class TournamentsService implements OnModuleInit {
     this.seatTimers.set(key, timer);
   }
 
-  private humanAverageLevel(tournament: Tournament): number {
-    const entries = tournament.seats.filter((seat) => !seat.ai).flatMap((seat) => this.trainers.byId(seat.id)?.teamEntries() ?? []);
-    return averageLevel(entries);
-  }
-
   private start(tournament: Tournament): void {
     const at = now();
     tournament.start({
       at,
       order: shuffledOrder(tournament.size),
-      aiLevel: tournament.levelCap ?? this.humanAverageLevel(tournament),
       firstMatchAt: at + this.timings.bracketDrawMs,
     });
     this.tournaments.save(tournament);
@@ -205,11 +197,10 @@ export class TournamentsService implements OnModuleInit {
   }
 
   private seatTeam(tournament: Tournament, seat: Seat): RosterEntry[] {
-    const level = tournament.aiLevel!;
     const ai = aiLevelOf(seat.id);
-    if (ai) return tournament.mode === 'random' ? buildAiRandomParty({ level }) : buildAiTeam({ difficulty: ai, level });
+    if (ai) return tournament.mode === 'random' ? buildAiRandomParty() : buildAiTeam({ difficulty: ai });
     const trainer = this.trainers.byId(seat.id);
-    if (!trainer?.roster.length) return buildAiRandomParty({ level });
+    if (!trainer?.roster.length) return buildAiRandomParty();
     return tournament.mode === 'random' ? randomParty(trainer.roster) : trainer.teamSnapshot();
   }
 
@@ -222,7 +213,6 @@ export class TournamentsService implements OnModuleInit {
       id: newId(),
       host: { id: host.id, name: host.name, team: this.seatTeam(tournament, host), ai: host.ai },
       guest: { id: guest.id, name: guest.name, team: this.seatTeam(tournament, guest), ai: guest.ai },
-      levelCap: tournament.levelCap,
       mode: tournament.mode,
       tournamentId: tournament.id,
       round: next.round,

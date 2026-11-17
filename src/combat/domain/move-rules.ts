@@ -28,7 +28,7 @@ export interface MoveRule {
   before?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): 'skip' | null;
   /** The whole effect of a status move on its user or the field. Returns whether it did something. */
   use?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): boolean;
-  /** The whole effect of a status move aimed at the foe (or bounced back at its user, then `foe` is the user). */
+  /** The whole effect of a status move aimed at the foe (or at its user, bounced back or aimed there by the trainer: then `foe` is the user). */
   useOn?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): boolean;
   /** After the move, with the damage it dealt. */
   after?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove, dealt: number): void;
@@ -155,7 +155,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
 
   substitute: {
     use(api, me) {
-      if (me.volatiles.substitute || me.hp <= Math.floor(me.stats.hp / 4)) return api.nothing(me, me.volatiles.substitute ? null : 'lowHp');
+      if (me.volatiles.substitute || me.hp <= Math.floor(me.stats.hp / 4) || me.stats.hp === 1) return api.nothing(me, me.volatiles.substitute ? null : 'lowHp');
       api.hurt(me, Math.floor(me.stats.hp / 4), 'cost');
       me.volatiles.substitute = Math.floor(me.stats.hp / 4);
       api.volatile(me, 'substitute');
@@ -231,10 +231,10 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   acupressure: {
-    use(api, me) {
-      const open = STATS.filter((k) => me.boosts[k] < 6);
+    useOn(api, me, target) {
+      const open = STATS.filter((k) => target.boosts[k] < 6);
       if (!open.length) return api.nothing(me);
-      api.boost(me, { [pick(api, open)]: 2 }, me);
+      api.boost(target, { [pick(api, open)]: 2 }, me);
       return true;
     },
   },
@@ -561,7 +561,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   'shed-tail': {
     use(api, me) {
       if (!benchAlive(api, me)) return api.nothing(me, 'noBench');
-      if (me.hp <= Math.floor(me.stats.hp / 2)) return api.nothing(me, 'lowHp');
+      if (me.hp <= Math.ceil(me.stats.hp / 2)) return api.nothing(me, 'lowHp');
       api.hurt(me, Math.ceil(me.stats.hp / 2), 'cost');
       api.switchOut(me, { substitute: Math.floor(me.stats.hp / 4) });
       return true;

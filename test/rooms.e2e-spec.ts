@@ -109,6 +109,7 @@ const phases = (frames: any[]) => frames.map(phaseOf).filter((phase, i, all) => 
 const seat = (who: { me: any }, { ready, online }: { ready: boolean; online: boolean }) => ({
   id: who.me.id,
   name: who.me.name,
+  avatar: who.me.avatar,
   ai: null,
   wins: 0,
   losses: 0,
@@ -317,7 +318,7 @@ test('room chat: players and viewers talk in the room, floods and anonymous view
 test('tournament chat: the tournament page and its match rooms share one channel', async () => {
   const host = await trainer('Organiza');
   const fan = await trainer('Hinchada');
-  const tournament = (await call('/api/tournaments', { method: 'POST', token: host.token, body: { size: 4, mode: 'team', levelCap: 50, visibility: 'private' } })).data.tournament;
+  const tournament = (await call('/api/tournaments', { method: 'POST', token: host.token, body: { size: 4, mode: 'team', visibility: 'private' } })).data.tournament;
   const page = new Client({ t: 'tour', id: tournament.id, token: host.token });
   const fanPage = new Client({ t: 'tour', id: tournament.id, token: fan.token });
   assert.deepEqual((await page.next((f) => f.t === 'chatLog')).messages, []);

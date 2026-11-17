@@ -19,7 +19,6 @@ import { createPreview, pick, previewView, chosenEntries } from './team-preview.
 
 const SNAPSHOT = join(PROJECT_ROOT, 'src', 'combat', 'domain', 'battle.replays.snapshot.txt');
 const LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'] as const;
-const LEVEL_CAPS = [null, 50, 100, 30];
 
 const LOGS = join(PROJECT_ROOT, 'dist', 'replays');
 
@@ -33,20 +32,17 @@ const digest = (view: unknown): string => sha256(canonical(view));
 
 function replay(seed: number): string[] {
   const level = (side: number) => LEVELS[(seed + side * 2) % LEVELS.length];
-  const levelCap = LEVEL_CAPS[seed % LEVEL_CAPS.length];
-  const teamLevel = levelCap ?? 60;
-  const teams = [0, 1].map((side) => (seed % 5 === 4 && side === 1 ? buildAiRandomParty({ level: teamLevel, random: rng(`party-${seed}`) }) : buildAiTeam({ difficulty: level(side), level: teamLevel, random: rng(`team-${seed}-${side}`) })));
+  const teams = [0, 1].map((side) => (seed % 5 === 4 && side === 1 ? buildAiRandomParty({ random: rng(`party-${seed}`) }) : buildAiTeam({ difficulty: level(side), random: rng(`team-${seed}-${side}`) })));
   const sides = teams.map((entries, side) => ({ trainerId: `ai:${level(side)}`, name: `Side ${side}`, entries }));
-  const preview = createPreview({ sides, levelCap });
+  const preview = createPreview({ sides });
   for (const side of [0, 1]) pick(preview, side, aiPicks({ difficulty: level(side), own: teams[side], random: rng(`picks-${seed}-${side}`) }));
   const battle = createBattle({
     id: `replay-${seed}`,
-    levelCap,
     random: rng(seed),
     sides: sides.map((side, index) => ({ ...side, entries: chosenEntries(preview, index) })),
   });
   const choices = [0, 1].map((side) => rng(`choices-${seed}-${side}`));
-  const lines = [`# battle ${seed}: ${level(0)} vs ${level(1)}, level cap ${levelCap}`, `preview ${digest(previewView(preview, 0))}`];
+  const lines = [`# battle ${seed}: ${level(0)} vs ${level(1)}`, `preview ${digest(previewView(preview, 0))}`];
   for (const event of battle.intro) lines.push(`intro ${canonical(event)}`);
   let submits = 0;
   while (battle.status === 'active' && submits++ < 1000) {

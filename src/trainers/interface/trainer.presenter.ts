@@ -9,6 +9,7 @@ export function trainerSummary(trainer: Trainer) {
   return {
     id: trainer.id,
     name: trainer.name,
+    avatar: trainer.look,
     wins: trainer.wins,
     losses: trainer.losses,
     rosterSize: trainer.roster.length,

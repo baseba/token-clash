@@ -12,7 +12,7 @@ const token = z.string().optional().catch(undefined);
 const picks = z.array(z.int()).catch([]);
 
 const BattleAction = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('move'), move: z.int() }),
+  z.object({ type: z.literal('move'), move: z.int(), target: z.enum(['foe', 'self']).optional().catch(undefined) }),
   z.object({ type: z.literal('switch'), to: z.int() }),
 ]);
 
@@ -35,6 +35,7 @@ export const ClientMessage = z.discriminatedUnion('t', [
   z.object({ t: z.literal('pick'), picks }),
   /** A move or a switch. */
   z.object({ t: z.literal('act'), action: BattleAction.nullable().catch(null) }),
+  z.object({ t: z.literal('surrender') }),
   /** A message to the room's or the tournament's chat. */
   z.object({ t: z.literal('chat'), text: z.string().catch('') }),
 ]);

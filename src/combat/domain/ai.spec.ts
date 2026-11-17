@@ -13,7 +13,7 @@ const fullyEvolved = (id) => {
 test('every difficulty builds six distinct Pokémon from generations 1 to 5 with moves that work', () => {
   for (const difficulty of AI_LEVELS) {
     for (let seed = 0; seed < 5; seed++) {
-      const team = buildAiTeam({ difficulty, level: 50, random: rng(`${difficulty}:${seed}`) });
+      const team = buildAiTeam({ difficulty, random: rng(`${difficulty}:${seed}`) });
       assert.equal(team.length, 6, difficulty);
       assert.equal(new Set(team.map((e) => e.finalID)).size, 6, difficulty);
       for (const e of team) {
@@ -28,7 +28,7 @@ test('every difficulty builds six distinct Pokémon from generations 1 to 5 with
 
 test('the AI team rolls the same dice as the random mode', () => {
   for (const difficulty of AI_LEVELS) {
-    const team = buildAiTeam({ difficulty, level: 50, random: rng(`d:${difficulty}`) });
+    const team = buildAiTeam({ difficulty, random: rng(`d:${difficulty}`) });
     for (const e of team) {
       assert.deepEqual(e.ivs, { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 }, difficulty);
       assert.equal(e.nature, undefined, difficulty);
@@ -38,7 +38,7 @@ test('the AI team rolls the same dice as the random mode', () => {
 
 test('each harder AI draws from a smaller share of the strongest fully evolved Pokémon', () => {
   const bst = (id) => speciesData(id).stats.reduce((a, x) => a + x, 0);
-  const pools = AI_LEVELS.map((difficulty) => aiTeamPool(difficulty, 50));
+  const pools = AI_LEVELS.map((difficulty) => aiTeamPool(difficulty));
   const evolved = pools[0].length;
   assert.deepEqual(AI_LEVELS.map((d) => AI_POOL_SHARE[d]), [1, 0.8, 0.6, 0.5, 0.4]);
   assert.ok(pools[0].every(fullyEvolved));
@@ -53,37 +53,37 @@ test('each harder AI draws from a smaller share of the strongest fully evolved P
   });
 });
 
-test('the pool never drops below a full party, even at low levels', () => {
-  for (const difficulty of AI_LEVELS) assert.ok(aiTeamPool(difficulty, 1).length >= 6, difficulty);
+test('the pool never drops below a full party', () => {
+  for (const difficulty of AI_LEVELS) assert.ok(aiTeamPool(difficulty).length >= 6, difficulty);
 });
 
 test('the AI builds its team and picks its three without looking at yours', () => {
   const water = [7, 8, 9, 54, 55, 60].map((finalID) => ({ finalID }));
   const fire = [4, 5, 6, 37, 38, 58].map((finalID) => ({ finalID }));
   for (const difficulty of AI_LEVELS) {
-    const a = buildAiTeam({ difficulty, level: 50, foes: water, random: rng(`t:${difficulty}`) } as any);
-    const b = buildAiTeam({ difficulty, level: 50, foes: fire, random: rng(`t:${difficulty}`) } as any);
+    const a = buildAiTeam({ difficulty, foes: water, random: rng(`t:${difficulty}`) } as any);
+    const b = buildAiTeam({ difficulty, foes: fire, random: rng(`t:${difficulty}`) } as any);
     assert.deepEqual(a, b, difficulty);
     assert.deepEqual(aiPicks({ difficulty, own: a, foes: water, random: rng(9) } as any), aiPicks({ difficulty, own: a, foes: fire, random: rng(9) } as any), difficulty);
   }
 });
 
 test('the hard AIs still bring strong Pokémon, but not always the same ones', () => {
-  const pool = new Set(aiTeamPool('veryhard', 50));
-  const teams = [0, 1, 2, 3].map((seed) => buildAiTeam({ difficulty: 'veryhard', level: 50, random: rng(`v:${seed}`) }).map((e) => e.finalID).sort().join());
+  const pool = new Set(aiTeamPool('veryhard'));
+  const teams = [0, 1, 2, 3].map((seed) => buildAiTeam({ difficulty: 'veryhard', random: rng(`v:${seed}`) }).map((e) => e.finalID).sort().join());
   assert.ok(new Set(teams).size > 1);
   for (const t of teams) for (const id of t.split(',')) assert.ok(pool.has(Number(id)));
 });
 
 test('the random party of the AI comes from fully evolved Pokémon of generations 1 to 5 too', () => {
-  const party = buildAiRandomParty({ level: 40, random: rng(3) });
+  const party = buildAiRandomParty({ random: rng(3) });
   assert.equal(party.length, 6);
-  assert.ok(party.every((e) => e.finalID <= LAST_AI_SPECIES && e.level === 40 && fullyEvolved(e.finalID)));
+  assert.ok(party.every((e) => e.finalID <= LAST_AI_SPECIES && e.level === 100 && fullyEvolved(e.finalID)));
 });
 
 test('the AI always takes three distinct Pokémon to the battle', () => {
-  const own = buildAiTeam({ difficulty: 'hard', level: 50, random: rng(5) });
-  const foes = buildAiTeam({ difficulty: 'easy', level: 50, random: rng(6) });
+  const own = buildAiTeam({ difficulty: 'hard', random: rng(5) });
+  const foes = buildAiTeam({ difficulty: 'easy', random: rng(6) });
   for (const difficulty of AI_LEVELS) {
     const picks = aiPicks({ difficulty, own, foes, random: rng(7) } as any);
     assert.equal(picks.length, 3);
@@ -127,8 +127,8 @@ test('the very hard AI switches out of a fight it cannot win', () => {
 
 function aiVsAi(levelA, levelB, seed) {
   const random = rng(`fight:${seed}`);
-  const a = buildAiTeam({ difficulty: levelA, level: 50, random }).slice(0, 3);
-  const bTeam = buildAiTeam({ difficulty: levelB, level: 50, random }).slice(0, 3);
+  const a = buildAiTeam({ difficulty: levelA, random }).slice(0, 3);
+  const bTeam = buildAiTeam({ difficulty: levelB, random }).slice(0, 3);
   const b = createBattle({ id: `f${seed}`, random, sides: [{ trainerId: `ai:${levelA}`, name: 'A', entries: a }, { trainerId: `ai:${levelB}`, name: 'B', entries: bTeam }] });
   const levels = [levelA, levelB];
   for (let guard = 0; guard < 500 && b.status === 'active'; guard++) {

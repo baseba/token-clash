@@ -20,13 +20,10 @@ export const BATTLE_MODES = ['team', 'random'] as const;
 export type BattleMode = (typeof BATTLE_MODES)[number];
 export const VISIBILITIES = ['public', 'private'] as const;
 export type Visibility = (typeof VISIBILITIES)[number];
-/** The only level cap there is: everyone fights at level 50. Without it (null), each at their own level. */
-export const LEVEL_CAP = 50;
-
 /** What we keep of a finished battle: its public state (who fought, who won). */
 export interface FinalBattleState {
   winner: number | null;
-  sides: { team: { speciesName?: string; sprite?: string; types?: string[]; hidden?: boolean }[] }[];
+  sides: { team: { uid?: string; hp?: number; speciesName?: string; sprite?: string; types?: string[]; hidden?: boolean }[] }[];
   [key: string]: unknown;
 }
 
@@ -35,7 +32,6 @@ export interface ChallengeState {
   hostId: string;
   hostName: string;
   hostTeam: RosterEntry[];
-  levelCap: number | null;
   status: ChallengeStatus;
   createdAt: number;
   mode: BattleMode;
@@ -72,7 +68,6 @@ export class Challenge implements ChallengeState {
   hostId: string;
   hostName: string;
   hostTeam: RosterEntry[];
-  levelCap: number | null;
   status: ChallengeStatus;
   createdAt: number;
   mode: BattleMode;
@@ -99,12 +94,12 @@ export class Challenge implements ChallengeState {
   }
 
   /** A room waiting for a rival. In a random battle the teams are rolled when someone joins. */
-  static open(input: { id: string; host: Player; hostTeam: RosterEntry[]; levelCap: number | null; mode: BattleMode; visibility: Visibility; at: number }): Challenge {
-    return new Challenge({ id: input.id, hostId: input.host.id, hostName: input.host.name, hostTeam: input.hostTeam, levelCap: input.levelCap, mode: input.mode, visibility: input.visibility, status: 'open', createdAt: input.at });
+  static open(input: { id: string; host: Player; hostTeam: RosterEntry[]; mode: BattleMode; visibility: Visibility; at: number }): Challenge {
+    return new Challenge({ id: input.id, hostId: input.host.id, hostName: input.host.name, hostTeam: input.hostTeam, mode: input.mode, visibility: input.visibility, status: 'open', createdAt: input.at });
   }
 
   /** A battle against the AI starts at once. Private: nobody else can take its seat. */
-  static againstAi(input: { id: string; host: Player; hostTeam: RosterEntry[]; ai: Player & { level: string }; aiTeam: RosterEntry[]; levelCap: number | null; mode: BattleMode; at: number }): Challenge {
+  static againstAi(input: { id: string; host: Player; hostTeam: RosterEntry[]; ai: Player & { level: string }; aiTeam: RosterEntry[]; mode: BattleMode; at: number }): Challenge {
     return new Challenge({
       id: input.id,
       hostId: input.host.id,
@@ -113,7 +108,6 @@ export class Challenge implements ChallengeState {
       guestId: input.ai.id,
       guestName: input.ai.name,
       guestTeam: input.aiTeam,
-      levelCap: input.levelCap,
       mode: input.mode,
       visibility: 'private',
       ai: input.ai.level,
@@ -127,7 +121,6 @@ export class Challenge implements ChallengeState {
     id: string;
     host: Player & { team: RosterEntry[]; ai: string | null };
     guest: Player & { team: RosterEntry[]; ai: string | null };
-    levelCap: number | null;
     mode: BattleMode;
     tournamentId: string;
     round: number;
@@ -143,7 +136,6 @@ export class Challenge implements ChallengeState {
       guestId: guest.id,
       guestName: guest.name,
       guestTeam: guest.team,
-      levelCap: input.levelCap,
       mode: input.mode,
       ai: guest.ai ?? host.ai ?? null,
       aiOnly: !!(host.ai && guest.ai),

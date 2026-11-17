@@ -1,0 +1,1 @@
+ALTER TABLE `trainers` ADD `avatar` text;

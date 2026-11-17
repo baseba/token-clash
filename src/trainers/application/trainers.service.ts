@@ -13,6 +13,7 @@ const TOKEN_FORMAT = /^[A-Za-z0-9_-]{20,100}$/;
 
 export interface ProfileChanges {
   name?: string;
+  avatar?: string;
   team?: string[];
   nickname?: { id: string; name: string } | null;
 }
@@ -83,8 +84,10 @@ export class TrainersService implements OnModuleInit {
     return { token, trainer };
   }
 
+  /** @throws {DomainError} the chosen look is not a trainer sprite */
   updateProfile(trainer: Trainer, changes: ProfileChanges): Trainer {
     if (changes.name !== undefined) trainer.rename(changes.name);
+    if (changes.avatar !== undefined) trainer.chooseAvatar(changes.avatar);
     if (changes.team) trainer.chooseTeam(changes.team);
     if (changes.nickname) trainer.setNickname(changes.nickname.id, changes.nickname.name);
     trainer.touch(now());

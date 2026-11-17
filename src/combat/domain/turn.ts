@@ -8,6 +8,7 @@ import { residual } from './residual.js';
 import { doSwitch, entryOrder, runEntry, settle, wakeAbilities } from './switching.js';
 import { activeFighters, activeOf, benchSlots, emit, hasBench, nameOf, speedOf } from './effects.js';
 import { chain, run } from './ability-engine.js';
+import { conflict } from '../../shared/domain/errors.js';
 
 export const TURN_LIMIT = 100;
 const FOCUS_MOVES = new Set(['focus-punch', 'shell-trap', 'beak-blast']);
@@ -16,10 +17,20 @@ function alive(side: BattleSide): boolean {
   return side.team.some((f) => f.hp > 0);
 }
 
-function finish(battle: BattleState, winner: number | null, reason: 'limit' | null = null): void {
+function finish(battle: BattleState, winner: number | null, reason: 'limit' | 'forfeit' | null = null): void {
   battle.status = 'finished';
   battle.winner = winner;
   emit(battle, { t: 'end', winner, ...(reason ? { reason } : {}) });
+}
+
+/** @throws {DomainError} the battle is already over */
+export function forfeit(battle: BattleState, sideIndex: number): BattleEvent[] {
+  if (battle.status !== 'active') throw conflict('La pelea ya terminó.');
+  const events: BattleEvent[] = [];
+  battle.events = events;
+  for (const side of battle.sides) side.action = null;
+  finish(battle, 1 - sideIndex, 'forfeit');
+  return events;
 }
 
 function checkEnd(battle: BattleState): boolean {
@@ -90,7 +101,7 @@ function continueTurn(battle: BattleState, events: BattleEvent[], movers: Mover[
   for (let i = from; i < movers.length; i++) {
     const mover = movers[i];
     if (activeOf(battle, mover.sideIndex) !== mover.fighter) continue;
-    useMove(battle, mover.sideIndex, mover.move, mover.prio, mover.why);
+    useMove(battle, mover.sideIndex, mover.move, mover.prio, mover.why, mover.target ?? null);
     settle(battle);
     if (checkEnd(battle)) return done(battle, events);
     if (pauseForSwitch(battle, [mover.sideIndex, 1 - mover.sideIndex], movers, i + 1)) return done(battle, events);

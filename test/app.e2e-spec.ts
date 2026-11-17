@@ -37,7 +37,7 @@ before(async () => {
   jevProxy = createJevProxy({ apiKey: FAKE_JEV_KEY, upstream: `http://127.0.0.1:${(fakeJev.address() as AddressInfo).port}/v1/systemone` });
   await new Promise<void>((r) => jevProxy.listen(0, '127.0.0.1', r));
   const proxyPort = (jevProxy.address() as AddressInfo).port;
-  app = appProcess({ ...FAST_TIMINGS, SEAT_GRACE_MS: '60000', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${proxyPort}/v1/systemone` }, 18000);
+  app = appProcess({ ...FAST_TIMINGS, SEAT_GRACE_MS: '60000', TRUST_CF_CONNECTING_IP: '1', JEV_API_KEY: '', JEV_API_URL: `http://127.0.0.1:${proxyPort}/v1/systemone` }, 18000);
   ({ base, port: PORT } = app);
   await app.start();
 });
@@ -47,10 +47,10 @@ after(() => {
   fakeJev.close();
 });
 
-async function call(path: string, { method = 'GET', body = undefined as unknown, token = undefined as string | undefined } = {}): Promise<{ status: number; data: any; headers: Headers }> {
+async function call(path: string, { method = 'GET', body = undefined as unknown, token = undefined as string | undefined, ip = undefined as string | undefined } = {}): Promise<{ status: number; data: any; headers: Headers }> {
   const res = await fetch(base + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(ip ? { 'CF-Connecting-IP': ip } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   return { status: res.status, data: await res.json().catch(() => null), headers: res.headers };
@@ -90,11 +90,11 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   const team = [a.data.me.roster[3].uid];
   assert.deepEqual((await call('/api/me', { method: 'PUT', token: a.data.token, body: { team } })).data.me.team, team);
 
-  const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { levelCap: 50 } });
+  const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { visibility: 'private' } });
   assert.equal(ch.status, 200);
   const id = ch.data.challenge.id;
   assert.equal(ch.data.challenge.hostTeam.length, 1);
-  assert.equal(ch.data.challenge.hostTeam[0].level, 50);
+  assert.equal(ch.data.challenge.hostTeam[0].level, 100);
 
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: a.data.token })).status, 400);
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST' })).status, 401);
@@ -180,7 +180,7 @@ test('random battle rolls a party from each collection', async () => {
 test('a battle against the AI starts at once and stays out of the ranking and the history', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Solo', save } });
   for (const mode of ['team', 'random']) {
-    const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode, ai: 'veryhard', levelCap: 50 } });
+    const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode, ai: 'veryhard' } });
     assert.equal(ch.status, 200);
     assert.equal(ch.data.challenge.status, 'active');
     assert.equal(ch.data.challenge.ai, 'veryhard');
@@ -203,7 +203,7 @@ test('a battle against the AI starts at once and stays out of the ranking and th
 test('against Skynet, Jev picks the AI\'s actions and the battle ends', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Sarah', save } });
   assert.ok(a.data.me.aiLevels.includes('skynet'));
-  const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode: 'team', ai: 'skynet', levelCap: 50 } });
+  const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode: 'team', ai: 'skynet' } });
   assert.equal(ch.status, 200);
   assert.match(ch.data.challenge.guest.name, / ai - skynet$/);
   const first = jevCalls.length;
@@ -215,6 +215,36 @@ test('against Skynet, Jev picks the AI\'s actions and the battle ends', async ()
   assert.ok(mine.length > 0, 'Jev was never asked');
   assert.ok(mine.every((c) => c.auth === `Bearer ${FAKE_JEV_KEY}`));
   assert.ok(!JSON.stringify(mine.map((c) => c.body)).includes('Sarah'), 'trainer name sent to Jev');
+});
+
+test('a player who surrenders loses at once, and it counts in the ranking', async () => {
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Rendida', save }, ip: '10.9.0.1' });
+  const b = await call('/api/import', { method: 'POST', body: { name: 'Ganadora', save }, ip: '10.9.0.2' });
+  const id = (await call('/api/challenges', { method: 'POST', token: a.data.token, body: { visibility: 'private' } })).data.challenge.id;
+  await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token });
+  const quitter = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
+  let surrendered = false;
+  const ended = new Promise<any>((r) => quitter.on('message', (raw) => {
+    const m = JSON.parse(String(raw));
+    if (m.state?.status === 'finished') r(m);
+    if (m.t === 'lobby' && !m.players[m.you].ready) quitter.send(JSON.stringify({ t: 'set-ready', ready: true }));
+    const mine = m.preview && m.you != null ? m.preview.sides[m.you] : null;
+    if (mine && !mine.ready) quitter.send(JSON.stringify({ t: 'pick', picks: mine.party.slice(0, mine.needed).map((_, i) => i) }));
+    if (m.actions?.length && !surrendered) {
+      surrendered = true;
+      quitter.send(JSON.stringify({ t: 'surrender' }));
+    }
+  }));
+  quitter.on('open', () => quitter.send(JSON.stringify({ t: 'hello', room: id, token: a.data.token })));
+  const rival = player(id, b.data.token);
+  const end = await ended;
+  assert.equal(end.state.winner, 1);
+  assert.deepEqual(end.events.at(-1), { t: 'end', winner: 1, reason: 'forfeit' });
+  [quitter, rival.ws].forEach((ws) => ws.close());
+  await new Promise<any>((r) => setTimeout(r, 200));
+  assert.equal((await call(`/api/challenges/${id}`)).data.challenge.winnerId, b.data.me.id);
+  assert.equal((await call('/api/me', { token: a.data.token })).data.me.losses, 1);
+  assert.equal((await call('/api/me', { token: b.data.token })).data.me.wins, 1);
 });
 
 test('timeouts auto-play so a battle always ends', async () => {
@@ -265,7 +295,7 @@ test('a 1v1 room waits until both press ready, and the guest can leave to reopen
 test('a 4-player tournament filled with AIs plays every match in order until a champion', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Campeona', save } });
   const b = await call('/api/import', { method: 'POST', body: { name: 'Intrusa', save } });
-  const T = (await call('/api/tournaments', { method: 'POST', token: a.data.token, body: { size: 4, mode: 'random', levelCap: 50, visibility: 'private' } })).data.tournament;
+  const T = (await call('/api/tournaments', { method: 'POST', token: a.data.token, body: { size: 4, mode: 'random', visibility: 'private' } })).data.tournament;
   assert.equal(T.status, 'open');
   assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', body: { level: 'easy' } })).status, 401);
   assert.equal((await call(`/api/tournaments/${T.id}/join`, { method: 'POST', token: b.data.token })).status, 200);
@@ -313,7 +343,7 @@ test('a 4-player tournament filled with AIs plays every match in order until a c
 test('public rooms are listed and a matching search joins them; private ones stay hidden', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Anfitrión', save } });
   const b = await call('/api/import', { method: 'POST', body: { name: 'Buscador', save } });
-  const body = { mode: 'random', levelCap: 50 };
+  const body = { mode: 'random' };
   const priv = (await call('/api/challenges', { method: 'POST', token: a.data.token, body: { ...body, visibility: 'private' } })).data.challenge;
   assert.equal(priv.visibility, 'private');
   const pub = (await call('/api/challenges', { method: 'POST', token: a.data.token, body })).data.challenge;

@@ -6,14 +6,13 @@ import { NewChallengeDto } from './new-challenge.dto.js';
 import { NewTournamentDto } from './new-tournament.dto.js';
 import { AddAisDto, SetReadyDto } from './tournament-actions.dto.js';
 
-test('an empty "new battle" is a public team battle at each own level', () => {
-  assert.deepEqual(NewChallengeDto.parse({}), { mode: 'team', levelCap: null, visibility: 'public' });
-  assert.deepEqual(NewChallengeDto.parse({ mode: 'random', levelCap: 50, ai: 'hard' }), { mode: 'random', levelCap: 50, visibility: 'public', ai: 'hard' });
+test('an empty "new battle" is a public team battle', () => {
+  assert.deepEqual(NewChallengeDto.parse({}), { mode: 'team', visibility: 'public' });
+  assert.deepEqual(NewChallengeDto.parse({ mode: 'random', ai: 'hard' }), { mode: 'random', visibility: 'public', ai: 'hard' });
 });
 
 test('values outside the allowed ones are rejected instead of silently replaced', () => {
   assert.equal(NewChallengeDto.safeParse({ mode: 'chaos' }).success, false);
-  assert.equal(NewChallengeDto.safeParse({ levelCap: 100 }).success, false);
   assert.equal(NewChallengeDto.safeParse([]).success, false);
   assert.equal(NewTournamentDto.safeParse({ size: 5 }).success, false);
   assert.equal(NewTournamentDto.parse({}).size, 8);

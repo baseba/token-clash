@@ -22,6 +22,7 @@ function publicMove(move: MoveData) {
     contact: move.flags.includes('contact'),
     pp: move.pp,
     target: move.target,
+    ...(move.aimable ? { aimable: move.aimable } : {}),
     ...(move.boosts ? { boosts: move.boosts } : {}),
     ...(move.status ? { status: move.status } : {}),
     ...(move.heal ? { heal: move.heal } : {}),
@@ -184,7 +185,6 @@ export function publicState(battle: BattleState, viewer: number | null = null) {
     phase: battle.phase,
     turn: battle.turn,
     winner: battle.winner,
-    levelCap: battle.levelCap,
     field: {
       weather: battle.field.weather,
       terrain: battle.field.terrain,
@@ -195,6 +195,7 @@ export function publicState(battle: BattleState, viewer: number | null = null) {
     sides: battle.sides.map((side, s) => ({
       trainerId: side.trainerId,
       name: side.name,
+      avatar: side.avatar,
       active: side.active,
       ready: !needsAction(battle, s),
       mustSwitch: side.mustSwitch,
