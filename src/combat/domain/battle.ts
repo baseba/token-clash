@@ -5,7 +5,7 @@ import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js
 import { ABILITIES, type AbilityEffect, type AbilityHook, type BoostChanges } from './ability-effects.js';
 import type { Gender, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { invalid } from '../../shared/domain/errors.js';
-import type { Action, MoveAction, SwitchAction, SideAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, Look, Mover } from './battle-types.js';
+import type { Action, MoveAction, SwitchAction, SideAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, Look, Mover, Volatiles } from './battle-types.js';
 
 export type * from './battle-types.js';
 
@@ -215,6 +215,8 @@ function makeEngine(battle: BattleState) {
 }
 
 const moveApis = new WeakMap<BattleState, MoveRuleApi>();
+/** The volatiles Baton Pass hands to the next fighter. */
+const BATON_PASSED = ['confusion', 'focusEnergy', 'perish', 'leechSeed', 'curse', 'ingrain', 'aquaRing', 'magnetRise', 'substitute', 'trappedBy', 'gastroAcid'] as const;
 const HAZARD_MAX: Record<string, number> = { spikes: 3, toxicspikes: 2 };
 
 function moveApi(battle: BattleState): MoveRuleApi {
@@ -378,21 +380,8 @@ function makeMoveApi(battle: BattleState) {
       if (pass) {
         const kept: NonNullable<BattleSide['pass']> = {};
         if (pass.boosts) kept.boosts = { ...fighter.boosts };
-        if (pass.volatiles)
-          for (const key of [
-            'confusion',
-            'focusEnergy',
-            'perish',
-            'leechSeed',
-            'curse',
-            'ingrain',
-            'aquaRing',
-            'magnetRise',
-            'substitute',
-            'trappedBy',
-            'gastroAcid',
-          ])
-            if (fighter.volatiles[key]) kept[key] = fighter.volatiles[key];
+        const keep = <K extends keyof Volatiles>(key: K) => (kept[key] = fighter.volatiles[key]);
+        if (pass.volatiles) for (const key of BATON_PASSED) if (fighter.volatiles[key]) keep(key);
         if (pass.substitute) kept.substitute = pass.substitute;
         battle.sides[sideOf(fighter)].pass = kept;
       }
@@ -597,7 +586,7 @@ function addVolatile(
   const sideIndex = sideIndexOf(battle, fighter);
   if (kind === 'flinch') fighter.volatiles.flinch = true;
   else if (kind === 'confusion') fighter.volatiles.confusion = 2 + Math.floor(battle.random() * 4);
-  else if (kind === 'attract') fighter.volatiles.attract = source;
+  else if (kind === 'attract' && source) fighter.volatiles.attract = source;
   else if (kind === 'disable') fighter.volatiles.disabled = { key: opts.move!.key, name: opts.move!.name, turns: 4 };
   else if (kind === 'perish') fighter.volatiles.perish = 4;
   else if (kind === 'charge') fighter.volatiles.charge = true;
@@ -923,8 +912,8 @@ function runEntry(battle: BattleState, sideIndex: number): void {
 function leave(battle: BattleState, fighter: BattleFighter): boolean {
   const hadGas = fighter.ability === 'neutralizing-gas';
   if (fighter.hp > 0) run(battle, fighter, 'onSwitchOut');
-  if (fighter.volatiles.mimic)
-    fighter.moves = fighter.moves.map((m, i) => (i === fighter.volatiles.mimic.slot ? fighter.volatiles.mimic.original : m));
+  const { mimic } = fighter.volatiles;
+  if (mimic) fighter.moves = fighter.moves.map((m, i) => (i === mimic.slot ? mimic.original : m));
   if (fighter.volatiles.powerTrick) fighter.stats = { ...fighter.stats, atk: fighter.stats.def, def: fighter.stats.atk };
   if (fighter.volatiles.transformed) Object.assign(fighter, fighter.volatiles.transformed);
   fighter.boosts = freshBoosts();
@@ -1068,9 +1057,10 @@ function usableMoves(battle: BattleState, fighter: BattleFighter): { move: MoveD
 }
 
 function encoreMove(fighter: BattleFighter): number | undefined {
-  if (!fighter.volatiles.encore) return undefined;
-  const slot = fighter.moves.findIndex((m) => m.key === fighter.volatiles.encore.key);
-  return slot >= 0 && (fighter.pp[fighter.volatiles.encore.key] ?? 0) > 0 ? slot : undefined;
+  const { encore } = fighter.volatiles;
+  if (!encore) return undefined;
+  const slot = fighter.moves.findIndex((m) => m.key === encore.key);
+  return slot >= 0 && (fighter.pp[encore.key] ?? 0) > 0 ? slot : undefined;
 }
 
 export function forcedAction(battle: BattleState, sideIndex: number): Action | null {
@@ -2150,10 +2140,10 @@ function residual(battle: BattleState): void {
       delete fighter.volatiles.yawn;
       setStatus(battle, fighter, 'slp', null);
     }
-    for (const [key, kind] of [['taunt', 'taunt'], ['encore', 'encore'], ['healBlock', 'healblock'], ['telekinesis', 'telekinesis'], ['magnetRise', 'magnetrise']]) {
+    for (const [key, kind] of [['taunt', 'taunt'], ['encore', 'encore'], ['healBlock', 'healblock'], ['telekinesis', 'telekinesis'], ['magnetRise', 'magnetrise']] as const) {
       const effect = fighter.volatiles[key];
       if (!effect) continue;
-      if (--effect.turns <= 0 || (key === 'encore' && !(fighter.pp[effect.key] > 0))) {
+      if (--effect.turns <= 0 || ('key' in effect && !(fighter.pp[effect.key] > 0))) {
         delete fighter.volatiles[key];
         emit(battle, { t: 'volatileEnd', side: sideIndexOf(battle, fighter), name: nameOf(fighter), kind });
       }

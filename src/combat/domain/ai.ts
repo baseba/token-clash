@@ -199,7 +199,7 @@ function believedFoe(fighter: BattleFighter): BattleFighter {
     moves = slots.filter(Boolean) as MoveData[];
     const slotOf = (slot: number | null | undefined) => (slot == null || !slots[slot] ? undefined : moves.indexOf(slots[slot]));
     volatiles = { ...fighter.volatiles, charging: slotOf(fighter.volatiles.charging), mustRecharge: slotOf(fighter.volatiles.mustRecharge) };
-    for (const key of ['charging', 'mustRecharge']) if (volatiles[key] === undefined) delete volatiles[key];
+    for (const key of ['charging', 'mustRecharge'] as const) if (volatiles[key] === undefined) delete volatiles[key];
   }
   const base = fighter.form ? formData(fighter.form)?.base : speciesData(fighter.speciesId)?.stats;
   const stats = fighter.volatiles.transformed || !base ? { ...fighter.stats } : statsFor(base, GUESS_IVS, fighter.level);

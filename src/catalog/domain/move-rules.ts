@@ -4,7 +4,7 @@
 import { moveData, type BoostKey, type Boosts, type MoveData } from './creatures.js';
 import { TYPES } from './type-chart.js';
 import type { MoveRuleApi } from '../../combat/domain/battle.js';
-import type { BattleFighter, BattleMove } from '../../combat/domain/battle-types.js';
+import type { BattleFighter, BattleMove, Volatiles } from '../../combat/domain/battle-types.js';
 
 /** What a calling move (Metronome, Copycat…) asks the engine to use instead. */
 export interface CalledMove {
@@ -108,11 +108,11 @@ function setRoom(api: MoveRuleApi, key: string, turns: number): boolean {
   return true;
 }
 
-function setVol(
+function setVol<K extends keyof Volatiles>(
   api: MoveRuleApi,
   fighter: BattleFighter,
-  key: string,
-  value: unknown,
+  key: K,
+  value: Volatiles[K],
   kind: string = key,
   extra: Record<string, unknown> = {},
 ): boolean {
@@ -587,7 +587,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   comeuppance: { damage: (api, me, target) => (me.turnHit?.by === target ? Math.floor(me.turnHit.amount * 1.5) : null) },
   bide: {
     before(api, me, foe, move) {
-      const lock = me.volatiles.locked;
+      const lock = me.volatiles.locked?.kind === 'bide' ? me.volatiles.locked : null;
       if (!lock) {
         me.volatiles.locked = { move: move.slot, kind: 'bide', turns: 2, damage: 0 };
         api.volatile(me, 'bide');

@@ -1,7 +1,7 @@
 // The shapes the battle engine works on. The engine (battle.ts) mutates these in place; the rules of
 // abilities (catalog/domain/abilities.ts) and moves (catalog/domain/move-rules.ts) receive them
 // through the APIs battle.ts hands them (AbilityEngine and MoveRuleApi).
-import type { BoostKey, Fighter, MajorStatus, MoveData, Stats, Weather } from '../../catalog/domain/creatures.js';
+import type { BoostKey, Fighter, MajorStatus, MoveData, StatKey, Stats, Weather } from '../../catalog/domain/creatures.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 
 export interface MoveAction {
@@ -21,14 +21,118 @@ export type Action = MoveAction | SwitchAction;
 /** A chosen action; `auto` marks one the server played for the trainer (a locked move). */
 export type SideAction = Action & { auto?: boolean };
 
+/** A move that keeps its user locked in for several turns, by what it counts. */
+export type LockedMove =
+  | { kind: 'bide'; move: number | null; turns: number; damage: number }
+  | { kind: 'rollout'; move: number | null; count: number }
+  | { kind: 'uproar'; move: number | null; turns: number };
+
 /**
- * Volatile state of a fighter on the field: dozens of keys (confusion, substitute, encore,
- * illusion, lockedMove, stockpile…), each with its own shape, set and read by the engine and by many
- * move and ability rules, and wiped when the fighter leaves. It is deliberately loose: typing every
- * key precisely would mean a second copy of the rules. It never leaves the server as is
- * (publicState() picks what clients see).
+ * Volatile state of a fighter on the field, set and read by the engine and by the move and ability
+ * rules, and wiped when the fighter leaves. Numbers named after a move without "turns" are the turn
+ * it was used. It never leaves the server as is (publicState() picks what clients see).
  */
-export type Volatiles = Record<string, any>;
+export interface Volatiles {
+  /** The turn this fighter came out. */
+  enteredTurn?: number;
+  /** Who it is disguised as (Illusion). */
+  illusion?: Look;
+  /** It already used a move since it came out. */
+  acted?: boolean;
+  aquaRing?: boolean;
+  /** Who it is infatuated with. */
+  attract?: BattleFighter;
+  /** Caught by a binding move (Wrap, Fire Spin…) of `by`. */
+  bound?: { turns: number; by: BattleFighter; move: string };
+  charge?: boolean;
+  /** Slot of the two-turn move it is charging (Fly, Solar Beam…). */
+  charging?: number;
+  /** Turns of confusion left. */
+  confusion?: number;
+  curse?: boolean;
+  defenseCurl?: boolean;
+  destinyBond?: boolean;
+  disabled?: { key: string; name: string; turns: number };
+  electrify?: number;
+  encore?: { key: string; turns: number };
+  endure?: number;
+  flashFire?: boolean;
+  flinch?: boolean;
+  focusEnergy?: boolean;
+  /** Id of the move it is focusing for (Focus Punch, Shell Trap, Beak Blast). */
+  focusing?: string;
+  foresight?: boolean;
+  /** Fury Cutter hits in a row. */
+  furyCutter?: number;
+  gastroAcid?: boolean;
+  glaiveRush?: number;
+  grudge?: boolean;
+  /** What Cramorant swallowed (Gulp Missile). */
+  gulp?: 'arrokuda' | 'pikachu';
+  healBlock?: { turns: number };
+  imprison?: boolean;
+  ingrain?: boolean;
+  /** Last turn of Laser Focus. */
+  laserFocus?: number;
+  lastFailed?: boolean;
+  /** Key of the last move it used. */
+  lastMove?: string;
+  leechSeed?: boolean;
+  locked?: LockedMove;
+  /** Key of the move Gorilla Tactics locks it into. */
+  lockedMove?: string;
+  /** The foe its next move can't miss (Lock-On, Mind Reader). */
+  lockOn?: BattleFighter;
+  magicCoat?: number;
+  magnetRise?: { turns: number };
+  /** The slot Mimic replaced and the move that was there. */
+  mimic?: { slot: number; original: MoveData };
+  miracleEye?: boolean;
+  /** Slot of the move it must recharge from (Hyper Beam…). */
+  mustRecharge?: number;
+  nightmare?: boolean;
+  noRetreat?: boolean;
+  /** Who holds it with Octolock. */
+  octolock?: BattleFighter;
+  /** The stat Protosynthesis or Quark Drive raises. */
+  paradoxStat?: StatKey;
+  /** Perish Song count left. */
+  perish?: number;
+  powerTrick?: boolean;
+  /** Key of the move it used before the last one. */
+  prevMove?: string;
+  proteanUsed?: boolean;
+  protect?: { turn: number; kind: string };
+  rage?: boolean;
+  /** Outrage and friends: the slot, and how many more turns. */
+  rampage?: { move: number; left: number };
+  saltCure?: boolean;
+  /** Turns of Slow Start left. */
+  slowStart?: number;
+  smackedDown?: boolean;
+  snatch?: number;
+  /** Protect-like moves used in a row. */
+  stall?: number;
+  /** Stockpile count and the defense boosts it gave, to take back. */
+  stockpile?: { count: number; def: number; sdef: number };
+  /** HP left in its substitute. */
+  substitute?: number;
+  /** It switches out at the end of this action (U-turn, Baton Pass, Emergency Exit…). */
+  switchNow?: boolean;
+  taunt?: { turns: number };
+  telekinesis?: { turns: number };
+  torment?: boolean;
+  /** What Transform replaced, to restore when it leaves. */
+  transformed?: Pick<BattleFighter, 'types' | 'stats' | 'moves' | 'sprite' | 'floats' | 'pp'>;
+  /** Who keeps it from switching out (Mean Look, Jaw Lock…). */
+  trappedBy?: BattleFighter;
+  truantRest?: boolean;
+  uproar?: boolean;
+  /** Keys of the moves it used since it came out (Last Resort). */
+  usedMoves?: Set<string>;
+  /** Turns until Yawn puts it to sleep. */
+  yawn?: number;
+}
 
 /** How a fighter looks to the rival (also what Illusion copies). */
 export interface Look {
@@ -116,8 +220,8 @@ export interface BattleSide {
   hazards: Hazards;
   /** Side conditions (tailwind, safeguard, quickguard…) → turns left or the turn they were set. */
   conds: Record<string, number>;
-  /** What Baton Pass and friends hand to the next fighter (boosts and volatiles). */
-  pass?: Volatiles;
+  /** What Baton Pass and friends hand to the next fighter. */
+  pass?: Volatiles & { boosts?: Record<BoostKey, number> };
   healingWish?: string;
   faintedTurn?: number;
   wish?: { at: number; amount: number; name: string };
