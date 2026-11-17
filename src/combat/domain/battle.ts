@@ -28,7 +28,7 @@ const freshBoosts = (): Record<BoostKey, number> => ({ atk: 0, def: 0, satk: 0, 
 const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
 const isSun = (weather: string | null | undefined): boolean => weather === 'sun' || weather === 'harshsun';
 const isRain = (weather: string | null | undefined): boolean => weather === 'rain' || weather === 'heavyrain';
-const poisoned = (status: string | null | undefined): boolean => status === 'psn' || status === 'tox';
+const poisoned = (status: MajorStatus | null): status is 'psn' | 'tox' => status === 'psn' || status === 'tox';
 export const STRUGGLE_MOVE = -1;
 const HEALS_WITH_WEATHER: Record<string, Weather> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
 
@@ -128,22 +128,31 @@ function abilityKey(battle: BattleState, fighter: BattleFighter): string | null 
 }
 
 const abilityDef = (battle: BattleState, fighter: BattleFighter): AbilityEffect | null => ABILITIES[abilityKey(battle, fighter) as string] ?? null;
-const run = (battle: BattleState, fighter: BattleFighter, hook: AbilityHook, ...args: unknown[]): unknown =>
-  (abilityDef(battle, fighter)?.[hook] as ((engine: AbilityEngine, me: BattleFighter, ...args: unknown[]) => unknown) | undefined)?.(
-    engine(battle),
-    fighter,
-    ...args,
-  );
 const flag = (battle: BattleState, fighter: BattleFighter, name: keyof AbilityEffect): boolean => !!abilityDef(battle, fighter)?.[name];
 
-function mul(battle: BattleState, fighter: BattleFighter, hook: AbilityHook, ...args: unknown[]): number {
-  const result = run(battle, fighter, hook, ...args);
-  return typeof result === 'number' ? result : 1;
+type Hook<H extends AbilityHook> = NonNullable<AbilityEffect[H]>;
+/** What a hook takes after the engine and the fighter whose ability it is. */
+type HookArgs<H extends AbilityHook> = Parameters<Hook<H>> extends [AbilityEngine, BattleFighter, ...infer Args] ? Args : never;
+type MultiplierHook = 'onBasePower' | 'onIncoming' | 'onAttack' | 'onDefense' | 'onAttackerFinal' | 'onDefenderFinal';
+type ChainHook = 'onSpeed' | 'onAccuracy' | 'onEvasion' | 'onCritStage' | 'onEffectiveness' | 'onDamage' | 'onModifyPriority' | 'onStatusDamage';
+type ChainArgs<H extends ChainHook> = HookArgs<H> extends [...infer Args, number] ? Args : never;
+
+/**
+ * Calls the fighter's ability hook; undefined when its ability (or none) doesn't have it. TypeScript
+ * can't call a hook picked by a generic key, so the call inside is loose; the signature is what callers get.
+ */
+function run<H extends AbilityHook>(battle: BattleState, fighter: BattleFighter, hook: H, ...args: HookArgs<H>): ReturnType<Hook<H>> | undefined {
+  type AnyHook = (engine: AbilityEngine, me: BattleFighter, ...args: unknown[]) => unknown;
+  return (abilityDef(battle, fighter)?.[hook] as AnyHook | undefined)?.(engine(battle), fighter, ...args) as ReturnType<Hook<H>> | undefined;
 }
 
-function chain(battle: BattleState, fighter: BattleFighter, hook: AbilityHook, value: number, ...args: unknown[]): number {
-  const result = run(battle, fighter, hook, ...args, value);
-  return typeof result === 'number' ? result : value;
+function mul<H extends MultiplierHook>(battle: BattleState, fighter: BattleFighter, hook: H, ...args: HookArgs<H>): number {
+  return run(battle, fighter, hook, ...args) ?? 1;
+}
+
+/** Passes `value` through the hook, which gets it as its last argument and returns the new one. */
+function chain<H extends ChainHook>(battle: BattleState, fighter: BattleFighter, hook: H, value: number, ...args: ChainArgs<H>): number {
+  return run(battle, fighter, hook, ...([...args, value] as HookArgs<H>)) ?? value;
 }
 
 const anyActiveHas = (battle: BattleState, key: string): boolean => activeFighters(battle).some((f) => abilityKey(battle, f) === key);
@@ -1980,7 +1989,7 @@ function resolveTurn(battle: BattleState): BattleEvent[] {
         ...action,
         fighter,
         prio: chain(battle, fighter, 'onModifyPriority', move.priority, move),
-        frac: typeof frac === 'number' ? frac : 0,
+        frac: frac ?? 0,
         spd: speedOf(battle, fighter),
         tie: battle.random(),
       };

@@ -17,7 +17,8 @@ export interface HitInfo {
 
 /**
  * What an ability does. Flags are read by the engine (flag()); hooks are called by it (run(), mul(),
- * chain()). Hooks return a multiplier, a new value, true/false to block, or nothing.
+ * chain()). A hook returns a multiplier (mul), the new value of the number it was handed last (chain),
+ * a boolean that blocks or allows, or nothing.
  */
 export interface AbilityEffect {
   // Flags
@@ -55,53 +56,53 @@ export interface AbilityEffect {
   wonderSkin?: boolean;
   weatherImmune?: string[];
   // Hooks
-  onAccuracy?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, acc: number): unknown;
-  onAfterEachBoost?(engine: AbilityEngine, me: BattleFighter, applied: Boosts, source: BattleFighter | null, effect?: string): unknown;
-  onAfterMoveHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, total: number): unknown;
-  onAfterMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
-  onAfterSetStatus?(engine: AbilityEngine, me: BattleFighter, status: MajorStatus, source: BattleFighter | null): unknown;
-  onAnyFaint?(engine: AbilityEngine, me: BattleFighter, fainted: BattleFighter): unknown;
-  onAttackerFinal?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, info: { eff: number; crit: boolean }): unknown;
-  onAttack?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter): unknown;
-  onBasePower?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter): unknown;
-  onBeforeMoveForm?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
-  onBeforeMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
-  onChangeBoost?(engine: AbilityEngine, me: BattleFighter, changes: BoostChanges): unknown;
-  onCritStage?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, stage: number): unknown;
-  onDamage?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, dmg: number): unknown;
-  onDamagingHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, info: HitInfo): unknown;
+  onAccuracy?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, acc: number): number;
+  onAfterEachBoost?(engine: AbilityEngine, me: BattleFighter, applied: Boosts, source: BattleFighter | null, effect?: string): void;
+  onAfterMoveHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, total: number): void;
+  onAfterMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): void;
+  onAfterSetStatus?(engine: AbilityEngine, me: BattleFighter, status: MajorStatus, source: BattleFighter | null): void;
+  onAnyFaint?(engine: AbilityEngine, me: BattleFighter, fainted: BattleFighter): void;
+  onAttackerFinal?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, info: { eff: number; crit: boolean }): number;
+  onAttack?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter): number;
+  onBasePower?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter): number;
+  onBeforeMoveForm?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): void;
+  onBeforeMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): boolean;
+  onChangeBoost?(engine: AbilityEngine, me: BattleFighter, changes: BoostChanges): void;
+  onCritStage?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, stage: number): number;
+  onDamage?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, dmg: number): number;
+  onDamagingHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, info: HitInfo): void;
   onDefenderFinal?(
     engine: AbilityEngine,
     me: BattleFighter,
     move: BattleMove,
     attacker: BattleFighter,
     info: { eff: number; crit: boolean },
-  ): unknown;
-  onDefense?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): unknown;
-  onEffectiveness?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, eff: number): unknown;
-  onEndTurn?(engine: AbilityEngine, me: BattleFighter): unknown;
-  onEvasion?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, acc: number): unknown;
-  onFaint?(engine: AbilityEngine, me: BattleFighter, by: BattleFighter | null, move: BattleMove | null, lastHit: number): unknown;
-  onFlinch?(engine: AbilityEngine, me: BattleFighter): unknown;
-  onFoeBoost?(engine: AbilityEngine, me: BattleFighter, foe: BattleFighter, ups: Boosts, effect?: string): unknown;
-  onFoeFaint?(engine: AbilityEngine, me: BattleFighter, fainted: BattleFighter): unknown;
-  onFoeMove?(engine: AbilityEngine, me: BattleFighter, user: BattleFighter, move: BattleMove): unknown;
-  onFractionalPriority?(engine: AbilityEngine, me: BattleFighter, move: MoveData): unknown;
-  onIncoming?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): unknown;
-  onInflictStatus?(engine: AbilityEngine, me: BattleFighter, target: BattleFighter, status: MajorStatus): unknown;
-  onModifyMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
-  onModifyPriority?(engine: AbilityEngine, me: BattleFighter, move: MoveData, priority: number): unknown;
-  onPrepareMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
-  onSetStatus?(engine: AbilityEngine, me: BattleFighter, status: string, source: BattleFighter | null): unknown;
-  onSpeed?(engine: AbilityEngine, me: BattleFighter, spd: number): unknown;
-  onStart?(engine: AbilityEngine, me: BattleFighter): unknown;
-  onStatusDamage?(engine: AbilityEngine, me: BattleFighter, status: MajorStatus, amount: number): unknown;
-  onSwitchOut?(engine: AbilityEngine, me: BattleFighter): unknown;
-  onTerrainChange?(engine: AbilityEngine, me: BattleFighter): unknown;
-  onTrapFoe?(engine: AbilityEngine, me: BattleFighter, foe: BattleFighter): unknown;
-  onTryBoost?(engine: AbilityEngine, me: BattleFighter, changes: BoostChanges, source: BattleFighter | null, effect?: string): unknown;
-  onTryHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): unknown;
-  onWeatherChange?(engine: AbilityEngine, me: BattleFighter): unknown;
+  ): number;
+  onDefense?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): number;
+  onEffectiveness?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, eff: number): number;
+  onEndTurn?(engine: AbilityEngine, me: BattleFighter): void;
+  onEvasion?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter, acc: number): number;
+  onFaint?(engine: AbilityEngine, me: BattleFighter, by: BattleFighter | null, move: BattleMove | null, lastHit: number): void;
+  onFlinch?(engine: AbilityEngine, me: BattleFighter): void;
+  onFoeBoost?(engine: AbilityEngine, me: BattleFighter, foe: BattleFighter, ups: Boosts, effect?: string): void;
+  onFoeFaint?(engine: AbilityEngine, me: BattleFighter, fainted: BattleFighter): void;
+  onFoeMove?(engine: AbilityEngine, me: BattleFighter, user: BattleFighter, move: BattleMove): void;
+  onFractionalPriority?(engine: AbilityEngine, me: BattleFighter, move: MoveData): number;
+  onIncoming?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): number;
+  onInflictStatus?(engine: AbilityEngine, me: BattleFighter, target: BattleFighter, status: MajorStatus): void;
+  onModifyMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): void;
+  onModifyPriority?(engine: AbilityEngine, me: BattleFighter, move: MoveData, priority: number): number;
+  onPrepareMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): void;
+  onSetStatus?(engine: AbilityEngine, me: BattleFighter, status: string, source: BattleFighter | null): boolean;
+  onSpeed?(engine: AbilityEngine, me: BattleFighter, spd: number): number;
+  onStart?(engine: AbilityEngine, me: BattleFighter): void;
+  onStatusDamage?(engine: AbilityEngine, me: BattleFighter, status: MajorStatus, amount: number): number;
+  onSwitchOut?(engine: AbilityEngine, me: BattleFighter): void;
+  onTerrainChange?(engine: AbilityEngine, me: BattleFighter): void;
+  onTrapFoe?(engine: AbilityEngine, me: BattleFighter, foe: BattleFighter): boolean;
+  onTryBoost?(engine: AbilityEngine, me: BattleFighter, changes: BoostChanges, source: BattleFighter | null, effect?: string): void;
+  onTryHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): boolean;
+  onWeatherChange?(engine: AbilityEngine, me: BattleFighter): void;
 }
 
 /** Names of the hooks (the methods of AbilityEffect). */
@@ -169,7 +170,7 @@ const absorb = (type: string, effect: { heal?: number; boost?: Boosts; flashFire
   },
 });
 
-const contactChance = (chance: number, apply: (engine: AbilityEngine, me: BattleFighter, attacker: BattleFighter) => unknown): AbilityEffect => ({
+const contactChance = (chance: number, apply: (engine: AbilityEngine, me: BattleFighter, attacker: BattleFighter) => void): AbilityEffect => ({
   onDamagingHit(engine, me, move, attacker) {
     if (!contact(engine, move, attacker) || attacker.hp <= 0 || engine.rand() >= chance) return;
     apply(engine, me, attacker);
@@ -251,7 +252,7 @@ const merge = (...parts: AbilityEffect[]): AbilityEffect => {
   return out as AbilityEffect;
 };
 
-const formChanger = (decide: (engine: AbilityEngine, me: BattleFighter) => unknown): AbilityEffect => ({
+const formChanger = (decide: (engine: AbilityEngine, me: BattleFighter) => void): AbilityEffect => ({
   unsuppressable: true,
   noTrace: true,
   onStart: (engine, me) => decide(engine, me),
@@ -502,8 +503,8 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'good-as-gold': { breakable: true, blocksStatusMoves: true },
   'wonder-skin': { breakable: true, wonderSkin: true },
   'poison-heal': {
-    onStatusDamage(engine, me, status) {
-      if (!poison(status)) return undefined;
+    onStatusDamage(engine, me, status, amount) {
+      if (!poison(status)) return amount;
       if (!full(me)) {
         engine.show(me);
         engine.heal(me, fraction(me, 1 / 8), me);
