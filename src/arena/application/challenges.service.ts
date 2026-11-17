@@ -64,7 +64,7 @@ export class ChallengesService implements OnModuleInit {
     }
     if (input.visibility === 'public') {
       const { own, rival } = matchFor(this.lobby.publicRooms(), { trainerId: trainer.id, mode: input.mode, levelCap: input.levelCap });
-      if (rival) {
+      if (rival && this.duels.joinable(rival)) {
         this.duels.join(rival, trainer);
         if (own) this.duels.close(own);
         return { challenge: rival, joined: true };

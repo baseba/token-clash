@@ -89,11 +89,15 @@ export class DuelService {
   }
 
   /** Someone takes the free seat of an open room. */
+  /** A random battle rolls the host's party when someone joins: a host with no Pokémon left can't be joined. */
+  joinable(c: Challenge): boolean {
+    return c.battleMode !== 'random' || !!this.trainers.byId(c.hostId)?.roster.length;
+  }
+
   join(c: Challenge, guest: Trainer): void {
-    const host = this.trainers.byId(c.hostId);
+    if (!this.joinable(c)) throw conflict('El anfitrión ya no tiene Pokémon.');
     if (c.battleMode === 'random') {
-      if (!host?.roster.length) throw conflict('El anfitrión ya no tiene Pokémon.');
-      c.join(guest, { hostTeam: randomParty(host.roster), guestTeam: randomParty(guest.roster) });
+      c.join(guest, { hostTeam: randomParty(this.trainers.byId(c.hostId)!.roster), guestTeam: randomParty(guest.roster) });
     } else c.join(guest, { guestTeam: guest.teamSnapshot() });
     this.challenges.save(c);
     const r = this.presence.room(c.id);
