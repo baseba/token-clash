@@ -33,12 +33,12 @@ export function createPreview({ sides, levelCap = null, mode = 'team' }: { sides
 
 export const picksNeeded = (p: PreviewState, s: number): number => Math.min(BATTLE_SIZE, p.sides[s].entries.length);
 
-export function validPicks(p: PreviewState, s: number, picks: unknown): picks is number[] {
+function validPicks(p: PreviewState, s: number, picks: number[]): boolean {
   const n = picksNeeded(p, s);
-  return Array.isArray(picks) && picks.length === n && new Set(picks).size === n && picks.every((i) => Number.isInteger(i) && i >= 0 && i < p.sides[s].entries.length);
+  return picks.length === n && new Set(picks).size === n && picks.every((i) => Number.isInteger(i) && i >= 0 && i < p.sides[s].entries.length);
 }
 
-export function pick(p: PreviewState, s: number, picks: unknown): void {
+export function pick(p: PreviewState, s: number, picks: number[]): void {
   if (p.sides[s].picks) throw new Error('Ya elegiste tu equipo.');
   if (!validPicks(p, s, picks)) throw new Error(`Elige ${picksNeeded(p, s)} Pokémon distintos.`);
   p.sides[s].picks = [...picks];

@@ -130,13 +130,13 @@ export class TournamentsService implements OnModuleInit {
   // ---------- following a tournament over the socket ----------
 
   /** A client opens the tournament page. Returns it, or null if it doesn't exist. */
-  follow(ws: ClientConnection, msg: { id?: unknown; token?: unknown }): Tournament | null {
-    const T = typeof msg.id === 'string' ? this.tournaments.findById(msg.id) : undefined;
+  follow(ws: ClientConnection, id: string, token: string | undefined): Tournament | null {
+    const T = this.tournaments.findById(id);
     if (!T) {
       ws.send({ t: 'error', error: 'Ese torneo no existe.' });
       return null;
     }
-    if (typeof msg.token === 'string') ws.trainerId = this.trainers.authenticate(msg.token)?.id ?? null;
+    if (token !== undefined) ws.trainerId = this.trainers.authenticate(token)?.id ?? null;
     ws.tourId = T.id;
     this.presence.tourWatchers(T.id).add(ws);
     this.broadcast(T);

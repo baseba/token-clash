@@ -441,9 +441,9 @@ export class DuelService {
   // ---------- messages from a client in a room ----------
 
   /** A client opens a room page. Returns the challenge, or null if it doesn't exist. */
-  enter(ws: ClientConnection, msg: { token?: unknown; room?: unknown }): Challenge | null {
-    if (typeof msg.token === 'string') ws.trainerId = this.trainers.authenticate(msg.token)?.id ?? null;
-    const c = typeof msg.room === 'string' ? this.challenges.findById(msg.room) : undefined;
+  enter(ws: ClientConnection, room: string, token: string | undefined): Challenge | null {
+    if (token !== undefined) ws.trainerId = this.trainers.authenticate(token)?.id ?? null;
+    const c = this.challenges.findById(room);
     if (!c) {
       ws.send({ t: 'error', error: 'Ese desafío no existe.' });
       return null;
@@ -491,30 +491,28 @@ export class DuelService {
     if (r?.readyCheck && c?.guestId === ws.trainerId) this.reopenRoom(c!, r);
   }
 
-  seen(ws: ClientConnection, turn: unknown): void {
-    ws.seenTurn = Math.max(ws.seenTurn ?? 0, Number(turn) || 0);
+  seen(ws: ClientConnection, turn: number): void {
+    ws.seenTurn = Math.max(ws.seenTurn ?? 0, turn);
   }
 
   /** A player is marking picks (not confirmed yet): viewers see the draft live. */
-  choosing(ws: ClientConnection, picks: unknown): void {
+  choosing(ws: ClientConnection, picks: number[]): void {
     const r = this.presence.rooms.get(ws.roomId!);
     if (!r?.preview || r.preview.revealed) return;
     const s = sideIn(r.preview.sides, ws.trainerId);
     if (s === null || r.preview.sides[s].picks) return;
     const side = r.preview.sides[s];
-    side.draft = Array.isArray(picks)
-      ? [...new Set(picks.map(Number))].filter((i) => Number.isInteger(i) && i >= 0 && i < side.entries.length).slice(0, picksNeeded(r.preview, s))
-      : [];
+    side.draft = [...new Set(picks)].filter((i) => i >= 0 && i < side.entries.length).slice(0, picksNeeded(r.preview, s));
     this.broadcastWatchers(r);
   }
 
-  pick(ws: ClientConnection, picks: unknown): void {
+  pick(ws: ClientConnection, picks: number[]): void {
     const r = this.presence.rooms.get(ws.roomId!);
     if (!r?.preview) return;
     const s = sideIn(r.preview.sides, ws.trainerId);
     if (s === null) return;
     try {
-      pick(r.preview, s, (Array.isArray(picks) ? picks.map(Number) : null) as number[]);
+      pick(r.preview, s, picks);
     } catch (e) {
       return ws.send({ t: 'error', error: (e as Error).message });
     }
@@ -522,16 +520,14 @@ export class DuelService {
     else this.broadcast(r, { t: 'preview' });
   }
 
-  act(ws: ClientConnection, a: unknown): void {
+  act(ws: ClientConnection, action: Action | null): void {
     const r = this.presence.rooms.get(ws.roomId!);
     if (!r?.battle || r.battle.status !== 'active') return;
     const s = sideOf(r.battle, ws.trainerId);
     if (s === null) return;
-    const raw = (a ?? null) as { type?: unknown; move?: unknown; to?: unknown } | null;
-    const action: Action | null = raw && raw.type === 'move' ? { type: 'move', move: Number(raw.move) } : raw && raw.type === 'switch' ? { type: 'switch', to: Number(raw.to) } : null;
     let events: BattleEvent[] | null;
     try {
-      events = submit(r.battle, s, action as Action);
+      events = submit(r.battle, s, action);
     } catch (e) {
       return ws.send({ t: 'error', error: (e as Error).message });
     }

@@ -46,12 +46,12 @@ export class TrainersService implements OnModuleInit {
   }
 
   /** Who owns a session token, without marking them as seen (the lobby list does this). */
-  peekToken(token: unknown): Trainer | undefined {
-    return typeof token === 'string' ? this.trainers.findByTokenHash(sha256(token)) : undefined;
+  peekToken(token: string | undefined): Trainer | undefined {
+    return token === undefined ? undefined : this.trainers.findByTokenHash(sha256(token));
   }
 
   /** Who owns a session token, and mark them as seen now (feeds "active now" in the stats). */
-  authenticate(token: unknown): Trainer | undefined {
+  authenticate(token: string): Trainer | undefined {
     const t = this.peekToken(token);
     if (t) {
       t.lastSeen = now();

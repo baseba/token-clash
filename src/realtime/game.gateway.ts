@@ -1,15 +1,7 @@
 // The socket protocol at /ws. One gateway, thin: it keeps per-connection state, checks which
 // messages are allowed in which state, and hands each one to the use case that owns it (arena for
 // rooms, tournaments and the lobby; chat for messages). The frames sent back are built there too.
-//
-// Client → server messages ({ t: ... }):
-//   lobby {token}           follow the open rooms list
-//   tour {id, token}        follow a tournament page
-//   hello {room, token}     enter a room (as a player or a viewer)
-//   set-ready {ready}       ready check of a 1v1 room       leave   guest walks out of it
-//   choosing {picks}        draft of the 3 picks (viewers)  pick {picks}  confirm them
-//   act {action}            a move or a switch              seen {turn}   finished animating a turn
-//   chat {text}             a message to the room/tournament chat
+// What each message carries is in client-messages.ts; they arrive here already parsed.
 import { Logger } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import type { IncomingMessage } from 'node:http';
@@ -23,6 +15,7 @@ import { ChatService } from '../chat/application/chat.service.js';
 import { chatChannel, tournamentChannel } from '../chat/domain/chat.js';
 import { now } from '../shared/domain/clock.js';
 import { TrainersService } from '../trainers/application/trainers.service.js';
+import type { ClientMessageOf } from './client-messages.js';
 import { ConnectionLimits } from './connection-limits.js';
 
 /** Adapts a WebSocket to the arena's ClientConnection port. */
@@ -53,8 +46,6 @@ class WsConnection implements ClientConnection {
     return !this.roomId && !this.tourId && !this.inLobby;
   }
 }
-
-type Msg = Record<string, unknown>;
 
 @WebSocketGateway({ path: '/ws', maxPayload: 4096 })
 export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayConnection<WebSocket>, OnGatewayDisconnect<WebSocket> {
@@ -110,7 +101,7 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
   }
 
   @SubscribeMessage('lobby')
-  onLobby(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: Msg): void {
+  onLobby(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'lobby'>): void {
     const c = this.conn(socket);
     if (!c || c.roomId || c.inLobby) return;
     c.inLobby = true;
@@ -118,25 +109,25 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
   }
 
   @SubscribeMessage('tour')
-  onTour(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: Msg): void {
+  onTour(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'tour'>): void {
     const c = this.conn(socket);
     if (!c?.idle) return;
-    const T = this.tournaments.follow(c, msg);
+    const T = this.tournaments.follow(c, msg.id, msg.token);
     if (T) c.send({ t: 'chatLog', messages: this.chat.history(tournamentChannel(T.id)) });
   }
 
   @SubscribeMessage('hello')
-  onHello(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: Msg): void {
+  onHello(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'hello'>): void {
     const c = this.conn(socket);
     if (!c?.idle) return;
-    const challenge = this.duels.enter(c, msg);
+    const challenge = this.duels.enter(c, msg.room, msg.token);
     if (challenge) c.send({ t: 'chatLog', messages: this.chat.history(chatChannel(challenge)) });
   }
 
   @SubscribeMessage('set-ready')
-  onSetReady(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: Msg): void {
+  onSetReady(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'set-ready'>): void {
     const c = this.conn(socket);
-    if (c?.roomId) this.duels.setReady(c, msg.ready !== false);
+    if (c?.roomId) this.duels.setReady(c, msg.ready);
   }
 
   @SubscribeMessage('leave')
@@ -146,31 +137,31 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
   }
 
   @SubscribeMessage('seen')
-  onSeen(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: Msg): void {
+  onSeen(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'seen'>): void {
     const c = this.conn(socket);
     if (c?.roomId) this.duels.seen(c, msg.turn);
   }
 
   @SubscribeMessage('choosing')
-  onChoosing(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: Msg): void {
+  onChoosing(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'choosing'>): void {
     const c = this.conn(socket);
     if (c?.roomId) this.duels.choosing(c, msg.picks);
   }
 
   @SubscribeMessage('pick')
-  onPick(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: Msg): void {
+  onPick(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'pick'>): void {
     const c = this.conn(socket);
     if (c?.roomId) this.duels.pick(c, msg.picks);
   }
 
   @SubscribeMessage('act')
-  onAct(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: Msg): void {
+  onAct(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'act'>): void {
     const c = this.conn(socket);
     if (c?.roomId) this.duels.act(c, msg.action);
   }
 
   @SubscribeMessage('chat')
-  onChat(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: Msg): void {
+  onChat(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'chat'>): void {
     const c = this.conn(socket);
     if (!c || (!c.roomId && !c.tourId)) return;
     const trainer = this.trainers.byId(c.trainerId);

@@ -396,6 +396,26 @@ test('requests with the wrong shape get a 400 before reaching the domain', async
   assert.equal(unknownAi.data.error, 'Esa dificultad no está disponible.');
 });
 
+test('malformed socket frames are dropped or answered like a wrong value, and the socket stays usable', async () => {
+  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Ruido', save } })).data;
+  const room = (await call('/api/challenges', { method: 'POST', token, body: { ai: 'easy' } })).data.challenge.id;
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
+  const frames: any[] = [];
+  ws.on('message', (raw) => frames.push(JSON.parse(String(raw))));
+  await new Promise((r) => ws.once('open', r));
+  const next = async () => {
+    for (let i = 0; i < 50 && !frames.length; i++) await new Promise((r) => setTimeout(r, 20));
+    return frames.shift();
+  };
+  for (const frame of ['not json', '[]', JSON.stringify({ t: 'nope' }), JSON.stringify({ t: 'act', action: 'x' })]) ws.send(frame);
+  ws.send(JSON.stringify({ t: 'hello', room: 42 }));
+  assert.deepEqual(await next(), { t: 'error', error: 'Ese desafío no existe.' });
+  ws.send(JSON.stringify({ t: 'hello', room, token }));
+  assert.equal((await next()).you, 0);
+  ws.close();
+  assert.equal((await fetch(`${base}/healthz`)).status, 200);
+});
+
 test('everything survives a restart: sessions, collections, results and tournaments live in SQLite', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Memoria', save } });
   const token = a.data.token;
