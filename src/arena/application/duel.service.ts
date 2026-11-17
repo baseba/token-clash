@@ -88,12 +88,12 @@ export class DuelService {
     return c;
   }
 
-  /** Someone takes the free seat of an open room. */
   /** A random battle rolls the host's party when someone joins: a host with no Pokémon left can't be joined. */
   joinable(c: Challenge): boolean {
     return c.battleMode !== 'random' || !!this.trainers.byId(c.hostId)?.roster.length;
   }
 
+  /** Someone takes the free seat of an open room. */
   join(c: Challenge, guest: Trainer): void {
     if (!this.joinable(c)) throw conflict('El anfitrión ya no tiene Pokémon.');
     if (c.battleMode === 'random') {
@@ -519,9 +519,8 @@ export class DuelService {
     if (s === null) return;
     try {
       pick(r.preview, s, picks);
-    } catch (e) {
-      if (e instanceof DomainError) return ws.send({ t: 'error', error: e.message });
-      throw e;
+    } catch (error) {
+      return this.refuse(ws, error);
     }
     if (previewReady(r.preview)) this.revealPicks(ws.roomId!, r);
     else this.broadcast(r, { t: 'preview' });
@@ -535,12 +534,21 @@ export class DuelService {
     let events: BattleEvent[] | null;
     try {
       events = submit(r.battle, s, action);
-    } catch (e) {
-      if (e instanceof DomainError) return ws.send({ t: 'error', error: e.message });
-      throw e;
+    } catch (error) {
+      return this.refuse(ws, error);
     }
     if (events) this.afterResolve(ws.roomId!, r, events);
     else this.broadcast(r, { t: 'ready' });
+  }
+
+  /**
+   * A rule said no: the player reads why. Anything else is an engine bug: it goes to the log, and the
+   * player still gets an error frame (the client only shows frames with a `t`), never a stuck screen.
+   */
+  private refuse(ws: ClientConnection, error: unknown): void {
+    if (error instanceof DomainError) return ws.send({ t: 'error', error: error.message });
+    this.logger.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
+    ws.send({ t: 'error', error: 'Algo falló en el servidor. Intenta de nuevo.' });
   }
 
   /** Who is talking in a room's chat: a player (and which side) or a viewer. */
