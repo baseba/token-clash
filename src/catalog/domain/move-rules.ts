@@ -4,7 +4,7 @@
 import { moveData, type BoostKey, type Boosts, type MoveData } from './creatures.js';
 import { TYPES } from './type-chart.js';
 import type { MoveRuleApi } from '../../combat/domain/battle.js';
-import type { BattleFighter, BattleMove } from '../../combat/domain/battle-types.js';
+import type { BattleFighter, BattleMove, SideCondition, Volatiles } from '../../combat/domain/battle-types.js';
 
 /** What a calling move (Metronome, Copycat…) asks the engine to use instead. */
 export interface CalledMove {
@@ -14,21 +14,22 @@ export interface CalledMove {
 }
 
 /**
- * The hooks a move may define. `foe` is the rival on the field. The engine stops a move that targets
- * the foe when there is none, so rules that read it always get one; only self moves may run with no
- * foe on the field, and their rules don't read it (the engine passes it through unchecked).
+ * The hooks a move may define. `foe` is the rival on the field, or null when it has fainted. A status
+ * move aimed at the foe stops before its rule when there is none, so useOn always gets one.
  */
 export interface MoveRule {
   /** Why it fails before doing anything (a reason for the browser), or nothing. */
-  fail?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): string | null | undefined | false;
+  fail?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): string | null | undefined | false;
   /** Use another move instead. */
-  call?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): CalledMove | null | undefined;
+  call?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): CalledMove | null | undefined;
   /** Runs before the move; 'skip' stops it. */
-  before?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): unknown;
-  /** The whole effect of a status move. */
-  use?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): unknown;
+  before?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): 'skip' | null;
+  /** The whole effect of a status move on its user or the field. Returns whether it did something. */
+  use?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): boolean;
+  /** The whole effect of a status move aimed at the foe (or bounced back at its user, then `foe` is the user). */
+  useOn?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): boolean;
   /** After the move, with the damage it dealt. */
-  after?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove, dealt: number): unknown;
+  after?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove, dealt: number): void;
   /** Fixed damage of an attack (null: it does nothing). */
   damage?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove): number | null | undefined;
   /** Base power of an attack. */
@@ -38,7 +39,7 @@ export interface MoveRule {
   /** Power of each hit, counted from 0. */
   hitPower?(api: MoveRuleApi, me: BattleFighter, hit: number): number;
   /** After all hits landed, with the total damage. */
-  hit?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove, total: number): unknown;
+  hit?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove, total: number): void;
 }
 
 
@@ -77,7 +78,7 @@ function weightPower(kg: number): number {
   return 120;
 }
 
-function setSide(api: MoveRuleApi, me: BattleFighter, key: string, turns: number, target: BattleFighter = me): boolean {
+function setSide(api: MoveRuleApi, me: BattleFighter, key: SideCondition, turns: number, target: BattleFighter = me): boolean {
   const sideIndex = api.sideOf(target);
   const conds = api.side(sideIndex).conds;
   if (conds[key]) return false;
@@ -108,13 +109,13 @@ function setRoom(api: MoveRuleApi, key: string, turns: number): boolean {
   return true;
 }
 
-function setVol(
+function setVol<K extends keyof Volatiles>(
   api: MoveRuleApi,
   fighter: BattleFighter,
-  key: string,
-  value: unknown,
+  key: K,
+  value: Volatiles[K],
   kind: string = key,
-  extra: Record<string, unknown> = {},
+  extra: { move?: string } = {},
 ): boolean {
   if (fighter.volatiles[key]) return false;
   fighter.volatiles[key] = value;
@@ -195,31 +196,31 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   'psych-up': {
-    use: (api, me, foe) => {
+    useOn: (api, me, foe) => {
       setBoosts(api, me, foe.boosts);
       if (foe.volatiles.focusEnergy) me.volatiles.focusEnergy = true;
       return true;
     },
   },
   'topsy-turvy': {
-    use: (api, me, foe) =>
+    useOn: (api, me, foe) =>
       (Object.values(foe.boosts).some(Boolean)
         ? setBoosts(api, foe, Object.fromEntries(STATS.map((k) => [k, -foe.boosts[k] || 0])))
         : api.nothing(me)),
   },
-  'guard-swap': { use: (api, me, foe) => api.swapBoosts(me, foe, ['def', 'sdef']) },
-  'power-swap': { use: (api, me, foe) => api.swapBoosts(me, foe, ['atk', 'satk']) },
-  'heart-swap': { use: (api, me, foe) => api.swapBoosts(me, foe, STATS) },
+  'guard-swap': { useOn: (api, me, foe) => api.swapBoosts(me, foe, ['def', 'sdef']) },
+  'power-swap': { useOn: (api, me, foe) => api.swapBoosts(me, foe, ['atk', 'satk']) },
+  'heart-swap': { useOn: (api, me, foe) => api.swapBoosts(me, foe, STATS) },
   'speed-swap': {
-    use: (api, me, foe) => {
+    useOn: (api, me, foe) => {
       const ownSpeed = me.stats.spd;
       api.setStats(me, { spd: foe.stats.spd });
       api.setStats(foe, { spd: ownSpeed });
       return true;
     },
   },
-  'guard-split': { use: (api, me, foe) => api.splitStats(me, foe, ['def', 'sdef']) },
-  'power-split': { use: (api, me, foe) => api.splitStats(me, foe, ['atk', 'satk']) },
+  'guard-split': { useOn: (api, me, foe) => api.splitStats(me, foe, ['def', 'sdef']) },
+  'power-split': { useOn: (api, me, foe) => api.splitStats(me, foe, ['atk', 'satk']) },
   'power-trick': {
     use: (api, me) => {
       api.setStats(me, { atk: me.stats.def, def: me.stats.atk });
@@ -252,14 +253,14 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   'lock-on': {
-    use: (api, me, foe) => {
+    useOn: (api, me, foe) => {
       me.volatiles.lockOn = foe;
       api.volatile(me, 'lockon');
       return true;
     },
   },
   'mind-reader': {
-    use: (api, me, foe) => {
+    useOn: (api, me, foe) => {
       me.volatiles.lockOn = foe;
       api.volatile(me, 'lockon');
       return true;
@@ -270,7 +271,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
       (api.battle.field.rooms.gravity || me.volatiles.ingrain ? api.nothing(me) : setVol(api, me, 'magnetRise', { turns: 5 }, 'magnetrise')),
   },
   telekinesis: {
-    use: (api, me, foe) =>
+    useOn: (api, me, foe) =>
       (api.battle.field.rooms.gravity || foe.volatiles.ingrain ? api.nothing(me) : setVol(api, foe, 'telekinesis', { turns: 3 })),
   },
   ingrain: { use: (api, me) => setVol(api, me, 'ingrain', true) },
@@ -298,28 +299,28 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
 
-  taunt: { use: (api, me, foe) => setVol(api, foe, 'taunt', { turns: 3 }) },
-  torment: { use: (api, me, foe) => setVol(api, foe, 'torment', true) },
-  'heal-block': { use: (api, me, foe) => setVol(api, foe, 'healBlock', { turns: 5 }, 'healblock') },
+  taunt: { useOn: (api, me, foe) => setVol(api, foe, 'taunt', { turns: 3 }) },
+  torment: { useOn: (api, me, foe) => setVol(api, foe, 'torment', true) },
+  'heal-block': { useOn: (api, me, foe) => setVol(api, foe, 'healBlock', { turns: 5 }, 'healblock') },
   imprison: {
     use: (api, me, foe) =>
       (foe && foe.moves.some((m) => me.moves.some((x) => x.key === m.key)) ? setVol(api, me, 'imprison', true) : api.nothing(me)),
   },
   encore: {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       const last = foe.volatiles.lastMove;
       if (!last || NO_ENCORE.has(last) || foe.volatiles.encore || !foe.moves.some((m) => m.key === last)) return api.nothing(me);
       return setVol(api, foe, 'encore', { key: last, turns: 3 }, 'encore', { move: moveData(last)?.name });
     },
   },
   disable: {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       const last = foe.volatiles.lastMove && foe.moves.find((m) => m.key === foe.volatiles.lastMove);
       return last ? api.addVolatile(foe, 'disable', me, { move: last }) : api.nothing(me);
     },
   },
   spite: {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       const last = foe.volatiles.lastMove;
       if (!last || !(foe.pp[last] > 0)) return api.nothing(me);
       const lost = Math.min(4, foe.pp[last]);
@@ -329,25 +330,25 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   yawn: {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       if (foe.status || foe.volatiles.yawn || api.side(api.sideOf(foe)).conds.safeguard) return api.nothing(me);
       return setVol(api, foe, 'yawn', 2);
     },
   },
-  nightmare: { use: (api, me, foe) => (foe.status === 'slp' ? setVol(api, foe, 'nightmare', true) : api.nothing(me, 'notAsleep')) },
+  nightmare: { useOn: (api, me, foe) => (foe.status === 'slp' ? setVol(api, foe, 'nightmare', true) : api.nothing(me, 'notAsleep')) },
   curse: {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       if (!me.types.includes('ghost')) return Object.keys(api.boost(me, { spd: -1, atk: 1, def: 1 }, me)).length > 0;
-      if (!foe || foe.volatiles.curse) return api.nothing(me);
+      if (foe.volatiles.curse) return api.nothing(me);
       api.hurt(me, Math.floor(me.stats.hp / 2), 'cost');
       return setVol(api, foe, 'curse', true);
     },
   },
-  foresight: { use: (api, me, foe) => setVol(api, foe, 'foresight', true) },
-  'odor-sleuth': { use: (api, me, foe) => setVol(api, foe, 'foresight', true) },
-  'miracle-eye': { use: (api, me, foe) => setVol(api, foe, 'miracleEye', true, 'miracleeye') },
+  foresight: { useOn: (api, me, foe) => setVol(api, foe, 'foresight', true) },
+  'odor-sleuth': { useOn: (api, me, foe) => setVol(api, foe, 'foresight', true) },
+  'miracle-eye': { useOn: (api, me, foe) => setVol(api, foe, 'miracleEye', true, 'miracleeye') },
   'mean-look': {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       if (foe.volatiles.trappedBy) return api.nothing(me);
       foe.volatiles.trappedBy = me;
       api.volatile(foe, 'trapped');
@@ -355,7 +356,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   block: {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       if (foe.volatiles.trappedBy) return api.nothing(me);
       foe.volatiles.trappedBy = me;
       api.volatile(foe, 'trapped');
@@ -363,7 +364,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   'spider-web': {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       if (foe.volatiles.trappedBy) return api.nothing(me);
       foe.volatiles.trappedBy = me;
       api.volatile(foe, 'trapped');
@@ -371,7 +372,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   octolock: {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       if (foe.volatiles.octolock) return api.nothing(me);
       foe.volatiles.trappedBy = me;
       foe.volatiles.octolock = me;
@@ -380,7 +381,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   electrify: {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       if (api.moved(foe)) return api.nothing(me);
       foe.volatiles.electrify = api.turn();
       api.volatile(foe, 'electrify');
@@ -388,7 +389,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   'gastro-acid': {
-    use: (api, me, foe) => (api.abilityDef(foe.ability)?.unsuppressable ? api.nothing(me) : setVol(api, foe, 'gastroAcid', true, 'gastroacid')),
+    useOn: (api, me, foe) => (api.abilityDef(foe.ability)?.unsuppressable ? api.nothing(me) : setVol(api, foe, 'gastroAcid', true, 'gastroacid')),
   },
   'destiny-bond': {
     use(api, me) {
@@ -420,19 +421,19 @@ export const MOVE_RULES: Record<string, MoveRule> = {
       return true;
     },
   },
-  quash: { use: (api, me, foe) => (api.moved(foe) ? api.nothing(me) : (api.volatile(foe, 'quash'), true)) },
+  quash: { useOn: (api, me, foe) => (api.moved(foe) ? api.nothing(me) : (api.volatile(foe, 'quash'), true)) },
 
-  'role-play': { use: (api, me, foe) => copyAbility(api, me, foe.ability) || api.nothing(me) },
-  doodle: { use: (api, me, foe) => copyAbility(api, me, foe.ability) || api.nothing(me) },
+  'role-play': { useOn: (api, me, foe) => copyAbility(api, me, foe.ability) || api.nothing(me) },
+  doodle: { useOn: (api, me, foe) => copyAbility(api, me, foe.ability) || api.nothing(me) },
   entrainment: {
-    use: (api, me, foe) => (api.abilityDef(foe.ability)?.unsuppressable ? api.nothing(me) : copyAbility(api, foe, me.ability) || api.nothing(me)),
+    useOn: (api, me, foe) => (api.abilityDef(foe.ability)?.unsuppressable ? api.nothing(me) : copyAbility(api, foe, me.ability) || api.nothing(me)),
   },
   'simple-beam': {
-    use: (api, me, foe) =>
+    useOn: (api, me, foe) =>
       (api.abilityDef(foe.ability)?.unsuppressable || foe.ability === 'simple' ? api.nothing(me) : (api.changeAbility(foe, 'simple'), true)),
   },
   'worry-seed': {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       if (api.abilityDef(foe.ability)?.unsuppressable || foe.ability === 'insomnia') return api.nothing(me);
       api.changeAbility(foe, 'insomnia');
       if (foe.status === 'slp') api.cure(foe);
@@ -440,7 +441,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   'skill-swap': {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       const mine = me.ability;
       const theirs = foe.ability;
       if (!mine || !theirs || NO_COPY_ABILITY.has(mine) || NO_COPY_ABILITY.has(theirs)) return api.nothing(me);
@@ -450,13 +451,13 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
 
-  soak: { use: (api, me, foe) => (foe.types.length === 1 && foe.types[0] === 'water' ? api.nothing(me) : (api.setTypes(foe, ['water']), true)) },
+  soak: { useOn: (api, me, foe) => (foe.types.length === 1 && foe.types[0] === 'water' ? api.nothing(me) : (api.setTypes(foe, ['water']), true)) },
   'magic-powder': {
-    use: (api, me, foe) => (foe.types.length === 1 && foe.types[0] === 'psychic' ? api.nothing(me) : (api.setTypes(foe, ['psychic']), true)),
+    useOn: (api, me, foe) => (foe.types.length === 1 && foe.types[0] === 'psychic' ? api.nothing(me) : (api.setTypes(foe, ['psychic']), true)),
   },
-  'forests-curse': { use: (api, me, foe) => (foe.types.includes('grass') ? api.nothing(me) : (api.setTypes(foe, [...foe.types, 'grass']), true)) },
-  'trick-or-treat': { use: (api, me, foe) => (foe.types.includes('ghost') ? api.nothing(me) : (api.setTypes(foe, [...foe.types, 'ghost']), true)) },
-  'reflect-type': { use: (api, me, foe) => (api.setTypes(me, [...foe.types]), true) },
+  'forests-curse': { useOn: (api, me, foe) => (foe.types.includes('grass') ? api.nothing(me) : (api.setTypes(foe, [...foe.types, 'grass']), true)) },
+  'trick-or-treat': { useOn: (api, me, foe) => (foe.types.includes('ghost') ? api.nothing(me) : (api.setTypes(foe, [...foe.types, 'ghost']), true)) },
+  'reflect-type': { useOn: (api, me, foe) => (api.setTypes(me, [...foe.types]), true) },
   conversion: {
     use(api, me) {
       const type = me.moves[0]?.type;
@@ -466,7 +467,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   'conversion-2': {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       const last = lastMoveOf(foe);
       if (!last?.type) return api.nothing(me);
       const resist = Object.keys(TYPES).filter((t) => api.effectiveness(last.type, [t]) < 1 && !(me.types.length === 1 && me.types[0] === t));
@@ -484,18 +485,18 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   transform: {
-    use: (api, me, foe) =>
+    useOn: (api, me, foe) =>
       (foe.volatiles.transformed || me.volatiles.transformed || foe.volatiles.substitute ? api.nothing(me) : (api.transform(me, foe), true)),
   },
-  sketch: { use: (api, me, foe, move) => api.copyMove(me, foe, move, { permanent: true }) },
-  mimic: { use: (api, me, foe, move) => api.copyMove(me, foe, move, { permanent: false }) },
+  sketch: { useOn: (api, me, foe, move) => api.copyMove(me, foe, move, { permanent: true }) },
+  mimic: { useOn: (api, me, foe, move) => api.copyMove(me, foe, move, { permanent: false }) },
 
   'venom-drench': {
-    use: (api, me, foe) =>
+    useOn: (api, me, foe) =>
       (foe.status === 'psn' || foe.status === 'tox' ? Object.keys(api.boost(foe, { atk: -1, satk: -1, spd: -1 }, me)).length > 0 : api.nothing(me)),
   },
   'psycho-shift': {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       if (!me.status || foe.status) return api.nothing(me);
       const status = me.status;
       if (!api.setStatus(foe, status, me)) return api.nothing(me);
@@ -503,9 +504,9 @@ export const MOVE_RULES: Record<string, MoveRule> = {
       return true;
     },
   },
-  purify: { use: (api, me, foe) => (foe.status ? (api.cure(foe), api.heal(me, me.stats.hp / 2), true) : api.nothing(me)) },
+  purify: { useOn: (api, me, foe) => (foe.status ? (api.cure(foe), api.heal(me, me.stats.hp / 2), true) : api.nothing(me)) },
   'pain-split': {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       const avg = Math.floor((me.hp + foe.hp) / 2);
       for (const fighter of [me, foe]) {
         if (avg > fighter.hp) api.heal(fighter, avg - fighter.hp);
@@ -515,7 +516,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   'strength-sap': {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       if (foe.boosts.atk <= -6) return api.nothing(me);
       const amount = Math.floor(foe.stats.atk * api.stageMult(foe.boosts.atk));
       api.boost(foe, { atk: -1 }, me);
@@ -524,9 +525,9 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   'floral-healing': {
-    use: (api, me, foe) => api.heal(foe, foe.stats.hp * (api.battle.field.terrain === 'grassy' ? 2 / 3 : 1 / 2)) > 0 || api.nothing(me),
+    useOn: (api, me, foe) => api.heal(foe, foe.stats.hp * (api.battle.field.terrain === 'grassy' ? 2 / 3 : 1 / 2)) > 0 || api.nothing(me),
   },
-  'heal-pulse': { use: (api, me, foe) => api.heal(foe, foe.stats.hp / 2) > 0 || api.nothing(me) },
+  'heal-pulse': { useOn: (api, me, foe) => api.heal(foe, foe.stats.hp / 2) > 0 || api.nothing(me) },
   'jungle-healing': {
     use: (api, me) => {
       const healed = api.heal(me, me.stats.hp / 4);
@@ -536,8 +537,8 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   refresh: { use: (api, me) => ((['brn', 'par', 'psn', 'tox'] as (string | null)[]).includes(me.status) ? (api.cure(me), true) : api.nothing(me)) },
-  'heal-bell': { use: (api, me) => api.cureTeam(me) },
-  aromatherapy: { use: (api, me) => api.cureTeam(me) },
+  'heal-bell': { useOn: (api, me) => api.cureTeam(me) },
+  aromatherapy: { useOn: (api, me) => api.cureTeam(me) },
   wish: {
     use(api, me) {
       const side = api.side(api.sideOf(me));
@@ -565,15 +566,15 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
   },
   'parting-shot': {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       const applied = api.boost(foe, { atk: -1, satk: -1 }, me);
       if (!Object.keys(applied).length) return api.nothing(me);
       if (benchAlive(api, me)) api.switchOut(me);
       return true;
     },
   },
-  roar: { use: (api, me, foe) => api.dragOut(foe) || api.nothing(me, 'noBench') },
-  whirlwind: { use: (api, me, foe) => api.dragOut(foe) || api.nothing(me, 'noBench') },
+  roar: { useOn: (api, me, foe) => api.dragOut(foe) || api.nothing(me, 'noBench') },
+  whirlwind: { useOn: (api, me, foe) => api.dragOut(foe) || api.nothing(me, 'noBench') },
 
   'super-fang': { damage: (api, me, target) => Math.max(1, Math.floor(target.hp / 2)) },
   'natures-madness': { damage: (api, me, target) => Math.max(1, Math.floor(target.hp / 2)) },
@@ -587,7 +588,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   comeuppance: { damage: (api, me, target) => (me.turnHit?.by === target ? Math.floor(me.turnHit.amount * 1.5) : null) },
   bide: {
     before(api, me, foe, move) {
-      const lock = me.volatiles.locked;
+      const lock = me.volatiles.locked?.kind === 'bide' ? me.volatiles.locked : null;
       if (!lock) {
         me.volatiles.locked = { move: move.slot, kind: 'bide', turns: 2, damage: 0 };
         api.volatile(me, 'bide');
@@ -601,7 +602,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
       move.bideDamage = lock.damage * 2;
       return null;
     },
-    damage: (api, me, target, move) => (move.bideDamage! > 0 ? move.bideDamage : null),
+    damage: (api, me, target, move) => ((move.bideDamage ?? 0) > 0 ? move.bideDamage : null),
   },
 
   'crush-grip': { power: (api, me, target) => Math.max(1, Math.floor((120 * target.hp) / target.stats.hp)) },
@@ -633,7 +634,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   present: {
     before(api, me, foe, move) {
       const roll = api.random();
-      if (roll < 0.2) {
+      if (roll < 0.2 && foe) {
         api.heal(foe, foe.stats.hp / 4) || api.nothing(me);
         return 'skip';
       }
@@ -662,10 +663,9 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     },
     after(api, me, foe, move, dealt) {
       const lock = me.volatiles.locked?.kind === 'rollout' ? me.volatiles.locked : null;
-      if (!dealt) return delete me.volatiles.locked;
-      if (!lock) me.volatiles.locked = { move: move.slot, kind: 'rollout', count: 1 };
+      if (!dealt) delete me.volatiles.locked;
+      else if (!lock) me.volatiles.locked = { move: move.slot, kind: 'rollout', count: 1 };
       else if (++lock.count >= 5) delete me.volatiles.locked;
-      return null;
     },
   },
   uproar: {
@@ -681,13 +681,11 @@ export const MOVE_RULES: Record<string, MoveRule> = {
         delete me.volatiles.uproar;
         api.volatileEnd(me, 'uproar');
       }
-      return null;
     },
   },
   rage: {
     after(api, me) {
       me.volatiles.rage = true;
-      return null;
     },
   },
   'future-sight': { before: (api, me, foe, move) => (api.future(me, move), 'skip') },
@@ -725,6 +723,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   },
   'me-first': {
     call(api, me, foe) {
+      if (!foe) return { fail: null };
       const theirs = api.chosen(api.sideOf(foe));
       if (!theirs || api.moved(foe) || theirs.kind === 'status' || theirs.flags.includes('failmefirst')) return { fail: null };
       return { key: theirs.key, powerMult: 1.5 };
@@ -732,7 +731,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   },
   'nature-power': { call: (api) => ({ key: NATURE_POWER[api.battle.field.terrain as string] ?? 'tri-attack' }) },
   instruct: {
-    use(api, me, foe) {
+    useOn(api, me, foe) {
       const last = lastMoveOf(foe);
       if (!last
         || !last.supported

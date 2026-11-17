@@ -9,7 +9,7 @@
 // Nothing here is stored except the challenge, through its repository.
 import { Injectable } from '@nestjs/common';
 import { randomParty } from '../../combat/domain/random-party.js';
-import { aiTrainerId, buildAiRandomParty, buildAiTeam } from '../../combat/domain/ai.js';
+import { aiTrainerId, buildAiRandomParty, buildAiTeam, type AiLevel } from '../../combat/domain/ai.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { newId, now } from '../../shared/domain/clock.js';
@@ -49,7 +49,7 @@ export class DuelService {
   }
 
   /** A battle against the AI: no waiting room, straight to the preview. */
-  startAgainstAi(trainer: Trainer, { mode, levelCap, level }: { mode: BattleMode; levelCap: number | null; level: string }): Challenge {
+  startAgainstAi(trainer: Trainer, { mode, levelCap, level }: { mode: BattleMode; levelCap: number | null; level: AiLevel }): Challenge {
     const hostTeam = mode === 'random' ? randomParty(trainer.roster) : trainer.teamSnapshot();
     const aiLevel = levelCap ?? averageLevel(hostTeam);
     const aiTeam = mode === 'random' ? buildAiRandomParty({ level: aiLevel }) : buildAiTeam({ difficulty: level, level: aiLevel });

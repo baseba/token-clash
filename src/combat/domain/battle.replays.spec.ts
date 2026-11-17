@@ -18,7 +18,7 @@ import { aiPicks, buildAiTeam, buildAiRandomParty, chooseAction } from './ai.js'
 import { createPreview, pick, previewView, chosenEntries } from './team-preview.js';
 
 const SNAPSHOT = join(PROJECT_ROOT, 'src', 'combat', 'domain', 'battle.replays.snapshot.txt');
-const LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
+const LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'] as const;
 const LEVEL_CAPS = [null, 50, 100, 30];
 
 const LOGS = join(PROJECT_ROOT, 'dist', 'replays');

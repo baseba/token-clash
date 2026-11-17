@@ -3,7 +3,7 @@
 // keeps them trivial to test); the Tournament class is the aggregate that uses them and is the
 // only thing the use cases change.
 
-import { aiSeatId } from '../../combat/domain/ai.js';
+import { aiSeatId, type AiLevel } from '../../combat/domain/ai.js';
 import { conflict, forbidden } from '../../shared/domain/errors.js';
 import type { BattleMode, Visibility } from './challenge.js';
 
@@ -97,7 +97,7 @@ export function setReady(tournament: Seated, trainerId: string, ready: boolean):
   tournament.seats[seatIndex].ready = !!ready;
 }
 
-export function nextAiId(tournament: Pick<Seated, 'seats'>, level: string): { id: string; seatNumber: number } {
+export function nextAiId(tournament: Pick<Seated, 'seats'>, level: AiLevel): { id: string; seatNumber: number } {
   let seatNumber = 1;
   while (tournament.seats.some((s) => s.id === aiSeatId(level, seatNumber))) seatNumber += 1;
   return { id: aiSeatId(level, seatNumber), seatNumber };
@@ -271,7 +271,7 @@ export class Tournament implements TournamentState {
   }
 
   /** Fills free seats with AIs of a difficulty, each with a name not yet used here. */
-  addAis(level: string, count: number): void {
+  addAis(level: AiLevel, count: number): void {
     if (this.full) throw conflict('El torneo ya está lleno.');
     const added = Math.max(1, Math.min(this.size - this.seats.length, count));
     for (let i = 0; i < added; i++) {

@@ -21,12 +21,16 @@ export type Stats = Record<StatKey, number>;
 export type BoostKey = 'atk' | 'def' | 'satk' | 'sdef' | 'spd' | 'acc' | 'eva';
 export type Boosts = Partial<Record<BoostKey, number>>;
 export type MoveCategory = 'physical' | 'special' | 'status';
+/** The status a Pokémon keeps until cured (burn, paralysis, poison, bad poison, sleep, freeze). */
+export type MajorStatus = 'brn' | 'par' | 'psn' | 'tox' | 'slp' | 'frz';
+/** The primal ones (harshsun, heavyrain, winds) only come from abilities, and last while their setter stays. */
+export type Weather = 'sun' | 'rain' | 'sand' | 'hail' | 'snow' | 'harshsun' | 'heavyrain' | 'winds';
 
 export interface MoveSecondary {
   chance: number;
   boosts?: Boosts;
   self?: Boosts;
-  status?: string;
+  status?: MajorStatus;
   flinch?: boolean;
   confuse?: boolean;
 }
@@ -61,14 +65,14 @@ export interface MoveData {
   selfSwitchKind?: string;
   ignoresImmunity?: boolean;
   recoil?: number;
-  status?: string;
+  status?: MajorStatus;
   fixedDamage?: number | string;
   terrain?: string;
   selfDestruct?: boolean;
   pseudoWeather?: string;
   breaksProtect?: boolean;
   ohko?: boolean;
-  weather?: string;
+  weather?: Weather;
   heal?: number;
   sleepUsable?: boolean;
   // Derived in moveData():
@@ -104,8 +108,7 @@ type RawMove = Omit<MoveData, 'key' | 'id' | 'kind' | 'supported'>;
 interface RawSpecies {
   name: string;
   types: string[];
-  /** hp, attack, defense, special attack, special defense, speed */
-  stats: [number, number, number, number, number, number];
+  stats: [hp: number, attack: number, defense: number, spAttack: number, spDefense: number, speed: number];
   abilities: string[];
   hiddenAbility: string | null;
   learnset?: [string, number][];
@@ -285,8 +288,7 @@ export const ALL_MOVE_IDS = (): string[] => Object.keys(MOVEDEX);
 export function moveData(id: string): MoveData | null {
   const raw = MOVEDEX[id];
   if (!raw) return null;
-  // `supported` is set last, as before, so the object keeps its key order.
-  const move = { key: id, id, ...raw, flags: [...(raw.flags ?? [])], kind: raw.category === 'status' ? 'status' : 'attack' } as MoveData;
+  const move: MoveData = { key: id, id, ...raw, flags: [...(raw.flags ?? [])], kind: raw.category === 'status' ? 'status' : 'attack', supported: false };
   if (GRASSY_HALVED.has(id)) move.weakenedByGrassyTerrain = true;
   if (id === 'foul-play') move.usesTargetAttack = true;
   if (id === 'toxic') move.status = 'tox';

@@ -90,7 +90,7 @@ test('events say who acts first and why, and whom a switch replaces', () => {
   const moves = ev.filter((e) => e.t === 'move');
   assert.ok(['priority', 'speed', 'tie'].includes(moves[0].why as string));
   assert.equal(moves[1]?.why, undefined);
-  for (const e of ev.filter((x) => x.t === 'damage')) assert.notEqual(e.side, ev[ev.indexOf(e) - 1].side); // damage lands on the other side
+  for (const e of ev.filter((x) => x.t === 'damage')) assert.notEqual(e.side, (ev[ev.indexOf(e) - 1] as { side: number }).side); // damage lands on the other side
 
   const c = createBattle({ id: 's', random: rng(2), sides: [{ trainerId: 'a', name: 'A', entries: roster }, { trainerId: 'b', name: 'B', entries: roster }] });
   submit(c, 0, { type: 'switch', to: 1 });

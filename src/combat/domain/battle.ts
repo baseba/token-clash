@@ -1,11 +1,11 @@
 // Turn-based battle engine. Pure: no I/O, randomness injected, so it can be tested and replayed.
-import { buildFighter, effectiveness, formData, statsFor, speciesData, moveData, ALL_MOVE_IDS, STRUGGLE, type BoostKey, type Boosts, type MoveData, type Stats } from '../../catalog/domain/creatures.js';
+import { buildFighter, effectiveness, formData, statsFor, speciesData, moveData, ALL_MOVE_IDS, STRUGGLE, type BoostKey, type Boosts, type MajorStatus, type MoveData, type Stats, type Weather } from '../../catalog/domain/creatures.js';
 import { MOVE_RULES } from '../../catalog/domain/move-rules.js';
 import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
 import { ABILITIES, type AbilityEffect, type AbilityHook, type BoostChanges } from './ability-effects.js';
 import type { Gender, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { invalid } from '../../shared/domain/errors.js';
-import type { Action, MoveAction, SwitchAction, SideAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, Look, Mover } from './battle-types.js';
+import type { Action, SwitchAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, AbilityDetails, Guard, Hazards, Look, MoveEvent, Mover, OrderReason, SideCondition, Volatiles } from './battle-types.js';
 
 export type * from './battle-types.js';
 
@@ -17,11 +17,10 @@ export const BATTLE_SIZE = 3;
 export const TURN_LIMIT = 100;
 const STAGE_LIMIT = 6;
 const FIELD_TURNS = 5;
-const PRIMAL = new Set<string | null>(['heavyrain', 'harshsun', 'winds']);
-const MAJOR = new Set(['brn', 'par', 'psn', 'tox', 'slp', 'frz']);
+const PRIMAL = new Set<Weather | null>(['heavyrain', 'harshsun', 'winds']);
 const SAND_PROOF = ['rock', 'ground', 'steel'];
 const SCREEN_KINDS = ['reflect', 'lightscreen', 'auroraveil'];
-const VEIL_WEATHER = new Set<string | null>(['hail', 'snow']);
+const VEIL_WEATHER = new Set<Weather | null>(['hail', 'snow']);
 
 const stageMult = (stage: number): number => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
 const accuracyMult = (stage: number): number => (stage >= 0 ? (3 + stage) / 3 : 3 / (3 - stage));
@@ -29,10 +28,9 @@ const freshBoosts = (): Record<BoostKey, number> => ({ atk: 0, def: 0, satk: 0, 
 const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
 const isSun = (weather: string | null | undefined): boolean => weather === 'sun' || weather === 'harshsun';
 const isRain = (weather: string | null | undefined): boolean => weather === 'rain' || weather === 'heavyrain';
-const poisoned = (status: string | null | undefined): boolean => status === 'psn' || status === 'tox';
-const isAttack = (move: AnyMove): boolean => move.category !== 'status';
+const poisoned = (status: MajorStatus | null): status is 'psn' | 'tox' => status === 'psn' || status === 'tox';
 export const STRUGGLE_MOVE = -1;
-const HEALS_WITH_WEATHER: Record<string, string> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
+const HEALS_WITH_WEATHER: Record<string, Weather> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
 
 function prepare(entry: RosterEntry, levelCap: number | null): BattleFighter {
   const fighter = buildFighter(entry, { levelCap });
@@ -81,6 +79,7 @@ export function createBattle({ id, sides, levelCap = null, random = Math.random 
       screens: {},
       hazards: { spikes: 0, stealthrock: false, stickyweb: false },
       conds: {},
+      guards: new Set(),
     })),
     events: [],
     moved: new Set(),
@@ -129,22 +128,31 @@ function abilityKey(battle: BattleState, fighter: BattleFighter): string | null 
 }
 
 const abilityDef = (battle: BattleState, fighter: BattleFighter): AbilityEffect | null => ABILITIES[abilityKey(battle, fighter) as string] ?? null;
-const run = (battle: BattleState, fighter: BattleFighter, hook: AbilityHook, ...args: unknown[]): unknown =>
-  (abilityDef(battle, fighter)?.[hook] as ((engine: AbilityEngine, me: BattleFighter, ...args: unknown[]) => unknown) | undefined)?.(
-    engine(battle),
-    fighter,
-    ...args,
-  );
 const flag = (battle: BattleState, fighter: BattleFighter, name: keyof AbilityEffect): boolean => !!abilityDef(battle, fighter)?.[name];
 
-function mul(battle: BattleState, fighter: BattleFighter, hook: AbilityHook, ...args: unknown[]): number {
-  const result = run(battle, fighter, hook, ...args);
-  return typeof result === 'number' ? result : 1;
+type Hook<H extends AbilityHook> = NonNullable<AbilityEffect[H]>;
+/** What a hook takes after the engine and the fighter whose ability it is. */
+type HookArgs<H extends AbilityHook> = Parameters<Hook<H>> extends [AbilityEngine, BattleFighter, ...infer Args] ? Args : never;
+type MultiplierHook = 'onBasePower' | 'onIncoming' | 'onAttack' | 'onDefense' | 'onAttackerFinal' | 'onDefenderFinal';
+type ChainHook = 'onSpeed' | 'onAccuracy' | 'onEvasion' | 'onCritStage' | 'onEffectiveness' | 'onDamage' | 'onModifyPriority' | 'onStatusDamage';
+type ChainArgs<H extends ChainHook> = HookArgs<H> extends [...infer Args, number] ? Args : never;
+
+/**
+ * Calls the fighter's ability hook; undefined when its ability (or none) doesn't have it. TypeScript
+ * can't call a hook picked by a generic key, so the call inside is loose; the signature is what callers get.
+ */
+function run<H extends AbilityHook>(battle: BattleState, fighter: BattleFighter, hook: H, ...args: HookArgs<H>): ReturnType<Hook<H>> | undefined {
+  type AnyHook = (engine: AbilityEngine, me: BattleFighter, ...args: unknown[]) => unknown;
+  return (abilityDef(battle, fighter)?.[hook] as AnyHook | undefined)?.(engine(battle), fighter, ...args) as ReturnType<Hook<H>> | undefined;
 }
 
-function chain(battle: BattleState, fighter: BattleFighter, hook: AbilityHook, value: number, ...args: unknown[]): number {
-  const result = run(battle, fighter, hook, ...args, value);
-  return typeof result === 'number' ? result : value;
+function mul<H extends MultiplierHook>(battle: BattleState, fighter: BattleFighter, hook: H, ...args: HookArgs<H>): number {
+  return run(battle, fighter, hook, ...args) ?? 1;
+}
+
+/** Passes `value` through the hook, which gets it as its last argument and returns the new one. */
+function chain<H extends ChainHook>(battle: BattleState, fighter: BattleFighter, hook: H, value: number, ...args: ChainArgs<H>): number {
+  return run(battle, fighter, hook, ...([...args, value] as HookArgs<H>)) ?? value;
 }
 
 const anyActiveHas = (battle: BattleState, key: string): boolean => activeFighters(battle).some((f) => abilityKey(battle, f) === key);
@@ -179,13 +187,13 @@ function makeEngine(battle: BattleState) {
     foe: (fighter: BattleFighter) => foeOf(battle, fighter),
     has: (fighter: BattleFighter, key: string) => abilityKey(battle, fighter) === key,
     anyActiveHas: (key: string) => anyActiveHas(battle, key),
-    show: (fighter: BattleFighter, note?: string | null, extra?: Record<string, unknown>) => showAbility(battle, fighter, note, extra),
-    note: (fighter: BattleFighter, kind: string) => emit(battle, { t: kind, side: sideIndexOf(battle, fighter) }),
+    show: (fighter: BattleFighter, note?: string | null, details?: AbilityDetails) => showAbility(battle, fighter, note, details),
+    immune: (fighter: BattleFighter) => emit(battle, { t: 'immune', side: sideIndexOf(battle, fighter) }),
     boost: (fighter: BattleFighter, changes: Boosts, source?: BattleFighter | null, opts?: BoostOptions) =>
       boost(battle, fighter, changes, source, opts),
     damage: (fighter: BattleFighter, amount: number, cause?: string) => hurt(battle, fighter, amount, cause),
     heal: (fighter: BattleFighter, amount: number, source?: BattleFighter | null, opts?: { silent?: boolean }) => heal(battle, fighter, amount, opts),
-    setStatus: (fighter: BattleFighter, status: string, source?: BattleFighter | null, opts?: { ability?: BattleFighter }) =>
+    setStatus: (fighter: BattleFighter, status: MajorStatus, source?: BattleFighter | null, opts?: { ability?: BattleFighter }) =>
       setStatus(battle, fighter, status, source, opts),
     addVolatile: (
       fighter: BattleFighter,
@@ -197,7 +205,7 @@ function makeEngine(battle: BattleState) {
     cure: (fighter: BattleFighter, announce?: boolean) => cure(battle, fighter, announce),
     weather: () => currentWeather(battle),
     terrain: () => battle.field.terrain,
-    setWeather: (weather: string, source: BattleFighter | null) => setWeather(battle, weather, source),
+    setWeather: (weather: Weather, source: BattleFighter | null) => setWeather(battle, weather, source),
     setTerrain: (terrain: string, source: BattleFighter | null) => setTerrain(battle, terrain, source),
     grounded: (fighter: BattleFighter) => grounded(battle, fighter),
     asleep: (fighter: BattleFighter) => fighter.status === 'slp' || flag(battle, fighter, 'comatose'),
@@ -217,6 +225,8 @@ function makeEngine(battle: BattleState) {
 }
 
 const moveApis = new WeakMap<BattleState, MoveRuleApi>();
+/** The volatiles Baton Pass hands to the next fighter. */
+const BATON_PASSED = ['confusion', 'focusEnergy', 'perish', 'leechSeed', 'curse', 'ingrain', 'aquaRing', 'magnetRise', 'substitute', 'trappedBy', 'gastroAcid'] as const;
 const HAZARD_MAX: Record<string, number> = { spikes: 3, toxicspikes: 2 };
 
 function moveApi(battle: BattleState): MoveRuleApi {
@@ -244,7 +254,7 @@ function makeMoveApi(battle: BattleState) {
     hurt: (fighter: BattleFighter, amount: number, cause?: string) => hurt(battle, fighter, amount, cause),
     heal: (fighter: BattleFighter, amount: number) => heal(battle, fighter, amount),
     boost: (fighter: BattleFighter, changes: Boosts, source?: BattleFighter | null) => boost(battle, fighter, changes, source),
-    setStatus: (fighter: BattleFighter, status: string, source?: BattleFighter | null) => setStatus(battle, fighter, status, source),
+    setStatus: (fighter: BattleFighter, status: MajorStatus, source?: BattleFighter | null) => setStatus(battle, fighter, status, source),
     cure: (fighter: BattleFighter) => cure(battle, fighter),
     addVolatile: (
       fighter: BattleFighter,
@@ -272,7 +282,7 @@ function makeMoveApi(battle: BattleState) {
     abilityDef: (key: string | null): AbilityEffect | undefined => ABILITIES[key as string],
     stageMult,
     weight: (fighter: BattleFighter): number => speciesData(fighter.speciesId)?.weight ?? 50,
-    baseAttack: (fighter: BattleFighter): number | undefined => speciesData(fighter.speciesId)?.stats?.[1],
+    baseAttack: (fighter: BattleFighter): number | undefined => speciesData(fighter.speciesId)?.base.attack,
     moved: (fighter: BattleFighter) => battle.moved.has(fighter),
     chosen: (sideIndex: number): MoveData | null => battle.chosen?.[sideIndex] ?? null,
     lastMove: (): string | null => battle.lastMove ?? null,
@@ -280,11 +290,11 @@ function makeMoveApi(battle: BattleState) {
       emit(battle, { t: 'nothing', side: sideOf(fighter), ...(reason ? { reason } : {}) });
       return false;
     },
-    volatile: (fighter: BattleFighter, kind: string, extra: Record<string, unknown> = {}) =>
+    volatile: (fighter: BattleFighter, kind: string, extra: { move?: string; count?: number } = {}) =>
       emit(battle, { t: 'volatile', side: sideOf(fighter), name: nameOf(fighter), kind, ...extra }),
-    volatileEnd: (fighter: BattleFighter, kind: string, extra: Record<string, unknown> = {}) =>
+    volatileEnd: (fighter: BattleFighter, kind: string, extra: { move?: string } = {}) =>
       emit(battle, { t: 'volatileEnd', side: sideOf(fighter), name: nameOf(fighter), kind, ...extra }),
-    sideStart: (sideIndex: number, kind: string, extra: Record<string, unknown> = {}) =>
+    sideStart: (sideIndex: number, kind: string, extra: { name?: string } = {}) =>
       emit(battle, { t: 'sideStart', side: sideIndex, kind, ...extra }),
     fieldStart: (kind: string) => emit(battle, { t: 'fieldStart', kind }),
     fieldEnd: (kind: string) => emit(battle, { t: 'fieldEnd', kind }),
@@ -322,8 +332,7 @@ function makeMoveApi(battle: BattleState) {
       emit(battle, { t: 'protect', side: sideOf(fighter), name: nameOf(fighter), kind });
       return true;
     },
-    guard: (fighter: BattleFighter, kind: string): boolean => {
-      const conds = battle.sides[sideOf(fighter)].conds;
+    guard: (fighter: BattleFighter, kind: Guard): boolean => {
       if (kind === 'quickguard' || kind === 'wideguard') {
         const stalls = fighter.volatiles.stall ?? 0;
         if (stalls > 0 && battle.random() >= 1 / 3 ** stalls) {
@@ -332,11 +341,11 @@ function makeMoveApi(battle: BattleState) {
         }
         fighter.volatiles.stall = stalls + 1;
       }
-      conds[kind] = battle.turn;
+      battle.sides[sideOf(fighter)].guards.add(kind);
       emit(battle, { t: 'sideStart', side: sideOf(fighter), kind });
       return true;
     },
-    hazard: (fighter: BattleFighter, kind: string): boolean => {
+    hazard: (fighter: BattleFighter, kind: keyof Hazards | 'toxicspikes'): boolean => {
       const sideIndex = 1 - sideOf(fighter);
       const side = battle.sides[sideIndex];
       if (kind === 'toxicspikes') {
@@ -345,18 +354,22 @@ function makeMoveApi(battle: BattleState) {
         emit(battle, { t: 'hazard', side: sideIndex, layers: side.toxicSpikes });
         return true;
       }
-      const hazards = side.hazards as unknown as Record<string, number | boolean>;
-      const cur = hazards[kind];
-      if (kind === 'spikes' ? (cur as number) >= HAZARD_MAX.spikes : cur) return api.nothing(fighter);
-      hazards[kind] = kind === 'spikes' ? (cur as number) + 1 : true;
-      emit(battle, { t: 'sideStart', side: sideIndex, kind, ...(kind === 'spikes' ? { layers: side.hazards.spikes } : {}) });
+      const { hazards } = side;
+      if (kind === 'spikes') {
+        if (hazards.spikes >= HAZARD_MAX.spikes) return api.nothing(fighter);
+        hazards.spikes += 1;
+      } else {
+        if (hazards[kind]) return api.nothing(fighter);
+        hazards[kind] = true;
+      }
+      emit(battle, { t: 'sideStart', side: sideIndex, kind, ...(kind === 'spikes' ? { layers: hazards.spikes } : {}) });
       return true;
     },
     clearHazards: (sideIndex: number) => clearHazards(battle, sideIndex),
     courtChange: (): boolean => {
       const [first, second] = battle.sides;
-      const swap = <K extends 'hazards' | 'conds' | 'screens' | 'toxicSpikes'>(key: K) => ([first[key], second[key]] = [second[key], first[key]]);
-      for (const key of ['hazards', 'conds', 'screens', 'toxicSpikes'] as const) swap(key);
+      const swap = <K extends 'hazards' | 'conds' | 'guards' | 'screens' | 'toxicSpikes'>(key: K) => ([first[key], second[key]] = [second[key], first[key]]);
+      for (const key of ['hazards', 'conds', 'guards', 'screens', 'toxicSpikes'] as const) swap(key);
       emit(battle, { t: 'courtChange' });
       return true;
     },
@@ -380,21 +393,8 @@ function makeMoveApi(battle: BattleState) {
       if (pass) {
         const kept: NonNullable<BattleSide['pass']> = {};
         if (pass.boosts) kept.boosts = { ...fighter.boosts };
-        if (pass.volatiles)
-          for (const key of [
-            'confusion',
-            'focusEnergy',
-            'perish',
-            'leechSeed',
-            'curse',
-            'ingrain',
-            'aquaRing',
-            'magnetRise',
-            'substitute',
-            'trappedBy',
-            'gastroAcid',
-          ])
-            if (fighter.volatiles[key]) kept[key] = fighter.volatiles[key];
+        const keep = <K extends keyof Volatiles>(key: K) => (kept[key] = fighter.volatiles[key]);
+        if (pass.volatiles) for (const key of BATON_PASSED) if (fighter.volatiles[key]) keep(key);
         if (pass.substitute) kept.substitute = pass.substitute;
         battle.sides[sideOf(fighter)].pass = kept;
       }
@@ -464,19 +464,14 @@ function showAbility(
   battle: BattleState,
   fighter: BattleFighter,
   note: string | null = null,
-  extra: Record<string, unknown> & { copied?: string; move?: string } = {},
+  details: AbilityDetails = {},
 ): void {
   const info = abilityInfo(fighter.ability);
   fighter.revealedAbilities.add(fighter.ability);
-  if (extra.copied) {
-    const foe = foeOf(battle, fighter);
-    if (foe && foe.ability === extra.copied) foe.revealedAbilities.add(extra.copied);
-  }
-  if (extra.move) {
-    const foe = foeOf(battle, fighter);
-    const known = foe?.moves.find((m) => m.name === extra.move);
-    if (known) foe!.revealedMoves.add(known.key);
-  }
+  const foe = foeOf(battle, fighter);
+  if (foe && details.copied && foe.ability === details.copied) foe.revealedAbilities.add(details.copied);
+  const known = details.move && foe?.moves.find((m) => m.name === details.move);
+  if (foe && known) foe.revealedMoves.add(known.key);
   emit(battle, {
     t: 'ability',
     side: sideIndexOf(battle, fighter),
@@ -484,8 +479,8 @@ function showAbility(
     ability: info?.name ?? fighter.ability,
     info,
     ...(note ? { note } : {}),
-    ...extra,
-    ...(extra.copied ? { copied: abilityInfo(extra.copied)?.name } : {}),
+    ...details,
+    ...(details.copied ? { copied: abilityInfo(details.copied)?.name } : {}),
   });
 }
 
@@ -511,11 +506,11 @@ function boost(battle: BattleState, fighter: BattleFighter, changes: Boosts, sou
     const next = clamp(cur + by, -STAGE_LIMIT, by > 0 ? (opts.cap ?? STAGE_LIMIT) : STAGE_LIMIT);
     if (next !== cur) applied[stat] = next - cur;
   }
-  const stats = Object.keys(applied) as BoostKey[];
-  if (stats.length && opts.ability) showAbility(battle, opts.ability);
-  for (const stat of stats) {
-    fighter.boosts[stat] += applied[stat] as number;
-    emit(battle, { t: 'boost', side: sideIndexOf(battle, fighter), stat, by: applied[stat], stage: fighter.boosts[stat] });
+  const changed = Object.entries(applied) as [BoostKey, number][];
+  if (changed.length && opts.ability) showAbility(battle, opts.ability);
+  for (const [stat, by] of changed) {
+    fighter.boosts[stat] += by;
+    emit(battle, { t: 'boost', side: sideIndexOf(battle, fighter), stat, by, stage: fighter.boosts[stat] });
   }
   if (source && source !== fighter && ((Object.values(applied) as number[]).some((v) => v < 0) || opts.effect === 'intimidate'))
     run(battle, fighter, 'onAfterEachBoost', applied, source, opts.effect);
@@ -531,17 +526,17 @@ function grounded(battle: BattleState, fighter: BattleFighter): boolean {
   return !fighter.types.includes('flying') && !flag(battle, fighter, 'levitates');
 }
 
-function currentWeather(battle: BattleState): string | null {
+function currentWeather(battle: BattleState): Weather | null {
   if (anyActiveHas(battle, 'cloud-nine') || anyActiveHas(battle, 'air-lock')) return null;
   return battle.field.weather;
 }
 
-function weatherFor(battle: BattleState, fighter: BattleFighter): string | null {
+function weatherFor(battle: BattleState, fighter: BattleFighter): Weather | null {
   const weather = currentWeather(battle);
   return !weather && flag(battle, fighter, 'actsInSun') ? 'harshsun' : weather;
 }
 
-function statusImmune(battle: BattleState, fighter: BattleFighter, status: string, source: BattleFighter | null): boolean {
+function statusImmune(battle: BattleState, fighter: BattleFighter, status: MajorStatus, source: BattleFighter | null): boolean {
   if (status === 'brn' && fighter.types.includes('fire')) return true;
   if (status === 'par' && fighter.types.includes('electric')) return true;
   if (status === 'frz' && (fighter.types.includes('ice') || isSun(currentWeather(battle)))) return true;
@@ -555,11 +550,11 @@ function statusImmune(battle: BattleState, fighter: BattleFighter, status: strin
 function setStatus(
   battle: BattleState,
   fighter: BattleFighter,
-  status: string,
+  status: MajorStatus,
   source: BattleFighter | null = null,
   opts: { ability?: BattleFighter } = {},
 ): boolean {
-  if (fighter.hp <= 0 || fighter.status || !MAJOR.has(status)) return false;
+  if (fighter.hp <= 0 || fighter.status) return false;
   if (statusImmune(battle, fighter, status, source)) return false;
   if (source && source !== fighter && battle.sides[sideIndexOf(battle, fighter)].conds.safeguard) return false;
   if (status === 'slp' && activeFighters(battle).some((o) => o.volatiles.uproar)) return false;
@@ -599,7 +594,7 @@ function addVolatile(
   const sideIndex = sideIndexOf(battle, fighter);
   if (kind === 'flinch') fighter.volatiles.flinch = true;
   else if (kind === 'confusion') fighter.volatiles.confusion = 2 + Math.floor(battle.random() * 4);
-  else if (kind === 'attract') fighter.volatiles.attract = source;
+  else if (kind === 'attract' && source) fighter.volatiles.attract = source;
   else if (kind === 'disable') fighter.volatiles.disabled = { key: opts.move!.key, name: opts.move!.name, turns: 4 };
   else if (kind === 'perish') fighter.volatiles.perish = 4;
   else if (kind === 'charge') fighter.volatiles.charge = true;
@@ -638,7 +633,7 @@ function setTypes(battle: BattleState, fighter: BattleFighter, types: readonly s
   emit(battle, { t: 'types', side: sideIndexOf(battle, fighter), types: fighter.types });
 }
 
-function setWeather(battle: BattleState, weather: string, source: BattleFighter | null): boolean {
+function setWeather(battle: BattleState, weather: Weather, source: BattleFighter | null): boolean {
   const cur = battle.field.weather;
   if (cur === weather) return false;
   if (PRIMAL.has(cur) && !PRIMAL.has(weather)) return false;
@@ -702,10 +697,11 @@ function clearScreens(battle: BattleState, sideIndex: number, cause: string): bo
 function clearHazards(battle: BattleState, sideIndex: number): boolean {
   const side = battle.sides[sideIndex];
   let did = clearToxicSpikes(battle, sideIndex);
-  for (const kind of ['spikes', 'stealthrock', 'stickyweb']) {
-    const hazards = side.hazards as unknown as Record<string, number | boolean>;
+  const { hazards } = side;
+  for (const kind of ['spikes', 'stealthrock', 'stickyweb'] as const) {
     if (!hazards[kind]) continue;
-    hazards[kind] = kind === 'spikes' ? 0 : false;
+    if (kind === 'spikes') hazards.spikes = 0;
+    else hazards[kind] = false;
     emit(battle, { t: 'sideEnd', side: sideIndex, kind });
     did = true;
   }
@@ -719,19 +715,19 @@ function bypassesSub(battle: BattleState, me: BattleFighter, move: AnyMove): boo
 function blockedByProtection(battle: BattleState, me: BattleFighter, target: BattleFighter | null, move: BattleMove): boolean {
   if (!target || target === me) return false;
   const sideIndex = sideIndexOf(battle, target);
-  const conds = battle.sides[sideIndex].conds;
+  const guards = battle.sides[sideIndex].guards;
   const prot = target.volatiles.protect?.turn === battle.turn ? target.volatiles.protect.kind : null;
   const status = move.kind === 'status';
   const shielded = prot && move.flags.includes('protect') && !(status && ['kings-shield', 'obstruct', 'silk-trap'].includes(prot));
   const guarded =
-    (conds.quickguard === battle.turn && move.effectivePriority > 0 && move.flags.includes('protect')) ||
-    (conds.wideguard === battle.turn && move.spread) ||
-    (conds.craftyshield === battle.turn && status) ||
-    (conds.matblock === battle.turn && !status && move.flags.includes('protect'));
+    (guards.has('quickguard') && move.effectivePriority > 0 && move.flags.includes('protect')) ||
+    (guards.has('wideguard') && move.spread) ||
+    (guards.has('craftyshield') && status) ||
+    (guards.has('matblock') && !status && move.flags.includes('protect'));
   if (!shielded && !guarded) return false;
   if (move.breaksProtect) {
     delete target.volatiles.protect;
-    for (const key of ['quickguard', 'wideguard', 'craftyshield', 'matblock']) delete conds[key];
+    guards.clear();
     emit(battle, { t: 'protectBroken', side: sideIndex, name: nameOf(target) });
     return false;
   }
@@ -925,8 +921,8 @@ function runEntry(battle: BattleState, sideIndex: number): void {
 function leave(battle: BattleState, fighter: BattleFighter): boolean {
   const hadGas = fighter.ability === 'neutralizing-gas';
   if (fighter.hp > 0) run(battle, fighter, 'onSwitchOut');
-  if (fighter.volatiles.mimic)
-    fighter.moves = fighter.moves.map((m, i) => (i === fighter.volatiles.mimic.slot ? fighter.volatiles.mimic.original : m));
+  const { mimic } = fighter.volatiles;
+  if (mimic) fighter.moves = fighter.moves.map((m, i) => (i === mimic.slot ? mimic.original : m));
   if (fighter.volatiles.powerTrick) fighter.stats = { ...fighter.stats, atk: fighter.stats.def, def: fighter.stats.atk };
   if (fighter.volatiles.transformed) Object.assign(fighter, fighter.volatiles.transformed);
   fighter.boosts = freshBoosts();
@@ -1070,9 +1066,10 @@ function usableMoves(battle: BattleState, fighter: BattleFighter): { move: MoveD
 }
 
 function encoreMove(fighter: BattleFighter): number | undefined {
-  if (!fighter.volatiles.encore) return undefined;
-  const slot = fighter.moves.findIndex((m) => m.key === fighter.volatiles.encore.key);
-  return slot >= 0 && (fighter.pp[fighter.volatiles.encore.key] ?? 0) > 0 ? slot : undefined;
+  const { encore } = fighter.volatiles;
+  if (!encore) return undefined;
+  const slot = fighter.moves.findIndex((m) => m.key === encore.key);
+  return slot >= 0 && (fighter.pp[encore.key] ?? 0) > 0 ? slot : undefined;
 }
 
 export function forcedAction(battle: BattleState, sideIndex: number): Action | null {
@@ -1098,7 +1095,7 @@ export function validActions(battle: BattleState, sideIndex: number): Action[] {
   return moves.concat(trapped(battle, sideIndex) ? [] : switches);
 }
 
-const sameAction = (a: Action, b: Action): boolean => a.type === b.type && (a.type === 'move' ? a.move === (b as MoveAction).move : a.to === (b as SwitchAction).to);
+const sameAction = (a: Action, b: Action): boolean => (a.type === 'move' ? b.type === 'move' && a.move === b.move : b.type === 'switch' && a.to === b.to);
 
 // Returns the events of the resolved turn, or null if still waiting on the other side.
 export function submit(battle: BattleState, sideIndex: number, action: Action | null | undefined): BattleEvent[] | null {
@@ -1182,7 +1179,7 @@ function canAct(battle: BattleState, me: BattleFighter, move: BattleMove): boole
   return true;
 }
 
-function statusEffectOf(move: AnyMove): { effect: string; stat?: string } {
+function statusEffectOf(move: AnyMove): Pick<MoveEvent, 'effect' | 'stat'> {
   if (move.heal || HEALS_WITH_WEATHER[move.id] || move.id === 'rest') return { effect: 'heal' };
   if (move.weather || move.terrain) return { effect: 'weather' };
   if (move.screen) return { effect: 'boost', stat: move.screen === 'lightscreen' ? 'sdef' : 'def' };
@@ -1200,8 +1197,8 @@ function spendPP(battle: BattleState, me: BattleFighter, move: AnyMove): void {
 }
 
 const FOCUS_MOVES = new Set(['focus-punch', 'shell-trap', 'beak-blast']);
-const STATUSED = new Set<string | null>(['brn', 'par', 'psn', 'tox']);
-const WEATHER_BALL: Record<string, string> = { sun: 'fire', harshsun: 'fire', rain: 'water', heavyrain: 'water', sand: 'rock', hail: 'ice', snow: 'ice' };
+const STATUSED = new Set<MajorStatus | null>(['brn', 'par', 'psn', 'tox']);
+const WEATHER_BALL: Partial<Record<Weather, string>> = { sun: 'fire', harshsun: 'fire', rain: 'water', heavyrain: 'water', sand: 'rock', hail: 'ice', snow: 'ice' };
 const TERRAIN_PULSE: Record<string, string> = { electric: 'electric', grassy: 'grass', misty: 'fairy', psychic: 'psychic' };
 
 function moveOfAction(battle: BattleState, sideIndex: number, idx: number): MoveData {
@@ -1244,8 +1241,9 @@ export function moveWillFail(battle: BattleState, sideIndex: number, idx: number
 
 function adaptMove(battle: BattleState, me: BattleFighter, move: BattleMove): void {
   const weather = currentWeather(battle);
-  if (move.id === 'weather-ball' && WEATHER_BALL[weather as string]) {
-    move.type = WEATHER_BALL[weather as string];
+  const ballType = weather && WEATHER_BALL[weather];
+  if (move.id === 'weather-ball' && ballType) {
+    move.type = ballType;
     move.power = 100;
   }
   if (move.id === 'terrain-pulse' && battle.field.terrain && grounded(battle, me)) {
@@ -1394,7 +1392,7 @@ function perform(
   opts: { called?: boolean } = {},
 ): void {
   const rules = MOVE_RULES[base.id];
-  const failed = failReason(battle, me, foe, move, firstAction) ?? rules?.fail?.(moveApi(battle), me, foe as BattleFighter, move) ?? null;
+  const failed = failReason(battle, me, foe, move, firstAction) ?? rules?.fail?.(moveApi(battle), me, foe, move) ?? null;
   if (failed) {
     emit(battle, { t: 'nothing', side: sideIndex, reason: failed });
     me.volatiles.lastFailed = true;
@@ -1404,7 +1402,7 @@ function perform(
     return;
   }
   if (rules?.call) {
-    const called = rules.call(moveApi(battle), me, foe as BattleFighter, move);
+    const called = rules.call(moveApi(battle), me, foe, move);
     if (!called?.key) {
       emit(battle, { t: 'nothing', side: sideIndex, ...(called?.fail ? { reason: called.fail } : {}) });
       me.volatiles.lastFailed = true;
@@ -1413,7 +1411,7 @@ function perform(
     runCalled(battle, me, called.key, { powerMult: called.powerMult });
     return;
   }
-  if (rules?.before && rules.before(moveApi(battle), me, foe as BattleFighter, move) === 'skip') return;
+  if (rules?.before?.(moveApi(battle), me, foe, move) === 'skip') return;
   if (base.id === 'echoed-voice')
     battle.echo = battle.echo?.turn === battle.turn
       ? battle.echo
@@ -1429,7 +1427,7 @@ function perform(
     if (move.recoilMaxHp && me.hp > 0) hurt(battle, me, me.stats.hp * move.recoilMaxHp, 'recoil');
     me.volatiles.lastFailed = !dealt;
   }
-  rules?.after?.(moveApi(battle), me, foe as BattleFighter, move, dealt);
+  rules?.after?.(moveApi(battle), me, foe, move, dealt);
   if (base.id === 'fury-cutter' && dealt) me.volatiles.furyCutter = Math.min(2, (me.volatiles.furyCutter ?? 0) + 1);
   else delete me.volatiles.furyCutter;
   if (base.rampage && me.hp > 0 && moveIdx != null) {
@@ -1446,15 +1444,7 @@ function perform(
   }
 }
 
-function runCalled(battle: BattleState, me: BattleFighter, key: string, opts: { powerMult?: number; instructed?: boolean } = {}): void {
-  const base = moveData(key);
-  if (!base || me.hp <= 0) return;
-  const sideIndex = sideIndexOf(battle, me);
-  const move = { ...base, flags: [...base.flags], effectivePriority: base.priority, slot: null };
-  if (opts.powerMult && move.power) move.power = Math.floor(move.power * opts.powerMult);
-  adaptMove(battle, me, move);
-  run(battle, me, 'onModifyMove', move);
-  const status = move.kind === 'status' ? statusEffectOf(move) : {};
+function announceMove(battle: BattleState, sideIndex: number, me: BattleFighter, base: MoveData, move: BattleMove, extra: Pick<MoveEvent, 'called' | 'why'>): void {
   emit(battle, {
     t: 'move',
     side: sideIndex,
@@ -1466,15 +1456,26 @@ function runCalled(battle: BattleState, me: BattleFighter, key: string, opts: { 
     category: move.category,
     target: shownTarget(me, base.key, move.target),
     flags: move.flags,
-    called: true,
-    ...status,
+    ...(move.kind === 'status' ? statusEffectOf(move) : {}),
     ...(move.multihit ? { multihit: true } : {}),
     ...(move.drain ? { drain: true } : {}),
+    ...extra,
   });
+}
+
+function runCalled(battle: BattleState, me: BattleFighter, key: string, opts: { powerMult?: number; instructed?: boolean } = {}): void {
+  const base = moveData(key);
+  if (!base || me.hp <= 0) return;
+  const sideIndex = sideIndexOf(battle, me);
+  const move = { ...base, flags: [...base.flags], effectivePriority: base.priority, slot: null };
+  if (opts.powerMult && move.power) move.power = Math.floor(move.power * opts.powerMult);
+  adaptMove(battle, me, move);
+  run(battle, me, 'onModifyMove', move);
+  announceMove(battle, sideIndex, me, base, move, { called: true });
   perform(battle, sideIndex, me, foeOf(battle, me), base, move, null, false, { called: true });
 }
 
-function useMove(battle: BattleState, sideIndex: number, moveIdx: number, priority: number, why: string | null = null): void {
+function useMove(battle: BattleState, sideIndex: number, moveIdx: number, priority: number, why: OrderReason | null = null): void {
   const me = activeOf(battle, sideIndex);
   if (me.hp <= 0) return;
   battle.moved.add(me);
@@ -1512,7 +1513,6 @@ function useMove(battle: BattleState, sideIndex: number, moveIdx: number, priori
   me.revealedMoves.add(base.key);
   me.volatiles.prevMove = me.volatiles.lastMove;
   me.volatiles.lastMove = base.key;
-  const status = move.kind === 'status' ? statusEffectOf(move) : {};
   const startsCharge = move.flags.includes('charge')
     && !charged
     && !(isSun(currentWeather(battle)) && (base.id === 'solar-beam' || base.id === 'solar-blade'));
@@ -1522,22 +1522,7 @@ function useMove(battle: BattleState, sideIndex: number, moveIdx: number, priori
     emit(battle, { t: 'charging', side: sideIndex, name: nameOf(me), move: move.name, key: base.key, hidden: !!HIDDEN_BY[base.id] });
     return;
   }
-  emit(battle, {
-    t: 'move',
-    side: sideIndex,
-    name: nameOf(me),
-    move: move.name,
-    type: move.type,
-    kind: move.kind,
-    key: base.key,
-    category: move.category,
-    target: shownTarget(me, base.key, move.target),
-    flags: move.flags,
-    ...status,
-    ...(move.multihit ? { multihit: true } : {}),
-    ...(move.drain ? { drain: true } : {}),
-    ...(why ? { why } : {}),
-  });
+  announceMove(battle, sideIndex, me, base, move, why ? { why } : {});
 
   const foe = foeOf(battle, me);
   delete me.volatiles.charging;
@@ -1566,7 +1551,7 @@ function selfStatus(battle: BattleState, me: BattleFighter, move: BattleMove): v
   }
   const rules = MOVE_RULES[move.id];
   if (rules?.use) {
-    rules.use(moveApi(battle), me, foeOf(battle, me) as BattleFighter, move);
+    rules.use(moveApi(battle), me, foeOf(battle, me), move);
     return;
   }
   let did = false;
@@ -1654,8 +1639,8 @@ function statusMove(battle: BattleState, me: BattleFighter, foe: BattleFighter |
   }
   const source = target === me ? foe : me;
   const rules = MOVE_RULES[move.id];
-  if (rules?.use) {
-    rules.use(moveApi(battle), source, target, move);
+  if (rules?.useOn) {
+    rules.useOn(moveApi(battle), source, target, move);
     return;
   }
   let did = false;
@@ -1782,7 +1767,7 @@ function computeDamage(
   const mw = weatherFor(battle, me);
   if (isSun(mw)) dmg *= move.type === 'fire' || move.id === 'hydro-steam' ? 1.5 : move.type === 'water' ? 0.5 : 1;
   if (isRain(mw)) dmg *= move.type === 'water' ? 1.5 : move.type === 'fire' ? 0.5 : 1;
-  if (move.type && me.types.includes(move.type)) dmg *= flag(battle, me, 'stab') ? (abilityDef(battle, me)!.stab as number) : 1.5;
+  if (move.type && me.types.includes(move.type)) dmg *= abilityDef(battle, me)?.stab ?? 1.5;
   dmg *= eff * (0.85 + battle.random() * 0.15) * (crit ? 1.5 : 1);
   if (me.status === 'brn' && physical && !flag(battle, me, 'ignoresBurn') && move.id !== 'facade') dmg *= 0.5;
   if (!crit && screened(battle, me, target, move)) dmg *= 0.5;
@@ -1943,7 +1928,7 @@ function alive(side: BattleSide): boolean {
   return side.team.some((f) => f.hp > 0);
 }
 
-function finish(battle: BattleState, winner: number | null, reason: string | null = null): void {
+function finish(battle: BattleState, winner: number | null, reason: 'limit' | null = null): void {
   battle.status = 'finished';
   battle.winner = winner;
   emit(battle, { t: 'end', winner, ...(reason ? { reason } : {}) });
@@ -1966,8 +1951,8 @@ function resolveTurn(battle: BattleState): BattleEvent[] {
   battle.moved = new Set();
   for (const fighter of activeFighters(battle)) fighter.activeTurns += 1;
   // Both sides have chosen by now (submit() only resolves then).
-  const acts = battle.sides.map((side, sideIndex) => ({ sideIndex, ...(side.action as SideAction) }));
-  battle.chosen = acts.map((a) => (a.type === 'move' ? moveOfAction(battle, a.sideIndex, a.move) : null));
+  const acts = battle.sides.flatMap((side, sideIndex) => (side.action ? [{ sideIndex, ...side.action }] : []));
+  battle.chosen = battle.sides.map((side, sideIndex) => (side.action?.type === 'move' ? moveOfAction(battle, sideIndex, side.action.move) : null));
   for (const side of battle.sides) side.action = null;
   for (const side of battle.sides) for (const fighter of side.team) delete fighter.turnHit;
 
@@ -1982,7 +1967,7 @@ function resolveTurn(battle: BattleState): BattleEvent[] {
   if (checkEnd(battle)) return done(battle, events);
 
   const movers: Mover[] = acts
-    .filter((a): a is { sideIndex: number } & MoveAction & { auto?: boolean } => a.type === 'move')
+    .filter((a) => a.type === 'move')
     .map((action) => {
       const fighter = activeOf(battle, action.sideIndex);
       const move = action.move === STRUGGLE_MOVE ? STRUGGLE : fighter.moves[action.move];
@@ -1991,7 +1976,7 @@ function resolveTurn(battle: BattleState): BattleEvent[] {
         ...action,
         fighter,
         prio: chain(battle, fighter, 'onModifyPriority', move.priority, move),
-        frac: typeof frac === 'number' ? frac : 0,
+        frac: frac ?? 0,
         spd: speedOf(battle, fighter),
         tie: battle.random(),
       };
@@ -2151,10 +2136,10 @@ function residual(battle: BattleState): void {
       delete fighter.volatiles.yawn;
       setStatus(battle, fighter, 'slp', null);
     }
-    for (const [key, kind] of [['taunt', 'taunt'], ['encore', 'encore'], ['healBlock', 'healblock'], ['telekinesis', 'telekinesis'], ['magnetRise', 'magnetrise']]) {
+    for (const [key, kind] of [['taunt', 'taunt'], ['encore', 'encore'], ['healBlock', 'healblock'], ['telekinesis', 'telekinesis'], ['magnetRise', 'magnetrise']] as const) {
       const effect = fighter.volatiles[key];
       if (!effect) continue;
-      if (--effect.turns <= 0 || (key === 'encore' && !(fighter.pp[effect.key] > 0))) {
+      if (--effect.turns <= 0 || ('key' in effect && !(fighter.pp[effect.key] > 0))) {
         delete fighter.volatiles[key];
         emit(battle, { t: 'volatileEnd', side: sideIndexOf(battle, fighter), name: nameOf(fighter), kind });
       }
@@ -2183,15 +2168,12 @@ function residual(battle: BattleState): void {
         }
       }
     }
-    for (const key of Object.keys(side.conds)) {
-      const turns = side.conds[key];
-      if (['quickguard', 'wideguard', 'craftyshield', 'matblock'].includes(key)) {
-        if (turns < battle.turn + 1) delete side.conds[key];
-        continue;
-      }
-      if (--side.conds[key] <= 0) {
-        delete side.conds[key];
-        emit(battle, { t: 'sideEnd', side: sideIndex, kind: key });
+    side.guards.clear();
+    for (const [kind, turns] of Object.entries(side.conds) as [SideCondition, number][]) {
+      if (turns > 1) side.conds[kind] = turns - 1;
+      else {
+        delete side.conds[kind];
+        emit(battle, { t: 'sideEnd', side: sideIndex, kind });
       }
     }
   });
@@ -2242,7 +2224,7 @@ function afterTurn(battle: BattleState): void {
   battle.sides.forEach((side, sideIndex) => {
     const fighter = side.team[side.active];
     const escaping = fighter.hp > 0
-      && (fighter.volatiles.exitPending || fighter.volatiles.switchNow)
+      && !!fighter.volatiles.switchNow
       && side.team.some((o) => o !== fighter && o.hp > 0);
     delete fighter.volatiles.switchNow;
     side.mustSwitch = fighter.hp <= 0 || escaping;
@@ -2259,8 +2241,8 @@ function resolveReplacements(battle: BattleState): BattleEvent[] {
   battle.events = events;
   const entered: number[] = [];
   battle.sides.forEach((side, sideIndex) => {
-    if (side.mustSwitch && side.action) {
-      if (doSwitch(battle, sideIndex, (side.action as SwitchAction).to)) wakeAbilities(battle, activeOf(battle, sideIndex));
+    if (side.mustSwitch && side.action?.type === 'switch') {
+      if (doSwitch(battle, sideIndex, side.action.to)) wakeAbilities(battle, activeOf(battle, sideIndex));
       entered.push(sideIndex);
     }
     side.action = null;
@@ -2355,25 +2337,30 @@ function publicVolatiles(fighter: BattleFighter) {
 // What a client may see. Pending choices stay hidden; only "ready" is shown.
 const percentOf = (hp: number, max: number): number => (hp <= 0 ? 0 : Math.max(1, Math.round((hp / max) * 100)));
 
-function hiddenHp(event: BattleEvent): BattleEvent {
-  if (event.max == null) return event.stats ? { ...event, stats: { hp: 100 } } : event;
-  const before = event.t === 'damage' || event.t === 'hurt' ? event.hp! + event.amount! : event.hp! - event.amount!;
-  const hp = percentOf(event.hp!, event.max);
-  const out = { ...event, hp, max: 100, pct: true };
-  if (event.amount != null) out.amount = event.amount > 0 ? Math.max(1, Math.abs(percentOf(before, event.max) - hp)) : 0;
-  if (event.stats) out.stats = { hp: 100 };
-  return out;
+/** A rival's HP change, in percentages (`pct`), never exact numbers. */
+function inPercent(event: Extract<BattleEvent, { hp: number }>) {
+  const hp = percentOf(event.hp, event.max);
+  const shown = { ...event, hp, max: 100, pct: true as const, ...('stats' in event ? { stats: { hp: 100 } } : {}) };
+  if (!('amount' in event)) return shown;
+  const before = event.t === 'heal' ? event.hp - event.amount : event.hp + event.amount;
+  return { ...shown, amount: event.amount > 0 ? Math.max(1, Math.abs(percentOf(before, event.max) - hp)) : 0 };
 }
 
-function viewEvent(event: BattleEvent, viewer: number | null): BattleEvent {
-  if (event.card) {
+/** A switch shows each client the card it may see; a rival's HP and stats come as percentages. */
+function viewEvent(event: BattleEvent, viewer: number | null) {
+  if (event.t === 'switch') {
     const { card, seen, ...rest } = event;
     return { ...rest, mon: event.side === viewer ? card : seen };
   }
-  return event.side == null || event.side === viewer || (event.max == null && !event.stats) ? event : hiddenHp(event);
+  if (!('side' in event) || event.side === viewer) return event;
+  if ('hp' in event) return inPercent(event);
+  return 'stats' in event ? { ...event, stats: { hp: 100 } } : event;
 }
 
-export function viewEvents(events: BattleEvent[], viewer: number | null = null): BattleEvent[] {
+/** A BattleEvent as one client receives it. */
+export type EventView = ReturnType<typeof viewEvent>;
+
+export function viewEvents(events: BattleEvent[], viewer: number | null = null): EventView[] {
   return events.map((e) => viewEvent(e, viewer));
 }
 
@@ -2467,7 +2454,7 @@ export function publicState(battle: BattleState, viewer: number | null = null) {
       toxicSpikes: side.toxicSpikes,
       screens: { ...side.screens },
       hazards: { ...side.hazards },
-      conds: Object.fromEntries(Object.entries(side.conds).filter(([k]) => ['tailwind', 'safeguard', 'mist', 'luckychant'].includes(k))),
+      conds: { ...side.conds },
       ...(side.wish ? { wish: true } : {}),
       ...(side.future ? { future: side.future.name } : {}),
       team: side.team.map((f, i) => fighterView(battle, s, i, viewer === s || battle.status === 'finished', viewer === null)),

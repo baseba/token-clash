@@ -99,7 +99,7 @@ const moveKey = (b, s, action) => b.sides[s].team[b.sides[s].active].moves[actio
 test('from medium up, the AI never wastes a turn on a move the rival is immune to', () => {
   const pika = mon('p', 25, ['thunderbolt', 'quick-attack']);
   const sandslash = mon('s', 28, ['scratch'], { abilityChoice: 'sand-veil' });
-  for (const difficulty of ['mid', 'hard', 'veryhard']) {
+  for (const difficulty of ['mid', 'hard', 'veryhard'] as const) {
     for (let seed = 0; seed < 20; seed++) {
       const b = duel([pika], [sandslash], seed);
       assert.equal(moveKey(b, 0, chooseAction(b, 0, difficulty, rng(seed))), 'quick-attack', difficulty);
@@ -159,7 +159,7 @@ test("the AI decides on what it has seen, never on the rival's hidden moves, ben
     [mon('a', 143, ['body-slam']), mon('b', 65, ['psychic'])],
     [mon('a', 143, ['earthquake', 'crunch', 'rest']), mon('b', 6, ['flamethrower'])],
   ];
-  for (const difficulty of ['easy', 'mid', 'hard', 'veryhard']) {
+  for (const difficulty of ['easy', 'mid', 'hard', 'veryhard'] as const) {
     for (let seed = 0; seed < 5; seed++) {
       const picks = rivals.map((rival) => {
         const b = duel([gengar], rival, seed);

@@ -216,3 +216,11 @@ test('spectators see both whole teams, while a player only sees the foes that ca
   const asSpectator = publicState(b, null).sides;
   assert.ok(asSpectator.every((side) => side.team.every((f) => !f.hidden && f.name)));
 });
+
+test('Present with its rival already fainted reports no target instead of throwing', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const b = battle([mon('e', 101, ['explosion']), mon('q', 68, ['tackle'])], mon('d', 225, ['present'], { level: 70 }), seed);
+    const events = turn(b, 'explosion', 'present');
+    assert.ok(events.some((e) => e.t === 'notarget' && e.side === 1), `seed ${seed}`);
+  }
+});
