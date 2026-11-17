@@ -8,7 +8,7 @@ import { SkynetService } from '../../combat/application/skynet.service.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { newId, now } from '../../shared/domain/clock.js';
-import { conflict, forbidden, invalid, notFound } from '../../shared/domain/errors.js';
+import { conflict, notFound } from '../../shared/domain/errors.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
@@ -30,7 +30,7 @@ export interface NewTournament {
 
 @Injectable()
 export class TournamentsService implements OnModuleInit {
-  private readonly t: ArenaTimings;
+  private readonly timings: ArenaTimings;
   /** Seats of people who disconnected from the lobby, waiting for them to come back. */
   private readonly seatTimers = new Map<string, NodeJS.Timeout>();
 
@@ -46,7 +46,7 @@ export class TournamentsService implements OnModuleInit {
     private readonly skynet: SkynetService,
     events: ArenaEvents,
   ) {
-    this.t = config.timings;
+    this.timings = config.timings;
     events.onMatchFinished((e) => this.matchFinished(e));
   }
 
@@ -76,7 +76,7 @@ export class TournamentsService implements OnModuleInit {
         return { tournament: rival, joined: true };
       }
     }
-    const T = Tournament.create({ id: newId(6), host: trainer, ...opts, at: now() });
+    const T = Tournament.create({ id: newId(), host: trainer, ...opts, at: now() });
     this.tournaments.save(T);
     this.watchSeat(T, trainer.id);
     if (opts.visibility === 'public') this.lobby.notifyAfterGrace();
@@ -101,7 +101,7 @@ export class TournamentsService implements OnModuleInit {
   }
 
   closeByHost(T: Tournament, trainer: Trainer): void {
-    if (T.hostId !== trainer.id) throw forbidden('Solo el dueño puede cerrar el torneo.');
+    T.assertHost(trainer.id, 'cerrar el torneo');
     T.assertLobby();
     this.close(T);
   }
@@ -113,32 +113,30 @@ export class TournamentsService implements OnModuleInit {
   }
 
   addAis(T: Tournament, trainer: Trainer, { level, count }: { level: string; count: number }): void {
-    if (T.hostId !== trainer.id) throw forbidden('Solo el dueño puede agregar IAs.');
+    T.assertHost(trainer.id, 'agregar IAs');
     T.assertLobby();
-    if (!this.skynet.aiLevels.includes(level)) throw invalid('Esa dificultad no está disponible.');
+    this.skynet.assertOffered(level);
     T.addAis(level, count);
     this.afterSeatsChange(T);
   }
 
   kick(T: Tournament, trainer: Trainer, seat: number): void {
-    if (T.hostId !== trainer.id) throw forbidden('Solo el dueño puede quitar jugadores.');
+    T.assertHost(trainer.id, 'quitar jugadores');
     T.assertLobby();
     T.kick(seat);
     this.afterSeatsChange(T);
   }
 
-  // ---------- following a tournament over the socket ----------
-
   /** A client opens the tournament page. Returns it, or null if it doesn't exist. */
-  follow(ws: ClientConnection, msg: { id?: unknown; token?: unknown }): Tournament | null {
-    const T = typeof msg.id === 'string' ? this.tournaments.findById(msg.id) : undefined;
+  follow(ws: ClientConnection, id: string, token: string | undefined): Tournament | null {
+    const T = this.tournaments.findById(id);
     if (!T) {
       ws.send({ t: 'error', error: 'Ese torneo no existe.' });
       return null;
     }
-    if (typeof msg.token === 'string') ws.trainerId = this.trainers.authenticate(msg.token)?.id ?? null;
+    if (token !== undefined) ws.trainerId = this.trainers.authenticate(token)?.id ?? null;
     ws.tourId = T.id;
-    this.presence.tourWatchers(T.id).add(ws);
+    this.presence.followTournament(T.id, ws);
     this.broadcast(T);
     return T;
   }
@@ -146,7 +144,7 @@ export class TournamentsService implements OnModuleInit {
   unfollow(ws: ClientConnection): void {
     const T = ws.tourId ? this.tournaments.findById(ws.tourId) : undefined;
     if (!T) return;
-    this.presence.tourSockets(T.id).delete(ws);
+    this.presence.unfollowTournament(T.id, ws);
     if (T.seatOf(ws.trainerId) !== -1 && T.status === 'open') {
       this.watchSeat(T, ws.trainerId!);
       this.broadcast(T);
@@ -159,11 +157,9 @@ export class TournamentsService implements OnModuleInit {
   }
 
   broadcast(T: Tournament): void {
-    for (const ws of this.presence.tourSockets(T.id)) if (ws.open) ws.send({ t: 'tour', tournament: this.views.tournament(T, ws.trainerId) });
+    for (const ws of this.presence.tournamentSockets(T.id)) if (ws.open) ws.send({ t: 'tour', tournament: this.views.tournament(T, ws.trainerId) });
     if (T.visibility === 'public') this.lobby.notify();
   }
-
-  // ---------- lobby ----------
 
   private afterSeatsChange(T: Tournament): void {
     if (T.everyoneReady) return this.start(T);
@@ -187,12 +183,10 @@ export class TournamentsService implements OnModuleInit {
       if (T.status !== 'open' || this.presence.inTournament(T.id, trainerId)) return;
       if (trainerId === T.hostId) return this.close(T);
       if (T.leave(trainerId)) this.afterSeatsChange(T);
-    }, this.t.seatGraceMs);
-    timer.unref?.();
+    }, this.timings.seatGraceMs);
+    timer.unref();
     this.seatTimers.set(key, timer);
   }
-
-  // ---------- playing the bracket ----------
 
   private humanAverageLevel(T: Tournament): number {
     const entries = T.seats.filter((seat) => !seat.ai).flatMap((seat) => this.trainers.byId(seat.id)?.teamEntries() ?? []);
@@ -201,11 +195,11 @@ export class TournamentsService implements OnModuleInit {
 
   private start(T: Tournament): void {
     const at = now();
-    T.start({ at, order: shuffledOrder(T.size), aiLevel: T.levelCap ?? this.humanAverageLevel(T), firstMatchAt: at + this.t.drawMs });
+    T.start({ at, order: shuffledOrder(T.size), aiLevel: T.levelCap ?? this.humanAverageLevel(T), firstMatchAt: at + this.timings.bracketDrawMs });
     this.tournaments.save(T);
     this.broadcast(T);
     this.lobby.notify();
-    setTimeout(() => this.startMatch(T), this.t.drawMs).unref?.();
+    setTimeout(() => this.startMatch(T), this.timings.bracketDrawMs).unref();
   }
 
   private seatTeam(T: Tournament, seat: Seat): RosterEntry[] {
@@ -222,7 +216,7 @@ export class TournamentsService implements OnModuleInit {
     // A person always hosts when there is one (the AI side is the guest).
     const [host, guest] = next.a.ai && !next.b.ai ? [next.b, next.a] : [next.a, next.b];
     const c = Challenge.tournamentMatch({
-      id: newId(6),
+      id: newId(),
       host: { id: host.id, name: host.name, team: this.seatTeam(T, host), ai: host.ai },
       guest: { id: guest.id, name: guest.name, team: this.seatTeam(T, guest), ai: guest.ai },
       levelCap: T.levelCap,
@@ -243,8 +237,8 @@ export class TournamentsService implements OnModuleInit {
     const T = c.tournamentId ? this.tournaments.findById(c.tournamentId) : undefined;
     if (!T || T.status !== 'running') return;
     const at = now();
-    const champion = T.matchFinished({ round: c.round!, index: c.match! }, c.winnerId ?? null, { now: at, nextMatchAt: at + this.t.betweenMs });
-    if (champion === null) setTimeout(() => this.startMatch(T), this.t.betweenMs).unref?.();
+    const champion = T.matchFinished({ round: c.round!, index: c.match! }, c.winnerId ?? null, { now: at, nextMatchAt: at + this.timings.betweenMatchesMs });
+    if (champion === null) setTimeout(() => this.startMatch(T), this.timings.betweenMatchesMs).unref();
     this.tournaments.save(T);
     this.broadcast(T);
   }

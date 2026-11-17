@@ -35,8 +35,6 @@ export class TrainersService implements OnModuleInit {
     if (fixed) this.logger.log(`Quité especies repetidas de ${fixed} entrenador(es).`);
   }
 
-  // ---------- queries (read-only, also used by other contexts) ----------
-
   byId(id: string | null | undefined): Trainer | undefined {
     return id ? this.trainers.findById(id) : undefined;
   }
@@ -46,12 +44,12 @@ export class TrainersService implements OnModuleInit {
   }
 
   /** Who owns a session token, without marking them as seen (the lobby list does this). */
-  peekToken(token: unknown): Trainer | undefined {
-    return typeof token === 'string' ? this.trainers.findByTokenHash(sha256(token)) : undefined;
+  peekToken(token: string | undefined): Trainer | undefined {
+    return token === undefined ? undefined : this.trainers.findByTokenHash(sha256(token));
   }
 
   /** Who owns a session token, and mark them as seen now (feeds "active now" in the stats). */
-  authenticate(token: unknown): Trainer | undefined {
+  authenticate(token: string): Trainer | undefined {
     const t = this.peekToken(token);
     if (t) {
       t.lastSeen = now();
@@ -66,21 +64,19 @@ export class TrainersService implements OnModuleInit {
     return m && TOKEN_FORMAT.test(m[1]) ? this.authenticate(m[1]) : undefined;
   }
 
-  // ---------- commands ----------
-
   /**
    * Imports a save. Without a session it registers a new trainer and returns their token (shown
    * once: only its hash is stored). With a session it updates that trainer's collection.
    */
   importSave(current: Trainer | undefined, input: { save: string; name?: string }): { token: string | null; trainer: Trainer } {
     const parsed = parseSave(input.save);
-    const name = cleanName(input.name);
+    const name = cleanName(input.name ?? '');
     let trainer = current;
     let token: string | null = null;
     if (!trainer) {
       if (!name) throw invalid('Ponte un nombre de entrenador.');
       token = newToken();
-      trainer = Trainer.register({ id: newId(6), name, tokenHash: sha256(token), at: now() });
+      trainer = Trainer.register({ id: newId(), name, tokenHash: sha256(token), at: now() });
     } else if (name) trainer.rename(name);
     trainer.importSave(parsed, now());
     this.trainers.save(trainer);

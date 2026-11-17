@@ -147,10 +147,6 @@ export class Challenge implements ChallengeState {
     return this.mode ?? 'team';
   }
 
-  get roomVisibility(): Visibility {
-    return this.visibility ?? 'private';
-  }
-
   /** Only 1v1 battles between people count for the ranking (not the AI, not tournaments). */
   get ranked(): boolean {
     return !this.ai && !this.tournamentId;

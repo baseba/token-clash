@@ -4,6 +4,7 @@ import { MOVE_RULES } from '../../catalog/domain/move-rules.js';
 import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
 import { ABILITIES, type AbilityEffect, type AbilityHook, type BoostChanges } from './ability-effects.js';
 import type { Gender, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { invalid } from '../../shared/domain/errors.js';
 import type { Action, MoveAction, SwitchAction, SideAction, BattleEvent, BattleFighter, BattleMove, BattleSide, BattleSideInput, BattleState, Look, Mover } from './battle-types.js';
 
 export type * from './battle-types.js';
@@ -13,7 +14,8 @@ type F = BattleFighter;
 /** A move as functions below accept it: a catalog move, or the copy being used this turn. */
 type AnyMove = MoveData | BattleMove;
 
-export const TEAM_SIZE = 3;
+/** How many Pokémon fight on each side. */
+export const BATTLE_SIZE = 3;
 export const TURN_LIMIT = 100;
 const STAGE_LIMIT = 6;
 const FIELD_TURNS = 5;
@@ -73,7 +75,7 @@ export function createBattle({ id, sides, levelCap = null, random = Math.random 
     sides: sides.map((s) => ({
       trainerId: s.trainerId,
       name: s.name,
-      team: s.entries.slice(0, TEAM_SIZE).map((e) => prepare(e, levelCap)),
+      team: s.entries.slice(0, BATTLE_SIZE).map((e) => prepare(e, levelCap)),
       active: 0,
       action: null,
       mustSwitch: false,
@@ -964,7 +966,7 @@ const sameAction = (a: Action, b: Action): boolean => a.type === b.type && (a.ty
 
 // Returns the events of the resolved turn, or null if still waiting on the other side.
 export function submit(b: B, s: number, action: Action | null | undefined): BattleEvent[] | null {
-  if (!action || !validActions(b, s).some((v) => sameAction(v, action))) throw new Error('Acción inválida');
+  if (!action || !validActions(b, s).some((v) => sameAction(v, action))) throw invalid('Acción inválida');
   b.sides[s].action = action.type === 'move' ? { type: 'move', move: action.move } : { type: 'switch', to: action.to };
   if (b.sides.some((_, i) => needsAction(b, i))) return null;
   if (b.phase === 'switchout') return resolveSwitchOut(b);

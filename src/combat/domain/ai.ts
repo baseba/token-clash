@@ -2,10 +2,10 @@
 import { buildFighter, speciesData, formData, statsFor, effectiveness, usableMovepool, moveData, shuffled, rng, STRUGGLE, MOVES_PER_FIGHTER, type MoveData, type Random, type SpeciesData } from '../../catalog/domain/creatures.js';
 import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { validActions, submit, needsAction, moveWillFail, STRUGGLE_MOVE } from './battle.js';
+import { validActions, submit, needsAction, moveWillFail, BATTLE_SIZE, STRUGGLE_MOVE } from './battle.js';
 import type { Action, BattleFighter, BattleSide, BattleState, MoveAction, SwitchAction } from './battle-types.js';
 import { randomize } from './random-party.js';
-import { PARTY_SIZE, BATTLE_SIZE } from './team-preview.js';
+import { PARTY_SIZE } from './team-preview.js';
 
 type F = BattleFighter;
 type B = BattleState;
@@ -20,6 +20,8 @@ export const AI_PREFIX = 'ai:';
 export const LAST_AI_SPECIES = DEX_LIMIT;
 
 export const aiTrainerId = (level: string): string => `${AI_PREFIX}${level}`;
+/** A tournament can seat several AIs of one level: each gets a number. */
+export const aiSeatId = (level: string, n: number): string => `${aiTrainerId(level)}#${n}`;
 export const aiLevelOf = (trainerId: unknown): string | null => (typeof trainerId === 'string' && trainerId.startsWith(AI_PREFIX) ? trainerId.slice(AI_PREFIX.length).split('#')[0] : null);
 
 const IMMUNE_BY_ABILITY: Record<string, string> = {
@@ -162,6 +164,8 @@ function expectedMoves(speciesId: number, level: number): MoveData[] {
       const probe = { id: `guess-${speciesId}`, finalID: speciesId, baseID: speciesId, level, ivs: GUESS_IVS, learned: [] } as unknown as RosterEntry;
       moves = pickMoveset(probe, 'hard', () => 0.5).map(moveData) as MoveData[];
     } catch {
+      // The probe is a bare entry, not a real Pokémon: if the catalog can't build one for this
+      // species, the AI guesses no moves rather than stalling the turn timer with a throw.
       moves = [];
     }
     guesses.set(key, moves);

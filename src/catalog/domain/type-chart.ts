@@ -10,8 +10,6 @@ export interface TypeInfo {
 
 export const TYPES: Readonly<Record<string, TypeInfo>> = chart.TYPES;
 
-export const typeLabel = (type: string): string => chart.typeLabel(type);
-
 /**
  * How much a move of `moveType` does to a creature with `defTypes`: the product of the chart over
  * each defending type (0, 0.25, 0.5, 1, 2 or 4).

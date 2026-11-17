@@ -9,7 +9,7 @@ import { TrainersService } from '../../trainers/application/trainers.service.js'
 import { TournamentRepository } from '../domain/arena.repositories.js';
 import type { Challenge } from '../domain/challenge.js';
 import { visibilityOf } from '../domain/lobby.js';
-import { roundName, type Tournament } from '../domain/tournament.js';
+import { humanCount, reachedRound, roundName, type Tournament } from '../domain/tournament.js';
 import { Presence, type CountdownPlayer } from './presence.js';
 
 @Injectable()
@@ -28,7 +28,7 @@ export class ArenaViews {
 
   challenge(c: Challenge, viewerId: string | null = null) {
     const host = this.trainers.byId(c.hostId);
-    const hostTeam = (c.status === 'finished' || c.mode !== 'random' ? c.hostTeam : []).map((e) => buildFighter(e, { levelCap: c.levelCap }));
+    const hostTeam = (c.status === 'finished' || c.battleMode !== 'random' ? c.hostTeam : []).map((e) => buildFighter(e, { levelCap: c.levelCap }));
     const T = c.tournamentId ? this.tournaments.findById(c.tournamentId) : undefined;
     return {
       id: c.id,
@@ -42,7 +42,7 @@ export class ArenaViews {
       host: { id: c.hostId, name: host?.name ?? c.hostName },
       guest: c.guestId ? { id: c.guestId, name: this.nameOf(c.guestId, c.guestName) } : null,
       hostTeam: viewerId === c.hostId || c.status === 'finished' ? hostTeam : [],
-      hostTeamSize: c.mode === 'random' ? Math.min(PARTY_SIZE, host?.roster.length ?? 0) : hostTeam.length,
+      hostTeamSize: c.battleMode === 'random' ? Math.min(PARTY_SIZE, host?.roster.length ?? 0) : hostTeam.length,
       winnerId: c.winnerId ?? null,
       turns: c.turns ?? null,
       final: c.final ?? null,
@@ -88,6 +88,30 @@ export class ArenaViews {
       aiLevels: this.skynet.aiLevels,
       serverNow: Date.now(),
     };
+  }
+
+  /** A 1v1 in `trainerId`'s history. */
+  pastChallenge(c: Challenge, trainerId: string) {
+    const mine = c.hostId === trainerId;
+    return {
+      id: c.id,
+      status: c.status,
+      levelCap: c.levelCap,
+      mode: c.battleMode,
+      ai: c.ai ?? null,
+      visibility: visibilityOf(c),
+      createdAt: c.createdAt,
+      opponent: mine ? (c.guestId ? (this.nameOf(c.guestId, c.guestName) ?? null) : null) : this.nameOf(c.hostId, c.hostName),
+      won: c.status === 'finished' ? c.winnerId === trainerId : null,
+      mine,
+    };
+  }
+
+  /** A tournament in `trainerId`'s history: how far they got. */
+  pastTournament(T: Tournament, trainerId: string) {
+    const seat = T.seatOf(trainerId);
+    const reached = T.bracket ? reachedRound(T.bracket, seat) : -1;
+    return { id: T.id, size: T.size, mode: T.mode, levelCap: T.levelCap ?? null, status: T.status, humans: humanCount(T), createdAt: T.createdAt, champion: T.champion === seat, reached: reached === -1 ? null : roundName(T.size, reached) };
   }
 
   countdownPlayer(id: string, fallbackName: string): CountdownPlayer {

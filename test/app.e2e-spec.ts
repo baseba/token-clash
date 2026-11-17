@@ -377,6 +377,10 @@ test('bad uploads get a clear error', async () => {
   const r = await call('/api/import', { method: 'POST', body: { name: 'X', save: '{"hello":1}' } });
   assert.equal(r.status, 400);
   assert.match(r.data.error, /colección/);
+  const notJson = await fetch(`${base}/api/import`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{bad' });
+  assert.deepEqual([notJson.status, await notJson.json()], [400, { error: 'JSON inválido' }]);
+  const huge = await call('/api/import', { method: 'POST', body: { name: 'X', save: 'x'.repeat(10 * 1024 * 1024) } });
+  assert.deepEqual([huge.status, huge.data], [413, { error: 'El archivo es demasiado grande (máx. 9 MB).' }]);
   const traversal = await fetch(`${base}/..%2fserver%2findex.js`);
   assert.equal(traversal.status, 404);
 });
@@ -394,6 +398,26 @@ test('requests with the wrong shape get a 400 before reaching the domain', async
   const unknownAi = await call('/api/challenges', { method: 'POST', token, body: { ai: 'godlike' } });
   assert.equal(unknownAi.status, 400);
   assert.equal(unknownAi.data.error, 'Esa dificultad no está disponible.');
+});
+
+test('malformed socket frames are dropped or answered like a wrong value, and the socket stays usable', async () => {
+  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Ruido', save } })).data;
+  const room = (await call('/api/challenges', { method: 'POST', token, body: { ai: 'easy' } })).data.challenge.id;
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
+  const frames: any[] = [];
+  ws.on('message', (raw) => frames.push(JSON.parse(String(raw))));
+  await new Promise((r) => ws.once('open', r));
+  const next = async () => {
+    for (let i = 0; i < 50 && !frames.length; i++) await new Promise((r) => setTimeout(r, 20));
+    return frames.shift();
+  };
+  for (const frame of ['not json', '[]', JSON.stringify({ t: 'nope' }), JSON.stringify({ t: 'act', action: 'x' })]) ws.send(frame);
+  ws.send(JSON.stringify({ t: 'hello', room: 42 }));
+  assert.deepEqual(await next(), { t: 'error', error: 'Ese desafío no existe.' });
+  ws.send(JSON.stringify({ t: 'hello', room, token }));
+  assert.equal((await next()).you, 0);
+  ws.close();
+  assert.equal((await fetch(`${base}/healthz`)).status, 200);
 });
 
 test('everything survives a restart: sessions, collections, results and tournaments live in SQLite', async () => {

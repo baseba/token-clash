@@ -3,7 +3,8 @@
 // keeps them trivial to test); the Tournament class is the aggregate that uses them and is the
 // only thing the use cases change.
 
-import { conflict } from '../../shared/domain/errors.js';
+import { aiSeatId } from '../../combat/domain/ai.js';
+import { conflict, forbidden } from '../../shared/domain/errors.js';
 import type { BattleMode, Visibility } from './challenge.js';
 
 export const TOURNAMENT_SIZES = [4, 8, 16] as const;
@@ -97,8 +98,8 @@ export function setReady(t: Seated, trainerId: string, ready: boolean): void {
 
 export function nextAiId(t: Pick<Seated, 'seats'>, level: string): { id: string; n: number } {
   let n = 1;
-  while (t.seats.some((s) => s.id === `ai:${level}#${n}`)) n += 1;
-  return { id: `ai:${level}#${n}`, n };
+  while (t.seats.some((s) => s.id === aiSeatId(level, n))) n += 1;
+  return { id: aiSeatId(level, n), n };
 }
 
 export function shuffledOrder(count: number, random = Math.random): number[] {
@@ -225,6 +226,11 @@ export class Tournament implements TournamentState {
 
   seatOf(trainerId: string | null | undefined): number {
     return seatOf(this, trainerId);
+  }
+
+  /** Only the host may `action` ("cerrar el torneo", "agregar IAs"…). */
+  assertHost(trainerId: string, action: string): void {
+    if (trainerId !== this.hostId) throw forbidden(`Solo el dueño puede ${action}.`);
   }
 
   /** Seat changes are only allowed before the tournament starts. */

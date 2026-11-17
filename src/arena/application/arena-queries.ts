@@ -39,6 +39,6 @@ export class ArenaQueries {
   }
 
   tournamentConnections(id: string): ReadonlySet<ClientConnection> {
-    return this.presence.tourSockets(id);
+    return this.presence.tournamentSockets(id);
   }
 }

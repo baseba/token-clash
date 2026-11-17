@@ -57,7 +57,8 @@ src/trainers/
 **La regla de dependencia:** `domain` no importa nada de las otras tres. `application` importa `domain`.
 `infrastructure` e `interface` importan las dos anteriores. Por eso el dominio se testea sin base de datos ni
 servidor (`save-file.spec.ts`, `tournament.spec.ts`…), y cambiar Drizzle por otra cosa solo toca
-`infrastructure/`.
+`infrastructure/`. `src/architecture.spec.ts` revisa los imports de cada archivo y falla si un `domain/` importa
+Nest, Drizzle u otra capa.
 
 El puerto es una clase abstracta (`TrainerRepository`) que además sirve de token de inyección de Nest:
 
@@ -67,9 +68,13 @@ providers: [TrainersService, { provide: TrainerRepository, useClass: DrizzleTrai
 exports: [TrainersService], // ← el repositorio NO se exporta
 ```
 
-`combat` y `catalog` son solo `domain/`: funciones puras con la aleatoriedad inyectada (`random = Math.random`),
+`combat` y `catalog` son casi solo `domain/`: funciones puras con la aleatoriedad inyectada (`random = Math.random`),
 así que sus tests reproducen una pelea entera con una semilla fija. En general, un dominio tiene solo las capas que
 usa: `chat` no tiene HTTP propio (habla por el socket) y `stats` no guarda nada.
+
+Un puerto es opcional: vale la pena cuando el adaptador podría cambiar o hay que reemplazarlo en los tests, como
+el almacenamiento. `SkynetService` (`combat/application`) importa el cliente de Jev de `combat/infrastructure/`
+directamente: hay un solo Jev, y sus tests le pasan un `fetch` falso.
 
 ### ¿Por qué no se ve como la guía de Nest?
 
@@ -89,11 +94,14 @@ pelea, un equipo que no repite especie), y para mostrar la regla de dependencia,
 
 ## 3. Reglas entre dominios
 
-1. **Cada dominio es dueño de sus tablas.** Nadie más las lee ni las escribe.
+1. **Cada dominio es dueño de sus tablas.** Nadie más las lee ni las escribe. Solo los `infrastructure/` usan
+   Drizzle, y nadie importa la `infrastructure/` ni el repositorio de otro dominio: lo revisa
+   `src/architecture.spec.ts`. Nest no lo impide, porque `DatabaseModule` es global y cualquier módulo podría
+   inyectar la base; una consulta escrita a mano contra una tabla ajena tampoco la ve el test, queda a la revisión.
 2. **Si A necesita que cambie algo de B, se lo pide a B.** Al terminar una pelea, `arena` no hace
    `UPDATE trainers SET wins = wins + 1`: llama a `TrainersService.recordRankedResult()`. La regla de qué pelea
    cuenta para el ranking (no contra la IA, no en torneos) la decide `arena` (`Challenge.ranked`); llevar la cuenta
-   es cosa de `trainers`. Nest lo hace cumplir: como `TrainersModule` exporta solo su servicio, inyectar
+   es cosa de `trainers`. Nest hace cumplir esta parte: como `TrainersModule` exporta solo su servicio, inyectar
    `TrainerRepository` desde `arena` hace que la app no arranque.
 3. **Entre dominios se referencian por id, sin foreign keys.** `challenges.host_id` es un texto. Así cada dominio
    podría vivir en otra base, y además un id de la arena puede ser una IA (`ai:hard`), que no es un entrenador.
@@ -134,10 +142,15 @@ ese movimiento, o si al torneo le queda lugar. Nest lo aplica solo con `@Body({ 
 al `StandardSchemaValidationPipe` registrado en `app.module.ts`, y el esquema da también el tipo:
 `type NewChallengeDto = z.infer<typeof NewChallengeDto>`.
 
+Las otras dos entradas siguen la misma regla: se leen una vez, en el borde, y adentro se confía en los tipos. Los
+mensajes del socket tienen sus esquemas en `realtime/client-messages.ts`, y las variables de entorno en
+`shared/config/app-config.ts`, que detiene el servidor al arrancar si una no se puede leer.
+
 ## 5. Una pelea en vivo
 
-Las peleas pasan por WebSocket. `GameGateway` (`realtime/`) recibe mensajes `{ "t": "pick", … }`, los enruta con
-`@SubscribeMessage('pick')` y se los pasa a `DuelService`. Cada sala en curso tiene un `Room` en memoria
+Las peleas pasan por WebSocket. `GameWsAdapter` (`realtime/`) lee cada mensaje `{ "t": "pick", … }` con su
+esquema, y `GameGateway` lo recibe ya tipado en `@SubscribeMessage('pick')` y se lo pasa a `DuelService`. Si el
+dominio dice que no (un `DomainError`), el cliente recibe `{ "t": "error", "error": "…" }`. Cada sala en curso tiene un `Room` en memoria
 (`arena/application/presence.ts`) que avanza así:
 
 ```
@@ -169,7 +182,8 @@ El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection
 
 | Qué | Dónde | Cómo |
 | --- | --- | --- |
-| Reglas puras (save, torneo, lobby, chat, stats, motor, IA) y DTOs | `*.spec.ts` al lado de cada archivo | funciones, sin Nest ni base de datos |
+| Reglas puras (save, torneo, lobby, chat, stats, motor, IA), DTOs y mensajes del socket | `*.spec.ts` al lado de cada archivo | funciones, sin Nest ni base de datos |
+| Reglas de dependencia | `src/architecture.spec.ts` | lee los imports de cada archivo |
 | Persistencia y migración | `src/legacy/legacy-json-import.spec.ts` | SQLite real en un directorio temporal |
 | Todo junto | `test/app.e2e-spec.ts` | levanta la app compilada y juega peleas y torneos por HTTP y WebSocket, y la reinicia |
 | Frontend | `test/web/*.test.js` | JS tal cual, como el navegador (no van en `public/` porque se publicarían) |

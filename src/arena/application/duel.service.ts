@@ -16,6 +16,7 @@ import { SkynetService } from '../../combat/application/skynet.service.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { newId, now } from '../../shared/domain/clock.js';
+import { conflict, DomainError } from '../../shared/domain/errors.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository } from '../domain/arena.repositories.js';
@@ -49,7 +50,7 @@ export function averageLevel(entries: RosterEntry[]): number {
 @Injectable()
 export class DuelService {
   private readonly logger = new Logger(DuelService.name);
-  private readonly t: ArenaTimings;
+  private readonly timings: ArenaTimings;
 
   constructor(
     config: AppConfig,
@@ -61,7 +62,7 @@ export class DuelService {
     private readonly events: ArenaEvents,
     private readonly skynet: SkynetService,
   ) {
-    this.t = config.timings;
+    this.timings = config.timings;
   }
 
   // ---------- starting matches ----------
@@ -71,7 +72,7 @@ export class DuelService {
     const hostTeam = mode === 'random' ? randomParty(trainer.roster) : trainer.teamSnapshot();
     const aiLevel = levelCap ?? averageLevel(hostTeam);
     const aiTeam = mode === 'random' ? buildAiRandomParty({ level: aiLevel }) : buildAiTeam({ difficulty: level, level: aiLevel });
-    const c = Challenge.againstAi({ id: newId(6), host: trainer, hostTeam, ai: { id: aiTrainerId(level), name: aiName(level).name, level }, aiTeam, levelCap, mode, at: now() });
+    const c = Challenge.againstAi({ id: newId(), host: trainer, hostTeam, ai: { id: aiTrainerId(level), name: aiName(level).name, level }, aiTeam, levelCap, mode, at: now() });
     this.challenges.save(c);
     const r = this.presence.room(c.id);
     r.preview = createPreview({
@@ -82,24 +83,27 @@ export class DuelService {
         { trainerId: c.guestId!, name: c.guestName!, entries: aiTeam },
       ],
     });
-    this.armPreviewTimer(c.id, r, mode === 'random' ? this.t.rollMs : 0);
+    this.armPreviewTimer(c.id, r, mode === 'random' ? this.timings.diceRollBonusMs : 0);
     this.scheduleAiPick(c.id, r, 1, level);
     return c;
   }
 
-  /** Someone takes the free seat of an open room. Returns why not, or null. */
-  join(c: Challenge, guest: Trainer): string | null {
-    const host = this.trainers.byId(c.hostId);
-    if (c.mode === 'random') {
-      if (!host?.roster.length) return 'El anfitrión ya no tiene Pokémon.';
-      c.join(guest, { hostTeam: randomParty(host.roster), guestTeam: randomParty(guest.roster) });
+  /** A random battle rolls the host's party when someone joins: a host with no Pokémon left can't be joined. */
+  joinable(c: Challenge): boolean {
+    return c.battleMode !== 'random' || !!this.trainers.byId(c.hostId)?.roster.length;
+  }
+
+  /** Someone takes the free seat of an open room. */
+  join(c: Challenge, guest: Trainer): void {
+    if (!this.joinable(c)) throw conflict('El anfitrión ya no tiene Pokémon.');
+    if (c.battleMode === 'random') {
+      c.join(guest, { hostTeam: randomParty(this.trainers.byId(c.hostId)!.roster), guestTeam: randomParty(guest.roster) });
     } else c.join(guest, { guestTeam: guest.teamSnapshot() });
     this.challenges.save(c);
     const r = this.presence.room(c.id);
     r.readyCheck = { ready: new Set(), players: [this.views.countdownPlayer(c.hostId, c.hostName), this.views.countdownPlayer(guest.id, guest.name)] };
     this.broadcast(r, { t: 'lobby' });
     this.lobby.notify();
-    return null;
   }
 
   /** The host closes the room (or leaves it): everyone inside is told. */
@@ -116,8 +120,8 @@ export class DuelService {
   startCountdown(c: Challenge, tournament: TournamentLabel | null = null): void {
     const r = this.presence.room(c.id);
     r.readyCheck = null;
-    r.countdown = { startedAt: now(), endsAt: now() + this.t.matchMs, players: [this.views.countdownPlayer(c.hostId, c.hostName), this.views.countdownPlayer(c.guestId!, c.guestName!)], tournament };
-    r.countdownTimer = setTimeout(() => this.openWhenArrived(c, r), this.t.matchMs);
+    r.countdown = { startedAt: now(), endsAt: now() + this.timings.countdownMs, players: [this.views.countdownPlayer(c.hostId, c.hostName), this.views.countdownPlayer(c.guestId!, c.guestName!)], tournament };
+    setTimeout(() => this.openWhenArrived(c, r), this.timings.countdownMs);
     this.broadcast(r, { t: 'countdown' });
   }
 
@@ -187,7 +191,7 @@ export class DuelService {
   /** People who follow a tournament: in its page or in the room of one of its matches. */
   private tournamentFollowers(tournamentId: string): string[] {
     const ids = new Set<string>();
-    for (const ws of this.presence.tourSockets(tournamentId)) if (ws.open && ws.trainerId) ids.add(ws.trainerId);
+    for (const ws of this.presence.tournamentSockets(tournamentId)) if (ws.open && ws.trainerId) ids.add(ws.trainerId);
     for (const [id, room] of this.presence.rooms) {
       if (this.challenges.findById(id)?.tournamentId !== tournamentId) continue;
       for (const ws of room.sockets) if (ws.open && ws.trainerId) ids.add(ws.trainerId);
@@ -205,13 +209,13 @@ export class DuelService {
           present: [...r.sockets].filter((ws) => ws.open).map((ws) => ws.trainerId),
         })
       : [];
-    if (pending.length && now() - r.countdown.startedAt < this.t.matchMs + this.t.arrivalMs) {
+    if (pending.length && now() - r.countdown.startedAt < this.timings.countdownMs + this.timings.arrivalWaitMs) {
       const waiting = pending.map((id) => this.trainers.byId(id)?.name ?? '…');
       const changed = JSON.stringify(waiting) !== JSON.stringify(r.countdown.waiting);
       r.countdown.waiting = waiting;
       r.countdown.endsAt = now();
       if (changed) this.broadcast(r, { t: 'countdown' });
-      r.countdownTimer = setTimeout(() => this.openWhenArrived(c, r), 500);
+      setTimeout(() => this.openWhenArrived(c, r), 500);
       return;
     }
     this.openPreview(c, r);
@@ -231,7 +235,7 @@ export class DuelService {
       ],
     });
     r.preview = preview;
-    this.armPreviewTimer(c.id, r, c.mode === 'random' ? this.t.rollMs : 0);
+    this.armPreviewTimer(c.id, r, c.battleMode === 'random' ? this.timings.diceRollBonusMs : 0);
     this.broadcast(r, { t: 'preview' });
     preview.sides.forEach((side, s) => {
       const level = aiLevelOf(side.trainerId);
@@ -249,14 +253,14 @@ export class DuelService {
     clearTimeout(r.timer ?? undefined);
     const preview = r.preview!;
     r.previewShort = this.someoneAbsent(id, r, preview.sides);
-    const ms = (r.previewShort ? Math.min(this.t.absentMs, this.t.previewMs) : this.t.previewMs) + extraMs;
+    const ms = (r.previewShort ? Math.min(this.timings.absentLimitMs, this.timings.pickLimitMs) : this.timings.pickLimitMs) + extraMs;
     r.deadline = now() + ms;
     r.timer = setTimeout(() => {
       if (!r.preview) return;
       fillMissing(r.preview);
       this.revealPicks(id, r);
     }, ms);
-    r.timer.unref?.();
+    r.timer.unref();
   }
 
   /** The AI marks its picks one by one (viewers see them), then confirms. */
@@ -264,7 +268,7 @@ export class DuelService {
     const preview = r.preview!;
     const choice = aiPicks({ difficulty: level, own: preview.sides[s].entries });
     const still = () => r.preview === preview && !preview.sides[s].picks;
-    const step = this.t.aiPickMs / (choice.length + 1);
+    const step = this.timings.aiPickMs / (choice.length + 1);
     choice.forEach((_, i) => {
       setTimeout(
         () => {
@@ -272,27 +276,27 @@ export class DuelService {
           preview.sides[s].draft = choice.slice(0, i + 1);
           this.broadcastWatchers(r);
         },
-        this.t.diceAnimMs + step * (i + 1),
-      ).unref?.();
+        this.timings.diceAnimationMs + step * (i + 1),
+      ).unref();
     });
     setTimeout(() => {
       if (!still()) return;
       pick(preview, s, choice);
       if (previewReady(preview)) this.revealPicks(id, r);
       else this.broadcast(r, { t: 'preview' });
-    }, this.t.diceAnimMs + this.t.aiPickMs).unref?.();
+    }, this.timings.diceAnimationMs + this.timings.aiPickMs).unref();
   }
 
   /** Both sides chose: everyone sees the 3 of each side for a moment, then the battle starts. */
   private revealPicks(id: string, r: Room): void {
     if (!r.preview || r.preview.revealed) return;
-    if (this.t.revealMs <= 0) return this.startBattle(id, r);
+    if (this.timings.revealMs <= 0) return this.startBattle(id, r);
     clearTimeout(r.timer ?? undefined);
     r.preview.revealed = true;
-    r.deadline = now() + this.t.revealMs;
+    r.deadline = now() + this.timings.revealMs;
     this.broadcast(r, { t: 'preview' });
-    r.timer = setTimeout(() => r.preview && this.startBattle(id, r), this.t.revealMs);
-    r.timer.unref?.();
+    r.timer = setTimeout(() => r.preview && this.startBattle(id, r), this.timings.revealMs);
+    r.timer.unref();
   }
 
   // ---------- battle ----------
@@ -322,10 +326,10 @@ export class DuelService {
       if (r.battle !== b) return;
       const waited = now() - since;
       const watching = [...r.sockets].filter((ws) => ws.open).map((ws) => ws.seenTurn);
-      if (waited >= this.t.aiPaceMs && (waited >= this.t.aiWatchMs || !viewersBehind(watching, turn))) return this.aiTurn(id, r);
-      setTimeout(check, 250).unref?.();
+      if (waited >= this.timings.aiVsAiPauseMs && (waited >= this.timings.aiVsAiViewerWaitMs || !viewersBehind(watching, turn))) return this.aiTurn(id, r);
+      setTimeout(check, 250).unref();
     };
-    setTimeout(check, Math.min(this.t.aiPaceMs, 250)).unref?.();
+    setTimeout(check, Math.min(this.timings.aiVsAiPauseMs, 250)).unref();
   }
 
   private aiTurn(id: string, r: Room): void {
@@ -363,7 +367,9 @@ export class DuelService {
     let events: BattleEvent[] | null;
     try {
       events = submit(b, s, action);
-    } catch {
+    } catch (e) {
+      // The turn timer still plays for Skynet.
+      this.logger.warn(`Skynet: no se pudo jugar su acción (${e}).`);
       return;
     }
     if (events) this.afterResolve(id, r, events);
@@ -377,7 +383,7 @@ export class DuelService {
     r.deadline = null;
     const b = r.battle;
     if (!b || b.status !== 'active') return;
-    const ms = this.someoneAbsent(id, r, b.sides) ? Math.min(this.t.absentMs, this.t.turnMs) : this.t.turnMs;
+    const ms = this.someoneAbsent(id, r, b.sides) ? Math.min(this.timings.absentLimitMs, this.timings.turnLimitMs) : this.timings.turnLimitMs;
     r.deadline = now() + ms;
     r.timer = setTimeout(() => {
       let events: BattleEvent[] | null = null;
@@ -389,7 +395,7 @@ export class DuelService {
       });
       this.afterResolve(id, r, events ?? [], true);
     }, ms);
-    r.timer.unref?.();
+    r.timer.unref();
   }
 
   private afterResolve(id: string, r: Room, events: BattleEvent[], timedOut = false): void {
@@ -441,9 +447,9 @@ export class DuelService {
   // ---------- messages from a client in a room ----------
 
   /** A client opens a room page. Returns the challenge, or null if it doesn't exist. */
-  enter(ws: ClientConnection, msg: { token?: unknown; room?: unknown }): Challenge | null {
-    if (typeof msg.token === 'string') ws.trainerId = this.trainers.authenticate(msg.token)?.id ?? null;
-    const c = typeof msg.room === 'string' ? this.challenges.findById(msg.room) : undefined;
+  enter(ws: ClientConnection, room: string, token: string | undefined): Challenge | null {
+    if (token !== undefined) ws.trainerId = this.trainers.authenticate(token)?.id ?? null;
+    const c = this.challenges.findById(room);
     if (!c) {
       ws.send({ t: 'error', error: 'Ese desafío no existe.' });
       return null;
@@ -472,7 +478,7 @@ export class DuelService {
         if (!r.readyCheck || this.presence.inRoom(r, ws.trainerId)) return;
         if (ws.trainerId === c.hostId) this.close(c);
         else this.reopenRoom(c, r);
-      }, this.t.seatGraceMs).unref?.();
+      }, this.timings.seatGraceMs).unref();
     }
     if (r.battle || r.preview) this.broadcast(r, { t: 'presence' });
     if (!r.battle && !r.preview && !r.countdown && !r.readyCheck && r.sockets.size === 0) this.presence.rooms.delete(c.id);
@@ -491,52 +497,58 @@ export class DuelService {
     if (r?.readyCheck && c?.guestId === ws.trainerId) this.reopenRoom(c!, r);
   }
 
-  seen(ws: ClientConnection, turn: unknown): void {
-    ws.seenTurn = Math.max(ws.seenTurn ?? 0, Number(turn) || 0);
+  seen(ws: ClientConnection, turn: number): void {
+    ws.seenTurn = Math.max(ws.seenTurn ?? 0, turn);
   }
 
   /** A player is marking picks (not confirmed yet): viewers see the draft live. */
-  choosing(ws: ClientConnection, picks: unknown): void {
+  choosing(ws: ClientConnection, picks: number[]): void {
     const r = this.presence.rooms.get(ws.roomId!);
     if (!r?.preview || r.preview.revealed) return;
     const s = sideIn(r.preview.sides, ws.trainerId);
     if (s === null || r.preview.sides[s].picks) return;
     const side = r.preview.sides[s];
-    side.draft = Array.isArray(picks)
-      ? [...new Set(picks.map(Number))].filter((i) => Number.isInteger(i) && i >= 0 && i < side.entries.length).slice(0, picksNeeded(r.preview, s))
-      : [];
+    side.draft = [...new Set(picks)].filter((i) => i >= 0 && i < side.entries.length).slice(0, picksNeeded(r.preview, s));
     this.broadcastWatchers(r);
   }
 
-  pick(ws: ClientConnection, picks: unknown): void {
+  pick(ws: ClientConnection, picks: number[]): void {
     const r = this.presence.rooms.get(ws.roomId!);
     if (!r?.preview) return;
     const s = sideIn(r.preview.sides, ws.trainerId);
     if (s === null) return;
     try {
-      pick(r.preview, s, (Array.isArray(picks) ? picks.map(Number) : null) as number[]);
-    } catch (e) {
-      return ws.send({ t: 'error', error: (e as Error).message });
+      pick(r.preview, s, picks);
+    } catch (error) {
+      return this.refuse(ws, error);
     }
     if (previewReady(r.preview)) this.revealPicks(ws.roomId!, r);
     else this.broadcast(r, { t: 'preview' });
   }
 
-  act(ws: ClientConnection, a: unknown): void {
+  act(ws: ClientConnection, action: Action | null): void {
     const r = this.presence.rooms.get(ws.roomId!);
     if (!r?.battle || r.battle.status !== 'active') return;
     const s = sideOf(r.battle, ws.trainerId);
     if (s === null) return;
-    const raw = (a ?? null) as { type?: unknown; move?: unknown; to?: unknown } | null;
-    const action: Action | null = raw && raw.type === 'move' ? { type: 'move', move: Number(raw.move) } : raw && raw.type === 'switch' ? { type: 'switch', to: Number(raw.to) } : null;
     let events: BattleEvent[] | null;
     try {
-      events = submit(r.battle, s, action as Action);
-    } catch (e) {
-      return ws.send({ t: 'error', error: (e as Error).message });
+      events = submit(r.battle, s, action);
+    } catch (error) {
+      return this.refuse(ws, error);
     }
     if (events) this.afterResolve(ws.roomId!, r, events);
     else this.broadcast(r, { t: 'ready' });
+  }
+
+  /**
+   * A rule said no: the player reads why. Anything else is an engine bug: it goes to the log, and the
+   * player still gets an error frame (the client only shows frames with a `t`), never a stuck screen.
+   */
+  private refuse(ws: ClientConnection, error: unknown): void {
+    if (error instanceof DomainError) return ws.send({ t: 'error', error: error.message });
+    this.logger.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
+    ws.send({ t: 'error', error: 'Algo falló en el servidor. Intenta de nuevo.' });
   }
 
   /** Who is talking in a room's chat: a player (and which side) or a viewer. */

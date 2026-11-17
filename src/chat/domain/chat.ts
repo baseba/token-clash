@@ -17,8 +17,7 @@ export interface ChatMessage {
 }
 
 /** Cleans a message (control characters, extra spaces, length), or null if nothing is left. */
-export function chatText(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
+export function chatText(raw: string): string | null {
   const text = raw.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
   return text ? [...text].slice(0, CHAT_MAX_LENGTH).join('') : null;
 }

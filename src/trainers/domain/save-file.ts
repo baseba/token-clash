@@ -7,6 +7,7 @@
 
 import { hash, NATURE_NAMES } from '../../catalog/domain/creatures.js';
 import { uniqueSpecies, variantKey, type Gender, type Ivs, type Rarity, type RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { invalid } from '../../shared/domain/errors.js';
 
 const RARITIES = new Set(['common', 'uncommon', 'rare', 'legendary']);
 const UUID = /^[0-9a-fA-F-]{8,40}$/;
@@ -15,9 +16,6 @@ const ABILITY_KEY = /^[a-z0-9-]{1,40}$/;
 const GENDERS = new Set(['male', 'female']);
 const MOVE_KEY = /^[a-z0-9-]{1,40}$/;
 const MAX_LEARNED = 120;
-
-/** The file is not a save we can read. The message tells the player what to do. */
-export class SaveError extends Error {}
 
 export interface ParsedSave {
   roster: RosterEntry[];
@@ -127,13 +125,13 @@ export function parseSave(text: string): ParsedSave {
     // profile.seed is a uint64 and loses precision here; we never use it.
     json = JSON.parse(text);
   } catch {
-    throw new SaveError('El archivo no es JSON válido.');
+    throw invalid('El archivo no es JSON válido.');
   }
-  if (!isObject(json)) throw new SaveError('El archivo no es un save de PokeTokenBar.');
-  if ('format' in json && json.format !== 'poketokenbar.save') throw new SaveError('Formato de archivo desconocido.');
+  if (!isObject(json)) throw invalid('El archivo no es un save de PokeTokenBar.');
+  if ('format' in json && json.format !== 'poketokenbar.save') throw invalid('Formato de archivo desconocido.');
   const state = json.format === 'poketokenbar.save' ? json.state : json;
   if (!isObject(state) || (!Array.isArray(state.dex) && !state.active)) {
-    throw new SaveError('No encontré tu colección. Exporta desde PokeTokenBar → Ajustes → Backup & Transfer.');
+    throw invalid('No encontré tu colección. Exporta desde PokeTokenBar → Ajustes → Backup & Transfer.');
   }
 
   const candidates: CaughtCandidate[] = [];
@@ -165,7 +163,7 @@ export function parseSave(text: string): ParsedSave {
 
   const roster = firstOfEachSpecies(candidates).slice(0, MAX_ROSTER);
 
-  if (roster.length === 0) throw new SaveError('Tu save no tiene Pokémon todavía (¿solo un huevo?). Vuelve cuando nazca el primero.');
+  if (roster.length === 0) throw invalid('Tu save no tiene Pokémon todavía (¿solo un huevo?). Vuelve cuando nazca el primero.');
 
   const used = Number(state.usedSinceInstall);
   return {

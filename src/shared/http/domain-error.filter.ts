@@ -4,7 +4,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger, NotFoundException } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { DomainError, type DomainErrorKind } from '../domain/errors.js';
-import { SaveError } from '../../trainers/domain/save-file.js';
 
 const STATUS: Record<DomainErrorKind, number> = { invalid: 400, forbidden: 403, 'not-found': 404, conflict: 409, gone: 410, unavailable: 503 };
 
@@ -21,11 +20,6 @@ export class DomainErrorFilter implements ExceptionFilter {
     const reply = (status: number, error: string) => (api ? res.status(status).json({ error }) : res.status(status).type('text/plain; charset=utf-8').send(error));
 
     if (err instanceof DomainError) return void reply(STATUS[err.kind], err.message);
-    if (err instanceof SaveError) return void reply(400, err.message);
-    // Body parser errors.
-    const type = (err as { type?: string })?.type;
-    if (type === 'entity.too.large') return void reply(413, 'El archivo es demasiado grande (máx. 8 MB).');
-    if (type === 'entity.parse.failed') return void reply(400, 'JSON inválido');
     if (err instanceof NotFoundException) {
       // No route matched (the app itself never throws NotFoundException: it uses DomainError).
       if (api) return void reply(404, 'No encontrado');

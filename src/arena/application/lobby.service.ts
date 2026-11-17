@@ -43,7 +43,7 @@ export class LobbyService {
     return list.slice(0, LISTED);
   }
 
-  subscribe(ws: ClientConnection, token: unknown): void {
+  subscribe(ws: ClientConnection, token: string | undefined): void {
     ws.trainerId = this.trainers.peekToken(token)?.id ?? null;
     this.presence.lobby.add(ws);
     this.send(ws, true);

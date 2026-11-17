@@ -1,9 +1,10 @@
 // Team preview: each side sees the rival's party (up to 6) and secretly picks the 3 that fight.
 import { buildFighter, type Fighter } from '../../catalog/domain/creatures.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { conflict, invalid } from '../../shared/domain/errors.js';
+import { BATTLE_SIZE } from './battle.js';
 
 export const PARTY_SIZE = 6;
-export const BATTLE_SIZE = 3;
 
 export interface PreviewSide {
   trainerId: string;
@@ -33,14 +34,14 @@ export function createPreview({ sides, levelCap = null, mode = 'team' }: { sides
 
 export const picksNeeded = (p: PreviewState, s: number): number => Math.min(BATTLE_SIZE, p.sides[s].entries.length);
 
-export function validPicks(p: PreviewState, s: number, picks: unknown): picks is number[] {
+function validPicks(p: PreviewState, s: number, picks: number[]): boolean {
   const n = picksNeeded(p, s);
-  return Array.isArray(picks) && picks.length === n && new Set(picks).size === n && picks.every((i) => Number.isInteger(i) && i >= 0 && i < p.sides[s].entries.length);
+  return picks.length === n && new Set(picks).size === n && picks.every((i) => Number.isInteger(i) && i >= 0 && i < p.sides[s].entries.length);
 }
 
-export function pick(p: PreviewState, s: number, picks: unknown): void {
-  if (p.sides[s].picks) throw new Error('Ya elegiste tu equipo.');
-  if (!validPicks(p, s, picks)) throw new Error(`Elige ${picksNeeded(p, s)} Pokémon distintos.`);
+export function pick(p: PreviewState, s: number, picks: number[]): void {
+  if (p.sides[s].picks) throw conflict('Ya elegiste tu equipo.');
+  if (!validPicks(p, s, picks)) throw invalid(`Elige ${picksNeeded(p, s)} Pokémon distintos.`);
   p.sides[s].picks = [...picks];
 }
 

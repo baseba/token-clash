@@ -7,8 +7,8 @@ test('a chat line is trimmed, keeps to one line and is capped in length', () => 
   assert.equal([...chatText('🔥'.repeat(CHAT_MAX_LENGTH + 10))].length, CHAT_MAX_LENGTH);
 });
 
-test('empty or non-text messages are dropped', () => {
-  for (const raw of ['', '   ', '\n\t', null, 42, { text: 'x' }]) assert.equal(chatText(raw), null);
+test('empty messages are dropped', () => {
+  for (const raw of ['', '   ', '\n\t']) assert.equal(chatText(raw), null);
 });
 
 test('the chat history keeps only the most recent messages', () => {
