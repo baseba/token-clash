@@ -7,19 +7,25 @@ import type { Action, BattleFighter, BattleSide, BattleState, MoveAction, Switch
 import { randomize } from './random-party.js';
 import { PARTY_SIZE } from './team-preview.js';
 
-export const AI_LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
+export const AI_LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'] as const;
+export type AiLevel = (typeof AI_LEVELS)[number];
+export const isAiLevel = (value: string): value is AiLevel => AI_LEVELS.some((level) => level === value);
 
 // Skynet's turns are decided by Jev (combat/infrastructure/jev/jev.ts). Everything else, and its fallback when Jev
 // can't answer, is the very hard AI.
 export const JEV_LEVEL = 'skynet';
-const tactics = (difficulty: string): string => (difficulty === JEV_LEVEL ? 'veryhard' : difficulty);
+const tactics = (level: AiLevel): Exclude<AiLevel, typeof JEV_LEVEL> => (level === JEV_LEVEL ? 'veryhard' : level);
 export const AI_PREFIX = 'ai:';
 export const LAST_AI_SPECIES = DEX_LIMIT;
 
-export const aiTrainerId = (level: string): string => `${AI_PREFIX}${level}`;
+export const aiTrainerId = (level: AiLevel): string => `${AI_PREFIX}${level}`;
 /** A tournament can seat several AIs of one level: each gets a number. */
-export const aiSeatId = (level: string, seatNumber: number): string => `${aiTrainerId(level)}#${seatNumber}`;
-export const aiLevelOf = (trainerId: unknown): string | null => (typeof trainerId === 'string' && trainerId.startsWith(AI_PREFIX) ? trainerId.slice(AI_PREFIX.length).split('#')[0] : null);
+export const aiSeatId = (level: AiLevel, seatNumber: number): string => `${aiTrainerId(level)}#${seatNumber}`;
+export function aiLevelOf(trainerId: string): AiLevel | null {
+  if (!trainerId.startsWith(AI_PREFIX)) return null;
+  const level = trainerId.slice(AI_PREFIX.length).split('#')[0];
+  return isAiLevel(level) ? level : null;
+}
 
 const IMMUNE_BY_ABILITY: Record<string, string> = {
   levitate: 'ground', 'volt-absorb': 'electric', 'lightning-rod': 'electric', 'motor-drive': 'electric', 'water-absorb': 'water',
@@ -78,7 +84,7 @@ function moveValue(move: MoveData, mon: { types: string[]; stats: { atk: number;
   return value;
 }
 
-export function pickMoveset(entry: RosterEntry, difficulty: string, random: Random): string[] {
+export function pickMoveset(entry: RosterEntry, difficulty: AiLevel, random: Random): string[] {
   const pool = usableMovepool(entry);
   if (difficulty === 'easy' || pool.length <= MOVES_PER_FIGHTER) return shuffled(pool, random).slice(0, MOVES_PER_FIGHTER);
   const mon = buildFighter({ ...entry, moveset: pool.slice(0, 1) });
@@ -111,7 +117,7 @@ function usableAtLevel(id: number, level: number): boolean {
   return usableMovepool({ id: 'probe', finalID: id, level, learned: [] }).some((k) => (moveData(k) as MoveData).kind === 'attack');
 }
 
-export const AI_POOL_SHARE: Record<string, number> = { easy: 1, mid: 0.8, hard: 0.6, veryhard: 0.5, skynet: 0.4 };
+export const AI_POOL_SHARE: Record<AiLevel, number> = { easy: 1, mid: 0.8, hard: 0.6, veryhard: 0.5, skynet: 0.4 };
 
 const DICE_IVS = { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 };
 
@@ -119,15 +125,15 @@ function diceEntry(id: number, { level, random, index }: { level: number; random
   return randomize({ id: `ai-${index}-${id}`, finalID: id, baseID: id, rarity: rarityOf(speciesData(id) as SpeciesData), shiny: false, level, ivs: DICE_IVS, learned: [] }, random);
 }
 
-export function aiTeamPool(difficulty: string, level: number): number[] {
+export function aiTeamPool(difficulty: AiLevel, level: number): number[] {
   const ranked = aiPool()
     .filter((id) => fullyEvolved(speciesData(id) as SpeciesData) && usableAtLevel(id, level))
     .sort((a, b) => bst(speciesData(b) as SpeciesData) - bst(speciesData(a) as SpeciesData) || a - b);
-  const size = Math.max(PARTY_SIZE, Math.ceil(ranked.length * (AI_POOL_SHARE[difficulty] ?? 1)));
+  const size = Math.max(PARTY_SIZE, Math.ceil(ranked.length * AI_POOL_SHARE[difficulty]));
   return ranked.slice(0, size);
 }
 
-export function buildAiTeam({ difficulty, level, random = Math.random }: { difficulty: string; level: number; random?: Random }): RosterEntry[] {
+export function buildAiTeam({ difficulty, level, random = Math.random }: { difficulty: AiLevel; level: number; random?: Random }): RosterEntry[] {
   const ids = shuffled(aiTeamPool(difficulty, level), random).slice(0, PARTY_SIZE);
   return ids.map((id, index) => diceEntry(id, { level, random, index }));
 }
@@ -139,7 +145,7 @@ export function buildAiRandomParty({ level, random = Math.random }: { level: num
 
 // The three for the battle are picked on a hunch, without looking at the rival's party: easier
 // AIs at random, harder ones leaning towards their strongest.
-export function aiPicks({ difficulty: level, own, random = Math.random }: { difficulty: string; own: RosterEntry[]; random?: Random }): number[] {
+export function aiPicks({ difficulty: level, own, random = Math.random }: { difficulty: AiLevel; own: RosterEntry[]; random?: Random }): number[] {
   const difficulty = tactics(level);
   const order = own.map((_, i) => i);
   const count = Math.min(BATTLE_SIZE, own.length);
@@ -401,7 +407,7 @@ function safeLookahead(battle: BattleState, sideIndex: number, options: Action[]
   }
 }
 
-export function chooseAction(battle: BattleState, sideIndex: number, level: string, random: Random = Math.random): Action | null {
+export function chooseAction(battle: BattleState, sideIndex: number, level: AiLevel, random: Random = Math.random): Action | null {
   const difficulty = tactics(level);
   const options = validActions(battle, sideIndex);
   if (!options.length) return null;

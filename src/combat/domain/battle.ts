@@ -1,5 +1,5 @@
 // Turn-based battle engine. Pure: no I/O, randomness injected, so it can be tested and replayed.
-import { buildFighter, effectiveness, formData, statsFor, speciesData, moveData, ALL_MOVE_IDS, STRUGGLE, type BoostKey, type Boosts, type MoveData, type Stats } from '../../catalog/domain/creatures.js';
+import { buildFighter, effectiveness, formData, statsFor, speciesData, moveData, ALL_MOVE_IDS, STRUGGLE, type BoostKey, type Boosts, type MajorStatus, type MoveData, type Stats, type Weather } from '../../catalog/domain/creatures.js';
 import { MOVE_RULES } from '../../catalog/domain/move-rules.js';
 import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
 import { ABILITIES, type AbilityEffect, type AbilityHook, type BoostChanges } from './ability-effects.js';
@@ -17,11 +17,10 @@ export const BATTLE_SIZE = 3;
 export const TURN_LIMIT = 100;
 const STAGE_LIMIT = 6;
 const FIELD_TURNS = 5;
-const PRIMAL = new Set<string | null>(['heavyrain', 'harshsun', 'winds']);
-const MAJOR = new Set(['brn', 'par', 'psn', 'tox', 'slp', 'frz']);
+const PRIMAL = new Set<Weather | null>(['heavyrain', 'harshsun', 'winds']);
 const SAND_PROOF = ['rock', 'ground', 'steel'];
 const SCREEN_KINDS = ['reflect', 'lightscreen', 'auroraveil'];
-const VEIL_WEATHER = new Set<string | null>(['hail', 'snow']);
+const VEIL_WEATHER = new Set<Weather | null>(['hail', 'snow']);
 
 const stageMult = (stage: number): number => (stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage));
 const accuracyMult = (stage: number): number => (stage >= 0 ? (3 + stage) / 3 : 3 / (3 - stage));
@@ -31,7 +30,7 @@ const isSun = (weather: string | null | undefined): boolean => weather === 'sun'
 const isRain = (weather: string | null | undefined): boolean => weather === 'rain' || weather === 'heavyrain';
 const poisoned = (status: string | null | undefined): boolean => status === 'psn' || status === 'tox';
 export const STRUGGLE_MOVE = -1;
-const HEALS_WITH_WEATHER: Record<string, string> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
+const HEALS_WITH_WEATHER: Record<string, Weather> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
 
 function prepare(entry: RosterEntry, levelCap: number | null): BattleFighter {
   const fighter = buildFighter(entry, { levelCap });
@@ -184,7 +183,7 @@ function makeEngine(battle: BattleState) {
       boost(battle, fighter, changes, source, opts),
     damage: (fighter: BattleFighter, amount: number, cause?: string) => hurt(battle, fighter, amount, cause),
     heal: (fighter: BattleFighter, amount: number, source?: BattleFighter | null, opts?: { silent?: boolean }) => heal(battle, fighter, amount, opts),
-    setStatus: (fighter: BattleFighter, status: string, source?: BattleFighter | null, opts?: { ability?: BattleFighter }) =>
+    setStatus: (fighter: BattleFighter, status: MajorStatus, source?: BattleFighter | null, opts?: { ability?: BattleFighter }) =>
       setStatus(battle, fighter, status, source, opts),
     addVolatile: (
       fighter: BattleFighter,
@@ -196,7 +195,7 @@ function makeEngine(battle: BattleState) {
     cure: (fighter: BattleFighter, announce?: boolean) => cure(battle, fighter, announce),
     weather: () => currentWeather(battle),
     terrain: () => battle.field.terrain,
-    setWeather: (weather: string, source: BattleFighter | null) => setWeather(battle, weather, source),
+    setWeather: (weather: Weather, source: BattleFighter | null) => setWeather(battle, weather, source),
     setTerrain: (terrain: string, source: BattleFighter | null) => setTerrain(battle, terrain, source),
     grounded: (fighter: BattleFighter) => grounded(battle, fighter),
     asleep: (fighter: BattleFighter) => fighter.status === 'slp' || flag(battle, fighter, 'comatose'),
@@ -243,7 +242,7 @@ function makeMoveApi(battle: BattleState) {
     hurt: (fighter: BattleFighter, amount: number, cause?: string) => hurt(battle, fighter, amount, cause),
     heal: (fighter: BattleFighter, amount: number) => heal(battle, fighter, amount),
     boost: (fighter: BattleFighter, changes: Boosts, source?: BattleFighter | null) => boost(battle, fighter, changes, source),
-    setStatus: (fighter: BattleFighter, status: string, source?: BattleFighter | null) => setStatus(battle, fighter, status, source),
+    setStatus: (fighter: BattleFighter, status: MajorStatus, source?: BattleFighter | null) => setStatus(battle, fighter, status, source),
     cure: (fighter: BattleFighter) => cure(battle, fighter),
     addVolatile: (
       fighter: BattleFighter,
@@ -530,17 +529,17 @@ function grounded(battle: BattleState, fighter: BattleFighter): boolean {
   return !fighter.types.includes('flying') && !flag(battle, fighter, 'levitates');
 }
 
-function currentWeather(battle: BattleState): string | null {
+function currentWeather(battle: BattleState): Weather | null {
   if (anyActiveHas(battle, 'cloud-nine') || anyActiveHas(battle, 'air-lock')) return null;
   return battle.field.weather;
 }
 
-function weatherFor(battle: BattleState, fighter: BattleFighter): string | null {
+function weatherFor(battle: BattleState, fighter: BattleFighter): Weather | null {
   const weather = currentWeather(battle);
   return !weather && flag(battle, fighter, 'actsInSun') ? 'harshsun' : weather;
 }
 
-function statusImmune(battle: BattleState, fighter: BattleFighter, status: string, source: BattleFighter | null): boolean {
+function statusImmune(battle: BattleState, fighter: BattleFighter, status: MajorStatus, source: BattleFighter | null): boolean {
   if (status === 'brn' && fighter.types.includes('fire')) return true;
   if (status === 'par' && fighter.types.includes('electric')) return true;
   if (status === 'frz' && (fighter.types.includes('ice') || isSun(currentWeather(battle)))) return true;
@@ -554,11 +553,11 @@ function statusImmune(battle: BattleState, fighter: BattleFighter, status: strin
 function setStatus(
   battle: BattleState,
   fighter: BattleFighter,
-  status: string,
+  status: MajorStatus,
   source: BattleFighter | null = null,
   opts: { ability?: BattleFighter } = {},
 ): boolean {
-  if (fighter.hp <= 0 || fighter.status || !MAJOR.has(status)) return false;
+  if (fighter.hp <= 0 || fighter.status) return false;
   if (statusImmune(battle, fighter, status, source)) return false;
   if (source && source !== fighter && battle.sides[sideIndexOf(battle, fighter)].conds.safeguard) return false;
   if (status === 'slp' && activeFighters(battle).some((o) => o.volatiles.uproar)) return false;
@@ -637,7 +636,7 @@ function setTypes(battle: BattleState, fighter: BattleFighter, types: readonly s
   emit(battle, { t: 'types', side: sideIndexOf(battle, fighter), types: fighter.types });
 }
 
-function setWeather(battle: BattleState, weather: string, source: BattleFighter | null): boolean {
+function setWeather(battle: BattleState, weather: Weather, source: BattleFighter | null): boolean {
   const cur = battle.field.weather;
   if (cur === weather) return false;
   if (PRIMAL.has(cur) && !PRIMAL.has(weather)) return false;
@@ -1199,8 +1198,8 @@ function spendPP(battle: BattleState, me: BattleFighter, move: AnyMove): void {
 }
 
 const FOCUS_MOVES = new Set(['focus-punch', 'shell-trap', 'beak-blast']);
-const STATUSED = new Set<string | null>(['brn', 'par', 'psn', 'tox']);
-const WEATHER_BALL: Record<string, string> = { sun: 'fire', harshsun: 'fire', rain: 'water', heavyrain: 'water', sand: 'rock', hail: 'ice', snow: 'ice' };
+const STATUSED = new Set<MajorStatus | null>(['brn', 'par', 'psn', 'tox']);
+const WEATHER_BALL: Partial<Record<Weather, string>> = { sun: 'fire', harshsun: 'fire', rain: 'water', heavyrain: 'water', sand: 'rock', hail: 'ice', snow: 'ice' };
 const TERRAIN_PULSE: Record<string, string> = { electric: 'electric', grassy: 'grass', misty: 'fairy', psychic: 'psychic' };
 
 function moveOfAction(battle: BattleState, sideIndex: number, idx: number): MoveData {
@@ -1243,8 +1242,9 @@ export function moveWillFail(battle: BattleState, sideIndex: number, idx: number
 
 function adaptMove(battle: BattleState, me: BattleFighter, move: BattleMove): void {
   const weather = currentWeather(battle);
-  if (move.id === 'weather-ball' && WEATHER_BALL[weather as string]) {
-    move.type = WEATHER_BALL[weather as string];
+  const ballType = weather && WEATHER_BALL[weather];
+  if (move.id === 'weather-ball' && ballType) {
+    move.type = ballType;
     move.power = 100;
   }
   if (move.id === 'terrain-pulse' && battle.field.terrain && grounded(battle, me)) {

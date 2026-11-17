@@ -2,7 +2,7 @@
 // those still arriving), each side picking 3 of its 6 with a clock, the AI's picks, and the
 // reveal of both picks before LiveBattleService starts the battle.
 import { Injectable, Logger } from '@nestjs/common';
-import { aiLevelOf, aiPicks } from '../../combat/domain/ai.js';
+import { aiLevelOf, aiPicks, type AiLevel } from '../../combat/domain/ai.js';
 import { createPreview, fillMissing, pick, picksNeeded, previewReady } from '../../combat/domain/team-preview.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { now } from '../../shared/domain/clock.js';
@@ -157,7 +157,7 @@ export class TeamPreviewService {
   }
 
   /** The AI marks its picks one by one (viewers see them), then confirms. */
-  private scheduleAiPick(room: Room, phase: PreviewPhase, sideIndex: number, level: string): void {
+  private scheduleAiPick(room: Room, phase: PreviewPhase, sideIndex: number, level: AiLevel): void {
     const { preview } = phase;
     const choice = aiPicks({ difficulty: level, own: preview.sides[sideIndex].entries });
     const still = () => room.phase === phase && !preview.sides[sideIndex].picks;

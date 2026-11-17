@@ -2,7 +2,7 @@
 // match at a time. Each match is an ordinary challenge that starts at its countdown; when its
 // battle ends, LiveBattleService announces it (ArenaEvents) and the bracket advances here.
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { buildAiRandomParty, buildAiTeam } from '../../combat/domain/ai.js';
+import { aiLevelOf, buildAiRandomParty, buildAiTeam } from '../../combat/domain/ai.js';
 import { randomParty } from '../../combat/domain/random-party.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
@@ -206,7 +206,8 @@ export class TournamentsService implements OnModuleInit {
 
   private seatTeam(tournament: Tournament, seat: Seat): RosterEntry[] {
     const level = tournament.aiLevel!;
-    if (seat.ai) return tournament.mode === 'random' ? buildAiRandomParty({ level }) : buildAiTeam({ difficulty: seat.ai, level });
+    const ai = aiLevelOf(seat.id);
+    if (ai) return tournament.mode === 'random' ? buildAiRandomParty({ level }) : buildAiTeam({ difficulty: ai, level });
     const trainer = this.trainers.byId(seat.id);
     if (!trainer?.roster.length) return buildAiRandomParty({ level });
     return tournament.mode === 'random' ? randomParty(trainer.roster) : trainer.teamSnapshot();

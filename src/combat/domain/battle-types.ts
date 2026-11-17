@@ -1,7 +1,7 @@
 // The shapes the battle engine works on. The engine (battle.ts) mutates these in place; the rules of
 // abilities (catalog/domain/abilities.ts) and moves (catalog/domain/move-rules.ts) receive them
 // through the APIs battle.ts hands them (AbilityEngine and MoveRuleApi).
-import type { BoostKey, Fighter, MoveData, Stats } from '../../catalog/domain/creatures.js';
+import type { BoostKey, Fighter, MajorStatus, MoveData, Stats, Weather } from '../../catalog/domain/creatures.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 
 export interface MoveAction {
@@ -45,7 +45,7 @@ export interface Look {
 export interface BattleFighter extends Fighter {
   hp: number;
   boosts: Record<BoostKey, number>;
-  status: string | null;
+  status: MajorStatus | null;
   statusTurns: number;
   volatiles: Volatiles;
   activeTurns: number;
@@ -89,7 +89,7 @@ export interface BattleMove extends MoveData {
 }
 
 export interface FieldState {
-  weather: string | null;
+  weather: Weather | null;
   weatherTurns: number;
   weatherSetter: BattleFighter | null;
   terrain: string | null;

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lineage, lineageLearnset, learnedMoves, moveOrigins, validMoveset } from './creatures.js';
+import { ALL_MOVE_IDS, lineage, lineageLearnset, learnedMoves, moveData, moveOrigins, validMoveset, type MajorStatus, type Weather } from './creatures.js';
 
 test('a species carries its whole pre-evolution line', () => {
   assert.deepEqual(lineage(26), [26, 25, 172]);
@@ -33,4 +33,14 @@ test('each move keeps the earliest level in the line and the closest species tha
   assert.equal(learnset.get('thunder').from, 25);
   const charizard = lineageLearnset(6);
   assert.deepEqual(charizard.get('dragon-rage'), { level: 16, from: 6 });
+});
+
+test('movedex.json only names the statuses and weathers the engine knows', () => {
+  const statuses: Record<MajorStatus, true> = { brn: true, par: true, psn: true, tox: true, slp: true, frz: true };
+  const weathers: Record<Weather, true> = { sun: true, rain: true, sand: true, hail: true, snow: true, harshsun: true, heavyrain: true, winds: true };
+  for (const id of ALL_MOVE_IDS()) {
+    const move = moveData(id)!;
+    for (const status of [move.status, ...(move.secondary ?? []).map((s) => s.status)]) if (status) assert.ok(status in statuses, `${id}: ${status}`);
+    if (move.weather) assert.ok(move.weather in weathers, `${id}: ${move.weather}`);
+  }
 });

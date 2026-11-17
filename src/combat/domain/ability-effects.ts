@@ -1,7 +1,7 @@
 // What each ability does in battle (EFFECTS). The effects are hooks the engine calls (onStart,
 // onBasePower, onTryHit…) with the AbilityEngine that battle.ts hands them, so they never touch the
 // battle state directly. Names and descriptions are catalog data: catalog/domain/abilities.ts.
-import type { Boosts, BoostKey, MoveData, StatKey } from '../../catalog/domain/creatures.js';
+import type { Boosts, BoostKey, MajorStatus, MoveData, StatKey, Weather } from '../../catalog/domain/creatures.js';
 import type { AbilityEngine } from './battle.js';
 import type { BattleFighter, BattleMove } from './battle-types.js';
 
@@ -59,7 +59,7 @@ export interface AbilityEffect {
   onAfterEachBoost?(engine: AbilityEngine, me: BattleFighter, applied: Boosts, source: BattleFighter | null, effect?: string): unknown;
   onAfterMoveHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, total: number): unknown;
   onAfterMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
-  onAfterSetStatus?(engine: AbilityEngine, me: BattleFighter, status: string, source: BattleFighter | null): unknown;
+  onAfterSetStatus?(engine: AbilityEngine, me: BattleFighter, status: MajorStatus, source: BattleFighter | null): unknown;
   onAnyFaint?(engine: AbilityEngine, me: BattleFighter, fainted: BattleFighter): unknown;
   onAttackerFinal?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, info: { eff: number; crit: boolean }): unknown;
   onAttack?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter): unknown;
@@ -88,14 +88,14 @@ export interface AbilityEffect {
   onFoeMove?(engine: AbilityEngine, me: BattleFighter, user: BattleFighter, move: BattleMove): unknown;
   onFractionalPriority?(engine: AbilityEngine, me: BattleFighter, move: MoveData): unknown;
   onIncoming?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, attacker: BattleFighter): unknown;
-  onInflictStatus?(engine: AbilityEngine, me: BattleFighter, target: BattleFighter, status: string): unknown;
+  onInflictStatus?(engine: AbilityEngine, me: BattleFighter, target: BattleFighter, status: MajorStatus): unknown;
   onModifyMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
   onModifyPriority?(engine: AbilityEngine, me: BattleFighter, move: MoveData, priority: number): unknown;
   onPrepareMove?(engine: AbilityEngine, me: BattleFighter, move: BattleMove): unknown;
   onSetStatus?(engine: AbilityEngine, me: BattleFighter, status: string, source: BattleFighter | null): unknown;
   onSpeed?(engine: AbilityEngine, me: BattleFighter, spd: number): unknown;
   onStart?(engine: AbilityEngine, me: BattleFighter): unknown;
-  onStatusDamage?(engine: AbilityEngine, me: BattleFighter, status: string, amount: number): unknown;
+  onStatusDamage?(engine: AbilityEngine, me: BattleFighter, status: MajorStatus, amount: number): unknown;
   onSwitchOut?(engine: AbilityEngine, me: BattleFighter): unknown;
   onTerrainChange?(engine: AbilityEngine, me: BattleFighter): unknown;
   onTrapFoe?(engine: AbilityEngine, me: BattleFighter, foe: BattleFighter): unknown;
@@ -176,7 +176,7 @@ const contactChance = (chance: number, apply: (engine: AbilityEngine, me: Battle
   },
 });
 
-const contactStatus = (status: string, chance = 0.3): AbilityEffect =>
+const contactStatus = (status: MajorStatus, chance = 0.3): AbilityEffect =>
   contactChance(chance, (E, me, attacker) => E.setStatus(attacker, status, me, { ability: me }));
 
 const hitBoost = (test: (move: BattleMove) => boolean, boost: Boosts): AbilityEffect => ({
@@ -200,7 +200,7 @@ const onKoBoost = (boost: Boosts | ((me: BattleFighter) => Boosts)): AbilityEffe
   },
 });
 
-const setsWeather = (weather: string): AbilityEffect => ({ onStart: (engine, me) => engine.setWeather(weather, me) });
+const setsWeather = (weather: Weather): AbilityEffect => ({ onStart: (engine, me) => engine.setWeather(weather, me) });
 const setsTerrain = (terrain: string): AbilityEffect => ({ onStart: (engine, me) => engine.setTerrain(terrain, me) });
 const announce = (note: string): AbilityEffect => ({ onStart: (engine, me) => engine.show(me, note) });
 
