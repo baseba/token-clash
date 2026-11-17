@@ -24,7 +24,6 @@ export interface Room {
   readyCheck?: { ready: Set<string>; players: CountdownPlayer[] } | null;
   /** The countdown before choosing teams. */
   countdown?: { startedAt: number; endsAt: number; players: CountdownPlayer[]; tournament: TournamentLabel | null; waiting?: string[] } | null;
-  countdownTimer?: NodeJS.Timeout;
   /** Each side picks 3 of its 6. */
   preview?: PreviewState | null;
   /** The preview timer was shortened because a tournament player is away. */

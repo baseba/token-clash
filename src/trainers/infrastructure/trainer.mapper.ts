@@ -1,13 +1,9 @@
 // Translates between the Trainer aggregate and its rows. The domain never sees a row and the
 // tables never see a Trainer: if the schema changes, only this file and the schema change.
 import type { Gender, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { compact } from '../../shared/infrastructure/database/compact.js';
 import { Trainer } from '../domain/trainer.js';
 import type { rosterEntries, RosterEntryRow, TrainerRow, trainers } from './trainer.schema.js';
-
-/** Drops the keys whose column was NULL, so a restored entry looks like the one that was saved. */
-function compact<T extends object>(o: T): T {
-  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined)) as T;
-}
 
 export function toDomain(row: TrainerRow, roster: RosterEntryRow[]): Trainer {
   return Trainer.restore(

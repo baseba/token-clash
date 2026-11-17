@@ -80,7 +80,7 @@ export class TrainersService implements OnModuleInit {
     if (!trainer) {
       if (!name) throw invalid('Ponte un nombre de entrenador.');
       token = newToken();
-      trainer = Trainer.register({ id: newId(6), name, tokenHash: sha256(token), at: now() });
+      trainer = Trainer.register({ id: newId(), name, tokenHash: sha256(token), at: now() });
     } else if (name) trainer.rename(name);
     trainer.importSave(parsed, now());
     this.trainers.save(trainer);

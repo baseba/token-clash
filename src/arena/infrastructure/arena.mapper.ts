@@ -1,13 +1,9 @@
 // Aggregate ⇄ rows for challenges and tournaments. A tournament is one aggregate stored in three
 // tables (tournament, seats, bracket matches): it is always loaded and saved whole.
+import { compact } from '../../shared/infrastructure/database/compact.js';
 import { Challenge, type BattleMode, type ChallengeStatus, type Visibility } from '../domain/challenge.js';
 import { Tournament, type Bracket, type TournamentStatus } from '../domain/tournament.js';
 import type { challenges, ChallengeRow, MatchRow, SeatRow, tournamentMatches, TournamentRow, tournaments, tournamentSeats } from './arena.schema.js';
-
-/** Drops the keys whose column was NULL, so a restored aggregate looks like the one that was saved. */
-function compact<T extends object>(o: T): T {
-  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined)) as T;
-}
 
 export function challengeToDomain(r: ChallengeRow): Challenge {
   return Challenge.restore({

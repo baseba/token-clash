@@ -76,7 +76,7 @@ export class TournamentsService implements OnModuleInit {
         return { tournament: rival, joined: true };
       }
     }
-    const T = Tournament.create({ id: newId(6), host: trainer, ...opts, at: now() });
+    const T = Tournament.create({ id: newId(), host: trainer, ...opts, at: now() });
     this.tournaments.save(T);
     this.watchSeat(T, trainer.id);
     if (opts.visibility === 'public') this.lobby.notifyAfterGrace();
@@ -222,7 +222,7 @@ export class TournamentsService implements OnModuleInit {
     // A person always hosts when there is one (the AI side is the guest).
     const [host, guest] = next.a.ai && !next.b.ai ? [next.b, next.a] : [next.a, next.b];
     const c = Challenge.tournamentMatch({
-      id: newId(6),
+      id: newId(),
       host: { id: host.id, name: host.name, team: this.seatTeam(T, host), ai: host.ai },
       guest: { id: guest.id, name: guest.name, team: this.seatTeam(T, guest), ai: guest.ai },
       levelCap: T.levelCap,

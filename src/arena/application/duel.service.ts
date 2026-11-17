@@ -71,7 +71,7 @@ export class DuelService {
     const hostTeam = mode === 'random' ? randomParty(trainer.roster) : trainer.teamSnapshot();
     const aiLevel = levelCap ?? averageLevel(hostTeam);
     const aiTeam = mode === 'random' ? buildAiRandomParty({ level: aiLevel }) : buildAiTeam({ difficulty: level, level: aiLevel });
-    const c = Challenge.againstAi({ id: newId(6), host: trainer, hostTeam, ai: { id: aiTrainerId(level), name: aiName(level).name, level }, aiTeam, levelCap, mode, at: now() });
+    const c = Challenge.againstAi({ id: newId(), host: trainer, hostTeam, ai: { id: aiTrainerId(level), name: aiName(level).name, level }, aiTeam, levelCap, mode, at: now() });
     this.challenges.save(c);
     const r = this.presence.room(c.id);
     r.preview = createPreview({
@@ -117,7 +117,7 @@ export class DuelService {
     const r = this.presence.room(c.id);
     r.readyCheck = null;
     r.countdown = { startedAt: now(), endsAt: now() + this.t.matchMs, players: [this.views.countdownPlayer(c.hostId, c.hostName), this.views.countdownPlayer(c.guestId!, c.guestName!)], tournament };
-    r.countdownTimer = setTimeout(() => this.openWhenArrived(c, r), this.t.matchMs);
+    setTimeout(() => this.openWhenArrived(c, r), this.t.matchMs);
     this.broadcast(r, { t: 'countdown' });
   }
 
@@ -211,7 +211,7 @@ export class DuelService {
       r.countdown.waiting = waiting;
       r.countdown.endsAt = now();
       if (changed) this.broadcast(r, { t: 'countdown' });
-      r.countdownTimer = setTimeout(() => this.openWhenArrived(c, r), 500);
+      setTimeout(() => this.openWhenArrived(c, r), 500);
       return;
     }
     this.openPreview(c, r);

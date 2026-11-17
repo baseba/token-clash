@@ -13,7 +13,8 @@ type F = BattleFighter;
 /** A move as functions below accept it: a catalog move, or the copy being used this turn. */
 type AnyMove = MoveData | BattleMove;
 
-export const TEAM_SIZE = 3;
+/** How many Pokémon fight on each side. */
+export const BATTLE_SIZE = 3;
 export const TURN_LIMIT = 100;
 const STAGE_LIMIT = 6;
 const FIELD_TURNS = 5;
@@ -73,7 +74,7 @@ export function createBattle({ id, sides, levelCap = null, random = Math.random 
     sides: sides.map((s) => ({
       trainerId: s.trainerId,
       name: s.name,
-      team: s.entries.slice(0, TEAM_SIZE).map((e) => prepare(e, levelCap)),
+      team: s.entries.slice(0, BATTLE_SIZE).map((e) => prepare(e, levelCap)),
       active: 0,
       action: null,
       mustSwitch: false,

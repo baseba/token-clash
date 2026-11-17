@@ -2,10 +2,10 @@
 import { buildFighter, speciesData, formData, statsFor, effectiveness, usableMovepool, moveData, shuffled, rng, STRUGGLE, MOVES_PER_FIGHTER, type MoveData, type Random, type SpeciesData } from '../../catalog/domain/creatures.js';
 import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { validActions, submit, needsAction, moveWillFail, STRUGGLE_MOVE } from './battle.js';
+import { validActions, submit, needsAction, moveWillFail, BATTLE_SIZE, STRUGGLE_MOVE } from './battle.js';
 import type { Action, BattleFighter, BattleSide, BattleState, MoveAction, SwitchAction } from './battle-types.js';
 import { randomize } from './random-party.js';
-import { PARTY_SIZE, BATTLE_SIZE } from './team-preview.js';
+import { PARTY_SIZE } from './team-preview.js';
 
 type F = BattleFighter;
 type B = BattleState;

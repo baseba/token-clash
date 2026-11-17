@@ -70,7 +70,7 @@ export class ChallengesService implements OnModuleInit {
       }
       if (own) return { challenge: own };
     }
-    const c = Challenge.open({ id: newId(6), host: trainer, hostTeam: input.mode === 'random' ? [] : trainer.teamSnapshot(), levelCap: input.levelCap, mode: input.mode, visibility: input.visibility, at: now() });
+    const c = Challenge.open({ id: newId(), host: trainer, hostTeam: input.mode === 'random' ? [] : trainer.teamSnapshot(), levelCap: input.levelCap, mode: input.mode, visibility: input.visibility, at: now() });
     this.challenges.save(c);
     if (input.visibility === 'public') {
       this.lobby.notify();
