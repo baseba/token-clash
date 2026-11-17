@@ -239,7 +239,9 @@ build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de 
   calcula `combat/domain/moves.ts`, que lee cada fila de `movedex.json` (`moveEntry()`, en el catálogo) como la
   necesita el motor. Quien necesita saberlo le pregunta a `combat`: los entrenadores al validar sus movimientos
   (`validMoveset`), la IA, y el navegador en la colección. El catálogo sirve datos y no importa nada de otro
-  dominio; `src/architecture.spec.ts` lo revisa.
+  dominio; `src/architecture.spec.ts` lo revisa. Hay una excepción a propósito: la lista `INERT`
+  (`catalog/domain/abilities.ts`) dice qué habilidades no hacen nada en Token Clash, con el texto que lee el jugador.
+  Es conocimiento del motor, pero no crea ninguna flecha hacia `combat`, así que se quedó en el catálogo.
 - **El estado en vivo no se guarda.** Peleas, presencia y chat viven en memoria por diseño: es un juego entre
   amigos y retomar una pelea a medias tras un reinicio no vale la complejidad.
 

@@ -2,14 +2,18 @@
 // a turn (submit). Pure: no I/O and randomness injected, so a battle can be tested and replayed. The engine is
 // split by question:
 //   turn.ts            in what order a turn happens, once both sides have chosen
-//   use-move.ts        what using a move does, up to the hit
+//   use-move.ts        what using a move does, up to the hit (and the whole effect of a status move)
 //   damage.ts          whether an attack lands, and how hard
 //   residual.ts        what happens at the end of each turn
 //   switching.ts       a fighter coming in, going out and fainting
-//   effects.ts         every change to a fighter, a side or the field, with its event
+//   effects.ts         every change to a fighter, a side or the field, with its event; also who is where, and speed
 //   ability-engine.ts  when an ability acts, and what its rules (ability-effects.ts) may do
 //   move-rule-api.ts   what the special move rules (move-rules.ts) may do
 //   battle-view.ts     what each client sees
+//   moves.ts           a move as the engine reads it: its data, whether Token Clash supports it, Struggle
+//   fighter.ts         a fighter built from a roster entry, and which moves it may carry
+//   conditions.ts      weather, status and stat-stage facts several modules share
+//   battle-types.ts    the types of all of the above
 import { effectiveness } from '../../catalog/domain/creatures.js';
 import { buildFighter } from './fighter.js';
 import { moveAt, type MoveData, STRUGGLE_MOVE } from './moves.js';

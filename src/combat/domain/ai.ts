@@ -1,11 +1,10 @@
 // The AI: builds its team, picks its three, and chooses what to do each turn. Randomness is injected.
 import { speciesData, formData, statsFor, effectiveness, shuffled, rng, type Random, type SpeciesData } from '../../catalog/domain/creatures.js';
 import { buildFighter, usableMovepool, MOVES_PER_FIGHTER } from './fighter.js';
-import { moveData, type MoveData } from './moves.js';
+import { moveAt, moveData, type MoveData } from './moves.js';
 import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';
 import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { validActions, submit, needsAction, moveWillFail, BATTLE_SIZE } from './battle.js';
-import { moveAt } from './moves.js';
 import type { Action, BattleFighter, BattleSide, BattleState, MoveAction, SwitchAction } from './battle-types.js';
 import { isRain, isSun, stageMult } from './conditions.js';
 import { randomize } from './random-party.js';
