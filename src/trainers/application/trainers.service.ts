@@ -74,7 +74,7 @@ export class TrainersService implements OnModuleInit {
    */
   importSave(current: Trainer | undefined, input: { save: string; name?: string }): { token: string | null; trainer: Trainer } {
     const parsed = parseSave(input.save);
-    const name = cleanName(input.name);
+    const name = cleanName(input.name ?? '');
     let trainer = current;
     let token: string | null = null;
     if (!trainer) {

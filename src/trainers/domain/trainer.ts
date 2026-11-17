@@ -27,8 +27,8 @@ export interface TrainerState {
 const RARITY_RANK = { legendary: 3, rare: 2, uncommon: 1, common: 0 } as const;
 
 /** Strips control and bidi characters a name could use to break the UI, and caps its length. */
-export function cleanName(s: unknown, max = 24): string {
-  return String(s ?? '')
+export function cleanName(s: string, max = 24): string {
+  return s
     .replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, '')
     .trim()
     .slice(0, max);
@@ -91,7 +91,7 @@ export class Trainer implements TrainerState {
     return this.teamEntries().map((e) => ({ ...e }));
   }
 
-  rename(name: unknown): void {
+  rename(name: string): void {
     const n = cleanName(name);
     if (n) this.name = n;
   }
@@ -114,9 +114,10 @@ export class Trainer implements TrainerState {
     this.updatedAt = at;
   }
 
-  chooseTeam(ids: unknown[]): void {
+  /** Unknown ids and repeated species are skipped; an empty choice keeps the current team. */
+  chooseTeam(ids: string[]): void {
     const byId = new Map(this.roster.map((e) => [e.id, e]));
-    const picked = [...new Set(ids.filter((id): id is string => typeof id === 'string' && byId.has(id)))].map((id) => byId.get(id)!);
+    const picked = [...new Set(ids.filter((id) => byId.has(id)))].map((id) => byId.get(id)!);
     const team = uniqueSpecies(picked)
       .map((e) => e.id)
       .slice(0, PARTY_SIZE);
@@ -124,25 +125,25 @@ export class Trainer implements TrainerState {
   }
 
   /** An empty nickname removes it. Unknown Pokémon are ignored. */
-  setNickname(entryId: unknown, name: unknown): void {
-    const e = typeof entryId === 'string' ? this.roster.find((x) => x.id === entryId) : undefined;
+  setNickname(entryId: string, name: string): void {
+    const e = this.roster.find((x) => x.id === entryId);
     if (!e) return;
     const n = cleanName(name, 16);
     if (n) e.nickname = n;
     else delete e.nickname;
   }
 
-  chooseMoves(entryId: string, moves: unknown): void {
+  chooseMoves(entryId: string, moves: string[]): void {
     const e = this.entry(entryId);
-    if (!validMoveset(e, moves as string[])) throw invalid(`Elige entre 1 y ${MOVES_PER_FIGHTER} movimientos distintos que conozca.`);
-    e.moveset = [...(moves as string[])];
+    if (!validMoveset(e, moves)) throw invalid(`Elige entre 1 y ${MOVES_PER_FIGHTER} movimientos distintos que conozca.`);
+    e.moveset = [...moves];
   }
 
-  chooseAbility(entryId: string, ability: unknown): void {
+  chooseAbility(entryId: string, ability: string): void {
     const e = this.entry(entryId);
     if (!abilityOptions(e).some((a) => a.key === ability)) throw invalid('Esa habilidad no es de su especie.');
-    if (!usableAbility(ability as string)) throw invalid('Esa habilidad no tiene efecto en Token Clash.');
-    e.abilityChoice = ability as string;
+    if (!usableAbility(ability)) throw invalid('Esa habilidad no tiene efecto en Token Clash.');
+    e.abilityChoice = ability;
   }
 
   touch(at: number): void {
