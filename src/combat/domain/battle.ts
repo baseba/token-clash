@@ -271,7 +271,7 @@ function makeMoveApi(battle: BattleState) {
     abilityDef: (key: string | null): AbilityEffect | undefined => ABILITIES[key as string],
     stageMult,
     weight: (fighter: BattleFighter): number => speciesData(fighter.speciesId)?.weight ?? 50,
-    baseAttack: (fighter: BattleFighter): number | undefined => speciesData(fighter.speciesId)?.stats?.[1],
+    baseAttack: (fighter: BattleFighter): number | undefined => speciesData(fighter.speciesId)?.base.attack,
     moved: (fighter: BattleFighter) => battle.moved.has(fighter),
     chosen: (sideIndex: number): MoveData | null => battle.chosen?.[sideIndex] ?? null,
     lastMove: (): string | null => battle.lastMove ?? null,
