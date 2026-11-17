@@ -3,7 +3,7 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 /** Fixed-window counters in memory: enough for one small server. */
 @Injectable()
 export class RateLimiter implements OnModuleDestroy {
-  private readonly buckets = new Map<string, { n: number; reset: number }>();
+  private readonly buckets = new Map<string, { hits: number; reset: number }>();
   private readonly sweeper = setInterval(() => {
     const now = Date.now();
     for (const [key, bucket] of this.buckets) if (now > bucket.reset) this.buckets.delete(key);
@@ -13,10 +13,10 @@ export class RateLimiter implements OnModuleDestroy {
   limited(key: string, max: number, windowMs: number): boolean {
     const now = Date.now();
     let bucket = this.buckets.get(key);
-    if (!bucket || now > bucket.reset) bucket = { n: 0, reset: now + windowMs };
-    bucket.n += 1;
+    if (!bucket || now > bucket.reset) bucket = { hits: 0, reset: now + windowMs };
+    bucket.hits += 1;
     this.buckets.set(key, bucket);
-    return bucket.n > max;
+    return bucket.hits > max;
   }
 
   onModuleDestroy(): void {

@@ -54,7 +54,7 @@ test('rejects junk as an invalid request', () => {
 });
 
 test('keeps only the first caught of each species, ordered by Pokédex number', () => {
-  const c = (id, finalID, caught, order): any => ({ e: { id, finalID }, caught, order });
+  const c = (id, finalID, caught, order): any => ({ entry: { id, finalID }, caught, order });
   const kept = firstOfEachSpecies([c('late', 25, Date.parse('2026-10-05'), 0), c('bulba', 1, Date.parse('2026-10-09'), 1), c('early', 25, Date.parse('2026-10-01'), 2), c('raising', 25, Infinity, 3), c('nodate-a', 7, Infinity, 4), c('nodate-b', 7, Infinity, 5)]);
   assert.deepEqual(kept.map((e) => e.id), ['bulba', 'nodate-a', 'early']);
 
@@ -78,7 +78,7 @@ test('a team slot held by a dropped repeat goes to the one that stays', () => {
 });
 
 test('a shiny and a plain one of the same species both stay in the collection', () => {
-  const c = (id, finalID, shiny, caught, order): any => ({ e: { id, finalID, shiny }, caught, order });
+  const c = (id, finalID, shiny, caught, order): any => ({ entry: { id, finalID, shiny }, caught, order });
   const kept = firstOfEachSpecies([c('plain-late', 25, false, 5, 0), c('shiny-late', 25, true, 6, 1), c('plain-early', 25, false, 1, 2), c('shiny-early', 25, true, 2, 3)]);
   assert.deepEqual(kept.map((e) => e.id), ['plain-early', 'shiny-early']);
   const stored: any[] = [{ id: 'p1', finalID: 25 }, { id: 's1', finalID: 25, shiny: true }, { id: 'p2', finalID: 25 }, { id: 's2', finalID: 25, shiny: true }];

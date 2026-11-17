@@ -47,7 +47,7 @@ export interface BattleFighter extends Fighter {
   boosts: Record<BoostKey, number>;
   status: string | null;
   statusTurns: number;
-  vol: Volatiles;
+  volatiles: Volatiles;
   activeTurns: number;
   form: string | null;
   permanentForm?: string | null;
@@ -141,9 +141,9 @@ export interface BattleEvent {
 
 /** A fighter about to use its move this turn, with what decides the order. */
 export interface Mover extends MoveAction {
-  s: number;
+  sideIndex: number;
   auto?: boolean;
-  f: BattleFighter;
+  fighter: BattleFighter;
   prio: number;
   frac: number;
   spd: number;
@@ -162,10 +162,10 @@ export interface BattleState {
   field: FieldState;
   sides: BattleSide[];
   /** Events of the step being resolved. */
-  ev: BattleEvent[];
+  events: BattleEvent[];
   moved: Set<BattleFighter>;
   /** Mold Breaker: the target whose breakable ability is ignored during this move. */
-  mold: { target: BattleFighter } | null;
+  moldBreaker: { target: BattleFighter } | null;
   intro: BattleEvent[];
   chosen?: (MoveData | null)[];
   lastMove?: string;

@@ -96,10 +96,10 @@ export function setReady(tournament: Seated, trainerId: string, ready: boolean):
   tournament.seats[seatIndex].ready = !!ready;
 }
 
-export function nextAiId(tournament: Pick<Seated, 'seats'>, level: string): { id: string; n: number } {
+export function nextAiId(tournament: Pick<Seated, 'seats'>, level: string): { id: string; seatNumber: number } {
   let seatNumber = 1;
   while (tournament.seats.some((s) => s.id === aiSeatId(level, seatNumber))) seatNumber += 1;
-  return { id: aiSeatId(level, seatNumber), n: seatNumber };
+  return { id: aiSeatId(level, seatNumber), seatNumber };
 }
 
 export function shuffledOrder(count: number, random = Math.random): number[] {

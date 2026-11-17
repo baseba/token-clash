@@ -91,7 +91,7 @@ function entryFrom(raw: Json, { finalID, baseID, defaultLevel, fallbackId, chain
 }
 
 export interface CaughtCandidate {
-  e: RosterEntry;
+  entry: RosterEntry;
   caught: number;
   order: number;
 }
@@ -100,11 +100,11 @@ export interface CaughtCandidate {
 export function firstOfEachSpecies(candidates: CaughtCandidate[]): RosterEntry[] {
   const first = new Map<string, CaughtCandidate>();
   for (const candidate of candidates) {
-    const key = variantKey(candidate.e);
+    const key = variantKey(candidate.entry);
     const prev = first.get(key);
     if (!prev || candidate.caught < prev.caught || (candidate.caught === prev.caught && candidate.order < prev.order)) first.set(key, candidate);
   }
-  return [...first.values()].sort((x, y) => x.e.finalID - y.e.finalID || Number(!!x.e.shiny) - Number(!!y.e.shiny)).map((c) => c.e);
+  return [...first.values()].sort((x, y) => x.entry.finalID - y.entry.finalID || Number(!!x.entry.shiny) - Number(!!y.entry.shiny)).map((c) => c.entry);
 }
 
 /**
@@ -140,7 +140,7 @@ export function parseSave(text: string): ParsedSave {
     if (!entry || seenIds.has(entry.id)) return;
     seenIds.add(entry.id);
     const time = Date.parse(caughtAt as string);
-    candidates.push({ e: entry, caught: Number.isFinite(time) ? time : Infinity, order: candidates.length });
+    candidates.push({ entry, caught: Number.isFinite(time) ? time : Infinity, order: candidates.length });
   };
 
   const dex = Array.isArray(state.dex) ? state.dex : [];

@@ -38,7 +38,7 @@ test('Sustituto recibe los golpes y bloquea los movimientos de estado', () => {
   turn(b, 'substitute', 'thunder-wave');
   const f = active(b, 0);
   assert.equal(f.hp, f.stats.hp - Math.floor(f.stats.hp / 4));
-  assert.ok(f.vol.substitute > 0);
+  assert.ok(f.volatiles.substitute > 0);
   const hp = f.hp;
   const ev = turn(b, 'tackle', 'thunder-shock');
   assert.ok(has(ev, (e) => e.t === 'subDamage' && e.side === 0));
@@ -134,7 +134,7 @@ test('Patada Baja depende del peso del rival', () => {
   const heavy = battle(mon(68, ['low-kick'], { abilityChoice: 'guts' }), snorlax(['growl']));
   turn(light, 'low-kick', 'growl');
   turn(heavy, 'low-kick', 'growl');
-  assert.equal(light.sides[0].team[0].vol.lastMove, 'low-kick');
+  assert.equal(light.sides[0].team[0].volatiles.lastMove, 'low-kick');
 });
 
 test('Remolino arrastra al rival, salvo que tenga Arraigo', () => {
@@ -144,7 +144,7 @@ test('Remolino arrastra al rival, salvo que tenga Arraigo', () => {
   const c = battle(mon(16, ['whirlwind'], { abilityChoice: 'keen-eye' }), [snorlax(['growl', 'ingrain']), mon(25, ['growl'], { abilityChoice: 'static' })]);
   turn(c, 'whirlwind', 'ingrain');
   assert.equal(c.sides[1].active, 0);
-  assert.ok(active(c, 1).vol.ingrain);
+  assert.ok(active(c, 1).volatiles.ingrain);
 });
 
 test('Transformación copia tipos, stats y movimientos del rival', () => {

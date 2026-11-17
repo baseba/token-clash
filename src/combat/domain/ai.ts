@@ -81,21 +81,21 @@ export function pickMoveset(entry: RosterEntry, difficulty: string, random: Rand
   const pool = usableMovepool(entry);
   if (difficulty === 'easy' || pool.length <= MOVES_PER_FIGHTER) return shuffled(pool, random).slice(0, MOVES_PER_FIGHTER);
   const mon = buildFighter({ ...entry, moveset: pool.slice(0, 1) });
-  const scored = pool.map((id) => ({ id, m: moveData(id) as MoveData })).map((x) => ({ ...x, v: moveValue(x.m, mon) * (difficulty === 'mid' ? 0.75 + random() * 0.5 : 1) }));
-  if (difficulty === 'mid') return scored.sort((a, b) => b.v - a.v).slice(0, MOVES_PER_FIGHTER).map((x) => x.id);
+  const scored = pool.map((id) => ({ id, move: moveData(id) as MoveData })).map((x) => ({ ...x, value: moveValue(x.move, mon) * (difficulty === 'mid' ? 0.75 + random() * 0.5 : 1) }));
+  if (difficulty === 'mid') return scored.sort((a, b) => b.value - a.value).slice(0, MOVES_PER_FIGHTER).map((x) => x.id);
   const maxStatus = difficulty === 'veryhard' ? 2 : 1;
   const chosen: typeof scored = [];
   while (chosen.length < MOVES_PER_FIGHTER) {
-    const types = new Set(chosen.filter((x) => x.m.kind === 'attack').map((x) => x.m.type));
-    const statusCount = chosen.filter((x) => x.m.kind === 'status').length;
+    const types = new Set(chosen.filter((x) => x.move.kind === 'attack').map((x) => x.move.type));
+    const statusCount = chosen.filter((x) => x.move.kind === 'status').length;
     const attacks = chosen.length - statusCount;
     let best: (typeof scored)[number] | null = null;
     let bestValue = -1;
     for (const candidate of scored) {
       if (chosen.includes(candidate)) continue;
-      if (candidate.m.kind === 'status' && (statusCount >= maxStatus || attacks < 2)) continue;
-      let value = candidate.v;
-      if (candidate.m.kind === 'attack') value *= types.has(candidate.m.type) ? 0.4 : types.size ? 1.3 : 1;
+      if (candidate.move.kind === 'status' && (statusCount >= maxStatus || attacks < 2)) continue;
+      let value = candidate.value;
+      if (candidate.move.kind === 'attack') value *= types.has(candidate.move.type) ? 0.4 : types.size ? 1.3 : 1;
       if (value > bestValue) [best, bestValue] = [candidate, value];
     }
     if (!best) break;
@@ -142,7 +142,7 @@ export function aiPicks({ difficulty: level, own, random = Math.random }: { diff
   const count = Math.min(BATTLE_SIZE, own.length);
   if (difficulty === 'easy' || difficulty === 'mid') return shuffled(order, random).slice(0, count);
   const strength = (index: number) => bst(speciesData(own[index].finalID) ?? { stats: [0] }) / 150;
-  return order.map((i) => ({ i, s: strength(i) + random() * 2 })).sort((a, b) => b.s - a.s).slice(0, count).map((x) => x.i);
+  return order.map((index) => ({ index, score: strength(index) + random() * 2 })).sort((a, b) => b.score - a.score).slice(0, count).map((x) => x.index);
 }
 
 // ---------- what the AI may know ----------
@@ -175,21 +175,21 @@ function expectedMoves(speciesId: number, level: number): MoveData[] {
 
 function believedFoe(fighter: F): F {
   if (!fighter.seen) return fighter;
-  const look = fighter.vol.illusion ?? fighter.seenAs;
+  const look = fighter.volatiles.illusion ?? fighter.seenAs;
   let moves = fighter.moves;
-  let vol = fighter.vol;
-  if (!fighter.vol.transformed) {
+  let vol = fighter.volatiles;
+  if (!fighter.volatiles.transformed) {
     // Revealed moves keep their slot; the unknown ones become guesses (or go, if there are none).
     const known = (move: MoveData) => fighter.revealedMoves.has(move.key);
     const extra = expectedMoves(fighter.speciesId, fighter.level).filter((g) => !fighter.moves.some((m) => known(m) && m.key === g.key));
     const slots = fighter.moves.map((m) => (known(m) ? m : extra.shift()));
     moves = slots.filter(Boolean) as MoveData[];
     const slotOf = (slot: number | null | undefined) => (slot == null || !slots[slot] ? undefined : moves.indexOf(slots[slot]));
-    vol = { ...fighter.vol, charging: slotOf(fighter.vol.charging), mustRecharge: slotOf(fighter.vol.mustRecharge) };
+    vol = { ...fighter.volatiles, charging: slotOf(fighter.volatiles.charging), mustRecharge: slotOf(fighter.volatiles.mustRecharge) };
     for (const key of ['charging', 'mustRecharge']) if (vol[key] === undefined) delete vol[key];
   }
   const base = fighter.form ? formData(fighter.form)?.base : speciesData(fighter.speciesId)?.stats;
-  const stats = fighter.vol.transformed || !base ? { ...fighter.stats } : statsFor(base, GUESS_IVS, fighter.level);
+  const stats = fighter.volatiles.transformed || !base ? { ...fighter.stats } : statsFor(base, GUESS_IVS, fighter.level);
   const share = fighter.hp / fighter.stats.hp;
   const ability = fighter.revealedAbilities.has(fighter.ability) ? fighter.ability : null;
   return {
@@ -198,7 +198,7 @@ function believedFoe(fighter: F): F {
     stats,
     hp: fighter.hp > 0 ? Math.max(1, Math.round(stats.hp * share)) : 0,
     moves,
-    vol,
+    volatiles: vol,
     pp: Object.fromEntries(moves.map((m) => [m.key, m.pp])),
     ability,
     baseAbility: ability,
@@ -313,9 +313,9 @@ export function scoreMove(battle: B, sideIndex: number, idx: number, knowsAbilit
     const downs = Object.keys(move.boosts) as (keyof F['boosts'])[];
     return downs.every((k) => (foe.boosts[k] ?? 0) <= -2) ? 0 : 15;
   }
-  if (move.volatile === 'leechseed') return foe.types.includes('grass') || foe.vol?.leechSeed ? 0 : 35;
-  if (move.volatile === 'confusion') return foe.vol?.confusion ? 0 : 28;
-  if (move.volatile === 'attract') return foe.vol?.attract ? 0 : 20;
+  if (move.volatile === 'leechseed') return foe.types.includes('grass') || foe.volatiles?.leechSeed ? 0 : 35;
+  if (move.volatile === 'confusion') return foe.volatiles?.confusion ? 0 : 28;
+  if (move.volatile === 'attract') return foe.volatiles?.attract ? 0 : 20;
   if (move.clearsScreens) return Object.keys(foeSide.screens ?? {}).length ? 40 : 5;
   return 5;
 }
@@ -328,15 +328,15 @@ function matchupScore(battle: B, mon: F, foe: F | null | undefined, knowsAbiliti
   return dealt - taken + faster + hpShare(mon) * 0.3;
 }
 
-function weighted<T>(items: { a: T; w: number }[], random: Random): T {
-  const total = items.reduce((sum, x) => sum + x.w, 0);
-  if (total <= 0) return pickOne(items, random).a;
+function weighted<T>(items: { option: T; weight: number }[], random: Random): T {
+  const total = items.reduce((sum, x) => sum + x.weight, 0);
+  if (total <= 0) return pickOne(items, random).option;
   let roll = random() * total;
   for (const item of items) {
-    roll -= item.w;
-    if (roll <= 0) return item.a;
+    roll -= item.weight;
+    if (roll <= 0) return item.option;
   }
-  return items[items.length - 1].a;
+  return items[items.length - 1].option;
 }
 
 function sideValue(side: BattleSide): number {
@@ -403,7 +403,7 @@ export function chooseAction(battle: B, sideIndex: number, level: string, random
 
   if (!moves.length) {
     if (!smart) return pickOne(switches, random);
-    return switches.map((a) => ({ a, s: matchupScore(belief, side.team[a.to], foe, true) + (difficulty === 'hard' ? random() * 0.3 : 0) })).sort((x, y) => y.s - x.s)[0].a;
+    return switches.map((action) => ({ action, score: matchupScore(belief, side.team[action.to], foe, true) + (difficulty === 'hard' ? random() * 0.3 : 0) })).sort((x, y) => y.score - x.score)[0].action;
   }
   if (difficulty === 'easy') return pickOne(moves, random);
   if (difficulty === 'veryhard' && belief.phase === 'choose' && foe && foe.hp > 0) {
@@ -412,29 +412,29 @@ export function chooseAction(battle: B, sideIndex: number, level: string, random
   }
 
   const veryhard = difficulty === 'veryhard';
-  const scored = moves.map((a) => ({ a, s: scoreMove(belief, sideIndex, a.move, veryhard, veryhard) }));
+  const scored = moves.map((action) => ({ action, score: scoreMove(belief, sideIndex, action.move, veryhard, veryhard) }));
   if (difficulty === 'mid') {
-    const useful = scored.filter((x) => x.s > 0);
-    return weighted((useful.length ? useful : scored).map((x) => ({ a: x.a, w: x.s + 5 })), random);
+    const useful = scored.filter((x) => x.score > 0);
+    return weighted((useful.length ? useful : scored).map((x) => ({ option: x.action, weight: x.score + 5 })), random);
   }
 
-  scored.sort((x, y) => y.s - x.s);
+  scored.sort((x, y) => y.score - x.score);
   const best = scored[0];
   if (switches.length) {
-    const canKo = foe && foe.hp > 0 && scored.some((x) => moveOf(me, x.a.move).kind !== 'status' && estimateDamage(belief, me, foe, moveOf(me, x.a.move)) >= foe.hp);
+    const canKo = foe && foe.hp > 0 && scored.some((x) => moveOf(me, x.action.move).kind !== 'status' && estimateDamage(belief, me, foe, moveOf(me, x.action.move)) >= foe.hp);
     const doomed = foe && foe.hp > 0 && bestDamage(belief, foe, me, true) >= me.hp && speedOf(foe) > speedOf(me);
-    const stuck = best.s < 15;
+    const stuck = best.score < 15;
     const lastSwitched = lastSwitchTurn.get(memory) === belief.turn - 1;
     const willing = veryhard ? true : random() < 0.35;
     if (!canKo && (veryhard ? doomed || stuck : stuck) && !lastSwitched && willing) {
       const here = matchupScore(belief, me, foe, true);
-      const alt = switches.map((a) => ({ a, s: matchupScore(belief, side.team[a.to], foe, true) })).sort((x, y) => y.s - x.s)[0];
-      if (alt.s > here + 0.35) {
+      const alt = switches.map((action) => ({ action, score: matchupScore(belief, side.team[action.to], foe, true) })).sort((x, y) => y.score - x.score)[0];
+      if (alt.score > here + 0.35) {
         lastSwitchTurn.set(memory, belief.turn);
-        return alt.a;
+        return alt.action;
       }
     }
   }
-  if (difficulty === 'hard' && scored.length > 1 && scored[1].s > 0 && scored[1].s >= best.s * 0.6 && random() < 0.25) return scored[1].a;
-  return best.a;
+  if (difficulty === 'hard' && scored.length > 1 && scored[1].score > 0 && scored[1].score >= best.score * 0.6 && random() < 0.25) return scored[1].action;
+  return best.action;
 }

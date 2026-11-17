@@ -50,7 +50,7 @@ export function importLegacyJson(db: Database, dataDir: string, log?: Pick<Logge
     mark({ result: 'no-file' });
     return { imported: false, reason: 'no-file' };
   }
-  const [{ n: trainerCount }] = db.select({ n: count() }).from(trainers).all();
+  const [{ trainerCount: trainerCount }] = db.select({ trainerCount: count() }).from(trainers).all();
   if (trainerCount > 0) {
     // Someone already has data in SQLite: never mix an old JSON into it.
     log?.warn(`Hay ${LEGACY_FILE} pero la base ya tiene datos: no lo importo.`);

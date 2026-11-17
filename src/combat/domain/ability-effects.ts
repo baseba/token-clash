@@ -159,7 +159,7 @@ const absorb = (type: string, effect: { heal?: number; boost?: Boosts; flashFire
     engine.show(me);
     if (effect.heal && !engine.heal(me, fraction(me, effect.heal))) engine.note(me, 'immune');
     if (effect.boost) engine.boost(me, effect.boost, me);
-    if (effect.flashFire) me.vol.flashFire = true;
+    if (effect.flashFire) me.volatiles.flashFire = true;
     return true;
   },
 });
@@ -303,7 +303,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   },
   immunity: blockStatus(poison),
   'flash-fire': merge(absorb('fire', { flashFire: true }), {
-    onBasePower: (engine, me, move) => (me.vol.flashFire && move.type === 'fire' ? 1.5 : 1),
+    onBasePower: (engine, me, move) => (me.volatiles.flashFire && move.type === 'fire' ? 1.5 : 1),
   }),
   'shield-dust': { breakable: true, blocksSecondaries: true },
   'own-tempo': merge(blockStatus((s) => s === 'confusion'), ignoresIntimidate),
@@ -397,15 +397,15 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'hyper-cutter': blockDrops(['atk']),
   truant: {
     onStart(engine, me) {
-      me.vol.truantRest = false;
+      me.volatiles.truantRest = false;
     },
     onBeforeMove(engine, me) {
-      if (me.vol.truantRest) {
-        me.vol.truantRest = false;
+      if (me.volatiles.truantRest) {
+        me.volatiles.truantRest = false;
         engine.show(me, 'loafing');
         return false;
       }
-      me.vol.truantRest = true;
+      me.volatiles.truantRest = true;
       return true;
     },
   },
@@ -442,7 +442,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'pure-power': { onAttack: (engine, me, move) => (physical(move) ? 2 : 1) },
   'shell-armor': { breakable: true, critImmune: true },
   'air-lock': announce('weatherOff'),
-  'tangled-feet': { breakable: true, onEvasion: (engine, me, move, attacker, acc) => (me.vol.confusion ? acc * 0.5 : acc) },
+  'tangled-feet': { breakable: true, onEvasion: (engine, me, move, attacker, acc) => (me.volatiles.confusion ? acc * 0.5 : acc) },
   'motor-drive': absorb('electric', { boost: { spd: 1 } }),
   rivalry: {
     onBasePower(engine, me, move, target) {
@@ -567,15 +567,15 @@ const EFFECTS: Record<string, AbilityEffect> = {
   filter: { breakable: true, onDefenderFinal: (engine, me, move, attacker, { eff }) => (eff > 1 ? 0.75 : 1) },
   'slow-start': {
     onStart(engine, me) {
-      me.vol.slowStart = 5;
+      me.volatiles.slowStart = 5;
       engine.show(me, 'slowStart');
     },
-    onAttack: (engine, me, move) => (me.vol.slowStart && physical(move) ? 0.5 : 1),
-    onSpeed: (engine, me, spd) => (me.vol.slowStart ? spd * 0.5 : spd),
+    onAttack: (engine, me, move) => (me.volatiles.slowStart && physical(move) ? 0.5 : 1),
+    onSpeed: (engine, me, spd) => (me.volatiles.slowStart ? spd * 0.5 : spd),
     onEndTurn(engine, me) {
-      if (!me.vol.slowStart) return;
-      me.vol.slowStart -= 1;
-      if (!me.vol.slowStart) engine.show(me, 'slowStartEnd');
+      if (!me.volatiles.slowStart) return;
+      me.volatiles.slowStart -= 1;
+      if (!me.volatiles.slowStart) engine.show(me, 'slowStartEnd');
     },
   },
   scrappy: merge(ignoresIntimidate, { hitsGhost: true }),
@@ -618,7 +618,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   defeatist: { onAttack: (engine, me) => (me.hp <= me.stats.hp / 2 ? 0.5 : 1) },
   'cursed-body': {
     onDamagingHit(engine, me, move, attacker) {
-      if (attacker.hp > 0 && move.key && !attacker.vol.disabled && engine.rand() < 0.3) engine.addVolatile(attacker, 'disable', me, { ability: me, move });
+      if (attacker.hp > 0 && move.key && !attacker.volatiles.disabled && engine.rand() < 0.3) engine.addVolatile(attacker, 'disable', me, { ability: me, move });
     },
   },
   'weak-armor': hitBoost(physical, { def: -1, spd: 2 }),
@@ -659,7 +659,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
     noTrace: true,
     onStart(engine, me) {
       const foe = engine.foe(me);
-      if (foe && !foe.vol.transformed && !foe.vol.illusion) {
+      if (foe && !foe.volatiles.transformed && !foe.volatiles.illusion) {
         engine.show(me);
         engine.transform(me, foe);
       }
@@ -791,7 +791,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
       },
     },
   ),
-  stakeout: { onBasePower: (engine, me, move, target) => (target.vol.enteredTurn === engine.b.turn ? 2 : 1) },
+  stakeout: { onBasePower: (engine, me, move, target) => (target.volatiles.enteredTurn === engine.battle.turn ? 2 : 1) },
   'water-bubble': merge(blockStatus((s) => s === 'brn'), {
     onIncoming: (engine, me, move) => (move.type === 'fire' ? 0.5 : 1),
     onBasePower: (engine, me, move) => (move.type === 'water' ? 2 : 1),
@@ -808,7 +808,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   infiltrator: { infiltrates: true },
   'screen-cleaner': {
     onStart(engine, me) {
-      const sides = [0, 1].filter((s) => Object.keys(engine.b.sides[s].screens).length);
+      const sides = [0, 1].filter((s) => Object.keys(engine.battle.sides[s].screens).length);
       if (!sides.length) return;
       engine.show(me);
       for (const sideIndex of sides) engine.clearScreens(sideIndex, 'cleaner');
@@ -939,15 +939,15 @@ const EFFECTS: Record<string, AbilityEffect> = {
     unsuppressable: true,
     noTrace: true,
     onAfterMove(engine, me, move) {
-      if (me.speciesId !== 845 || me.vol.gulp || (move.key !== 'surf' && move.key !== 'dive')) return;
-      me.vol.gulp = me.hp > me.stats.hp / 2 ? 'arrokuda' : 'pikachu';
-      engine.show(me, me.vol.gulp === 'arrokuda' ? 'gulpArrokuda' : 'gulpPikachu');
-      engine.changeForm(me, me.vol.gulp === 'arrokuda' ? 'cramorant-gulping' : 'cramorant-gorging');
+      if (me.speciesId !== 845 || me.volatiles.gulp || (move.key !== 'surf' && move.key !== 'dive')) return;
+      me.volatiles.gulp = me.hp > me.stats.hp / 2 ? 'arrokuda' : 'pikachu';
+      engine.show(me, me.volatiles.gulp === 'arrokuda' ? 'gulpArrokuda' : 'gulpPikachu');
+      engine.changeForm(me, me.volatiles.gulp === 'arrokuda' ? 'cramorant-gulping' : 'cramorant-gorging');
     },
     onDamagingHit(engine, me, move, attacker) {
-      if (!me.vol.gulp || attacker.hp <= 0) return;
-      const prey = me.vol.gulp;
-      delete me.vol.gulp;
+      if (!me.volatiles.gulp || attacker.hp <= 0) return;
+      const prey = me.volatiles.gulp;
+      delete me.volatiles.gulp;
       engine.show(me, 'gulpSpit');
       engine.changeForm(me, null);
       engine.damage(attacker, fraction(attacker, 1 / 4), 'ability');
@@ -1000,10 +1000,10 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'steely-spirit': typePower('steel', 1.5),
   'perish-body': {
     onDamagingHit(engine, me, move, attacker) {
-      if (!contact(engine, move, attacker) || attacker.vol.perish || attacker.hp <= 0) return;
+      if (!contact(engine, move, attacker) || attacker.volatiles.perish || attacker.hp <= 0) return;
       engine.show(me);
       engine.addVolatile(attacker, 'perish', me);
-      if (!me.vol.perish && me.hp > 0) engine.addVolatile(me, 'perish', me);
+      if (!me.volatiles.perish && me.hp > 0) engine.addVolatile(me, 'perish', me);
     },
   },
   'wandering-spirit': {
@@ -1018,7 +1018,7 @@ const EFFECTS: Record<string, AbilityEffect> = {
   'gorilla-tactics': {
     onAttack: (engine, me, move) => (physical(move) ? 1.5 : 1),
     onAfterMove(engine, me, move) {
-      if (move.key && me.vol.lockedMove == null) me.vol.lockedMove = move.key;
+      if (move.key && me.volatiles.lockedMove == null) me.volatiles.lockedMove = move.key;
     },
   },
   'neutralizing-gas': { unsuppressable: true, noTrace: true, onStart: (engine, me) => engine.show(me, 'neutralizingGas') },
@@ -1227,9 +1227,9 @@ function mimicryType(engine: E, me: F): void {
 function changesTypeBeforeMoving(): AbilityEffect {
   return {
     onPrepareMove(engine, me, move) {
-      if (me.vol.proteanUsed || !move.type || !isAttack(move)) return;
+      if (me.volatiles.proteanUsed || !move.type || !isAttack(move)) return;
       if (me.types.length === 1 && me.types[0] === move.type) return;
-      me.vol.proteanUsed = true;
+      me.volatiles.proteanUsed = true;
       engine.show(me);
       engine.setTypes(me, [move.type]);
     },
@@ -1253,7 +1253,7 @@ function escapesBelowHalf(): AbilityEffect {
     onDamagingHit(engine, me, move, attacker, { before }) {
       if (droppedBelowHalf(me, before) && engine.hasBench(me)) {
         engine.show(me);
-        me.vol.switchNow = true;
+        me.volatiles.switchNow = true;
       }
     },
   };
@@ -1273,14 +1273,14 @@ function oncePerBattle(boost: Boosts): AbilityEffect {
 function paradox(active: (engine: E) => boolean): AbilityEffect {
   const stat = (engine: E, me: F): StatKey | null => {
     if (!active(engine)) return null;
-    if (!me.vol.paradoxStat) {
-      me.vol.paradoxStat = highestStat(me);
-      engine.show(me, 'paradox', { stat: me.vol.paradoxStat });
+    if (!me.volatiles.paradoxStat) {
+      me.volatiles.paradoxStat = highestStat(me);
+      engine.show(me, 'paradox', { stat: me.volatiles.paradoxStat });
     }
-    return me.vol.paradoxStat;
+    return me.volatiles.paradoxStat;
   };
   const refresh = (engine: E, me: F): void => {
-    if (!active(engine)) delete me.vol.paradoxStat;
+    if (!active(engine)) delete me.volatiles.paradoxStat;
     else stat(engine, me);
   };
   return {
@@ -1288,9 +1288,9 @@ function paradox(active: (engine: E) => boolean): AbilityEffect {
     onStart: refresh,
     onWeatherChange: refresh,
     onTerrainChange: refresh,
-    onAttack: (engine, me, move) => (active(engine) && me.vol.paradoxStat === (physical(move) ? 'atk' : 'satk') ? 1.3 : 1),
-    onDefense: (engine, me, move) => (active(engine) && me.vol.paradoxStat === (physical(move) ? 'def' : 'sdef') ? 1.3 : 1),
-    onSpeed: (engine, me, spd) => (active(engine) && me.vol.paradoxStat === 'spd' ? spd * 1.5 : spd),
+    onAttack: (engine, me, move) => (active(engine) && me.volatiles.paradoxStat === (physical(move) ? 'atk' : 'satk') ? 1.3 : 1),
+    onDefense: (engine, me, move) => (active(engine) && me.volatiles.paradoxStat === (physical(move) ? 'def' : 'sdef') ? 1.3 : 1),
+    onSpeed: (engine, me, spd) => (active(engine) && me.volatiles.paradoxStat === 'spd' ? spd * 1.5 : spd),
   };
 }
 
