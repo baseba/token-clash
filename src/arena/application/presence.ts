@@ -62,18 +62,23 @@ export class Presence {
     return !!r && this.inRoom(r, c.hostId);
   };
 
-  tourWatchers(id: string): Set<ClientConnection> {
-    let set = this.tours.get(id);
-    if (!set) this.tours.set(id, (set = new Set()));
-    return set;
+  followTournament(id: string, ws: ClientConnection): void {
+    const followers = this.tours.get(id) ?? new Set();
+    followers.add(ws);
+    this.tours.set(id, followers);
   }
 
-  tourSockets(id: string): Set<ClientConnection> {
+  unfollowTournament(id: string, ws: ClientConnection): void {
+    this.tours.get(id)?.delete(ws);
+  }
+
+  /** The connections on a tournament's page (read only: follow and unfollow change it). */
+  tournamentSockets(id: string): ReadonlySet<ClientConnection> {
     return this.tours.get(id) ?? new Set();
   }
 
   inTournament(id: string, trainerId: string | null | undefined): boolean {
-    return [...this.tourSockets(id)].some((ws) => ws.trainerId === trainerId && ws.open);
+    return [...this.tournamentSockets(id)].some((ws) => ws.trainerId === trainerId && ws.open);
   }
 
   /** Rooms with a match going on (someone watching it). Shown in /stats. */

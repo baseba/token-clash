@@ -28,7 +28,7 @@ export class ArenaViews {
 
   challenge(c: Challenge, viewerId: string | null = null) {
     const host = this.trainers.byId(c.hostId);
-    const hostTeam = (c.status === 'finished' || c.mode !== 'random' ? c.hostTeam : []).map((e) => buildFighter(e, { levelCap: c.levelCap }));
+    const hostTeam = (c.status === 'finished' || c.battleMode !== 'random' ? c.hostTeam : []).map((e) => buildFighter(e, { levelCap: c.levelCap }));
     const T = c.tournamentId ? this.tournaments.findById(c.tournamentId) : undefined;
     return {
       id: c.id,
@@ -42,7 +42,7 @@ export class ArenaViews {
       host: { id: c.hostId, name: host?.name ?? c.hostName },
       guest: c.guestId ? { id: c.guestId, name: this.nameOf(c.guestId, c.guestName) } : null,
       hostTeam: viewerId === c.hostId || c.status === 'finished' ? hostTeam : [],
-      hostTeamSize: c.mode === 'random' ? Math.min(PARTY_SIZE, host?.roster.length ?? 0) : hostTeam.length,
+      hostTeamSize: c.battleMode === 'random' ? Math.min(PARTY_SIZE, host?.roster.length ?? 0) : hostTeam.length,
       winnerId: c.winnerId ?? null,
       turns: c.turns ?? null,
       final: c.final ?? null,

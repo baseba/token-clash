@@ -187,7 +187,7 @@ export class DuelService {
   /** People who follow a tournament: in its page or in the room of one of its matches. */
   private tournamentFollowers(tournamentId: string): string[] {
     const ids = new Set<string>();
-    for (const ws of this.presence.tourSockets(tournamentId)) if (ws.open && ws.trainerId) ids.add(ws.trainerId);
+    for (const ws of this.presence.tournamentSockets(tournamentId)) if (ws.open && ws.trainerId) ids.add(ws.trainerId);
     for (const [id, room] of this.presence.rooms) {
       if (this.challenges.findById(id)?.tournamentId !== tournamentId) continue;
       for (const ws of room.sockets) if (ws.open && ws.trainerId) ids.add(ws.trainerId);
@@ -231,7 +231,7 @@ export class DuelService {
       ],
     });
     r.preview = preview;
-    this.armPreviewTimer(c.id, r, c.mode === 'random' ? this.timings.diceRollBonusMs : 0);
+    this.armPreviewTimer(c.id, r, c.battleMode === 'random' ? this.timings.diceRollBonusMs : 0);
     this.broadcast(r, { t: 'preview' });
     preview.sides.forEach((side, s) => {
       const level = aiLevelOf(side.trainerId);
@@ -256,7 +256,7 @@ export class DuelService {
       fillMissing(r.preview);
       this.revealPicks(id, r);
     }, ms);
-    r.timer.unref?.();
+    r.timer.unref();
   }
 
   /** The AI marks its picks one by one (viewers see them), then confirms. */
@@ -273,14 +273,14 @@ export class DuelService {
           this.broadcastWatchers(r);
         },
         this.timings.diceAnimationMs + step * (i + 1),
-      ).unref?.();
+      ).unref();
     });
     setTimeout(() => {
       if (!still()) return;
       pick(preview, s, choice);
       if (previewReady(preview)) this.revealPicks(id, r);
       else this.broadcast(r, { t: 'preview' });
-    }, this.timings.diceAnimationMs + this.timings.aiPickMs).unref?.();
+    }, this.timings.diceAnimationMs + this.timings.aiPickMs).unref();
   }
 
   /** Both sides chose: everyone sees the 3 of each side for a moment, then the battle starts. */
@@ -292,7 +292,7 @@ export class DuelService {
     r.deadline = now() + this.timings.revealMs;
     this.broadcast(r, { t: 'preview' });
     r.timer = setTimeout(() => r.preview && this.startBattle(id, r), this.timings.revealMs);
-    r.timer.unref?.();
+    r.timer.unref();
   }
 
   // ---------- battle ----------
@@ -323,9 +323,9 @@ export class DuelService {
       const waited = now() - since;
       const watching = [...r.sockets].filter((ws) => ws.open).map((ws) => ws.seenTurn);
       if (waited >= this.timings.aiVsAiPauseMs && (waited >= this.timings.aiVsAiViewerWaitMs || !viewersBehind(watching, turn))) return this.aiTurn(id, r);
-      setTimeout(check, 250).unref?.();
+      setTimeout(check, 250).unref();
     };
-    setTimeout(check, Math.min(this.timings.aiVsAiPauseMs, 250)).unref?.();
+    setTimeout(check, Math.min(this.timings.aiVsAiPauseMs, 250)).unref();
   }
 
   private aiTurn(id: string, r: Room): void {
@@ -391,7 +391,7 @@ export class DuelService {
       });
       this.afterResolve(id, r, events ?? [], true);
     }, ms);
-    r.timer.unref?.();
+    r.timer.unref();
   }
 
   private afterResolve(id: string, r: Room, events: BattleEvent[], timedOut = false): void {
@@ -474,7 +474,7 @@ export class DuelService {
         if (!r.readyCheck || this.presence.inRoom(r, ws.trainerId)) return;
         if (ws.trainerId === c.hostId) this.close(c);
         else this.reopenRoom(c, r);
-      }, this.timings.seatGraceMs).unref?.();
+      }, this.timings.seatGraceMs).unref();
     }
     if (r.battle || r.preview) this.broadcast(r, { t: 'presence' });
     if (!r.battle && !r.preview && !r.countdown && !r.readyCheck && r.sockets.size === 0) this.presence.rooms.delete(c.id);

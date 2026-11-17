@@ -20,7 +20,7 @@ export interface StatsSource {
   tournaments?: Record<string, TournamentState>;
 }
 
-const nameOf = (db: StatsSource, id: string | null | undefined, fallback?: string | null) => (id ? db.trainers[id]?.name : undefined) ?? fallback ?? '¿?';
+const nameOf = (source: StatsSource, id: string | null | undefined, fallback?: string | null) => (id ? source.trainers[id]?.name : undefined) ?? fallback ?? '¿?';
 
 export function rankingOf(trainers: TrainerLike[]) {
   return trainers
@@ -84,11 +84,11 @@ function monUsage(battles: ChallengeState[]) {
   return [...usage.values()].sort((a, b) => b.uses - a.uses || b.wins - a.wins || a.name.localeCompare(b.name)).slice(0, TOP_MONS);
 }
 
-export function serverStats(db: StatsSource, now = Date.now()) {
-  const trainers = Object.values(db.trainers);
+export function serverStats(source: StatsSource, now = Date.now()) {
+  const trainers = Object.values(source.trainers);
   const players = playersOf(trainers);
   const entries = uniqueEntries(trainers);
-  const challenges = Object.values(db.challenges);
+  const challenges = Object.values(source.challenges);
   const pvp = challenges.filter((c) => !c.ai && !c.tournamentId && c.status === 'finished' && c.final);
   const vsAi = challenges.filter((c) => c.ai && !c.aiOnly && c.status === 'finished');
   const turns = pvp.reduce((sum, c) => sum + Math.min(c.turns ?? 0, TURN_LIMIT), 0);
@@ -115,8 +115,8 @@ export function serverStats(db: StatsSource, now = Date.now()) {
       .slice(0, RECENT)
       .map((c) => ({
         id: c.id,
-        host: nameOf(db, c.hostId, c.hostName),
-        guest: nameOf(db, c.guestId, c.guestName),
+        host: nameOf(source, c.hostId, c.hostName),
+        guest: nameOf(source, c.guestId, c.guestName),
         winner: c.winnerId === c.hostId ? 'host' : c.winnerId === c.guestId ? 'guest' : null,
         mode: c.mode ?? 'team',
         levelCap: c.levelCap ?? null,
@@ -124,17 +124,17 @@ export function serverStats(db: StatsSource, now = Date.now()) {
         finishedAt: c.finishedAt ?? c.createdAt,
       })),
     topMons: monUsage(pvp),
-    tournaments: tournamentStats(db),
+    tournaments: tournamentStats(source),
   };
 }
 
-export function tournamentStats(db: StatsSource) {
-  const done = Object.values(db.tournaments ?? {}).filter((t) => t.status === 'finished' && t.bracket && humanCount(t) >= 2);
+export function tournamentStats(source: StatsSource) {
+  const done = Object.values(source.tournaments ?? {}).filter((t) => t.status === 'finished' && t.bracket && humanCount(t) >= 2);
   type Row = { id: string; name: string; titles: number; finals: number; played: number; wins: number; losses: number };
   const rows = new Map<string, Row>();
   const row = (seat: { id: string; name: string }) => {
     const key = seat.id;
-    if (!rows.has(key)) rows.set(key, { id: seat.id, name: nameOf(db, seat.id, seat.name), titles: 0, finals: 0, played: 0, wins: 0, losses: 0 });
+    if (!rows.has(key)) rows.set(key, { id: seat.id, name: nameOf(source, seat.id, seat.name), titles: 0, finals: 0, played: 0, wins: 0, losses: 0 });
     return rows.get(key)!;
   };
   for (const t of done) {
@@ -158,7 +158,7 @@ export function tournamentStats(db: StatsSource) {
     .slice(0, RECENT)
     .map((t) => {
       const champ = t.seats[t.champion!];
-      return { id: t.id, size: t.size, mode: t.mode ?? 'team', levelCap: t.levelCap ?? null, humans: humanCount(t), champion: champ ? nameOf(db, champ.ai ? null : champ.id, champ.name) : '¿?', championAi: !!champ?.ai, finishedAt: t.finishedAt ?? t.createdAt };
+      return { id: t.id, size: t.size, mode: t.mode ?? 'team', levelCap: t.levelCap ?? null, humans: humanCount(t), champion: champ ? nameOf(source, champ.ai ? null : champ.id, champ.name) : '¿?', championAi: !!champ?.ai, finishedAt: t.finishedAt ?? t.createdAt };
     });
   return {
     totals: { tournaments: done.length, matches: done.reduce((n, t) => n + t.size - 1, 0), aiTitles: done.filter((t) => t.seats[t.champion!]?.ai).length },

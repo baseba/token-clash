@@ -138,7 +138,7 @@ export class TournamentsService implements OnModuleInit {
     }
     if (token !== undefined) ws.trainerId = this.trainers.authenticate(token)?.id ?? null;
     ws.tourId = T.id;
-    this.presence.tourWatchers(T.id).add(ws);
+    this.presence.followTournament(T.id, ws);
     this.broadcast(T);
     return T;
   }
@@ -146,7 +146,7 @@ export class TournamentsService implements OnModuleInit {
   unfollow(ws: ClientConnection): void {
     const T = ws.tourId ? this.tournaments.findById(ws.tourId) : undefined;
     if (!T) return;
-    this.presence.tourSockets(T.id).delete(ws);
+    this.presence.unfollowTournament(T.id, ws);
     if (T.seatOf(ws.trainerId) !== -1 && T.status === 'open') {
       this.watchSeat(T, ws.trainerId!);
       this.broadcast(T);
@@ -159,7 +159,7 @@ export class TournamentsService implements OnModuleInit {
   }
 
   broadcast(T: Tournament): void {
-    for (const ws of this.presence.tourSockets(T.id)) if (ws.open) ws.send({ t: 'tour', tournament: this.views.tournament(T, ws.trainerId) });
+    for (const ws of this.presence.tournamentSockets(T.id)) if (ws.open) ws.send({ t: 'tour', tournament: this.views.tournament(T, ws.trainerId) });
     if (T.visibility === 'public') this.lobby.notify();
   }
 
@@ -188,7 +188,7 @@ export class TournamentsService implements OnModuleInit {
       if (trainerId === T.hostId) return this.close(T);
       if (T.leave(trainerId)) this.afterSeatsChange(T);
     }, this.timings.seatGraceMs);
-    timer.unref?.();
+    timer.unref();
     this.seatTimers.set(key, timer);
   }
 
@@ -205,7 +205,7 @@ export class TournamentsService implements OnModuleInit {
     this.tournaments.save(T);
     this.broadcast(T);
     this.lobby.notify();
-    setTimeout(() => this.startMatch(T), this.timings.bracketDrawMs).unref?.();
+    setTimeout(() => this.startMatch(T), this.timings.bracketDrawMs).unref();
   }
 
   private seatTeam(T: Tournament, seat: Seat): RosterEntry[] {
@@ -244,7 +244,7 @@ export class TournamentsService implements OnModuleInit {
     if (!T || T.status !== 'running') return;
     const at = now();
     const champion = T.matchFinished({ round: c.round!, index: c.match! }, c.winnerId ?? null, { now: at, nextMatchAt: at + this.timings.betweenMatchesMs });
-    if (champion === null) setTimeout(() => this.startMatch(T), this.timings.betweenMatchesMs).unref?.();
+    if (champion === null) setTimeout(() => this.startMatch(T), this.timings.betweenMatchesMs).unref();
     this.tournaments.save(T);
     this.broadcast(T);
   }
