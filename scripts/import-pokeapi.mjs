@@ -5,7 +5,8 @@
 // - src/catalog/data/abilities.json: Spanish name and description of every main-series ability.
 // - src/catalog/data/movedex.json: every learnable move, with its Spanish name and description from PokeAPI and
 //   its battle data from Pokémon Showdown's MIT-licensed server data.
-// - public/sprites/: the official sprites of every species and battle form, via scripts/sprites.mjs.
+// - public/upstream/sprites.json and cries.json: where the sprites and the cry of every species and battle form
+//   live upstream, via scripts/sprites.mjs and scripts/sync-cries.js.
 //
 // The server never calls PokeAPI (production has no egress): run this again to refresh the data.
 //
@@ -13,6 +14,7 @@
 
 import { writeFileSync } from 'node:fs';
 import { syncSprites } from './sprites.mjs';
+import { syncCries } from './sync-cries.js';
 
 const API = 'https://pokeapi.co/api/v2';
 const OUT = new URL('../src/catalog/data/pokeapi.json', import.meta.url);
@@ -280,3 +282,4 @@ const formLines = BATTLE_FORMS.filter((n) => forms[n]).map((n) => `  "${n}": ${J
 writeFileSync(OUT, `${head},\n "species": {\n${lines.join(',\n')}\n },\n "forms": {\n${formLines.join(',\n')}\n }\n}\n`);
 console.error(`Listo: ${lines.length} especies en src/catalog/data/pokeapi.json`);
 await syncSprites();
+await syncCries();
