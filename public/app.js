@@ -842,11 +842,20 @@ function renderSound() {
 }
 renderSound();
 
+// Without the sprite manifest every Pokémon would stay blank for the session, so each navigation
+// asks for it again. One request at a time, and the repaint waits if it would drop unsaved edits.
+let spritesRetry = null;
+function retrySprites() {
+  if (spritesLoaded() || spritesRetry) return;
+  spritesRetry = loadSprites().then(() => {
+    spritesRetry = null;
+    if (spritesLoaded() && !unsaved?.()) route();
+  });
+}
+
 function route() {
   hideTip();
-  // Without the sprite manifest every Pokémon would stay blank for the session, so each navigation
-  // asks for it again and repaints once it arrives.
-  if (!spritesLoaded()) loadSprites().then(() => spritesLoaded() && route());
+  retrySprites();
   if (TAB_MUSIC[location.pathname]) music.play(TAB_MUSIC[location.pathname]);
   else if (location.pathname.startsWith('/t/')) music.play('tab:home');
   else if (location.pathname.startsWith('/b/')) music.play('prep');
