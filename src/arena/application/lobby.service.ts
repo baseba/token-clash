@@ -9,7 +9,7 @@ import { HOST_GRACE_MS, openRooms } from '../domain/lobby.js';
 import type { Tournament } from '../domain/tournament.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
-import { Presence, type BattlePhase, type Room } from './presence.js';
+import { Presence, tournamentWatchKey, watchKey, type BattlePhase, type Room } from './presence.js';
 
 const LISTED = 40;
 
@@ -57,9 +57,27 @@ export class LobbyService {
   }
 
   private watchable(room: Room): boolean {
-    const tournament = this.tournamentOf(room);
-    if (tournament) return tournament.visibility === 'public';
-    return !!room.challenge.ai || room.challenge.visibility === 'public';
+    return this.presence.watchable(watchKey(room.challenge));
+  }
+
+  /** A player opens their match, or their whole tournament, to watchers: it shows up in the live list. */
+  allowWatchers(ws: ClientConnection): void {
+    const room = this.presence.roomOf(ws);
+    const tournament = room ? this.tournamentOf(room) : ws.tourId ? this.tournaments.findById(ws.tourId) : undefined;
+    const player = tournament ? tournament.seatOf(ws.trainerId) !== -1 : !!room && !!ws.trainerId && [room.challenge.hostId, room.challenge.guestId].includes(ws.trainerId);
+    if (!player) return;
+    const key = tournament ? tournamentWatchKey(tournament.id) : watchKey(room!.challenge);
+    this.presence.allowWatchers(key);
+    const sockets = tournament ? this.presence.tournamentAudience(tournament.id) : [...room!.sockets];
+    for (const socket of sockets) if (socket.open) socket.send({ t: 'watch', open: true });
+    this.notify();
+  }
+
+  /** Whether the room or tournament a connection just entered is open to watchers. */
+  sendWatchState(ws: ClientConnection): void {
+    const room = this.presence.roomOf(ws);
+    const key = room ? watchKey(room.challenge) : ws.tourId ? tournamentWatchKey(ws.tourId) : null;
+    if (key) ws.send({ t: 'watch', open: this.presence.watchable(key) });
   }
 
   subscribe(ws: ClientConnection, token: string | undefined): void {

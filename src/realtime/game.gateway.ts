@@ -108,14 +108,18 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
   onTour(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'tour'>): void {
     const connection = this.conn(socket);
     if (!connection?.idle) return;
-    if (this.tournaments.follow(connection, msg.id, msg.token)) this.chat.sendHistory(connection);
+    if (!this.tournaments.follow(connection, msg.id, msg.token)) return;
+    this.chat.sendHistory(connection);
+    this.lobby.sendWatchState(connection);
   }
 
   @SubscribeMessage('hello')
   onHello(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'hello'>): void {
     const connection = this.conn(socket);
     if (!connection?.idle) return;
-    if (this.duels.enter(connection, msg.room, msg.token)) this.chat.sendHistory(connection);
+    if (!this.duels.enter(connection, msg.room, msg.token)) return;
+    this.chat.sendHistory(connection);
+    this.lobby.sendWatchState(connection);
   }
 
   @SubscribeMessage('set-ready')
@@ -158,6 +162,12 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
   onSurrender(@ConnectedSocket() socket: WebSocket): void {
     const connection = this.conn(socket);
     if (connection?.roomId) this.battles.surrender(connection);
+  }
+
+  @SubscribeMessage('watch')
+  onWatch(@ConnectedSocket() socket: WebSocket): void {
+    const connection = this.conn(socket);
+    if (connection && (connection.roomId || connection.tourId)) this.lobby.allowWatchers(connection);
   }
 
   @SubscribeMessage('chat')
