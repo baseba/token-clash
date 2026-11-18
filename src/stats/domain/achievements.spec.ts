@@ -192,15 +192,15 @@ test('the shop sells a color variant only once its original trainer is unlocked'
 test('a look is blocked while locked, with a message that says how to get it', () => {
   const ground = record({ roster: GROUND.slice(0, 3).map((id) => entry(id)) });
   assert.equal(lookBlocker(record(), undefined, 'giovanni'), 'Todavía no desbloqueas a ese entrenador.');
-  assert.equal(lookBlocker(record(), undefined, 'jacinthe_holo'), 'Ese entrenador se compra en tu perfil.');
+  assert.equal(lookBlocker(record(), undefined, 'iris__sapphire'), 'Ese entrenador se compra en tu perfil.');
   assert.equal(lookBlocker(ground, undefined, 'giovanni'), null);
-  assert.equal(lookBlocker(record(), null, 'hiker'), null, 'starters are always free');
+  assert.equal(lookBlocker(ground, null, 'youngster_m'), null, 'starters come with the first Pokémon');
 });
 
 test('the look a player already wears is never blocked, even if it is locked for them now', () => {
   assert.equal(lookBlocker(record(), 'giovanni', 'giovanni'), null);
-  assert.equal(lookBlocker(record(), 'jacinthe_holo', 'jacinthe_holo'), null);
-  assert.equal(lookBlocker(record(), 'jacinthe_holo', 'giovanni'), 'Todavía no desbloqueas a ese entrenador.');
+  assert.equal(lookBlocker(record(), 'iris__sapphire', 'iris__sapphire'), null);
+  assert.equal(lookBlocker(record(), 'iris__sapphire', 'giovanni'), 'Todavía no desbloqueas a ese entrenador.');
 });
 
 test('an original never asks for the same Pokémon one of its recolors is named after', () => {

@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { Buffer } from 'node:buffer';
 import { decodePng } from './sync-trainers.js';
+import { UPSTREAM } from '../public/upstream.js';
+import { fetchUpstream } from './upstream-files.js';
 import { CHAMPIONS, DOWNLOADED_SPRITES, HANDMADE_VARIANTS, SHOP_TRAINERS, VILLAINS } from '../public/trainer-sprites.js';
 
 const TRAINERS = new URL('../public/trainers/', import.meta.url);
@@ -531,11 +534,21 @@ function plan() {
   return variants;
 }
 
-function pokemonMaps() {
+const BW_SPRITES = 'sprites/pokemon/versions/generation-v/black-white/';
+
+async function pokemonSprite(id, side) {
+  const local = new URL(`../public/sprites/${id}-${side}.png`, import.meta.url);
+  if (existsSync(local)) return decodePng(readFileSync(local));
+  const response = await fetchUpstream(UPSTREAM.sprites, `${BW_SPRITES}${side === 'back' ? 'back/' : ''}${id}.png`);
+  if (!response.ok) throw new Error(`No pude bajar el sprite ${side} de #${id}.`);
+  return decodePng(Buffer.from(await response.arrayBuffer()));
+}
+
+async function pokemonMaps() {
   const maps = {};
   for (const variant of HANDMADE_VARIANTS.filter((v) => v.pokemon)) {
     const trainer = loadTrainer(variant.base);
-    const [front, back] = ['front', 'back'].map((side) => decodePng(readFileSync(new URL(`../public/sprites/${variant.pokemon}-${side}.png`, import.meta.url))));
+    const [front, back] = await Promise.all(['front', 'back'].map((side) => pokemonSprite(variant.pokemon, side)));
     const sprite = { width: front.width, height: front.height + back.height, rgba: Buffer.concat([front.rgba, back.rgba]) };
     const palette = pokemonPalette(sprite, 3);
     const opaque = trainer.rgba.filter((_, i) => i % 4 === 3 && trainer.rgba[i] > 0).length;
@@ -556,7 +569,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const variants = plan();
   const soldNow = new Set(variants.filter((v) => !v.earn).map((v) => v.key));
   const retired = Object.fromEntries(Object.entries(SHIPPED_RECOLORS).filter(([key]) => !soldNow.has(key)));
-  const maps = pokemonMaps();
+  const maps = await pokemonMaps();
   const quote = (value) => JSON.stringify(value).replace(/"/g, "'");
   const lines = variants.map((v) => `  { key: ${quote(v.key)}, base: ${quote(v.base)}, color: ${quote(v.color)},${v.earn ? ' earn: true,' : ''} map: ${quote(v.map)} },`);
   writeFileSync(
