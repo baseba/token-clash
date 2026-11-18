@@ -3,35 +3,15 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { Buffer } from 'node:buffer';
 import { inflateSync, deflateSync } from 'node:zlib';
 import { DOWNLOADED_SPRITES, TRAINER_VARIANTS } from '../public/trainer-sprites.js';
+import { UPSTREAM } from '../public/upstream.js';
+import { fetchUpstream, mapLimit } from './upstream-files.js';
 
-const RAW = 'https://raw.githubusercontent.com/pagefaultgames/pokerogue-assets/beta/images/trainer';
+// Served by us, unlike the rest of PokeRogue's files: each sprite is the first frame of an atlas,
+// cropped to its pixels, and the color variants are recolored from it.
+const TRAINERS = 'images/trainer';
 const OUT = new URL('../public/trainers/', import.meta.url);
-const CONCURRENCY = 16;
-const HEADERS = { 'user-agent': 'token-clash-importer' };
 
 const log = (msg) => console.log(msg);
-
-async function fetchRetry(url, tries = 4) {
-  for (let i = 1; ; i++) {
-    try {
-      const res = await fetch(url, { headers: HEADERS });
-      if (res.ok || res.status === 404) return res;
-      throw new Error(`${res.status} ${url}`);
-    } catch (err) {
-      if (i >= tries) throw err;
-      await new Promise((r) => setTimeout(r, 500 * 2 ** i));
-    }
-  }
-}
-
-async function mapLimit(items, fn) {
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: CONCURRENCY }, async () => {
-      while (next < items.length) await fn(items[next++]);
-    }),
-  );
-}
 
 function chunks(png) {
   const out = [];
@@ -237,7 +217,7 @@ export function generateVariants() {
 async function syncTrainer(key) {
   const file = new URL(`${key}.png`, OUT);
   if (existsSync(file)) return 'existing';
-  const [png, atlas] = await Promise.all([fetchRetry(`${RAW}/${key}.png`), fetchRetry(`${RAW}/${key}.json`)]);
+  const [png, atlas] = await Promise.all([fetchUpstream(UPSTREAM.pokerogue, `${TRAINERS}/${key}.png`), fetchUpstream(UPSTREAM.pokerogue, `${TRAINERS}/${key}.json`)]);
   if (!png.ok) return 'missing';
   const frames = atlas.ok ? await atlas.json() : null;
   writeFileSync(file, encodePng(firstFrame(decodePng(Buffer.from(await png.arrayBuffer())), frames)));

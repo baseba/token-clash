@@ -19,7 +19,7 @@ COPY scripts/sync-battle-anims.js ./scripts/sync-battle-anims.js
 COPY public/music.js public/battle-anims.js public/radio.js public/shop.js public/trainer-sprites.js public/trainer-variants.js public/upstream.js ./public/
 COPY src/catalog/data/movedex.json ./src/catalog/data/movedex.json
 RUN node scripts/sync-battle-anims.js
-COPY scripts/sync-trainers.js ./scripts/sync-trainers.js
+COPY scripts/sync-trainers.js scripts/upstream-files.js ./scripts/
 RUN node scripts/sync-trainers.js
 COPY src/catalog/data ./src/catalog/data
 COPY drizzle ./drizzle
