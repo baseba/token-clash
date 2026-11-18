@@ -76,8 +76,9 @@ así que sus tests reproducen una pelea entera con una semilla fija. La única l
 se leen una vez, al cargar el módulo, y la tabla de tipos es `public/types.js`, la misma que usa el navegador
 (`catalog/domain/type-chart.ts` explica cómo). La tienda (`public/shop.js`) y los entrenadores
 (`public/trainer-sprites.js`, `public/trainer-variants.js`) siguen el mismo camino: el catálogo les pone tipos en
-`catalog/domain/shop.ts` y `trainer-sprites.ts`, y `tsconfig.json` los incluye en el build. En general, un dominio tiene solo las capas que
-usa: `chat` no tiene HTTP propio (sus mensajes le llegan por la arena) y `stats` no guarda nada.
+`catalog/domain/shop.ts` y `trainer-sprites.ts`, y `tsconfig.json` los incluye en el build.
+
+En general, un dominio tiene solo las capas que usa: `chat` no tiene HTTP propio (sus mensajes le llegan por la arena) y `stats` no guarda nada.
 
 Un puerto es opcional: vale la pena cuando el adaptador podría cambiar o hay que reemplazarlo en los tests, como
 el almacenamiento. `SkynetService` (`combat/application`) importa el cliente de Jev de `combat/infrastructure/`
@@ -119,10 +120,10 @@ pelea, un equipo que no repite especie), y para mostrar la regla de dependencia,
    `TeamPreviewService`, que arranca la cuenta regresiva de cada partido). Cuando una pelea de torneo termina, la
    pelea no llama al torneo: `LiveBattleService` publica `matchFinished` en `ArenaEvents` y el torneo, que está
    suscrito, avanza la llave.
-6. **Los modelos de lectura solo leen.** `stats` arma la página con consultas de solo lectura
-   (`TrainersService.all()`, `ArenaQueries`). Los logros desbloquean entrenadores y artículos de la tienda, pero
-   `stats` no guarda nada: comprar, equipar y cambiar el look se lo pide a `TrainersService` (regla 2). En un sistema grande tendría su propia proyección alimentada por
-   eventos; acá sería exagerado.
+6. **Los modelos de lectura no guardan nada.** `stats` arma la página con consultas de solo lectura
+   (`TrainersService.all()`, `ArenaQueries`). En un sistema grande tendría su propia proyección alimentada por
+   eventos; acá sería exagerado. Los logros desbloquean entrenadores y artículos de la tienda, pero comprar,
+   equipar y cambiar el look se lo pide a `TrainersService` (regla 2).
 
 ## 4. Recorrido de una petición
 
@@ -251,6 +252,11 @@ build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de 
   `PUT /api/me/equip`, porque comprar un entrenador pide tener al original. Esa regla vive hoy en
   `AchievementsService.buy`, no en el dominio: `Trainer.buy` no la conoce. Lo limpio sería una función pura en
   `stats/domain/achievements.ts` con su spec, y `equip`, que no depende de logros, en `TrainersController`.
+  Además, sus cinco endpoints (`/api/shop`, `/api/shop/buy`, `/api/me/equip`, `/api/me/look` y
+  `/api/me/achievements`) no están en el e2e, sus DTOs (`BuyDto`, `EquipDto`, `ChooseLookDto`) no tienen spec y
+  `EquipDto` repite a mano la unión `EquipKind` de `trainer.ts`.
+- **Un test depende de una descarga.** `test/web/trainer-variants.test.js` lee `public/trainers/`, que baja
+  `npm install` y no se versiona. Sin conexión al instalar, `npm test` falla ahí.
 - **`combat` lleva cosméticos.** `BattleState` guarda el entrenador, el marco y la Poké Ball de cada lado para que
   la vista los muestre. Son datos de presentación de la arena; el motor no los usa para pelear.
 - **El estado en vivo no se guarda.** Peleas, presencia y chat viven en memoria por diseño: es un juego entre

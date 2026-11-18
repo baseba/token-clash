@@ -18,29 +18,31 @@ escrito ahí.
 
 ## Convenciones de Nest
 
-- Cada dominio es una carpeta con su `*.module.ts`. Adentro, solo las capas que usa (`domain/`, `application/`,
-  `infrastructure/`, `interface/`). El módulo exporta su servicio de aplicación y nada más.
+Las capas, los DTOs de Zod, `DomainError` y las reglas entre dominios están en `ARQUITECTURA.md` §2 a §4. Encima de
+eso:
+
+- El módulo de un dominio exporta servicios de aplicación (y consultas de solo lectura, como `ArenaQueries`). Nunca
+  exporta su repositorio.
 - Un endpoint nuevo va en el controller del dominio dueño de lo que cambia. El controller lee la petición y llama a
   un caso de uso. La regla vive en el agregado o en una función pura de `domain/`, con su spec al lado.
-- Valida cada entrada en el borde con un esquema de Zod: HTTP en `interface/dto/` con `@Body({ schema })`, mensajes
-  del socket en `realtime/client-messages.ts` y variables de entorno en `shared/config/app-config.ts`. Adentro,
-  confía en los tipos.
 - Para un valor que ya existe como unión en el dominio, exporta la lista desde el dominio y úsala en el DTO con
   `z.enum(...)`.
-- Cuando una regla dice que no, lanza un `DomainError` con su tipo (`conflict`, `not-found`, `forbidden`…).
-  `DomainErrorFilter` lo traduce a HTTP. Un solo estilo de error y ningún `catch` vacío.
+- En `src/`, una regla que dice que no lanza un `DomainError`. Ningún `catch` vacío.
 - Agrega un puerto (clase abstracta que sirve de token) solo si el adaptador puede cambiar o hay que reemplazarlo en
   los tests. Si hay un solo adaptador, impórtalo directo, como `SkynetService` con el cliente de Jev.
 - La pila es la que hay: Zod para validar, `app-config.ts` para la configuración, `node:test` con
   `node:assert/strict` para los tests y funciones puras con la aleatoriedad inyectada en vez de mocks de Nest.
   Proponer `@nestjs/config`, class-validator, Jest o `TestingModule` es una decisión de arquitectura: pregunta antes.
-- Si otro dominio necesita algo, se lo pide a su servicio. Nunca lee su tabla ni inyecta su repositorio.
-  `src/architecture.spec.ts` falla con un import prohibido.
+
+`ARQUITECTURA.md` §8 lista las deudas conocidas, por ejemplo cómo entra la tienda. Ese código no es un precedente:
+sigue las reglas de arriba aunque el archivo vecino no lo haga.
 
 ## Código
 
-- Nombres completos. Sin variables, parámetros ni alias de tipo de una letra. Solo se aceptan los índices `i` y
-  `j`, el parámetro de un callback de una sola expresión (`(m) => m.id`) y el generador pseudoaleatorio.
+- Nombres completos, también en los specs. Sin variables, parámetros ni alias de tipo de una letra. Se aceptan los
+  índices `i` y `j`, el parámetro de un callback de una sola expresión (`(m) => m.id`), los comparadores de
+  `sort` (`(a, b) =>`), los parámetros de tipo genéricos (`<T>`) y el generador pseudoaleatorio. Quedan letras sueltas
+  en código viejo: no las copies.
 - Un concepto, un nombre en todo el código. Si renombras, renombra en todos lados (con un codemod si son muchos).
 - Identificadores y comentarios en inglés. Los textos que ve el jugador y la documentación van en español.
 - Comenta solo el porqué: una decisión de diseño, una regla del dominio o entre dominios, una trampa externa. Cada
@@ -52,8 +54,7 @@ escrito ahí.
 
 ## Datos y migraciones
 
-- Al cambiar un `*.schema.ts`, actualiza el mapper y corre `npm run db:generate`. Commitea la migración de
-  `drizzle/`. Nunca edites una migración publicada.
+- Al cambiar un `*.schema.ts`, actualiza también el mapper (el resto está en "Ojo con" de `CONTRIBUTING.md`).
 - Para volver obligatoria una columna o borrarla, usa dos PRs (expand y contract, `ARQUITECTURA.md` §6). Un deploy
   que falla vuelve a la imagen anterior, y esa imagen tiene que seguir funcionando con la base nueva.
 - Una migración que reescribe datos se prueba sobre una copia de la base de producción antes del merge.

@@ -221,7 +221,7 @@ Por carpeta:
 | `drizzle/` | Migraciones SQL generadas por drizzle-kit; la app las aplica al arrancar. |
 | `src/**/*.spec.ts` | Tests unitarios (`node:test`), al lado del código que prueban. |
 | `test/` | Tests e2e (`*.e2e-spec.ts`: levantan la app entera), los del frontend (`test/web/`, en JS) y el save de ejemplo (`fixtures/`). |
-| `public/` | El frontend: `index.html`, `app.js` (toda la interfaz) y un módulo por tema. |
+| `public/` | El frontend: `index.html`, `style.css`, `app.js` (toda la interfaz) y un módulo por tema. |
 | `scripts/` | Descargas e importaciones de datos externos (detalle abajo). |
 | `deploy/` | Imagen, contenedores, redes y el deploy automático (ver [Deploy](#deploy-podman--cloudflare-tunnel)). |
 
@@ -231,18 +231,19 @@ Por tema:
 | --- | --- | --- | --- |
 | Importar el save | `src/trainers/domain/save-file.ts` | `POST /api/import` en `trainers/interface/trainers.controller.ts` | `public/savestore.js`, `public/savepatch.js` (save editado) |
 | Colección, equipo, movimientos | `src/trainers/domain/trainer.ts` | `PUT /api/me`, `PUT /api/me/mons/:id` | `public/app.js` |
-| Pokédex | `src/catalog/domain/pokedex.ts` | `GET /api/pokedex` | `public/app.js` |
+| Pokédex | `src/catalog/domain/pokedex.ts` | `GET /api/pokedex` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
 | Motor de batalla | `src/combat/domain/battle.ts` (mapa de archivos al principio), `move-rules.ts`, `ability-effects.ts` | WebSocket, por la arena | `public/battle-anims.js`, `public/fx.js` |
 | IA y Skynet | `src/combat/domain/ai.ts`, `src/combat/application/skynet.service.ts`, `src/combat/infrastructure/jev/` | | |
 | Salas y emparejamiento | `src/arena/domain/challenge.ts`, `lobby.ts` | `arena/interface/challenges.controller.ts` | `public/app.js` |
-| Pelea en vivo (fases de la sala) | `src/arena/application/duel.service.ts`, `team-preview.service.ts`, `live-battle.service.ts`, `presence.ts` | `src/realtime/game.gateway.ts`, mensajes en `client-messages.ts` | lo que ve cada cliente: `arena/application/room-frames.ts` |
+| Pelea en vivo (fases de la sala) | `src/arena/application/duel.service.ts`, `team-preview.service.ts`, `live-battle.service.ts`, `presence.ts`; lo que ve cada cliente, en `room-frames.ts` | `src/realtime/game.gateway.ts`, mensajes en `client-messages.ts` | `public/app.js`, `public/battle-anims.js` |
 | Torneos | `src/arena/domain/tournament.ts`, `arena/application/tournaments.service.ts` | `arena/interface/tournaments.controller.ts` | `public/app.js` |
 | Chat | `src/chat/domain/chat.ts`, canales en `arena/application/arena-chat.service.ts` | WebSocket | `public/app.js` |
-| Ranking y stats | `src/trainers/domain/ranking.ts`, `src/stats/application/server-stats.ts` | `GET /api/stats`, `GET /api/leaderboard` | `public/app.js` |
+| Ranking y stats | `src/trainers/domain/ranking.ts`, `src/stats/application/server-stats.ts` | `GET /api/stats` en `stats/interface/stats.controller.ts`, `GET /api/leaderboard` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
 | Logros y entrenador del perfil | `src/stats/domain/achievements.ts` | `GET /api/me/achievements`, `PUT /api/me/look` en `stats/interface/achievements.controller.ts` | `public/trainer-sprites.js` |
-| Variantes de colores de entrenadores | `public/trainer-sprites.js` (a mano), `public/trainer-variants.js` (lo genera `scripts/plan-trainer-variants.mjs`) | | `scripts/sync-trainers.js` las pinta al instalar |
-| Tienda | artículos y precios en `public/shop.js` (tipados en `src/catalog/domain/shop.ts`); saldo y compra en `src/trainers/domain/trainer.ts` | `GET /api/shop`, `POST /api/shop/buy`, `PUT /api/me/equip` en `stats/interface/achievements.controller.ts` | `public/shop.js`, `public/app.js` |
+| Variantes de colores de entrenadores | `public/trainer-sprites.js` (a mano), `public/trainer-variants.js` (lo genera `scripts/plan-trainer-variants.mjs`); `scripts/sync-trainers.js` pinta los sprites al instalar | | `public/app.js` |
+| Tienda | artículos y precios en `public/shop.js` (tipados en `src/catalog/domain/shop.ts`); saldo y compra en `src/trainers/domain/trainer.ts`; "pide al original" en `src/stats/application/achievements.service.ts` | `GET /api/shop`, `POST /api/shop/buy`, `PUT /api/me/equip` en `stats/interface/achievements.controller.ts`, con los DTOs de `trainers/interface/dto/shop.dto.ts` | `public/shop.js`, `public/app.js` |
 | Tipos y efectividad | `public/types.js` (lo comparten servidor y navegador) | | |
+| Escenario de batalla y sprites de Pokémon | | | `public/backgrounds.js`, `public/creature.js` |
 | Música, radio y sonidos | | | `public/music.js`, `public/radio.js`, `public/fx.js` |
 | Notificaciones | | | `public/notify.js` |
 | Configuración y variables de entorno | `src/shared/config/app-config.ts` | | |
