@@ -396,7 +396,7 @@ test('the shop sells, equips and guards what is still locked', async () => {
   };
   assert.deepEqual(await rejected('/api/shop/buy', 'POST', { item: 'ball:nope' }), [404, { error: 'Ese artículo no existe.' }]);
   assert.deepEqual(await rejected('/api/shop/buy', 'POST', { item: 'trainer:iris__sapphire' }), [403, { error: 'Primero desbloquea al entrenador original.' }]);
-  assert.deepEqual(await rejected('/api/me/equip', 'PUT', { kind: 'window', key: 'sapphire' }), [403, { error: 'Primero cómpralo en la tienda.' }]);
+  assert.deepEqual(await rejected('/api/me/equip', 'PUT', { kind: 'window', key: 'sapphire' }), [403, { error: 'Primero cómpralo en tu perfil.' }]);
   assert.deepEqual(await rejected('/api/me/look', 'PUT', { avatar: 'iris' }), [403, { error: 'Todavía no desbloqueas a ese entrenador.' }]);
 
   const bought = await call('/api/shop/buy', { method: 'POST', token, body: { item: 'window:sapphire' } });
@@ -404,6 +404,28 @@ test('the shop sells, equips and guards what is still locked', async () => {
   assert.ok(bought.data.shop.owned.includes('window:sapphire'));
   assert.equal((await call('/api/me/equip', { method: 'PUT', token, body: { kind: 'window', key: 'sapphire' } })).status, 200);
   assert.equal((await call('/api/me', { token })).data.me.shop.equipped.window, 'sapphire');
+});
+
+test('the shredder turns a repeated Pokémon into tokens once', async () => {
+  const withRepeat = JSON.parse(save);
+  const venusaur = withRepeat.state.dex.find((seen: { finalID: number }) => seen.finalID === 3);
+  venusaur.caughtAt = '2024-01-01T00:00:00Z';
+  withRepeat.state.dex.push({ ...venusaur, id: '22222222-2222-3333-4444-555555555555', caughtAt: '2099-01-01T00:00:00Z' });
+  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Recicla', save: JSON.stringify(withRepeat) }, ip: '10.9.0.4' })).data;
+  const before = await call('/api/me/recycling', { token });
+  assert.equal(before.status, 200);
+  const [duplicate] = before.data.recycling.duplicates;
+  assert.equal(duplicate.id, '22222222-2222-3333-4444-555555555555');
+
+  const shredded = await call('/api/me/recycling', { method: 'POST', token, body: { entry: duplicate.id } });
+  assert.equal(shredded.status, 200);
+  assert.equal(shredded.data.tokens, duplicate.tokens);
+  assert.ok(!shredded.data.recycling.duplicates.some((left: any) => left.id === duplicate.id));
+
+  const again = await call('/api/me/recycling', { method: 'POST', token, body: { entry: duplicate.id } });
+  assert.deepEqual([again.status, again.data], [409, { error: 'Ese Pokémon ya pasó por la trituradora.' }]);
+  const unknown = await call('/api/me/recycling', { method: 'POST', token, body: { entry: 'nope' } });
+  assert.deepEqual([unknown.status, unknown.data], [404, { error: 'Ese Pokémon no está entre tus repetidos.' }]);
 });
 
 test('bad uploads get a clear error', async () => {
