@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MUSIC_TRACKS, musicFile, trackFor, UI_SOUND_KINDS, uiSampleFor } from '../../public/music.js';
+import { MUSIC_TRACKS, SOUNDS, trackFor, UI_SOUND_KINDS, uiSampleFor } from '../../public/music.js';
 
 const scenes = [...new Set([...readFileSync(new URL('../../public/backgrounds.js', import.meta.url), 'utf8').matchAll(/file: '([a-z0-9-]+)'/g)].map((m) => m[1]))];
 
@@ -42,13 +42,12 @@ test('menus play the calm biome tracks, and prep and victories their own', () =>
   assert.equal(trackFor('unknown'), null);
   const ids = [...scenes.map((scene) => `scene:${scene}`), 'tab:home', 'tab:collection', 'tab:pokedex', 'tab:stats', 'prep', 'victory:win', 'victory:champion'];
   for (const id of ids) assert.ok(MUSIC_TRACKS.includes(trackFor(id)), id);
-  assert.equal(musicFile('bw/victory_trainer'), '/music/bw-victory_trainer.mp3');
 });
 
 test('each button sound maps to a PokeRogue sample, and unknown kinds play nothing', () => {
-  assert.deepEqual(uiSampleFor('select'), { url: '/sfx/se/select.wav', rate: 1 });
-  assert.deepEqual(uiSampleFor('back'), { url: '/sfx/se/select.wav', rate: 0.8 });
-  assert.equal(uiSampleFor('open').url, '/sfx/se/menu_open.wav');
-  for (const kind of UI_SOUND_KINDS) assert.match(uiSampleFor(kind).url, /^\/sfx\/se\/\w+\.wav$/);
+  assert.deepEqual(uiSampleFor('select'), { sound: 'select', rate: 1 });
+  assert.deepEqual(uiSampleFor('back'), { sound: 'select', rate: 0.8 });
+  assert.equal(uiSampleFor('open').sound, 'menu_open');
+  for (const kind of UI_SOUND_KINDS) assert.ok(SOUNDS.includes(uiSampleFor(kind).sound), kind);
   assert.equal(uiSampleFor('nope'), null);
 });

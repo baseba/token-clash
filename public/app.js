@@ -1278,11 +1278,11 @@ async function profilePage(seq) {
 // ---------- recycling ----------
 const RECYCLE_RARITY = { common: 'Común', uncommon: 'Poco común', rare: 'Raro', legendary: 'Legendario' };
 const SHRED_SOUNDS = [
-  { url: '/sfx/moves/audio/prsfx-shift-gear.wav', at: 0, gain: 0.6 },
-  { url: '/sfx/moves/audio/prsfx-drill-run.wav', at: 120, gain: 0.55 },
-  { url: '/sfx/moves/audio/prsfx-gear-grind.wav', at: 200, gain: 0.7 },
-  { url: '/sfx/moves/audio/prsfx-crunch.wav', at: 420, gain: 0.65 },
-  { url: '/sfx/moves/audio/prsfx-pay-day1.wav', at: 950, gain: 0.7 },
+  { sound: 'prsfx-shift-gear.wav', at: 0, gain: 0.6 },
+  { sound: 'prsfx-drill-run.wav', at: 120, gain: 0.55 },
+  { sound: 'prsfx-gear-grind.wav', at: 200, gain: 0.7 },
+  { sound: 'prsfx-crunch.wav', at: 420, gain: 0.65 },
+  { sound: 'prsfx-pay-day1.wav', at: 950, gain: 0.7 },
 ];
 const SHRED_CRY_MS = 380;
 const SHRED_STRIPS = 9;

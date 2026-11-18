@@ -87,3 +87,13 @@ test('every species and form has a cry on jsDelivr', async () => {
   const cries = readManifest('/upstream/cries.json');
   for (const sprite of creatures) assert.match(cryURLs(cries, sprite)[0] ?? '', jsdelivr('PokeAPI/cries'), sprite);
 });
+
+test('every music track, sound effect and shredder sound has its file in pokerogue-assets', async () => {
+  const { MUSIC_TRACKS, SOUNDS } = await import('../../public/music.js');
+  const pokerogue = readManifest('/upstream/pokerogue.json');
+  for (const track of MUSIC_TRACKS) assert.match(pokerogue.music[track] ?? '', /^audio\/bgm\/.+\.mp3$/, track);
+  for (const sound of SOUNDS) assert.match(pokerogue.sounds[sound] ?? '', /^audio\/(se|ui)\/\w+\.wav$/, sound);
+  const shredder = [...readFileSync(new URL('../../public/app.js', import.meta.url), 'utf8').matchAll(/\{ sound: '([^']+)'/g)].map((match) => match[1]);
+  assert.equal(shredder.length, 5);
+  for (const sound of shredder) assert.match(pokerogue.moveSounds[sound] ?? '', /^audio\/battle_anims\/.+\.wav$/, sound);
+});

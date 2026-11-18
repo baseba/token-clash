@@ -63,8 +63,6 @@ const SCREEN_TRACKS = {
 
 export const MUSIC_TRACKS = [...new Set([...Object.values(SCENE_TRACKS), ...Object.values(SCREEN_TRACKS), ...RADIO_TRACKS.map((track) => track.id)])];
 
-export const musicFile = (track) => `/music/${track.replace('/', '-')}.mp3`;
-
 export function trackFor(id) {
   const radio = /^radio:(.+)$/.exec(id ?? '')?.[1];
   if (radio) return radioTrack(radio)?.id ?? null;
@@ -72,34 +70,37 @@ export function trackFor(id) {
   return scene ? SCENE_TRACKS[scene] ?? null : SCREEN_TRACKS[id] ?? null;
 }
 
-const SE_FILES = { throw: 'pb_throw', switch: 'pb_rel', faint: 'faint', up: 'stat_up', down: 'stat_down', heal: 'restore', reveal: 'pb_tray_ball' };
+const SE_SOUNDS = { throw: 'pb_throw', switch: 'pb_rel', faint: 'faint', up: 'stat_up', down: 'stat_down', heal: 'restore', reveal: 'pb_tray_ball' };
+const hitSound = (eff) => (eff > 1 ? 'hit_strong' : eff < 1 ? 'hit_weak' : 'hit');
 
 const UI_SOUNDS = {
-  select: { file: 'select' },
-  back: { file: 'select', rate: 0.8 },
-  open: { file: 'menu_open' },
-  confirm: { file: 'pb_lock' },
-  danger: { file: 'flee' },
-  add: { file: 'pb_tray_enter' },
-  remove: { file: 'pb_tray_empty' },
-  save: { file: 'save' },
-  buy: { file: 'buy' },
+  select: { sound: 'select' },
+  back: { sound: 'select', rate: 0.8 },
+  open: { sound: 'menu_open' },
+  confirm: { sound: 'pb_lock' },
+  danger: { sound: 'flee' },
+  add: { sound: 'pb_tray_enter' },
+  remove: { sound: 'pb_tray_empty' },
+  save: { sound: 'save' },
+  buy: { sound: 'buy' },
 };
 export const UI_SOUND_KINDS = Object.keys(UI_SOUNDS);
 const UI_QUIET_AFTER_SFX_S = 0.6;
 
+/** Every PokeRogue sound effect the player can ask for: scripts/sync-battle-anims.js places each one upstream. */
+export const SOUNDS = [...new Set([...Object.values(SE_SOUNDS), ...[2, 1, 0.5].map(hitSound), ...Object.values(UI_SOUNDS).map((ui) => ui.sound)])];
+
 export function uiSampleFor(kind) {
-  const sound = UI_SOUNDS[kind];
-  return sound ? { url: `/sfx/se/${sound.file}.wav`, rate: sound.rate ?? 1 } : null;
+  const ui = UI_SOUNDS[kind];
+  return ui ? { sound: ui.sound, rate: ui.rate ?? 1 } : null;
 }
 
 export function sampleFor(kind, opts = {}) {
   if (kind === 'hit') {
     const eff = opts.eff ?? 1;
-    if (eff === 0) return null;
-    return `/sfx/se/${eff > 1 ? 'hit_strong' : eff < 1 ? 'hit_weak' : 'hit'}.wav`;
+    return eff === 0 ? null : hitSound(eff);
   }
-  return SE_FILES[kind] ? `/sfx/se/${SE_FILES[kind]}.wav` : null;
+  return SE_SOUNDS[kind] ?? null;
 }
 
 export function animSoundFor(kind, opts = {}) {
@@ -116,7 +117,7 @@ export function moveSfxCues(manifest, key, byPlayer = true) {
   const sides = manifest?.[key];
   if (!sides) return [];
   const cues = byPlayer ? sides[0] : sides[1] ?? sides[0];
-  return cues.map(([at, url, gain, rate]) => ({ at, url, gain, rate }));
+  return cues.map(([at, sound, gain, rate]) => ({ at, sound, gain, rate }));
 }
 
 
@@ -283,6 +284,13 @@ export function createPlayer({ storage = null } = {}) {
     const urls = cryURLs(await upstreamManifest('cries'), sprite);
     return urls.length ? loadBuffer(urls) : null;
   };
+
+  async function pokerogueBuffer(section, key) {
+    const path = (await upstreamManifest('pokerogue'))[section]?.[key];
+    return typeof path === 'string' ? loadBuffer(upstreamURLs(UPSTREAM.pokerogue, path)) : null;
+  }
+  const soundBuffer = (sound) => pokerogueBuffer('sounds', sound);
+  const cueBuffer = (cue) => pokerogueBuffer('moveSounds', cue.sound);
   const moveCues = async (key, byPlayer) => moveSfxCues(await loadManifest(MOVE_SFX_MANIFEST), key, byPlayer);
 
   const cueSources = new Set();
@@ -314,7 +322,7 @@ export function createPlayer({ storage = null } = {}) {
 
   async function playMove(out, { key, byPlayer = true, shape, type }) {
     const cues = key ? await moveCues(key, byPlayer) : [];
-    const buffers = await Promise.all(cues.map((cue) => loadBuffer([cue.url])));
+    const buffers = await Promise.all(cues.map(cueBuffer));
     if (ctx.state !== 'running') return;
     const start = ctx.currentTime + 0.01;
     if (!buffers.some(Boolean)) return SHAPE_SFX[shape]?.(out, start, TYPE_PITCH[type] ?? 1);
@@ -367,8 +375,8 @@ export function createPlayer({ storage = null } = {}) {
     }
   }
 
-  async function playSampleOr(out, url, fallback, rate = 1) {
-    const buffer = await loadBuffer([url]);
+  async function playSampleOr(out, sound, fallback, rate = 1) {
+    const buffer = await soundBuffer(sound);
     if (ctx.state !== 'running') return;
     if (buffer) playBuffer(out, buffer, { gain: 0.35, rate });
     else fallback();
@@ -376,7 +384,7 @@ export function createPlayer({ storage = null } = {}) {
 
   async function playCuesOr(out, key, byPlayer, fallback) {
     const cues = await moveCues(key, byPlayer);
-    const buffers = await Promise.all(cues.map((cue) => loadBuffer([cue.url])));
+    const buffers = await Promise.all(cues.map(cueBuffer));
     if (ctx.state !== 'running') return;
     if (!buffers.some(Boolean)) return fallback();
     const start = ctx.currentTime + 0.01;
@@ -411,7 +419,7 @@ export function createPlayer({ storage = null } = {}) {
   }
 
   async function stream(id, track, gain, loop) {
-    const [buffer, loops] = await Promise.all([loadBuffer([musicFile(track)]), loadManifest('/music/loops.json')]);
+    const [buffer, loops] = await Promise.all([pokerogueBuffer('music', track), loadManifest('/music/loops.json')]);
     if (current?.id !== id || trackGain !== gain || !buffer) return;
     const source = ctx.createBufferSource();
     const level = ctx.createGain();
@@ -442,7 +450,7 @@ export function createPlayer({ storage = null } = {}) {
     },
     unlock() {
       if (!ensure()) return;
-      for (const kind of UI_SOUND_KINDS) loadBuffer([uiSampleFor(kind).url]);
+      for (const kind of UI_SOUND_KINDS) soundBuffer(uiSampleFor(kind).sound);
       if (ctx.state === 'suspended') ctx.resume().then(() => shown() && start(shown()));
       else if (shown()) start(shown());
     },
@@ -461,26 +469,26 @@ export function createPlayer({ storage = null } = {}) {
     },
     preload({ sprites = [], moves = [] }) {
       if (!ensure()) return;
-      for (const kind of [...Object.keys(SE_FILES), 'hit']) for (const eff of [0.5, 1, 2]) {
-        const url = sampleFor(kind, { eff });
-        if (url) loadBuffer([url]);
+      for (const kind of [...Object.keys(SE_SOUNDS), 'hit']) for (const eff of [0.5, 1, 2]) {
+        const sound = sampleFor(kind, { eff });
+        if (sound) soundBuffer(sound);
       }
       for (const sprite of new Set(sprites)) if (sprite != null) cryBuffer(sprite);
       for (const key of new Set(moves)) {
         if (!key) continue;
-        for (const byPlayer of [true, false]) moveCues(key, byPlayer).then((cues) => cues.forEach((cue) => loadBuffer([cue.url])));
+        for (const byPlayer of [true, false]) moveCues(key, byPlayer).then((cues) => cues.forEach(cueBuffer));
       }
     },
     ui(kind) {
       const sample = uiSampleFor(kind);
       const out = sample && sfxBus();
       if (!out || ctx.currentTime - lastSfxAt < UI_QUIET_AFTER_SFX_S) return;
-      return playSampleOr(out, sample.url, () => sweep(out, ctx.currentTime + 0.01, { wave: 0.5, from: 1200 * sample.rate, to: 1200 * sample.rate, dur: 0.05, gain: 0.12 }), sample.rate);
+      return playSampleOr(out, sample.sound, () => sweep(out, ctx.currentTime + 0.01, { wave: 0.5, from: 1200 * sample.rate, to: 1200 * sample.rate, dur: 0.05, gain: 0.12 }), sample.rate);
     },
     cues(list, { maxMs = 1400 } = {}) {
       const out = sfxBus();
       if (!out || !list?.length) return;
-      Promise.all(list.map((cue) => loadBuffer([cue.url]))).then((loaded) => {
+      Promise.all(list.map(cueBuffer)).then((loaded) => {
         if (ctx.state !== 'running') return;
         stopCues();
         const start = ctx.currentTime + 0.01;
@@ -508,7 +516,7 @@ export function createPlayer({ storage = null } = {}) {
     stopCues,
     preloadCues(list) {
       if (!ensure()) return;
-      for (const cue of list ?? []) loadBuffer([cue.url]);
+      for (const cue of list ?? []) cueBuffer(cue);
     },
     sfx(kind, opts = {}) {
       const out = sfxBus();

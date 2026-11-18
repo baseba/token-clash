@@ -1,24 +1,26 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+// PokeRogue's battle animations, converted for our field at install and build time: one JSON per
+// animation in public/anims/, their sound cues in public/sfx/moves/moves.json, the music loop points
+// and the recolored Poké Balls of public/anims/ui/. The sheets, sounds and music they name are not
+// downloaded: public/upstream/pokerogue.json says where each one lives in pokerogue-assets and the
+// browser loads it from jsDelivr. `--manifest` (npm run anims) rewrites that manifest; run it when
+// the pinned commit, the moves or the music change.
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { Buffer } from 'node:buffer';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MUSIC_TRACKS, musicFile } from '../public/music.js';
-import { BALL_GROUPS, BALL_VARIANTS, CUSTOM_BALLS } from '../public/shop.js';
 import { crc32 } from 'node:zlib';
+import { MUSIC_TRACKS, SOUNDS } from '../public/music.js';
+import { BALL_GROUPS, BALL_VARIANTS, CUSTOM_BALLS } from '../public/shop.js';
+import { UPSTREAM } from '../public/upstream.js';
+import { fetchUpstream, firstExisting, manifestJSON, mapLimit } from './upstream-files.js';
 
-const RAW = 'https://raw.githubusercontent.com/pagefaultgames/pokerogue-assets/beta';
 const MOVEDEX = new URL('../src/catalog/data/movedex.json', import.meta.url);
+const MANIFEST = new URL('../public/upstream/pokerogue.json', import.meta.url);
 const ANIMS = new URL('../public/anims/', import.meta.url);
-const GRAPHICS = new URL('graphics/', ANIMS);
 const UI = new URL('ui/', ANIMS);
 const MUSIC = new URL('../public/music/', import.meta.url);
-const SFX = new URL('../public/sfx/', import.meta.url);
-const MOVE_AUDIO = new URL('moves/audio/', SFX);
-const SE = new URL('se/', SFX);
-const CUES = new URL('moves/moves.json', SFX);
-const CONCURRENCY = 16;
-const HEADERS = { 'user-agent': 'token-clash-importer' };
+const CUES = new URL('../public/sfx/moves/moves.json', import.meta.url);
 const MS_PER_ANIM_FRAME = 50;
 
 const COMMON_ANIMS = [
@@ -36,32 +38,14 @@ const CHARGE_ANIMS = [
 
 const BALLS = ['pb', 'gb', 'ub', 'lb', 'rb', 'mb'];
 const UI_IMAGES = [...BALLS.flatMap((ball) => [`pokeball/${ball}.png`, `pokeball/${ball}_open.png`]), 'effects/pb_particles.png', 'effects/battle_stats.png'];
-const SE_SOUNDS = ['pb_throw', 'pb_rel', 'hit', 'hit_strong', 'hit_weak', 'faint', 'stat_up', 'stat_down', 'restore', 'pb_tray_ball', 'pb_lock', 'flee', 'pb_tray_enter', 'pb_tray_empty', 'save', 'buy'];
-const UI_SOUNDS = ['select', 'menu_open'];
 
-async function fetchRetry(url, tries = 4) {
-  for (let i = 1; ; i++) {
-    try {
-      const res = await fetch(url, { headers: HEADERS });
-      if (res.ok || res.status === 404) return res;
-      throw new Error(`${res.status} ${url}`);
-    } catch (err) {
-      if (i >= tries) throw err;
-      await new Promise((r) => setTimeout(r, 500 * 2 ** i));
-    }
-  }
-}
+const pokerogue = (path) => fetchUpstream(UPSTREAM.pokerogue, path);
 
-async function mapLimit(items, fn) {
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: CONCURRENCY }, async () => {
-      while (next < items.length) await fn(items[next++]);
-    }),
-  );
-}
-
-export const assetName = (resourceName) => resourceName.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+(?=\.)|-+$/g, '');
+/**
+ * Our key for a sheet or a sound: its PokeRogue name made URL-safe ("PRAS- Fire" is "pras-fire").
+ * A name with no letters or digits keeps itself (Copycat's sheet is "!").
+ */
+export const assetName = (resourceName) => resourceName.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+(?=\.)|-+$/g, '') || resourceName;
 
 const BALL_PALETTE_SLOTS = {
   closed: { top: [2, 4, 5, 6], bottom: [7, 3] },
@@ -144,38 +128,29 @@ export function generateBalls() {
   return failed;
 }
 
-export function pngSize(data) {
-  if (data.length < 24 || data.toString('ascii', 12, 16) !== 'IHDR') return null;
-  return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
-}
-
-const sheetUrl = (graphic) => `/anims/graphics/${assetName(graphic)}.png`;
-const bgUrl = (name) => (name ? `/anims/graphics/${assetName(name)}.png` : null);
-const soundUrl = (name) => `/sfx/moves/audio/${assetName(name)}`;
-
 export function compactFrame(e) {
   const tone = e.tone?.some(Boolean) ? e.tone : 0;
   return [e.target ?? 2, e.x ?? 0, e.y ?? 0, e.zoomX ?? 0, e.zoomY ?? 0, e.angle ?? 0, e.mirror ? 1 : 0, e.visible ? 1 : 0, e.blendType ?? 0, e.graphicFrame ?? 0, e.opacity ?? 0, e.priority ?? 0, e.focus || 1, tone];
 }
 
-function compactConfig(config, columns = () => 5) {
+function compactConfig(config) {
   const events = Object.values(config.frameTimedEvents ?? {}).flat().sort((a, b) => a.frameIndex - b.frameIndex);
   const bg = events
     .filter((e) => e.eventType === 'AnimTimedAddBgEvent' || e.eventType === 'AnimTimedUpdateBgEvent')
-    .map((e) => [e.frameIndex, e.eventType === 'AnimTimedAddBgEvent' ? 'add' : 'update', e.eventType === 'AnimTimedAddBgEvent' ? bgUrl(e.resourceName) : null, e.bgX ?? null, e.bgY ?? null, e.opacity ?? null, e.duration ?? 0]);
+    .map((e) => [e.frameIndex, e.eventType === 'AnimTimedAddBgEvent' ? 'add' : 'update', e.eventType === 'AnimTimedAddBgEvent' && e.resourceName ? assetName(e.resourceName) : null, e.bgX ?? null, e.bgY ?? null, e.opacity ?? null, e.duration ?? 0]);
   const sounds = events
     .filter((e) => e.eventType === 'AnimTimedSoundEvent' && e.resourceName)
-    .map((e) => [e.frameIndex * MS_PER_ANIM_FRAME, soundUrl(e.resourceName), (e.volume ?? 100) / 100, (e.pitch ?? 100) / 100]);
+    .map((e) => [e.frameIndex * MS_PER_ANIM_FRAME, assetName(e.resourceName), (e.volume ?? 100) / 100, (e.pitch ?? 100) / 100]);
   return {
-    graphic: config.graphic ? { url: sheetUrl(config.graphic), columns: columns(config.graphic) } : null,
+    graphic: config.graphic ? assetName(config.graphic) : null,
     frames: (config.frames ?? []).map((frame) => frame.map(compactFrame)),
     bg,
     sounds,
   };
 }
 
-export function compactAnim(anim, columns) {
-  const [player, opponent] = (Array.isArray(anim) ? anim : [anim]).map((config) => compactConfig(config, columns));
+export function compactAnim(anim) {
+  const [player, opponent] = (Array.isArray(anim) ? anim : [anim]).map(compactConfig);
   return opponent && JSON.stringify(opponent) !== JSON.stringify(player) ? [player, opponent] : [player];
 }
 
@@ -188,105 +163,116 @@ export function resourcesOf(anim) {
   };
 }
 
-async function download(url, file) {
-  if (existsSync(file)) return readFileSync(file);
-  const res = await fetchRetry(url);
-  if (!res.ok) throw new Error(`${res.status} ${url}`);
-  const data = Buffer.from(await res.arrayBuffer());
-  writeFileSync(file, data);
-  return data;
+/** The keys a converted animation names that the manifest can't place. */
+export function missingAssets(anim, manifest) {
+  const named = anim.flatMap((side) => [
+    ...[side.graphic, ...side.bg.map((event) => event[2])].filter(Boolean).map((key) => ['graphics', key]),
+    ...side.sounds.map(([, key]) => ['moveSounds', key]),
+  ]);
+  return [...new Set(named.filter(([section, key]) => typeof manifest[section]?.[key] !== 'string').map(([, key]) => key))];
 }
 
-const readJson = (file) => {
-  try {
-    return JSON.parse(readFileSync(file, 'utf8'));
-  } catch {
-    return null;
+async function downloadTo(path, file) {
+  const res = await pokerogue(path);
+  if (!res.ok) throw new Error(`${res.status} ${path}`);
+  writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+}
+
+// Where each key lives in pokerogue-assets, checked with a HEAD request. A sound effect of ours is
+// in PokeRogue's effects folder or its menu folder; music tracks keep their subfolders (bw/…).
+async function resolveManifest(anims, failed) {
+  const files = { graphics: new Map(), moveSounds: new Map() };
+  const place = (section, key, path) => {
+    const known = files[section].get(key);
+    if (known && known !== path) failed.push(`${path} y ${known} se llamarían ${key}`);
+    files[section].set(key, path);
+  };
+  for (const key of [...anims.keys()].sort()) {
+    const { graphics, sounds } = resourcesOf(anims.get(key));
+    for (const graphic of graphics) place('graphics', assetName(graphic), `images/battle_anims/${graphic}.png`);
+    for (const sound of sounds) place('moveSounds', assetName(sound), `audio/battle_anims/${sound}`);
   }
-};
+  const sorted = (map) => [...map].sort(([a], [b]) => (a < b ? -1 : 1));
+  const candidates = [
+    ...sorted(files.graphics).map(([key, path]) => ['graphics', key, [path]]),
+    ...sorted(files.moveSounds).map(([key, path]) => ['moveSounds', key, [path]]),
+    ...SOUNDS.map((sound) => ['sounds', sound, [`audio/se/${sound}.wav`, `audio/ui/${sound}.wav`]]),
+    ...MUSIC_TRACKS.map((track) => ['music', track, [`audio/bgm/${track}.mp3`]]),
+  ];
+  const manifest = { graphics: {}, moveSounds: {}, sounds: {}, music: {} };
+  for (const [section, key] of candidates) manifest[section][key] = null;
+  await mapLimit(candidates, async ([section, key, paths]) => {
+    try {
+      manifest[section][key] = await firstExisting(UPSTREAM.pokerogue, paths);
+      if (!manifest[section][key]) failed.push(`${paths.join(' ni ')} (no existe)`);
+    } catch (err) {
+      failed.push(`${paths[0]} (${err.message})`);
+    }
+  });
+  return manifest;
+}
+
+const failure = (what, failed) => new Error(`No se pudieron procesar ${failed.length} ${what}: ${failed.slice(0, 10).join(', ')}${failed.length > 10 ? '…' : ''}`);
 
 /**
- * @throws {Promise<Error>} si algún recurso referenciado no se pudo descargar
+ * @throws {Promise<Error>} si algún recurso no se pudo descargar o el manifiesto no lo ubica
  */
-export async function syncBattleAnims({ refresh = false, log = (msg) => process.stderr.write(`${msg}\n`) } = {}) {
-  for (const dir of [GRAPHICS, UI, MOVE_AUDIO, SE, MUSIC]) mkdirSync(dir, { recursive: true });
+export async function syncBattleAnims({ writeManifest = false, log = (msg) => process.stderr.write(`${msg}\n`) } = {}) {
+  for (const dir of [UI, MUSIC, new URL('./', CUES)]) mkdirSync(dir, { recursive: true });
   const keys = [...Object.keys(JSON.parse(readFileSync(MOVEDEX, 'utf8'))), ...COMMON_ANIMS, ...CHARGE_ANIMS];
-  const pending = keys.filter((key) => refresh || !existsSync(new URL(`${key}.json`, ANIMS)));
-  log(`Animaciones de PokeRogue: ${keys.length - pending.length}/${keys.length} listas; descargando ${pending.length}.`);
+  log(`Animaciones de PokeRogue: descargando ${keys.length} de pokerogue-assets@${UPSTREAM.pokerogue.commit.slice(0, 7)}.`);
 
   const failed = [];
-  const sheetSizes = new Map();
-  const columnsOf = (graphic) => Math.max(1, Math.floor((sheetSizes.get(graphic)?.width ?? 480) / 96));
-
-  await mapLimit(pending, async (key) => {
+  const anims = new Map();
+  await mapLimit(keys, async (key) => {
     try {
-      const res = await fetchRetry(`${RAW}/battle-anims/${key}.json`);
-      if (!res.ok) return;
-      const anim = await res.json();
-      const { graphics, sounds } = resourcesOf(anim);
-      for (const graphic of graphics) {
-        const data = await download(`${RAW}/images/battle_anims/${encodeURIComponent(graphic)}.png`, new URL(`${assetName(graphic)}.png`, GRAPHICS));
-        sheetSizes.set(graphic, pngSize(data));
-      }
-      for (const sound of sounds) await download(`${RAW}/audio/battle_anims/${encodeURIComponent(sound)}`, new URL(assetName(sound), MOVE_AUDIO));
-      writeFileSync(new URL(`${key}.json`, ANIMS), `${JSON.stringify(compactAnim(anim, columnsOf))}\n`);
+      const res = await pokerogue(`battle-anims/${key}.json`);
+      if (res.ok) anims.set(key, await res.json());
     } catch (err) {
       failed.push(`${key} (${err.message})`);
     }
   });
 
+  if (writeManifest) {
+    if (failed.length) throw failure('animaciones', failed);
+    const manifest = await resolveManifest(anims, failed);
+    if (failed.length) throw failure('archivos', failed);
+    writeFileSync(MANIFEST, manifestJSON(manifest));
+    log(`Manifiesto escrito en public/upstream/pokerogue.json: ${Object.entries(manifest).map(([section, files]) => `${Object.keys(files).length} ${section}`).join(', ')}.`);
+  }
+
+  const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'));
+  const cues = {};
+  for (const key of keys.filter((key) => anims.has(key))) {
+    const anim = compactAnim(anims.get(key));
+    const missing = missingAssets(anim, manifest);
+    if (missing.length) failed.push(`${key} (${missing.join(', ')} no está en public/upstream/pokerogue.json: corre npm run anims)`);
+    writeFileSync(new URL(`${key}.json`, ANIMS), `${JSON.stringify(anim)}\n`);
+    if (anim.some((side) => side.sounds.length)) cues[key] = anim.map((side) => side.sounds);
+  }
+  writeFileSync(CUES, `${JSON.stringify(cues)}\n`);
+
   await mapLimit(UI_IMAGES, async (path) => {
     try {
-      await download(`${RAW}/images/${path}`, new URL(path.split('/').pop(), UI));
+      await downloadTo(`images/${path}`, new URL(path.split('/').pop(), UI));
     } catch (err) {
       failed.push(`${path} (${err.message})`);
     }
   });
   failed.push(...generateBalls());
-  await mapLimit(MUSIC_TRACKS, async (track) => {
-    try {
-      await download(`${RAW}/audio/bgm/${track}.mp3`, new URL(musicFile(track).slice('/music/'.length), MUSIC));
-    } catch (err) {
-      failed.push(`${track}.mp3 (${err.message})`);
-    }
-  });
   try {
-    const res = await fetchRetry(`${RAW}/biome-bgm-loop-points.json`);
+    const res = await pokerogue('biome-bgm-loop-points.json');
     if (!res.ok) throw new Error(String(res.status));
     const loops = await res.json();
     writeFileSync(new URL('loops.json', MUSIC), `${JSON.stringify(Object.fromEntries(MUSIC_TRACKS.map((track) => [track, loops[track] ?? 0])))}\n`);
   } catch (err) {
     failed.push(`biome-bgm-loop-points.json (${err.message})`);
   }
-  await mapLimit(SE_SOUNDS, async (name) => {
-    try {
-      await download(`${RAW}/audio/se/${name}.wav`, new URL(`${name}.wav`, SE));
-    } catch (err) {
-      failed.push(`${name}.wav (${err.message})`);
-    }
-  });
-  await mapLimit(UI_SOUNDS, async (name) => {
-    try {
-      await download(`${RAW}/audio/ui/${name}.wav`, new URL(`${name}.wav`, SE));
-    } catch (err) {
-      failed.push(`${name}.wav (${err.message})`);
-    }
-  });
 
-  const cues = {};
-  for (const key of keys) {
-    const anim = readJson(new URL(`${key}.json`, ANIMS));
-    if (anim?.some((side) => side.sounds.length)) cues[key] = anim.map((side) => side.sounds);
-  }
-  writeFileSync(CUES, `${JSON.stringify(cues)}\n`);
-
-  const ready = keys.filter((key) => existsSync(new URL(`${key}.json`, ANIMS)));
-  log(`Animaciones listas en public/anims/, sonidos en public/sfx/ y música en public/music/.`);
-  log(`  ${ready.length}/${keys.length} animaciones (movimientos, estados, clima y cargas)`);
+  log(`Animaciones listas en public/anims/ y sus sonidos en public/sfx/moves/moves.json.`);
+  log(`  ${anims.size}/${keys.length} animaciones (movimientos, estados, clima y cargas)`);
   log(`  ${Object.keys(cues).length} con sonido`);
-  if (failed.length) {
-    throw new Error(`No se pudieron procesar ${failed.length} recursos: ${failed.slice(0, 10).join(', ')}${failed.length > 10 ? '…' : ''}`);
-  }
+  if (failed.length) throw failure('recursos', failed);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes('--balls')) {
@@ -294,7 +280,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   console.log(failed.length ? `No pude generar: ${failed.join(', ')}` : `Poké Balls generadas: ${CUSTOM_BALLS.length + BALL_VARIANTS.length}.`);
   if (failed.length) process.exitCode = 1;
 } else if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  syncBattleAnims({ refresh: process.argv.includes('--refresh') }).catch((err) => {
+  syncBattleAnims({ writeManifest: process.argv.includes('--manifest') }).catch((err) => {
     console.error(err.message);
     process.exitCode = 1;
   });
