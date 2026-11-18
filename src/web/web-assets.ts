@@ -8,12 +8,12 @@ import { extname, join, normalize } from 'node:path';
 import { PUBLIC_DIR } from '../shared/paths.js';
 import { VARIANT_KEYS } from '../catalog/domain/trainer-sprites.js';
 
-const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.gif': 'image/gif', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.json': 'application/json; charset=utf-8', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain; charset=utf-8' };
+const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json; charset=utf-8', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain; charset=utf-8' };
 // Code revalidates on every load so a deploy shows up at once (Cloudflare would stretch a short
-// max-age to hours). Sprites and sounds can be cached, except what install generates by recoloring
-// (the Poké Balls in anims/ui/ and the trainer variants): it changes under the same name whenever
-// its colors do.
-const CACHEABLE = new Set(['.png', '.gif', '.ogg', '.mp3', '.wav', '.m4a', '.ico']);
+// max-age to hours). Images can be cached, except what install generates by recoloring (the Poké
+// Balls in anims/ui/ and the trainer variants): it changes under the same name whenever its colors
+// do. Sprites, cries, sounds and music aren't served from here (public/upstream.js).
+const CACHEABLE = new Set(['.png', '.ico']);
 const recolored = (rel: string): boolean => /^anims[/\\]ui[/\\]/.test(rel) || (/^trainers[/\\]/.test(rel) && VARIANT_KEYS.has(rel.slice('trainers/'.length, -'.png'.length)));
 
 export interface Asset {
