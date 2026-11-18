@@ -101,26 +101,26 @@ export function recordOf({ trainer, team, challenges, tournaments, rankedFirst }
   for (const [, entries] of species)
     for (const type of typesOf(entries[0])) {
       speciesByType[type] = (speciesByType[type] ?? 0) + 1;
-      if (entries.some((e) => e.shiny)) shinyByType[type] = (shinyByType[type] ?? 0) + 1;
+      if (entries.some((entry) => entry.shiny)) shinyByType[type] = (shinyByType[type] ?? 0) + 1;
     }
   const registered = new Set(trainer.roster.flatMap((entry) => lineage(entry.finalID)).filter((id) => id <= DEX_SIZE));
   const dexByRegion = Object.fromEntries(Object.keys(REGIONS).map((region) => [region, [...registered].filter((id) => inRegion(id, region as Region)).length])) as Record<Region, number>;
-  const legendary = [...species.values()].filter((entries) => entries.some((e) => e.rarity === 'legendary')).map((entries) => entries[0].finalID);
+  const legendary = [...species.values()].filter((entries) => entries.some((entry) => entry.rarity === 'legendary')).map((entries) => entries[0].finalID);
 
-  const finished = challenges.filter((c) => c.status === 'finished' && sideOf(c, trainer.id) !== null).sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt));
-  const won = finished.filter((c) => c.winnerId === trainer.id);
-  const aiWins = won.filter((c) => c.ai);
-  const aiWinsAtLeast = Object.fromEntries(AI_LEVELS.map((level, rank) => [level, aiWins.filter((c) => AI_LEVELS.indexOf(c.ai as AiLevel) >= rank).length])) as Record<AiLevel, number>;
-  const flawlessWins = won.filter((c) => {
-    const team = c.final?.sides[sideOf(c, trainer.id)!]?.team ?? [];
-    return team.length > 0 && team.every((f) => (f.hp ?? 0) > 0);
+  const finished = challenges.filter((challenge) => challenge.status === 'finished' && sideOf(challenge, trainer.id) !== null).sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt));
+  const won = finished.filter((challenge) => challenge.winnerId === trainer.id);
+  const aiWins = won.filter((challenge) => challenge.ai);
+  const aiWinsAtLeast = Object.fromEntries(AI_LEVELS.map((level, rank) => [level, aiWins.filter((challenge) => AI_LEVELS.indexOf(challenge.ai as AiLevel) >= rank).length])) as Record<AiLevel, number>;
+  const flawlessWins = won.filter((challenge) => {
+    const team = challenge.final?.sides[sideOf(challenge, trainer.id)!]?.team ?? [];
+    return team.length > 0 && team.every((fighter) => (fighter.hp ?? 0) > 0);
   }).length;
-  const lowLevelWins = won.filter((c) => {
-    const fought = foughtEntries(c, sideOf(c, trainer.id)!);
-    return fought.length > 0 && fought.every((e) => e.level < LOW_LEVEL);
+  const lowLevelWins = won.filter((challenge) => {
+    const fought = foughtEntries(challenge, sideOf(challenge, trainer.id)!);
+    return fought.length > 0 && fought.every((entry) => entry.level < LOW_LEVEL);
   }).length;
-  const championOf = (t: TournamentState) => (t.status === 'finished' && t.champion != null ? t.seats[t.champion]?.id : undefined);
-  const crowns = tournaments.filter((t) => championOf(t) === trainer.id);
+  const championOf = (tournament: TournamentState) => (tournament.status === 'finished' && tournament.champion != null ? tournament.seats[tournament.champion]?.id : undefined);
+  const crowns = tournaments.filter((tournament) => championOf(tournament) === trainer.id);
   const teamTypes = team.flatMap(typesOf);
 
   return {
@@ -130,16 +130,16 @@ export function recordOf({ trainer, team, challenges, tournaments, rankedFirst }
     dexTotal: registered.size,
     hoennLegendaries: legendary.filter((id) => inRegion(id, 'hoenn')).length,
     legendaries: legendary.length,
-    shinies: [...species.values()].filter((entries) => entries.some((e) => e.shiny)).length,
+    shinies: [...species.values()].filter((entries) => entries.some((entry) => entry.shiny)).length,
     tokens: trainer.totalTokens ?? 0,
     rankedWins: trainer.wins,
     rankedGames: trainer.wins + trainer.losses,
     bestStreak: bestStreak(finished.filter(isHumanDuel), trainer.id),
     rankedFirst,
     tournamentsWon: crowns.length,
-    bigTournamentsWon: crowns.filter((t) => t.size >= 16).length,
+    bigTournamentsWon: crowns.filter((tournament) => tournament.size >= 16).length,
     aiWinsAtLeast,
-    aiRandomWins: aiWins.filter((c) => c.mode === 'random').length,
+    aiRandomWins: aiWins.filter((challenge) => challenge.mode === 'random').length,
     flawlessWins,
     lowLevelWins,
     diverseTeam: team.length >= 6 && new Set(teamTypes).size === teamTypes.length,
