@@ -6,7 +6,7 @@ import { createFx, moveShape } from './fx.js?v=dev';
 import { chargeAnim, COMMON_PRELOAD, hpTweenMs, moveLands } from './battle-anims.js?v=dev';
 import { patchSave } from './savepatch.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
-import { TRAINER_SPRITES, trainerSpriteFor } from './trainer-sprites.js?v=dev';
+import { TRAINER_SPRITES, TRAINER_VARIANTS, trainerSpriteFor, VARIANT_COLOR_NAMES } from './trainer-sprites.js?v=dev';
 import { RADIO_KINDS, RADIO_REGIONS, RADIO_TRACKS, radioTrack } from './radio.js?v=dev';
 import { createNotifier } from './notify.js?v=dev';
 import { RARITIES, SHOP_KINDS } from './shop.js?v=dev';
@@ -535,9 +535,16 @@ function trainerImg(key, cls = '') {
 function avatarPic(key, size = 'sm', frame = null) {
   return key ? h('span', { class: `avatar avatar-${size}${frame ? ` ring-${frame}` : ''}`, 'aria-hidden': 'true' }, trainerImg(key)) : null;
 }
-const trainerLabel = (key) => key.replace(/_([mf])(?=$|_)/, (_, g) => (g === 'm' ? ' ♂' : ' ♀')).replace(/_(\d)$/, ' $1').replace(/_/g, ' ').replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
+const VARIANTS_BY_KEY = new Map(TRAINER_VARIANTS.map((variant) => [variant.key, variant]));
+const byLabel = (a, b) => trainerLabel(a).localeCompare(trainerLabel(b), 'es', { numeric: true, sensitivity: 'base' });
+const trainerLabel = (key) => {
+  const variant = VARIANTS_BY_KEY.get(key);
+  if (variant) return variant.name ?? `${baseTrainerLabel(variant.base)} ${VARIANT_COLOR_NAMES[variant.color] ?? variant.color}`;
+  return baseTrainerLabel(key);
+};
+const baseTrainerLabel = (key) => key.replace(/_([mf])(?=$|_)/, (_, g) => (g === 'm' ? ' ♂' : ' ♀')).replace(/_(\d)$/, ' $1').replace(/_/g, ' ').replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
 
-const TRAINER_GROUPS = { '': 'Todas las categorías', unlocked: 'Desbloqueados', locked: 'Bloqueados', starter: 'Básicos', shop: 'Tienda', gym: 'Líderes de gimnasio', elite: 'Alto Mando', champion: 'Campeones', villain: 'Villanos', special: 'Especiales' };
+const TRAINER_GROUPS = { '': 'Todas las categorías', unlocked: 'Desbloqueados', locked: 'Bloqueados', starter: 'Básicos', shop: 'Tienda', variant: 'Variantes de colores', gym: 'Líderes de gimnasio', elite: 'Alto Mando', champion: 'Campeones', villain: 'Villanos', special: 'Especiales' };
 
 async function loadAchievements() {
   if (!me) return null;
@@ -1027,7 +1034,7 @@ async function profilePage(seq) {
       if (group === 'locked' && usable(key)) return false;
       if (group && !['unlocked', 'locked'].includes(group) && (progress.get(key)?.group ?? 'starter') !== group) return false;
       return !words || label.toLowerCase().includes(words) || key.includes(words);
-    });
+    }).sort(byLabel);
     const open = TRAINER_SPRITES.filter(usable).length;
     count.textContent = `${shown.length === TRAINER_SPRITES.length ? '' : `${shown.length} de ${TRAINER_SPRITES.length} · `}${open} desbloqueados`;
     grid.replaceChildren(...(shown.length ? shown.map((key) => {
@@ -1094,6 +1101,7 @@ async function shopPage(seq) {
   if (stale(seq)) return;
   let kind = '';
   let hideOwned = false;
+  let query = '';
   const balance = h('div', { class: 'shop-balance' });
   const grid = h('div', { class: 'shop-grid' });
   const confirmDlg = h('dialog', { class: 'info-dlg confirm-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() });
@@ -1140,6 +1148,7 @@ async function shopPage(seq) {
     if (!confirmDlg.open) confirmDlg.showModal();
   }
   function action(item) {
+    if (!item.owned && item.available === false) return h('span', { class: 'muted small shop-locked', 'data-tip': `Desbloquea a ${trainerLabel(item.requires)} para poder comprarla` }, `🔒 Primero ${trainerLabel(item.requires)} · 🪙 ${tokensM(item.price)}`);
     if (!item.owned) {
       const short = item.price - shop.balance;
       return h('button', { class: 'btn sm primary', type: 'button', disabled: short > 0 || null, 'data-tip': short > 0 ? `Te faltan ${tokensM(short)}` : null, onclick: () => askBuy(item) }, `🪙 ${tokensM(item.price)}`);
@@ -1161,8 +1170,8 @@ async function shopPage(seq) {
     );
     const currentTrainer = shop.items.some((item) => item.kind === 'trainer' && item.key === me.avatar) ? [] : [{ id: 'trainer:current', kind: 'trainer', key: me.avatar, name: trainerLabel(me.avatar), rarity: null, price: 0, desc: 'Tu entrenador actual, de los gratis. Cámbialo por otro gratis en tu perfil.', owned: true, free: true }];
     const items = [...FREE_ITEMS, ...currentTrainer, ...shop.items]
-      .filter((item) => (!kind || item.kind === kind) && (!hideOwned || !item.owned))
-      .sort((a, b) => a.price - b.price || label(a).localeCompare(label(b), 'es'));
+      .filter((item) => (!kind || item.kind === kind) && (!hideOwned || !item.owned) && (!query || label(item).toLowerCase().includes(query)))
+      .sort((a, b) => a.price - b.price || label(a).localeCompare(label(b), 'es', { numeric: true, sensitivity: 'base' }));
     grid.replaceChildren(...(items.length ? items.map((item) => h('div', { class: `shop-card${item.owned ? ' is-owned' : ''}${isEquipped(item) ? ' is-equipped' : ''}${item.rarity ? ` rarity-${item.rarity}` : ''}` },
       h('div', { class: 'shop-preview' }, shopPreview(item)),
       h('div', { class: 'shop-info' }, h('b', null, label(item)), h('span', { class: 'row shop-tags' }, h('span', { class: `chip rarity-chip${item.rarity ? ` rarity-${item.rarity}` : ''}` }, item.rarity ? RARITIES[item.rarity].label : 'Gratis'), h('span', { class: 'muted small' }, SHOP_KINDS[item.kind])), h('small', { class: 'muted' }, item.desc)),
@@ -1175,6 +1184,7 @@ async function shopPage(seq) {
     h('section', { class: 'card' },
       h('div', { class: 'coll-bar' },
         h('div', { class: 'segmented', role: 'group', 'aria-label': 'Categoría' }, [['', 'Todo'], ...Object.entries(SHOP_KINDS)].map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === kind), onclick: (e) => { kind = value; e.currentTarget.parentElement.querySelectorAll('.seg-item').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); paint(); } }, text))),
+        h('input', { type: 'search', placeholder: 'Buscar…', 'aria-label': 'Buscar en la tienda', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } }),
         h('label', { class: 'toggle' }, h('input', { type: 'checkbox', onchange: (e) => { hideOwned = e.target.checked; paint(); } }), ' Ocultar lo que ya tengo'),
       ),
       grid,

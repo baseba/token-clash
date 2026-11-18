@@ -100,3 +100,46 @@ test('a locked sprite shows the way closest to done', () => {
   assert.equal(progress.group, 'gym');
   assert.deepEqual(progress.goals.map((g) => [g.have, g.need]), [[1, 3]]);
 });
+
+test('a recolored trainer needs its original first, plus what its colors are about', () => {
+  const water = [7, 8, 9, 54, 55, 60, 61, 62, 72, 73, 79, 86].map((id) => entry(id));
+  assert.ok(!isUnlocked(record({ roster: water }), 'red_blue'), 'Red is not unlocked yet');
+  assert.ok(!isUnlocked(record({ roster: water.slice(1), rankedFirst: true, wins: 30 }), 'red_blue'));
+  assert.ok(isUnlocked(record({ roster: water, rankedFirst: true, wins: 30 }), 'red_blue'));
+  const beatVeryHard = [duel(1, 'me', { ai: 'veryhard', guestId: 'ai:veryhard' })];
+  for (const [key, id] of [['maxie_aqua', 382], ['archie_magma', 383]] as const) {
+    assert.ok(!isUnlocked(record({ roster: [entry(id)] }), key), key);
+    assert.ok(isUnlocked(record({ roster: [entry(id)], challenges: beatVeryHard }), key), key);
+  }
+  const johto = Array.from({ length: 75 }, (_, i) => entry(152 + i));
+  assert.ok(!isUnlocked(record({ roster: johto }), 'lance_emerald'));
+  assert.ok(isUnlocked(record({ roster: [...johto, entry(384)] }), 'lance_emerald'));
+  const lance = spriteProgress(record()).find((p) => p.key === 'lance_emerald')!;
+  assert.equal(lance.group, 'champion');
+  assert.deepEqual(lance.goals.map((g) => g.need), [75, 1]);
+});
+
+test('each partner variant asks for its trainer\'s signature Pokémon on top of the trainer', () => {
+  const kanto = Array.from({ length: 75 }, (_, i) => entry(i + 1));
+  assert.ok(isUnlocked(record({ roster: kanto }), 'blue'));
+  assert.ok(isUnlocked(record({ roster: kanto }), 'blue_red'), 'Charizard (#6) is in the first 75');
+  const sinnoh = Array.from({ length: 100 }, (_, i) => entry(387 + i)).filter((e) => e.finalID !== 445);
+  assert.ok(!isUnlocked(record({ roster: sinnoh }), 'cynthia_garchomp'));
+  assert.ok(isUnlocked(record({ roster: [...sinnoh, entry(445), entry(486)] }), 'cynthia_garchomp'));
+});
+
+test('a shop variant of a locked trainer shows both steps: the original first, then buying it', () => {
+  const variant = spriteProgress(record()).find((p) => p.key.startsWith('cynthia__') && p.group === 'shop')!;
+  assert.deepEqual(variant.goals.map((g) => [g.have, g.need]), [[0, 1], [0, 1]]);
+  assert.match(variant.goals[0].text, /Cynthia/);
+});
+
+test('an earned color variant asks for its original and Pokémon of the type its color stands for', () => {
+  const progress = spriteProgress(record());
+  const cynthia = progress.find((p) => p.key.startsWith('cynthia__') && p.group === 'variant')!;
+  assert.equal(cynthia.goals.at(-1)!.need, 8);
+  assert.ok(cynthia.goals.length >= 2, 'the original comes first');
+  const free = progress.find((p) => p.key.startsWith('hiker__'))!;
+  assert.equal(free.group, 'variant');
+  assert.deepEqual(free.goals.map((g) => g.need), [5]);
+});

@@ -1,4 +1,4 @@
-import { SHOP_TRAINERS } from './trainer-sprites.js?v=dev';
+import { SHOP_TRAINERS, VARIANT_REQUIRES } from './trainer-sprites.js?v=dev';
 
 export const RARITIES = {
   common: { label: 'Común', price: 100_000_000 },
@@ -81,7 +81,10 @@ export const SHOP_ITEMS = [
   item('frame', 'neon', 'Marco neón', 'epic', 'Un doble aro neón, cian y magenta, alrededor de tu foto.'),
   item('frame', 'fire', 'Marco de fuego', 'legendary', 'Un aro de fuego que parpadea alrededor de tu foto.'),
   item('frame', 'galaxy', 'Marco galaxia', 'mythic', 'Un aro de galaxia que gira entre violeta y azul alrededor de tu foto.'),
-  ...Object.entries(SHOP_TRAINERS).map(([key, rarity]) => item('trainer', key, key, rarity, 'Un entrenador para tu perfil y tus peleas.')),
+  ...Object.entries(SHOP_TRAINERS).map(([key, rarity]) => ({
+    ...item('trainer', key, key, rarity, VARIANT_REQUIRES[key] ? 'Una variante de colores: primero necesitas tener al original.' : 'Un entrenador para tu perfil y tus peleas.'),
+    ...(VARIANT_REQUIRES[key] ? { requires: VARIANT_REQUIRES[key] } : {}),
+  })),
 ];
 
 export const shopItem = (id) => SHOP_ITEMS.find((i) => i.id === id) ?? null;

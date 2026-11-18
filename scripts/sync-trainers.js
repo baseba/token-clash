@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { Buffer } from 'node:buffer';
 import { inflateSync, deflateSync } from 'node:zlib';
-import { TRAINER_SPRITES } from '../public/trainer-sprites.js';
+import { DOWNLOADED_SPRITES, TRAINER_VARIANTS } from '../public/trainer-sprites.js';
 
 const RAW = 'https://raw.githubusercontent.com/pagefaultgames/pokerogue-assets/beta/images/trainer';
 const OUT = new URL('../public/trainers/', import.meta.url);
@@ -67,7 +67,7 @@ function unfilter(raw, height, stride, bpp) {
   return out;
 }
 
-function decodePng(png) {
+export function decodePng(png) {
   const parts = chunks(png);
   const header = parts.find((c) => c.type === 'IHDR').data;
   const width = header.readUInt32BE(0);
@@ -133,7 +133,7 @@ function chunk(type, data) {
   return Buffer.concat([length, body, crc]);
 }
 
-function encodePng({ width, height, rgba }) {
+export function encodePng({ width, height, rgba }) {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
@@ -177,6 +177,63 @@ function firstFrame(image, atlas) {
   return crop(frame, opaqueBox(frame));
 }
 
+function hslOf(r, g, b) {
+  const [rn, gn, bn] = [r / 255, g / 255, b / 255];
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = max === rn ? (gn - bn) / d + (gn < bn ? 6 : 0) : max === gn ? (bn - rn) / d + 2 : (rn - gn) / d + 4;
+  return [h * 60, s, l];
+}
+
+function rgbOf(h, s, l) {
+  const k = (n) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  return [0, 8, 4].map((n) => Math.round((l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))) * 255));
+}
+
+const skinLike = (h, l) => h >= 8 && h <= 31 && l >= 0.5;
+
+const inRange = (hue, [from, to]) => (to - from >= 360 || (from <= to ? hue >= from && hue <= to : hue >= from || hue <= to));
+
+export function recolorTrainer(image, swaps) {
+  const rgba = Buffer.from(image.rgba);
+  for (let i = 0; i < image.width * image.height; i++) {
+    if (!rgba[i * 4 + 3]) continue;
+    const [h, s, l] = hslOf(rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2]);
+    const swap = swaps.find((sw) => s >= (sw.minSat ?? (sw.maxSat === undefined ? 0.2 : 0)) && s <= (sw.maxSat ?? 1) && l >= (sw.minLight ?? 0) && l <= (sw.maxLight ?? 1) && !(sw.keepSkin && skinLike(h, l)) && inRange(h, sw.from));
+    if (swap) rgbOf(swap.hue, Math.min(1, swap.setSat ?? s * (swap.sat ?? 1)), Math.min(1, l * (swap.light ?? 1))).forEach((value, c) => (rgba[i * 4 + c] = value));
+  }
+  return { width: image.width, height: image.height, rgba };
+}
+
+export function recolorByMap(image, map) {
+  const rgba = Buffer.from(image.rgba);
+  const table = new Map(map.map(([from, to]) => [parseInt(from.slice(1), 16), [1, 3, 5].map((i) => parseInt(to.slice(i, i + 2), 16))]));
+  for (let i = 0; i < image.width * image.height; i++) {
+    if (!rgba[i * 4 + 3]) continue;
+    const to = table.get(rgba.readUIntBE(i * 4, 3));
+    if (to) to.forEach((value, c) => (rgba[i * 4 + c] = value));
+  }
+  return { width: image.width, height: image.height, rgba };
+}
+
+export function generateVariants() {
+  const failed = [];
+  for (const variant of TRAINER_VARIANTS) {
+    try {
+      const base = decodePng(readFileSync(new URL(`${variant.base}.png`, OUT)));
+      writeFileSync(new URL(`${variant.key}.png`, OUT), encodePng(variant.map ? recolorByMap(base, variant.map) : recolorTrainer(base, variant.swaps)));
+    } catch (err) {
+      failed.push(`${variant.key} (${err.message})`);
+    }
+  }
+  return failed;
+}
+
 async function syncTrainer(key) {
   const file = new URL(`${key}.png`, OUT);
   if (existsSync(file)) return 'existing';
@@ -190,7 +247,7 @@ async function syncTrainer(key) {
 async function main() {
   mkdirSync(OUT, { recursive: true });
   const counts = { new: 0, existing: 0, missing: 0, failed: 0 };
-  await mapLimit(TRAINER_SPRITES, async (key) => {
+  await mapLimit(DOWNLOADED_SPRITES, async (key) => {
     try {
       counts[await syncTrainer(key)] += 1;
     } catch (err) {
@@ -198,7 +255,10 @@ async function main() {
       log(`  ${key}: ${err.message}`);
     }
   });
-  log(`Entrenadores listos en public/trainers/: ${counts.new} nuevos, ${counts.existing} existentes, ${counts.missing} no disponibles, ${counts.failed} con error.`);
+  const variantsFailed = generateVariants();
+  for (const failure of variantsFailed) log(`  ${failure}`);
+  log(`Entrenadores listos en public/trainers/: ${counts.new} nuevos, ${counts.existing} existentes, ${counts.missing} no disponibles, ${counts.failed} con error; ${TRAINER_VARIANTS.length - variantsFailed.length} variantes de colores.`);
+  if (variantsFailed.length) process.exitCode = 1;
   if (counts.failed) process.exitCode = 1;
 }
 

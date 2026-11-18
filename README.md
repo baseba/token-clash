@@ -29,7 +29,16 @@ En vivo: **https://clash.mirrordev.xyz**
      el resto se desbloquea con logros (`src/stats/domain/achievements.ts`): líderes de gimnasio con 3, 6, 10 y 15
      especies de su tipo (el último, además, con un shiny del tipo), el Alto Mando con 12 de su tipo y 10 victorias
      contra jugadores, los campeones con la Pokédex regional, torneos, rachas y el ranking, los villanos ganándole a
-     la IA y los especiales con shinies, tokens y peleas sin bajas. Un bloqueado muestra en silueta qué te falta. Ese sprite, en chico, es tu foto de perfil; en las peleas tu entrenador y el
+     la IA y los especiales con shinies, tokens y peleas sin bajas. Un bloqueado muestra en silueta qué te falta.
+     Cada entrenador tiene además variantes de colores (403): los campeones y jefes villanos tienen 4, Team Star y
+     protagonistas 3, el resto 1. Las de personajes clave piden al original y a su Pokémon emblemático (Red Amarillo
+     con Pikachu, Cynthia Garchomp…); las demás se ganan con especies del tipo de su color (Carmesí → Fuego, Zafiro →
+     Agua…) o se compran en la tienda, más caras y pidiendo primero al original si este es difícil. `npm run variants`
+     las replanifica (`scripts/plan-trainer-variants.mjs` escribe `public/trainer-variants.js`) y las genera.
+     Hay además 22 variantes de colores generadas al instalar (`TRAINER_VARIANTS` en `public/trainer-sprites.js`):
+     las de personajes de la historia piden desbloquear al original y tener a su Pokémon emblemático (Red Amarillo
+     con Pikachu, Lance Esmeralda con Rayquaza, Cynthia Garchomp, Maxie Aqua con Kyogre…), y las de protagonistas,
+     Nate, Rosa y Leon se venden en la tienda, más caras cuanto más difícil es el original. Ese sprite, en chico, es tu foto de perfil; en las peleas tu entrenador y el
      rival entran al campo, lanzan sus Pokémon y se retiran, y vuelven al terminar (el tuyo, en espejo y más grande).
      Las IAs usan un entrenador al azar por pelea (el mismo durante todo un torneo), como sus nombres.
 3. En **Colección** armas tus 6, los ordenas arrastrando (el primero es el líder) y eliges los

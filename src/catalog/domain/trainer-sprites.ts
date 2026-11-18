@@ -1,6 +1,11 @@
 import * as sprites from '../../../public/trainer-sprites.js';
 
 export const TRAINER_SPRITES: readonly string[] = sprites.TRAINER_SPRITES;
+export const TRAINER_VARIANTS: readonly { key: string; base: string }[] = sprites.TRAINER_VARIANTS;
+export const EARNED_VARIANTS: readonly { key: string; base: string; color: string }[] = sprites.EARNED_VARIANTS;
+export const VARIANT_COLOR_TYPES: Readonly<Record<string, string>> = sprites.VARIANT_COLOR_TYPES;
+export const VARIANT_COLOR_NAMES: Readonly<Record<string, string>> = sprites.VARIANT_COLOR_NAMES;
+export const VARIANT_KEYS: ReadonlySet<string> = new Set(TRAINER_VARIANTS.map((variant) => variant.key));
 export const STARTER_SPRITES: readonly string[] = sprites.STARTER_SPRITES;
 export const GYM_LEADERS: Readonly<Record<string, readonly string[]>> = sprites.GYM_LEADERS;
 export const ELITE_FOUR: Readonly<Record<string, string>> = sprites.ELITE_FOUR;

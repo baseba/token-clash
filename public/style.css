@@ -1465,3 +1465,4 @@ body[data-watching="true"] .match-count { color: #5ec8ff; }
   .win-rainbow, .win-stellar { animation: none; }
   .avatar.ring-fire, .avatar.ring-galaxy, .match-avatar.ring-fire, .match-avatar.ring-galaxy { animation: none; box-shadow: 0 0 0 3px #ff8a3d; }
 }
+.shop-locked { text-align: right; }

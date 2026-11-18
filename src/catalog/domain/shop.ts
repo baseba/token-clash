@@ -9,6 +9,7 @@ export interface ShopItem {
   rarity: keyof typeof shop.RARITIES;
   price: number;
   desc: string;
+  requires?: string;
 }
 
 export const SHOP_ITEMS = shop.SHOP_ITEMS as readonly ShopItem[];

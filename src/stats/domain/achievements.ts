@@ -1,6 +1,6 @@
 import { lineage, speciesData } from '../../catalog/domain/creatures.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { ELITE_FOUR, GYM_LEADERS, isShopTrainer, TRAINER_SPRITES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
+import { EARNED_VARIANTS, ELITE_FOUR, GYM_LEADERS, isShopTrainer, TRAINER_SPRITES, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
 import { RARITIES, shopItemOf } from '../../catalog/domain/shop.js';
 import { TYPES } from '../../catalog/domain/type-chart.js';
 import type { ChallengeState } from '../../arena/domain/challenge.js';
@@ -15,6 +15,23 @@ const GYM_STEPS = [3, 6, 10, 15];
 const ELITE_SPECIES = 12;
 const ELITE_WINS = 10;
 const LOW_LEVEL = 30;
+const KYOGRE = 382;
+const GROUDON = 383;
+const RAYQUAZA = 384;
+const VARIANT_TYPE_COUNT = { free: 5, shop: 6, locked: 8 };
+const VARIANT_PARTNERS: readonly [string, string, number][] = [
+  ['red_yellow', 'red', 25],
+  ['red_green', 'red', 3],
+  ['blue_red', 'blue', 6],
+  ['lance_dragonite', 'lance', 149],
+  ['misty_starmie', 'misty', 121],
+  ['steven_metagross', 'steven', 376],
+  ['wallace_milotic', 'wallace', 350],
+  ['cynthia_garchomp', 'cynthia', 445],
+  ['cynthia_platinum', 'cynthia', 487],
+  ['iris_haxorus', 'iris', 612],
+  ['diantha_gardevoir', 'diantha', 282],
+];
 
 export interface PlayerRecord {
   speciesByType: Record<string, number>;
@@ -37,6 +54,7 @@ export interface PlayerRecord {
   lowLevelWins: number;
   diverseTeam: boolean;
   owned: string[];
+  species: number[];
 }
 
 export interface RecordSource {
@@ -123,6 +141,7 @@ export function recordOf({ trainer, team, challenges, tournaments, rankedFirst }
     lowLevelWins,
     diverseTeam: team.length >= 6 && new Set(teamTypes).size === teamTypes.length,
     owned: trainer.owned ?? [],
+    species: [...species.keys()],
   };
 }
 
@@ -134,11 +153,12 @@ export interface Goal {
 
 type GoalRule = (r: PlayerRecord) => Goal;
 interface Unlock {
-  group: 'gym' | 'elite' | 'champion' | 'villain' | 'special';
+  group: 'gym' | 'elite' | 'champion' | 'villain' | 'special' | 'variant';
   title: string;
   ways: GoalRule[][];
 }
 
+const displayName = (key: string) => key.replace(/_/g, ' ').replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
 const typeName = (type: string) => TYPES[type]?.label ?? type;
 const goal = (text: string, have: number | boolean, need = 1): Goal => ({ text, have: Math.min(Number(have), need), need });
 const ofType = (type: string, need: number): GoalRule => (r) => goal(`Pokémon tipo ${typeName(type)} en tu colección`, r.speciesByType[type] ?? 0, need);
@@ -185,6 +205,17 @@ function buildUnlocks(): Map<string, Unlock> {
   unlocks.set('lusamine', { ...unlocks.get('lusamine')!, ways: [[beatAi('veryhard', 'Muy difícil')], [legendaries]] });
   unlocks.set('rose', { ...unlocks.get('rose')!, ways: [[beatAi('skynet', 'Skynet')], [tokens(10_000_000_000, '10.000 millones')]] });
   const special = (key: string, ways: GoalRule[][]) => add([key], { group: 'special', title: 'Especial', ways });
+  const ownsSpecies = (id: number): GoalRule => (r) => goal(`Tener a ${speciesData(id)?.name ?? `#${id}`} en tu colección`, r.species.includes(id), 1);
+  const variantOf = (key: string, base: string, extra: GoalRule) => {
+    const original = unlocks.get(base)!;
+    add([key], { group: original.group, title: `${original.title} · variante de colores`, ways: original.ways.map((way) => [...way, extra]) });
+  };
+  variantOf('red_blue', 'red', ofType('water', 12));
+  variantOf('maxie_aqua', 'maxie', ownsSpecies(KYOGRE));
+  variantOf('archie_magma', 'archie', ownsSpecies(GROUDON));
+  variantOf('lance_emerald', 'lance', ownsSpecies(RAYQUAZA));
+  for (const [key, base, species] of VARIANT_PARTNERS) variantOf(key, base, ownsSpecies(species));
+
   special('collector', [[shinies(1)]]);
   special('colress', [[shinies(5)]]);
   special('mustard', [[shinies(15)]]);
@@ -193,6 +224,14 @@ function buildUnlocks(): Map<string, Unlock> {
   for (const key of ['cheren', 'hugh']) special(key, [[(r) => goal('Equipo de 6 sin tipos repetidos', r.diverseTeam, 1)]]);
   for (const key of ['emmet', 'ingo']) special(key, [[(r) => goal('Victoria sin que se debilite ninguno de tus Pokémon', r.flawlessWins, 1)]]);
   for (const key of ['bede', 'marnie']) special(key, [[(r) => goal(`Victoria con Pokémon de nivel menor a ${LOW_LEVEL} en tu save`, r.lowLevelWins, 1)]]);
+  for (const variant of EARNED_VARIANTS) {
+    const type = VARIANT_COLOR_TYPES[variant.color];
+    const title = `Variante ${VARIANT_COLOR_NAMES[variant.color]}`;
+    const original = unlocks.get(variant.base);
+    if (original) add([variant.key], { group: 'variant', title, ways: original.ways.map((way) => [...way, ofType(type, VARIANT_TYPE_COUNT.locked)]) });
+    else if (isShopTrainer(variant.base)) add([variant.key], { group: 'variant', title, ways: [[(r) => goal(`Tener a ${displayName(variant.base)}, de la tienda`, r.owned.includes(`trainer:${variant.base}`), 1), ofType(type, VARIANT_TYPE_COUNT.shop)]] });
+    else add([variant.key], { group: 'variant', title, ways: [[ofType(type, VARIANT_TYPE_COUNT.free)]] });
+  }
   return unlocks;
 }
 
@@ -214,7 +253,9 @@ export function spriteProgress(record: PlayerRecord): SpriteProgress[] {
     if (isShopTrainer(key)) {
       const item = shopItemOf('trainer', key)!;
       const owned = record.owned.includes(item.id);
-      return { key, group: 'shop', title: `Tienda · ${RARITIES[item.rarity].label}`, unlocked: owned, goals: [{ text: `Comprarlo en la tienda por ${(item.price / 1_000_000).toLocaleString('es')} M de tokens`, have: owned ? 1 : 0, need: 1 }] };
+      const buy = { text: `Comprarlo en la tienda por ${(item.price / 1_000_000).toLocaleString('es')} M de tokens`, have: owned ? 1 : 0, need: 1 };
+      const first = item.requires ? [{ text: `Desbloquear primero a ${displayName(item.requires)}`, have: owned || isUnlocked(record, item.requires) ? 1 : 0, need: 1 }] : [];
+      return { key, group: 'shop', title: `Tienda · ${RARITIES[item.rarity].label}`, unlocked: owned, goals: [...first, buy] };
     }
     const unlock = UNLOCKS.get(key);
     if (!unlock) return { key, group: 'starter', title: null, unlocked: true, goals: [] };
