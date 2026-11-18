@@ -1354,22 +1354,26 @@ body[data-watching="true"] .match-count { color: #5ec8ff; }
   50% { box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #ffd34d, 0 0 18px rgb(255 245 190 / .95), 0 0 30px rgb(255 211 77 / .5); }
 }
 @media (prefers-reduced-motion: reduce) { .avatar.ring-rainbow, .avatar.ring-shiny, .match-avatar.ring-rainbow, .match-avatar.ring-shiny { animation: none; box-shadow: 0 0 0 3px #ffd34d; } }
-.shop-head .nb-head { margin-bottom: .6rem; }
-.shop-balance { display: grid; gap: .3rem; padding: .8rem 1rem; border-radius: 14px; background: var(--card-2); border: 1px solid var(--line); }
-.shop-balance > div { display: flex; flex-direction: column; }
-.shop-coins { font-size: 1.8rem; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; }
-.shop-balance p { margin: 0; }
+.shop-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding-block: .9rem; }
+.shop-head h1 { margin: 0; }
+.shop-balance { display: flex; align-items: center; gap: .6rem; }
+.shop-coins { padding: .3rem .9rem; border-radius: 999px; background: var(--card-2); border: 1px solid var(--line); font-size: 1.35rem; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; cursor: help; }
 .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); gap: .7rem; }
-.shop-card { display: grid; grid-template-rows: auto 1fr auto; gap: .55rem; padding: .75rem; border-radius: 14px; border: 2px solid var(--line); background: var(--card-2); }
+.shop-card { display: grid; grid-template-rows: auto 1fr auto; gap: .45rem; padding: .75rem; border-radius: 14px; border: 2px solid var(--line); background: var(--card-2); }
 .shop-card.is-equipped { border-color: var(--accent); }
 .shop-preview { display: grid; place-items: center; min-height: 6.5rem; border-radius: 10px; background: radial-gradient(circle at 50% 40%, rgb(255 255 255 / .08), transparent 70%); }
 .shop-preview .trainer-frame { height: 84px; }
 .shop-preview .trainer-frame img { max-height: 84px; }
-.shop-ball { display: flex; gap: .8rem; align-items: center; }
+.shop-ball { display: flex; align-items: center; }
+.shop-ball { gap: .8rem; }
+.shop-action .shop-try { margin-right: auto; color: var(--muted); font-weight: 700; }
+.shop-action .shop-try:hover { color: var(--text); border-color: var(--accent); }
+.rarity-tag { font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.rarity-tag.rarity-common { color: #c4c9d4; } .rarity-tag.rarity-rare { color: #5ec8ff; } .rarity-tag.rarity-epic { color: #c58bff; } .rarity-tag.rarity-legendary { color: #ffcf4a; } .rarity-tag.rarity-mythic { color: #ff7a9c; }
 .shop-ball img { width: 36px; height: 48px; image-rendering: pixelated; }
-.shop-info { display: grid; gap: .3rem; align-content: start; }
+.shop-info { display: grid; gap: .15rem; align-content: start; }
 .shop-tags { gap: .4rem; flex-wrap: wrap; }
-.shop-action { display: flex; justify-content: flex-end; }
+.shop-action { display: flex; justify-content: flex-end; align-items: center; gap: .4rem; }
 .shop-owned { gap: .4rem; }
 .rarity-chip { font-weight: 800; }
 .rarity-chip.rarity-common { color: #c4c9d4; }
@@ -1481,3 +1485,17 @@ body[data-watching="true"] .match-count { color: #5ec8ff; }
 .unlock-version.is-locked { border-style: dashed; }
 .unlock-version.is-locked small { color: var(--muted); }
 .unlock-version.is-current { border-color: var(--accent, #f7c948); }
+.shop-try { margin-top: .35rem; font-size: .72rem; }
+.confirm-dlg:has(.ball-preview) { width: min(36rem, calc(100vw - 32px)); max-height: none; overflow: visible; }
+.ball-preview { position: relative; max-width: none !important; display: grid; gap: .8rem; }
+.ball-preview-head { display: flex; align-items: center; gap: .75rem; padding-right: 2.5rem; }
+.ball-preview-head h2 { margin: 0 0 .25rem !important; font-size: 1.15rem; }
+.ball-preview-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--card-2); border: 1px solid var(--line); }
+.ball-preview-icon img { width: 24px; height: 32px; image-rendering: pixelated; }
+.shop-stage { position: relative; overflow: hidden; aspect-ratio: 320 / 153; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); }
+.shop-arena { position: absolute; inset: 0 0 auto 0; width: 100%; max-width: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+.ball-preview-note { margin: 0 !important; font-size: .85rem; }
+.ball-preview .confirm-actions { margin-top: 0; justify-content: space-between; }
+.win-moves .move { border-color: color-mix(in srgb, var(--win-edge) 22%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--win-deep) 18%, var(--card-2)), var(--card-2)); }
+.win-moves .move:hover:not(:disabled) { border-color: var(--win-edge); box-shadow: 0 0 0 1px color-mix(in srgb, var(--win-edge) 40%, transparent), 0 0 12px color-mix(in srgb, var(--win-edge) 25%, transparent); }
+.win-moves .move .mv { color: color-mix(in srgb, var(--win-edge) 18%, var(--text)); }

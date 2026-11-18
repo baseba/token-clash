@@ -73,7 +73,7 @@ test('entries are placed on our field from the user, the target, the line betwee
 
 test('the animation lasts until its frames and background fades are over', () => {
   assert.equal(animLength({ frames: [[], [], []], bg: [] }), 3);
-  assert.equal(animLength({ frames: [[], [], []], bg: [[1, 'update', null, 0, 0, 0, 5]] }), 11);
+  assert.equal(animLength({ frames: [[], [], []], bg: [[1, 'update', null, 0, 0, 0, 5]] }), 6);
 });
 
 test('battle events pick the PokeRogue animation that matches them', () => {
@@ -129,4 +129,14 @@ test('a move does not land when it misses, is blocked or gets absorbed', () => {
 test('a move aimed at its user always plays, and the outcome stops at the next action', () => {
   assert.equal(moveLands([{ t: 'move', side: 0, target: 'self' }, { t: 'nothing', side: 0 }], 0), true);
   assert.equal(moveLands([{ t: 'move', side: 0, target: 'foe' }, { t: 'move', side: 1, target: 'foe' }, { t: 'miss', side: 1 }], 0), true);
+});
+
+test('a wave move ends when its wave is gone, so the damage lands right after it', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const key of ['surf', 'muddy-water']) {
+    const [player] = JSON.parse(readFileSync(new URL(`../../public/anims/${key}.json`, import.meta.url), 'utf8'));
+    const lastBgEvent = Math.max(...player.bg.map(([frame, , , , , , duration]) => frame + duration));
+    assert.equal(animLength(player), Math.max(player.frames.length, lastBgEvent), key);
+    assert.ok(animLength(player) <= 50, `${key} lasts ${animLength(player)} frames`);
+  }
 });

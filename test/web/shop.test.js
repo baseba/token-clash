@@ -51,3 +51,36 @@ test('the shop sells at least twice as many balls, windows and frames as at firs
   for (const ball of [...CUSTOM_BALLS, ...BALL_VARIANTS]) assert.match(ball.key, /^[a-z]{2}$/);
   assert.ok(count('ball') >= 20);
 });
+
+test('every Ball on sale has an opening effect themed on it, as rich as its rarity', async () => {
+  const { ballFx, BALL_FX_KEYS } = await import('../../public/ball-fx.js');
+  const balls = SHOP_ITEMS.filter((item) => item.kind === 'ball');
+  assert.deepEqual([...BALL_FX_KEYS].sort(), balls.map((ball) => ball.key).sort());
+  for (const ball of balls) assert.equal(ballFx(ball.key).rarity, ball.rarity, ball.key);
+  assert.ok(ballFx('md').tier > ballFx('gb').tier);
+  assert.equal(ballFx('pb'), null, 'the free Poké Ball keeps the PokeRogue sparkles');
+});
+
+test('every Ball on sale sounds like its theme, with files the install downloads', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const { ballSounds } = await import('../../public/ball-fx.js');
+  const anims = new URL('../../public/anims/', import.meta.url);
+  const downloaded = new Set(readdirSync(anims).filter((f) => f.endsWith('.json')).flatMap((f) => readFileSync(new URL(f, anims), 'utf8').match(/\/sfx\/moves\/audio\/[^"]+/g) ?? []));
+  for (const ball of SHOP_ITEMS.filter((item) => item.kind === 'ball')) {
+    const sounds = ballSounds(ball.key);
+    assert.ok(sounds.length, ball.key);
+    for (const sound of sounds) assert.ok(downloaded.has(sound.url), `${ball.key}: ${sound.url}`);
+  }
+  assert.ok(ballSounds('md').length > ballSounds('gb').length, 'the mythic Ball sounds richer');
+  assert.deepEqual(ballSounds('pb'), []);
+});
+
+test('the AI throws a random Ball: the free one, a common or a rare, never rarer', async () => {
+  const { aiBallFor, AI_BALLS, DEFAULT_BALL } = await import('../../public/shop.js');
+  assert.ok(AI_BALLS.includes(DEFAULT_BALL));
+  const rarity = Object.fromEntries(SHOP_ITEMS.filter((item) => item.kind === 'ball').map((item) => [item.key, item.rarity]));
+  for (const ball of AI_BALLS.filter((key) => key !== DEFAULT_BALL)) assert.ok(['common', 'rare'].includes(rarity[ball]), ball);
+  assert.equal(aiBallFor(0), AI_BALLS[0]);
+  assert.equal(aiBallFor(0.9999), AI_BALLS.at(-1));
+  assert.equal(new Set(Array.from({ length: 200 }, (_, i) => aiBallFor(i / 200))).size, AI_BALLS.length);
+});

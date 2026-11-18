@@ -1,3 +1,5 @@
+import { createBallBursts } from './ball-burst.js?v=dev';
+import { ballFx } from './ball-fx.js?v=dev';
 import { causeAnim, chargeAnim, conditionAnim, createAnimPlayer, shownSprite, statusAnim, terrainAnim, weatherAnim } from './battle-anims.js?v=dev';
 
 const PALETTE = {
@@ -111,6 +113,7 @@ export function createFx(arena, field = arena) {
   const layer = document.createElement('div');
   layer.className = 'fx-layer';
   arena.append(layer);
+  const bursts = createBallBursts(layer);
   const reduced = () => document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const unit = () => (arena.clientHeight / 100) * 1.4;
   const anims = createAnimPlayer(field);
@@ -798,7 +801,7 @@ export function createFx(arena, field = arena) {
     ], { duration: 250, easing: 'cubic-bezier(0.12, 0, 0.39, 0)' });
     await Promise.all([
       play(open, [{ transform: at(land), opacity: 1 }, { transform: at(land), opacity: 0 }], { duration: 200 }),
-      openParticles(land, k),
+      ballFx(kind) ? bursts.play(land, k, ballFx(kind)) : openParticles(land, k),
       grow?.finished.catch(() => {}),
     ]);
   }
@@ -912,6 +915,10 @@ export function createFx(arena, field = arena) {
     },
     stat(up, spot) {
       return statChange(up, spot);
+    },
+    warmBalls(keys) {
+      const themes = [...new Set(keys)].map(ballFx).filter(Boolean);
+      if (themes.length) bursts.warm(themes);
     },
     async sendOut(spot, mine, onOpen = () => {}, ball = 'pb') {
       if (reduced()) {
