@@ -254,6 +254,15 @@ build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de 
   a `TrainersController`.
 - **`combat` lleva cosméticos.** `BattleState` guarda el entrenador, el marco y la Poké Ball de cada lado para que
   la vista los muestre. Son datos de presentación de la arena; el motor no los usa para pelear.
+- **Los archivos de terceros los carga el navegador.** Los sprites, los gritos, los sonidos y la música son copias
+  exactas de archivos de PokeAPI/sprites, PokeAPI/cries y pokerogue-assets. El navegador los baja de jsDelivr, fijados a
+  un commit en `public/upstream.js` (`upstreamURLs` arma la URL; nada más escribe un host), y si jsDelivr falla los
+  pide una vez a raw.githubusercontent.com. Nuestro dominio queda lejos de muchos jugadores, y jsDelivr responde desde
+  cerca. Dónde está cada archivo lo dicen los manifiestos versionados de `public/upstream/`, que los scripts escriben
+  resolviendo una vez cada reemplazo (el navegador nunca prueba URLs). La regla de siempre sigue: nada en `src/` llama
+  a un servicio externo. La CSP solo abre `img-src` y `connect-src` a esos dos hosts. Lo que transformamos (las
+  animaciones convertidas, los tiempos de sus sonidos, las Poké Balls pintadas, los entrenadores recortados y sus
+  variantes) se genera al instalar y lo servimos nosotros.
 - **El estado en vivo no se guarda.** Peleas, presencia y chat viven en memoria por diseño: es un juego entre
   amigos y retomar una pelea a medias tras un reinicio no vale la complejidad.
 
