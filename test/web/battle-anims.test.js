@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { assetName, compactAnim, compactFrame, pngSize, resourcesOf } from '../../scripts/sync-battle-anims.js';
 import { animLength, causeAnim, hpTweenMs, chargeAnim, conditionAnim, moveLands, pickVariant, placeEntry, statusAnim, TARGET_GRAPHIC, TARGET_TARGET, TARGET_USER, terrainAnim, weatherAnim } from '../../public/battle-anims.js';
 import { animSoundFor, moveSfxCues, sampleFor } from '../../public/music.js';
@@ -131,10 +132,11 @@ test('a move aimed at its user always plays, and the outcome stops at the next a
   assert.equal(moveLands([{ t: 'move', side: 0, target: 'foe' }, { t: 'move', side: 1, target: 'foe' }, { t: 'miss', side: 1 }], 0), true);
 });
 
-test('a wave move ends when its wave is gone, so the damage lands right after it', async () => {
+const ANIMS = new URL('../../public/anims/', import.meta.url);
+test('a wave move ends when its wave is gone, so the damage lands right after it', { skip: existsSync(ANIMS) ? false : 'needs the battle animations in public/anims: run npm run anims' }, async () => {
   const { readFileSync } = await import('node:fs');
   for (const key of ['surf', 'muddy-water']) {
-    const [player] = JSON.parse(readFileSync(new URL(`../../public/anims/${key}.json`, import.meta.url), 'utf8'));
+    const [player] = JSON.parse(readFileSync(new URL(`${key}.json`, ANIMS), 'utf8'));
     const lastBgEvent = Math.max(...player.bg.map(([frame, , , , , , duration]) => frame + duration));
     assert.equal(animLength(player), Math.max(player.frames.length, lastBgEvent), key);
     assert.ok(animLength(player) <= 50, `${key} lasts ${animLength(player)} frames`);

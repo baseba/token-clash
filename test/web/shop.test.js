@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { crc32 } from 'node:zlib';
 import { BALL_GROUPS, BALL_VARIANTS, CUSTOM_BALLS, SHOP_ITEMS } from '../../public/shop.js';
 import { customBallColors, recolorPalette, tintColor, variantColors } from '../../scripts/sync-battle-anims.js';
@@ -61,10 +62,11 @@ test('every Ball on sale has an opening effect themed on it, as rich as its rari
   assert.equal(ballFx('pb'), null, 'the free Poké Ball keeps the PokeRogue sparkles');
 });
 
-test('every Ball on sale sounds like its theme, with files the install downloads', async () => {
+const ANIMS = new URL('../../public/anims/', import.meta.url);
+test('every Ball on sale sounds like its theme, with files the install downloads', { skip: existsSync(ANIMS) ? false : 'needs the battle animations in public/anims: run npm run anims' }, async () => {
   const { readdirSync, readFileSync } = await import('node:fs');
   const { ballSounds } = await import('../../public/ball-fx.js');
-  const anims = new URL('../../public/anims/', import.meta.url);
+  const anims = ANIMS;
   const downloaded = new Set(readdirSync(anims).filter((f) => f.endsWith('.json')).flatMap((f) => readFileSync(new URL(f, anims), 'utf8').match(/\/sfx\/moves\/audio\/[^"]+/g) ?? []));
   for (const ball of SHOP_ITEMS.filter((item) => item.kind === 'ball')) {
     const sounds = ballSounds(ball.key);
