@@ -8,6 +8,7 @@ import { patchSave } from './savepatch.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
 import { TRAINER_SPRITES, trainerSpriteFor } from './trainer-sprites.js?v=dev';
 import { RADIO_KINDS, RADIO_REGIONS, RADIO_TRACKS, radioTrack } from './radio.js?v=dev';
+import { createNotifier } from './notify.js?v=dev';
 
 const $app = document.getElementById('app');
 const $who = document.getElementById('who');
@@ -30,6 +31,7 @@ if (location.hash.startsWith('#key=')) {
 }
 
 let token = ls.get('tc_token');
+const notifier = createNotifier();
 let me = null;
 let cleanup = null;
 
@@ -766,6 +768,19 @@ function renderSound() {
   const icon = () => (silent() ? '🔇' : '🔊');
   const btn = h('button', { class: 'sound-btn', type: 'button', 'data-sfx': 'none', 'aria-label': 'Mezclador de sonido', 'aria-haspopup': 'true', 'aria-expanded': 'false' }, icon());
   const muteBox = h('input', { type: 'checkbox', checked: music.muted ? true : null });
+  const notifyBox = h('input', { type: 'checkbox', checked: notifier.enabled ? true : null });
+  const notifyNote = h('p', { class: 'muted small', hidden: true });
+  const paintNotify = () => {
+    const blocked = notifier.enabled && notifier.permission() === 'denied';
+    const unsupported = notifier.enabled && notifier.permission() === 'unsupported';
+    notifyNote.hidden = !blocked && !unsupported;
+    notifyNote.textContent = blocked ? 'El navegador bloqueó los avisos: solo parpadeará la pestaña.' : unsupported ? 'Este navegador no tiene avisos: solo parpadeará la pestaña.' : '';
+  };
+  notifyBox.addEventListener('change', async () => {
+    await notifier.setEnabled(notifyBox.checked);
+    paintNotify();
+  });
+  paintNotify();
   const sliders = [];
   const channel = (kind, label, icon) => {
     const value = h('span', { class: 'mix-value' }, `${Math.round(music.volume(kind) * 100)}%`);
@@ -789,6 +804,8 @@ function renderSound() {
     channel('music', 'Música de fondo', '🎵'),
     channel('sfx', 'Combate', '💥'),
     h('label', { class: 'mix-mute' }, muteBox, ' Silenciar todo'),
+    h('label', { class: 'mix-mute', 'data-tip': 'Te avisa cuando se llena tu sala, cuando solo faltas tú por estar listo y cuando te toca en una pelea, si estás en otra pestaña.' }, notifyBox, ' 🔔 Avisos'),
+    notifyNote,
   );
   const paint = () => {
     btn.textContent = icon();
@@ -2212,6 +2229,7 @@ async function battlePage(id, seq) {
   let match = null;
   let duel = null;
   const bar = roomBar(c);
+  const alerts = roomAlerts(c);
   const chat = chatPanel((msg) => send(msg));
   let dock = null;
   const stopFollow = c.tournament ? followTournament(c, seq, () => battle) : null;
@@ -2241,6 +2259,7 @@ async function battlePage(id, seq) {
       if (msg.t === 'chatLog') return chat.load(msg.messages);
       if (msg.t === 'chat') return chat.add(msg.message);
       dock ??= chatDock(chat);
+      alerts.check(msg);
       if (msg.t === 'closed') {
         cleanup?.();
         cleanup = null;
@@ -2460,6 +2479,39 @@ function readyButton(ready, onToggle) {
   return h('button', { class: `btn ${ready ? '' : 'primary'} ready-btn`, 'aria-pressed': String(ready), onclick: (e) => { e.currentTarget.disabled = true; onToggle(!ready); } }, ready ? 'Ya no estoy listo' : '✋ ¡Estoy listo!');
 }
 
+/** Watches a room's frames and alerts the player when the game is waiting on them. */
+function roomAlerts(c) {
+  let open = c.status === 'open';
+  let waitingOnYou = false;
+  let times = 0;
+  const rivalOf = (sides, you) => sides?.find((_, i) => i !== you)?.name ?? 'Tu rival';
+  return {
+    check(msg) {
+      const you = msg.you ?? null;
+      if (msg.t !== 'lobby') waitingOnYou = false;
+      if (you === null) return;
+      if (msg.t === 'lobby') {
+        const rival = rivalOf(msg.players, you);
+        if (open && you === 0) notifier.notify(`full:${c.id}:${++times}`, '¡Tu sala se llenó!', `${rival} entró a tu sala. Aprieta «¡Estoy listo!» para empezar.`);
+        open = false;
+        const othersReady = msg.players.every((p, i) => i === you || p.ready);
+        const onlyYou = !msg.players[you].ready && othersReady;
+        if (onlyYou && !waitingOnYou) notifier.notify(`ready:${c.id}:${++times}`, 'Solo faltas tú', `${rival} está listo. Aprieta «¡Estoy listo!» para que parta la pelea.`);
+        waitingOnYou = onlyYou;
+        return;
+      }
+      if (msg.preview && !msg.preview.sides[you]?.ready) {
+        notifier.notify(`pick:${c.id}`, '¡Elige tu equipo!', `Tu pelea contra ${rivalOf(msg.preview.sides, you)} está por empezar.`);
+        return;
+      }
+      const st = msg.state;
+      if (!st || st.status !== 'active' || !msg.actions?.length || msg.forced) return;
+      const mustSwitch = !!st.sides[you]?.mustSwitch;
+      notifier.notify(`turn:${c.id}:${st.turn}:${mustSwitch}`, mustSwitch ? '¡Elige quién entra!' : '¡Te toca!', `Turno ${st.turn} contra ${rivalOf(st.sides, you)}.`);
+    },
+  };
+}
+
 function duelLobbyUI(c, send) {
   const root = h('section', { class: 'card match duel-lobby' });
   return {
@@ -2635,9 +2687,11 @@ async function tournamentPage(id, seq) {
   ui.update(T);
   const chat = chatPanel((msg) => stop.send(msg));
   const dock = chatDock(chat);
+  const alerts = tournamentAlerts(T);
   const stop = tournamentFeed(id, (next) => {
     if (stale(seq)) return;
     const cur = next.current?.challengeId ?? null;
+    alerts.check(next);
     ui.update(next);
     if (cur && cur !== lastCurrent) follow(cur);
     lastCurrent = cur;
@@ -2647,6 +2701,25 @@ async function tournamentPage(id, seq) {
     stop();
     dock.destroy();
     ui.destroy();
+  };
+}
+
+/** Alerts a seated player when the tournament lobby fills up and when everyone but them is ready. */
+function tournamentAlerts(initial) {
+  const full = (T) => T.seats.length === T.size;
+  let wasFull = full(initial);
+  let waitingOnYou = false;
+  let times = 0;
+  return {
+    check(T) {
+      const seated = T.status === 'open' && T.you !== null && T.you !== undefined;
+      const isFull = full(T);
+      if (seated && isFull && !wasFull) notifier.notify(`tour-full:${T.id}:${++times}`, '¡Tu torneo se llenó!', `Los ${T.size} asientos están ocupados. Aprieta «¡Estoy listo!» para empezar.`);
+      wasFull = isFull;
+      const onlyYou = seated && isFull && !T.seats[T.you].ready && T.seats.every((s, i) => i === T.you || s.ready);
+      if (onlyYou && !waitingOnYou) notifier.notify(`tour-ready:${T.id}:${++times}`, 'Solo faltas tú', 'Todos en el torneo están listos. Aprieta «¡Estoy listo!» para que parta.');
+      waitingOnYou = onlyYou;
+    },
   };
 }
 
