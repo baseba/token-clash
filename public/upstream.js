@@ -2,7 +2,8 @@
 // not served by us. Our domain answers from a far Cloudflare edge for many players, and every file
 // took a long round trip, while jsDelivr answers from nearby. The browser loads each file from
 // jsDelivr pinned to a commit (the URL never changes content, so it is cached for a year) and
-// retries once at raw.githubusercontent.com if jsDelivr fails. The manifests in public/upstream/
+// retries once at raw.githubusercontent.com if jsDelivr fails. That retry carries real traffic: these
+// repos are over jsDelivr's package size limit, and it sometimes answers 403 for a while. The manifests in public/upstream/
 // map our keys (a sprite slug, a music track…) to paths inside these repos; the scripts in
 // scripts/ resolve them against these same commits.
 
@@ -60,10 +61,19 @@ export async function fetchFirst(urls, fetchURL = fetch) {
 
 const manifests = new Map();
 
-/** A manifest of public/upstream/, fetched once per page and shared by every module; empty if it can't be read. */
+/**
+ * A manifest of public/upstream/, fetched once per page and shared by every module. It is empty if
+ * it can't be read, and the next call tries again. The deploy's version in the URL lets the browser
+ * keep it cached.
+ */
 export function upstreamManifest(name) {
   if (!manifests.has(name)) {
-    manifests.set(name, fetch(`/upstream/${name}.json`).then((res) => (res.ok ? res.json() : {})).catch(() => ({})));
+    const manifest = fetch(`/upstream/${name}.json?v=dev`).then((res) => {
+      if (!res.ok) throw new Error(`${res.status} /upstream/${name}.json`);
+      return res.json();
+    });
+    manifest.catch(() => manifests.delete(name));
+    manifests.set(name, manifest);
   }
-  return manifests.get(name);
+  return manifests.get(name).catch(() => ({}));
 }

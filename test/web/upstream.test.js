@@ -54,7 +54,7 @@ test('a fetched file comes from the first URL that answers OK', async () => {
 });
 
 // The committed manifests, served to the browser as /upstream/<name>.json.
-const readManifest = (url) => JSON.parse(readFileSync(new URL(`../../public${url}`, import.meta.url), 'utf8'));
+const readManifest = (url) => JSON.parse(readFileSync(new URL(`../../public${url.split('?')[0]}`, import.meta.url), 'utf8'));
 globalThis.fetch = async (url) => ({ ok: true, json: async () => readManifest(url) });
 
 const pokeapi = JSON.parse(readFileSync(new URL('../../src/catalog/data/pokeapi.json', import.meta.url), 'utf8'));

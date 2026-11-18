@@ -92,6 +92,12 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   assert.deepEqual(csp.get('connect-src'), ["'self'", ...upstream], 'cries, sounds and music are fetched from the CDNs');
   for (const [name, sources] of csp) if (!['img-src', 'connect-src'].includes(name)) assert.ok(!sources.some((source) => source.startsWith('https:')), `${name} stays closed`);
 
+  const versioned = (await (await fetch(`${base}/upstream.js?v=dev`)).text()).match(/\/upstream\/\$\{name\}\.json\?v=(\w+)/);
+  assert.ok(versioned && versioned[1] !== 'dev', 'the page asks for the manifests with the deploy version');
+  const manifest = await fetch(`${base}/upstream/sprites.json?v=${versioned[1]}`);
+  assert.equal(manifest.status, 200);
+  assert.equal(manifest.headers.get('cache-control'), 'public, max-age=31536000, immutable', 'a versioned manifest is cached');
+
   const team = [a.data.me.roster[3].uid];
   assert.deepEqual((await call('/api/me', { method: 'PUT', token: a.data.token, body: { team } })).data.me.team, team);
 
