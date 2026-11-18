@@ -68,3 +68,28 @@ test('generated variants use many different colors instead of repeating a few', 
   assert.ok(Object.keys(VARIANT_COLOR_NAMES).length >= 16);
   assert.ok(Math.max(...Object.values(uses)) <= GENERATED_VARIANTS.length * 0.12, JSON.stringify(uses));
 });
+
+test('every generated variant changes its colors visibly instead of landing on a near shade', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { decodePng } = await import('../../scripts/sync-trainers.js');
+  const { GENERATED_VARIANTS } = await import('../../public/trainer-variants.js');
+  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const counts = new Map();
+  for (const variant of GENERATED_VARIANTS) {
+    if (!counts.has(variant.base)) {
+      const image = decodePng(readFileSync(new URL(`../../public/trainers/${variant.base}.png`, import.meta.url)));
+      const count = new Map();
+      for (let i = 0; i < image.width * image.height; i++) if (image.rgba[i * 4 + 3]) count.set(image.rgba.readUIntBE(i * 4, 3), (count.get(image.rgba.readUIntBE(i * 4, 3)) ?? 0) + 1);
+      counts.set(variant.base, count);
+    }
+    let weight = 0;
+    let change = 0;
+    for (const [from, to] of variant.map) {
+      const n = counts.get(variant.base).get(parseInt(from.slice(1), 16)) ?? 0;
+      const [a, b] = [rgb(from), rgb(to)];
+      change += n * Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      weight += n;
+    }
+    assert.ok(change / weight >= 50, `${variant.key}: ${Math.round(change / weight)}`);
+  }
+});

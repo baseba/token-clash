@@ -19,6 +19,9 @@ const KYOGRE = 382;
 const GROUDON = 383;
 const RAYQUAZA = 384;
 const VARIANT_TYPE_COUNT = { free: 5, shop: 6, locked: 8 };
+const BLASTOISE = 9;
+const CHARIZARD = 6;
+const GENERATED_PARTNERS: Readonly<Record<string, number>> = { red__magenta: CHARIZARD };
 const VARIANT_PARTNERS: readonly [string, string, number][] = [
   ['red_yellow', 'red', 25],
   ['red_green', 'red', 3],
@@ -210,7 +213,7 @@ function buildUnlocks(): Map<string, Unlock> {
     const original = unlocks.get(base)!;
     add([key], { group: original.group, title: `${original.title} · variante de colores`, ways: original.ways.map((way) => [...way, extra]) });
   };
-  variantOf('red_blue', 'red', ofType('water', 12));
+  variantOf('red_blue', 'red', ownsSpecies(BLASTOISE));
   variantOf('maxie_aqua', 'maxie', ownsSpecies(KYOGRE));
   variantOf('archie_magma', 'archie', ownsSpecies(GROUDON));
   variantOf('lance_emerald', 'lance', ownsSpecies(RAYQUAZA));
@@ -228,7 +231,8 @@ function buildUnlocks(): Map<string, Unlock> {
     const type = VARIANT_COLOR_TYPES[variant.color];
     const title = `Variante ${VARIANT_COLOR_NAMES[variant.color]}`;
     const original = unlocks.get(variant.base);
-    if (original) add([variant.key], { group: 'variant', title, ways: original.ways.map((way) => [...way, ofType(type, VARIANT_TYPE_COUNT.locked)]) });
+    const partner = GENERATED_PARTNERS[variant.key];
+    if (original) add([variant.key], { group: 'variant', title, ways: original.ways.map((way) => [...way, partner ? ownsSpecies(partner) : ofType(type, VARIANT_TYPE_COUNT.locked)]) });
     else if (isShopTrainer(variant.base)) add([variant.key], { group: 'variant', title, ways: [[(r) => goal(`Tener a ${displayName(variant.base)}, de la tienda`, r.owned.includes(`trainer:${variant.base}`), 1), ofType(type, VARIANT_TYPE_COUNT.shop)]] });
     else add([variant.key], { group: 'variant', title, ways: [[ofType(type, VARIANT_TYPE_COUNT.free)]] });
   }
@@ -243,6 +247,7 @@ export interface SpriteProgress {
   title: string | null;
   unlocked: boolean;
   goals: Goal[];
+  ways: Goal[][];
 }
 
 const done = (goals: Goal[]) => goals.every((g) => g.have >= g.need);
@@ -255,13 +260,14 @@ export function spriteProgress(record: PlayerRecord): SpriteProgress[] {
       const owned = record.owned.includes(item.id);
       const buy = { text: `Comprarlo en la tienda por ${(item.price / 1_000_000).toLocaleString('es')} M de tokens`, have: owned ? 1 : 0, need: 1 };
       const first = item.requires ? [{ text: `Desbloquear primero a ${displayName(item.requires)}`, have: owned || isUnlocked(record, item.requires) ? 1 : 0, need: 1 }] : [];
-      return { key, group: 'shop', title: `Tienda · ${RARITIES[item.rarity].label}`, unlocked: owned, goals: [...first, buy] };
+      const goals = [...first, buy];
+      return { key, group: 'shop', title: `Tienda · ${RARITIES[item.rarity].label}`, unlocked: owned, goals, ways: [goals] };
     }
     const unlock = UNLOCKS.get(key);
-    if (!unlock) return { key, group: 'starter', title: null, unlocked: true, goals: [] };
+    if (!unlock) return { key, group: 'starter', title: null, unlocked: true, goals: [], ways: [] };
     const ways = unlock.ways.map((way) => way.map((rule) => rule(record)));
     const best = ways.find(done) ?? ways.reduce((a, b) => (share(b) > share(a) ? b : a));
-    return { key, group: unlock.group, title: unlock.title, unlocked: ways.some(done), goals: best };
+    return { key, group: unlock.group, title: unlock.title, unlocked: ways.some(done), goals: best, ways };
   });
 }
 

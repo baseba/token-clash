@@ -102,10 +102,12 @@ test('a locked sprite shows the way closest to done', () => {
 });
 
 test('a recolored trainer needs its original first, plus what its colors are about', () => {
-  const water = [7, 8, 9, 54, 55, 60, 61, 62, 72, 73, 79, 86].map((id) => entry(id));
-  assert.ok(!isUnlocked(record({ roster: water }), 'red_blue'), 'Red is not unlocked yet');
-  assert.ok(!isUnlocked(record({ roster: water.slice(1), rankedFirst: true, wins: 30 }), 'red_blue'));
-  assert.ok(isUnlocked(record({ roster: water, rankedFirst: true, wins: 30 }), 'red_blue'));
+  const champion = { rankedFirst: true, wins: 30 };
+  assert.ok(!isUnlocked(record({ roster: [entry(9), entry(6)] }), 'red_blue'), 'Red is not unlocked yet');
+  assert.ok(!isUnlocked(record({ roster: [entry(6)], ...champion }), 'red_blue'));
+  assert.ok(isUnlocked(record({ roster: [entry(9)], ...champion }), 'red_blue'), 'Red Azul is Blastoise');
+  assert.ok(!isUnlocked(record({ roster: [entry(9)], ...champion }), 'red__magenta'));
+  assert.ok(isUnlocked(record({ roster: [entry(6)], ...champion }), 'red__magenta'), 'Red Magenta is Charizard');
   const beatVeryHard = [duel(1, 'me', { ai: 'veryhard', guestId: 'ai:veryhard' })];
   for (const [key, id] of [['maxie_aqua', 382], ['archie_magma', 383]] as const) {
     assert.ok(!isUnlocked(record({ roster: [entry(id)] }), key), key);
@@ -142,4 +144,10 @@ test('an earned color variant asks for its original and Pokémon of the type its
   const free = progress.find((p) => p.key.startsWith('hiker__'))!;
   assert.equal(free.group, 'variant');
   assert.deepEqual(free.goals.map((g) => g.need), [5]);
+});
+
+test('a trainer with several ways to unlock lists all of them, not only the closest', () => {
+  const cyrus = spriteProgress(record()).find((p) => p.key === 'cyrus')!;
+  assert.equal(cyrus.ways.length, 2);
+  assert.ok(cyrus.ways.some((way) => JSON.stringify(way) === JSON.stringify(cyrus.goals)), 'the closest way is one of them');
 });

@@ -997,24 +997,40 @@ async function profilePage(seq) {
     if (p.unlocked) return { tip: `🔓 ${trainerLabel(key)} · ${p.title}`, note: `Lo desbloqueaste con: ${p.goals.map((g) => (g.need === 1 ? g.text : `${g.text} (${g.need.toLocaleString('es')})`)).join(' y ')}` };
     return { tip: `🔒 ${trainerLabel(key)} · ${p.title}`, note: `Te falta: ${p.goals.filter((g) => g.have < g.need).map((g) => `${g.text} ${goalState(g)}`).join(' · ')}` };
   }
+  const goalList = (goals) => h('ul', { class: 'unlock-goals' }, goals.map((g) => h('li', { class: g.have >= g.need ? 'is-done' : null }, h('span', null, g.text), h('span', { class: 'unlock-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': g.need, 'aria-valuenow': g.have }, h('i', { style: { width: `${(g.have / g.need) * 100}%` } })), h('small', { class: 'muted' }, g.need === 1 ? (g.have >= 1 ? 'Listo' : 'Pendiente') : `${g.have.toLocaleString('es')} / ${g.need.toLocaleString('es')}`))));
+  const versionsOf = (key) => {
+    const base = VARIANTS_BY_KEY.get(key)?.base ?? key;
+    return [base, ...TRAINER_VARIANTS.filter((variant) => variant.base === base).map((variant) => variant.key)].sort(byLabel);
+  };
   function showDetail(key) {
     const p = progress.get(key);
     if (!p || p.unlocked) {
       detail.hidden = true;
       return;
     }
+    const ways = p.ways?.length ? p.ways : [p.goals];
+    const versions = versionsOf(key);
     detail.hidden = false;
-    detail.replaceChildren(
-      h('div', { class: 'unlock-head' }, h('span', { class: 'trainer-frame is-locked' }, trainerImg(key)), h('div', null, h('b', null, `🔒 ${trainerLabel(key)}`), h('p', { class: 'muted small' }, p.title))),
-      h('ul', { class: 'unlock-goals' }, p.goals.map((g) => h('li', null, h('span', null, g.text), h('span', { class: 'unlock-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': g.need, 'aria-valuenow': g.have }, h('i', { style: { width: `${(g.have / g.need) * 100}%` } })), h('small', { class: 'muted' }, g.need === 1 ? (g.have >= 1 ? 'Listo' : 'Pendiente') : `${g.have.toLocaleString('es')} / ${g.need.toLocaleString('es')}`)))),
+    detail.replaceChildren(...[
+      h('div', { class: 'unlock-head' }, h('span', { class: 'trainer-frame' }, trainerImg(key)), h('div', null, h('b', null, `🔒 ${trainerLabel(key)}`), p.title ? h('p', { class: 'muted small' }, p.title) : null)),
+      ways.length > 1
+        ? h('div', { class: 'unlock-ways' }, ways.flatMap((goals, i) => [i ? h('p', { class: 'unlock-or' }, 'o bien') : null, h('div', { class: 'unlock-way' }, h('small', { class: 'muted' }, `Opción ${i + 1}`), goalList(goals))]))
+        : goalList(ways[0]),
+      versions.length > 1
+        ? h('div', { class: 'unlock-versions' }, h('small', { class: 'muted' }, 'Versiones'), h('div', { class: 'unlock-version-row' }, versions.map((other) => {
+            const locked = !usable(other);
+            const { tip, note } = unlockTip(other);
+            return h('button', { type: 'button', class: `unlock-version${other === key ? ' is-current' : ''}${locked ? ' is-locked' : ''}`, 'data-tip': tip, 'data-tip-note': note, onclick: () => (locked ? showDetail(other) : choose(other, null)) }, h('span', { class: 'trainer-frame' }, trainerImg(other)), h('small', null, `${locked ? '🔒 ' : ''}${trainerLabel(other)}`));
+          })))
+        : null,
       p.group === 'shop' ? h('a', { class: 'btn sm primary', href: '/tienda', 'data-link': true }, '🛒 Ir a la tienda') : null,
-    );
+    ].filter(Boolean));
   }
   async function choose(key, btn) {
     if (!usable(key)) return showDetail(key);
     detail.hidden = true;
     if (key === me.avatar) return;
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
     try {
       me.avatar = (await api('/api/me/look', { method: 'PUT', body: { avatar: key } })).avatar;
       renderWho();
@@ -1022,7 +1038,7 @@ async function profilePage(seq) {
       paintGrid();
     } catch (err) {
       toast(err.message);
-      btn.disabled = false;
+      if (btn) btn.disabled = false;
     }
   }
   function paintGrid() {
