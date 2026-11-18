@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
 import { recolorTrainer } from '../../scripts/sync-trainers.js';
 import { DOWNLOADED_SPRITES, SHOP_TRAINERS, SPECIALS, TRAINER_SPRITES, TRAINER_VARIANTS } from '../../public/trainer-sprites.js';
 
@@ -69,15 +70,15 @@ test('generated variants use many different colors instead of repeating a few', 
   assert.ok(Math.max(...Object.values(uses)) <= GENERATED_VARIANTS.length * 0.12, JSON.stringify(uses));
 });
 
-test('every generated variant changes its colors visibly instead of landing on a near shade', async () => {
-  const { readFileSync } = await import('node:fs');
+const TRAINERS = new URL('../../public/trainers/', import.meta.url);
+test('every generated variant changes its colors visibly instead of landing on a near shade', { skip: existsSync(TRAINERS) ? false : 'needs the trainer sprites in public/trainers: run npm run trainers' }, async () => {
   const { decodePng } = await import('../../scripts/sync-trainers.js');
   const { GENERATED_VARIANTS } = await import('../../public/trainer-variants.js');
   const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   const counts = new Map();
   for (const variant of GENERATED_VARIANTS) {
     if (!counts.has(variant.base)) {
-      const image = decodePng(readFileSync(new URL(`../../public/trainers/${variant.base}.png`, import.meta.url)));
+      const image = decodePng(readFileSync(new URL(`${variant.base}.png`, TRAINERS)));
       const count = new Map();
       for (let i = 0; i < image.width * image.height; i++) if (image.rgba[i * 4 + 3]) count.set(image.rgba.readUIntBE(i * 4, 3), (count.get(image.rgba.readUIntBE(i * 4, 3)) ?? 0) + 1);
       counts.set(variant.base, count);
