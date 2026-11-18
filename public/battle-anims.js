@@ -157,7 +157,8 @@ export function createAnimPlayer(field) {
         if (img) el.style.backgroundSize = `${img.naturalWidth * 1.25 * scale}px ${img.naturalHeight * 1.25 * scale}px`;
       });
     }
-    el.style.transform = `translate(${((bgX ?? 0) - 320) * scale}px, ${((bgY ?? 0) - 284) * scale}px)`;
+    el.bgAt = { x: ((bgX ?? 0) - 320) * scale, y: ((bgY ?? 0) - 284) * scale };
+    el.style.transform = `translate(${el.bgAt.x}px, ${el.bgAt.y}px)`;
     field.insertBefore(el, field.querySelector('.spot'));
     return el;
   }
@@ -165,12 +166,20 @@ export function createAnimPlayer(field) {
   function updateBg(el, { bgX, bgY, opacity, duration }, scale) {
     if (!el) return;
     const ms = Math.max(1, duration * 3 * (1000 / 60));
-    el.style.transition = `transform ${ms}ms linear, opacity ${ms}ms linear`;
-    const current = new DOMMatrixReadOnly(getComputedStyle(el).transform);
-    const x = bgX != null ? (bgX * 0.5 - 320) * scale : current.m41;
-    const y = bgY != null ? (bgY * 0.5 - 284) * scale : current.m42;
-    el.style.transform = `translate(${x}px, ${y}px)`;
-    if (opacity != null) el.style.opacity = String(opacity / 255);
+    if (bgX != null || bgY != null) {
+      const from = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+      const to = { x: bgX != null ? (bgX * 0.5 - 320) * scale : el.bgAt.x, y: bgY != null ? (bgY * 0.5 - 284) * scale : el.bgAt.y };
+      el.bgAt = to;
+      el.bgMove?.cancel();
+      el.style.transform = `translate(${to.x}px, ${to.y}px)`;
+      el.bgMove = el.animate([{ transform: `translate(${from.m41}px, ${from.m42}px)` }, { transform: el.style.transform }], { duration: ms, easing: 'linear' });
+    }
+    if (opacity != null) {
+      const from = getComputedStyle(el).opacity;
+      el.bgFade?.cancel();
+      el.style.opacity = String(opacity / 255);
+      el.bgFade = el.animate([{ opacity: from }, { opacity: el.style.opacity }], { duration: ms, easing: 'linear' });
+    }
   }
 
   async function play(key, { userSpot, targetSpot = userSpot, byPlayer = true }) {
@@ -237,6 +246,9 @@ export function createAnimPlayer(field) {
         styleMon(mons[0], userEntry);
         styleMon(mons[1], targetEntry);
       }
+    };
+
+    const showBg = (f) => {
       for (const event of config.bg) {
         if (event[0] !== f) continue;
         const [, type, url, bgX, bgY, opacity, duration] = event;
@@ -257,6 +269,7 @@ export function createAnimPlayer(field) {
     await new Promise((resolve) => {
       let f = 0;
       const step = () => {
+        showBg(f);
         if (f < config.frames.length) showFrame(f);
         else if (f === config.frames.length) {
           graphics.splice(0).forEach((el) => el.remove());
