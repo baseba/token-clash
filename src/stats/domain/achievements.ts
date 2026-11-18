@@ -7,6 +7,7 @@ import type { ChallengeState } from '../../arena/domain/challenge.js';
 import { isHumanDuel } from '../../arena/domain/challenge.js';
 import type { TournamentState } from '../../arena/domain/tournament.js';
 import { AI_LEVELS, type AiLevel } from '../../combat/domain/ai.js';
+import { SHOP_TRAINER_NOT_BOUGHT } from '../../trainers/domain/trainer.js';
 
 const REGIONS = { kanto: [1, 151], johto: [152, 251], hoenn: [252, 386], sinnoh: [387, 493], unova: [494, 649] } as const;
 type Region = keyof typeof REGIONS;
@@ -287,5 +288,5 @@ export function buyBlocker(record: PlayerRecord, itemId: string): string | null 
 /** Why this player can't wear the look, or null if they can. The look they already wear stays theirs even if it would be locked now. */
 export function lookBlocker(record: PlayerRecord, currentAvatar: string | null | undefined, key: string): string | null {
   if (key === currentAvatar || isUnlocked(record, key)) return null;
-  return isShopTrainer(key) ? 'Ese entrenador se compra en tu perfil.' : 'Todavía no desbloqueas a ese entrenador.';
+  return isShopTrainer(key) ? SHOP_TRAINER_NOT_BOUGHT : 'Todavía no desbloqueas a ese entrenador.';
 }

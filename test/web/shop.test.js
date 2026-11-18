@@ -66,8 +66,7 @@ const ANIMS = new URL('../../public/anims/', import.meta.url);
 test('every Ball on sale sounds like its theme, with files the install downloads', { skip: existsSync(ANIMS) ? false : 'needs the battle animations in public/anims: run npm run anims' }, async () => {
   const { readdirSync, readFileSync } = await import('node:fs');
   const { ballSounds } = await import('../../public/ball-fx.js');
-  const anims = ANIMS;
-  const downloaded = new Set(readdirSync(anims).filter((f) => f.endsWith('.json')).flatMap((f) => readFileSync(new URL(f, anims), 'utf8').match(/\/sfx\/moves\/audio\/[^"]+/g) ?? []));
+  const downloaded = new Set(readdirSync(ANIMS).filter((f) => f.endsWith('.json')).flatMap((f) => readFileSync(new URL(f, ANIMS), 'utf8').match(/\/sfx\/moves\/audio\/[^"]+/g) ?? []));
   for (const ball of SHOP_ITEMS.filter((item) => item.kind === 'ball')) {
     const sounds = ballSounds(ball.key);
     assert.ok(sounds.length, ball.key);

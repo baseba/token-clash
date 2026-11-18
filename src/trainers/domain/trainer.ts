@@ -35,6 +35,8 @@ export interface TrainerState {
   recycled?: RecycledRecord[];
 }
 
+export const SHOP_TRAINER_NOT_BOUGHT = 'Ese entrenador se compra en tu perfil.';
+
 export const EQUIP_KINDS = ['ball', 'window', 'frame'] as const;
 export type EquipKind = (typeof EQUIP_KINDS)[number];
 export type Equipped = Partial<Record<EquipKind, string>>;
@@ -98,7 +100,7 @@ export class Trainer implements TrainerState {
   /** @throws {DomainError} the sprite is not one of the trainer sprites, or is sold in the shop and not bought */
   chooseAvatar(key: string): void {
     if (!isTrainerSprite(key)) throw invalid('Ese entrenador no existe.');
-    if (isShopTrainer(key) && !this.owns(`trainer:${key}`) && key !== this.avatar) throw forbidden('Ese entrenador se compra en tu perfil.');
+    if (isShopTrainer(key) && !this.owns(`trainer:${key}`) && key !== this.avatar) throw forbidden(SHOP_TRAINER_NOT_BOUGHT);
     this.avatar = key;
   }
 
