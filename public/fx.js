@@ -1,3 +1,4 @@
+import { createBallBursts } from './ball-burst.js?v=dev';
 import { ballFx } from './ball-fx.js?v=dev';
 import { causeAnim, chargeAnim, conditionAnim, createAnimPlayer, shownSprite, statusAnim, terrainAnim, weatherAnim } from './battle-anims.js?v=dev';
 
@@ -112,6 +113,7 @@ export function createFx(arena, field = arena) {
   const layer = document.createElement('div');
   layer.className = 'fx-layer';
   arena.append(layer);
+  const bursts = createBallBursts(layer);
   const reduced = () => document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const unit = () => (arena.clientHeight / 100) * 1.4;
   const anims = createAnimPlayer(field);
@@ -148,8 +150,8 @@ export function createFx(arena, field = arena) {
 
   const at = (p, extra = '') => `translate(${p.x}px, ${p.y}px) ${extra}`;
 
-  function particle(type, size, shape = PARTICLE[type] || 'star', palette = PALETTE[type] || PALETTE.normal) {
-    const [light, mid, dark] = palette;
+  function particle(type, size, shape = PARTICLE[type] || 'star') {
+    const [light, mid, dark] = PALETTE[type] || PALETTE.normal;
     const s = size;
     const css = { width: `${s}px`, height: `${s}px`, marginLeft: `${-s / 2}px`, marginTop: `${-s / 2}px` };
     switch (shape) {
@@ -188,15 +190,6 @@ export function createFx(arena, field = arena) {
         break;
       case 'orb':
         Object.assign(css, { borderRadius: '50%', background: `radial-gradient(circle at 38% 36%, ${light} 0 14%, ${mid} 46%, ${dark} 78%, transparent 82%)`, boxShadow: `0 0 ${s * 0.45}px ${mid}` });
-        break;
-      case 'petal':
-        Object.assign(css, { height: `${s * 0.7}px`, borderRadius: '70% 0 70% 0 / 70% 0 70% 0', background: `linear-gradient(135deg, ${light}, ${mid} 60%, ${dark})` });
-        break;
-      case 'flake':
-        Object.assign(css, { clipPath: 'polygon(50% 0, 58% 38%, 93% 25%, 64% 50%, 93% 75%, 58% 62%, 50% 100%, 42% 62%, 7% 75%, 36% 50%, 7% 25%, 42% 38%)', background: light, filter: `drop-shadow(0 0 ${s * 0.25}px ${mid})` });
-        break;
-      case 'coin':
-        Object.assign(css, { borderRadius: '50%', background: `radial-gradient(circle at 36% 32%, ${light} 0 18%, ${mid} 45%, ${dark} 85%)`, border: `${Math.max(1, s * 0.1)}px solid ${dark}`, boxShadow: `0 0 ${s * 0.5}px ${mid}` });
         break;
       default:
         Object.assign(css, { clipPath: 'polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)', background: `radial-gradient(circle, ${light}, ${mid} 70%)` });
@@ -776,182 +769,6 @@ export function createFx(arena, field = arena) {
     return Promise.all(jobs);
   }
 
-  function glowing(el, theme, strength) {
-    el.style.filter = `${el.style.filter || ''} drop-shadow(0 0 ${strength}px ${theme.colors[1]})`.trim();
-    if (!theme.shadow) el.style.mixBlendMode = 'screen';
-    return el;
-  }
-
-  function themedParticle(theme, k, size, accent = false, shape) {
-    const el = particle('normal', k * size, shape ?? (accent ? theme.accentShape : theme.shape), accent ? theme.accent : theme.colors);
-    return glowing(el, theme, k * (1 + theme.tier * 0.5));
-  }
-
-  function ballRing(p, k, theme, { count, dist, size, ms, delay = 0, accent = false, squash = 1 }) {
-    const turn = rnd(0, Math.PI * 2);
-    return Promise.all(Array.from({ length: count }, (_, i) => {
-      const ang = turn + (Math.PI * 2 * i) / count;
-      const far = k * dist * rnd(0.8, 1.2);
-      const mid = { x: p.x + Math.cos(ang) * far * 0.6, y: p.y + Math.sin(ang) * far * 0.6 * squash };
-      const to = { x: p.x + Math.cos(ang) * far, y: p.y + Math.sin(ang) * far * squash };
-      const spin = Math.round((ang * 180) / Math.PI + rnd(-30, 30));
-      const el = themedParticle(theme, k, size * rnd(0.75, 1.25), accent);
-      return play(el, [
-        { transform: at(p, `rotate(${spin}deg) scale(0.2)`), opacity: 1 },
-        { transform: at(mid, `rotate(${spin + 90}deg) scale(1.25)`), opacity: 1, offset: 0.35 },
-        { transform: at(to, `rotate(${spin + 200}deg) scale(0.9)`), opacity: 0.9, offset: 0.75 },
-        { transform: at(to, `rotate(${spin + 260}deg) scale(0.3)`), opacity: 0 },
-      ], { duration: ms, delay, easing: 'cubic-bezier(0.15, 0.8, 0.3, 1)' });
-    }));
-  }
-
-  function ballMotes(p, k, theme, { count, ms, spread, motion = theme.motion, size = [3.5, 6] }) {
-    return Promise.all(Array.from({ length: count }, (_, i) => {
-      const el = themedParticle(theme, k, rnd(size[0], size[1]), i % 3 === 2);
-      const dx = rnd(-spread, spread) * k;
-      const delay = rnd(0, ms * 0.45);
-      let frames;
-      switch (motion) {
-        case 'rise': {
-          const x = p.x + dx;
-          frames = [{ transform: at({ x, y: p.y + 8 * k }, 'scale(0.5)'), opacity: 0 }, { transform: at({ x: x + rnd(-8, 8) * k, y: p.y - 16 * k }, 'scale(1.2)'), opacity: 1, offset: 0.3 }, { transform: at({ x: x + rnd(-14, 14) * k, y: p.y - rnd(50, 80) * k }, 'scale(0.4)'), opacity: 0 }];
-          break;
-        }
-        case 'fall': {
-          const x = p.x + dx;
-          frames = [{ transform: at({ x, y: p.y - rnd(60, 90) * k }, 'rotate(0deg)'), opacity: 0 }, { transform: at({ x: x + rnd(-10, 10) * k, y: p.y - 40 * k }, 'rotate(160deg)'), opacity: 1, offset: 0.25 }, { transform: at({ x: x + rnd(-14, 14) * k, y: p.y - 10 * k }, 'rotate(280deg)'), opacity: 1, offset: 0.7 }, { transform: at({ x: x + rnd(-18, 18) * k, y: p.y + rnd(8, 18) * k }, 'rotate(380deg)'), opacity: 0 }];
-          break;
-        }
-        case 'drift': {
-          const ang = rnd(0, Math.PI * 2);
-          const far = rnd(24, 46) * k;
-          frames = [{ transform: at(p, 'scale(0.6)'), opacity: 0 }, { transform: at({ x: p.x + Math.cos(ang) * far * 0.5, y: p.y + Math.sin(ang) * far * 0.4 }, 'scale(2)'), opacity: 0.95, offset: 0.4 }, { transform: at({ x: p.x + Math.cos(ang) * far, y: p.y + Math.sin(ang) * far * 0.6 - 12 * k }, 'scale(3.2)'), opacity: 0 }];
-          break;
-        }
-        case 'swirl': {
-          const start = rnd(0, 360);
-          const dir = i % 2 ? 1 : -1;
-          frames = [0, 0.2, 0.4, 0.6, 0.8, 1].map((t) => {
-            const ang = ((start + dir * t * 420) * Math.PI) / 180;
-            const r = (4 + t * spread) * k;
-            return { transform: at({ x: p.x + Math.cos(ang) * r, y: p.y + Math.sin(ang) * r * 0.6 - t * 14 * k }, `scale(${1.2 - t * 0.7})`), opacity: t === 0 || t === 1 ? 0 : 1, offset: t };
-          });
-          break;
-        }
-        default: {
-          const spot = { x: p.x + dx, y: p.y + rnd(-spread * 1.2, spread * 0.5) * k };
-          frames = [{ transform: at(spot, 'scale(0) rotate(0deg)'), opacity: 0 }, { transform: at(spot, 'scale(1.6) rotate(90deg)'), opacity: 1, offset: 0.35 }, { transform: at(spot, 'scale(0.8) rotate(160deg)'), opacity: 1, offset: 0.6 }, { transform: at(spot, 'scale(0) rotate(220deg)'), opacity: 0 }];
-        }
-      }
-      return play(el, frames, { duration: ms, delay, easing: 'ease-in-out' });
-    }));
-  }
-
-  function ballSparkles(p, k, theme, { count, ms, spread, rise = 0 }) {
-    return Promise.all(Array.from({ length: count }, () => {
-      const el = glowing(particle('normal', k * rnd(2.5, 5), 'star', ['#ffffff', theme.accent[0], theme.colors[1]]), theme, k * 2);
-      const spot = { x: p.x + rnd(-spread, spread) * k, y: p.y + rnd(-spread * 1.3 - rise, spread * 0.4) * k };
-      return play(el, [{ transform: at(spot, 'scale(0)'), opacity: 0 }, { transform: at(spot, 'scale(1.5)'), opacity: 1, offset: 0.3 }, { transform: at(spot, 'scale(0)'), opacity: 0 }], { duration: rnd(ms * 0.4, ms * 0.7), delay: rnd(0, ms * 0.6) });
-    }));
-  }
-
-  function ballFlash(p, k, theme, size, ms) {
-    const [light, mid] = theme.colors;
-    const s = size * k;
-    const el = node({ width: `${s}px`, height: `${s}px`, marginLeft: `${-s / 2}px`, marginTop: `${-s / 2}px`, borderRadius: '50%', background: `radial-gradient(circle, #ffffff 0 10%, ${light} 22%, ${mid} 46%, transparent 70%)`, mixBlendMode: theme.shadow ? 'normal' : 'screen' });
-    return play(el, [{ transform: at(p, 'scale(0.1)'), opacity: 1 }, { transform: at(p, 'scale(1)'), opacity: 1, offset: 0.3 }, { transform: at(p, 'scale(1.4)'), opacity: 0 }], { duration: ms });
-  }
-
-  function ballGroundGlow(p, k, theme, ms) {
-    const s = 70 * k;
-    const el = node({ width: `${s}px`, height: `${s * 0.3}px`, marginLeft: `${-s / 2}px`, marginTop: `${-s * 0.15}px`, borderRadius: '50%', background: `radial-gradient(ellipse, ${theme.colors[0]} 0, ${theme.colors[1]} 40%, transparent 72%)`, mixBlendMode: theme.shadow ? 'multiply' : 'screen' });
-    return play(el, [{ transform: at(p, 'scale(0.3)'), opacity: 0 }, { transform: at(p, 'scale(1)'), opacity: 0.9, offset: 0.3 }, { transform: at(p, 'scale(1.15)'), opacity: 0.6, offset: 0.7 }, { transform: at(p, 'scale(1.3)'), opacity: 0 }], { duration: ms });
-  }
-
-  function ballShockwave(p, k, theme, ms, delay = 0, size = 80) {
-    const s = size * k;
-    const el = node({ width: `${s}px`, height: `${s * 0.5}px`, marginLeft: `${-s / 2}px`, marginTop: `${-s * 0.25}px`, borderRadius: '50%', border: `${Math.max(2, 2.4 * k)}px solid ${theme.colors[0]}`, boxShadow: `0 0 ${6 * k}px ${theme.colors[1]}, inset 0 0 ${6 * k}px ${theme.accent[1]}` });
-    return play(el, [{ transform: at(p, 'scale(0.05)'), opacity: 1 }, { transform: at(p, 'scale(1)'), opacity: 0 }], { duration: ms, delay, easing: 'cubic-bezier(0.1, 0.7, 0.3, 1)' });
-  }
-
-  function ballRays(p, k, theme, ms, reverse = false) {
-    const s = 130 * k;
-    const [light, mid] = theme.colors;
-    const mask = 'radial-gradient(circle, #000 0 12%, transparent 66%)';
-    const el = node({ width: `${s}px`, height: `${s}px`, marginLeft: `${-s / 2}px`, marginTop: `${-s / 2}px`, borderRadius: '50%', background: `repeating-conic-gradient(from ${reverse ? 15 : 0}deg, ${light} 0 5deg, ${mid}88 5deg 9deg, transparent 9deg 30deg)`, maskImage: mask, WebkitMaskImage: mask, mixBlendMode: 'screen' });
-    const turn = reverse ? -1 : 1;
-    return play(el, [{ transform: at(p, 'scale(0.2) rotate(0deg)'), opacity: 0 }, { transform: at(p, `scale(1) rotate(${turn * 50}deg)`), opacity: 1, offset: 0.3 }, { transform: at(p, `scale(1.25) rotate(${turn * 150}deg)`), opacity: 0 }], { duration: ms, easing: 'ease-out' });
-  }
-
-  function ballPillar(p, k, theme, ms) {
-    const w = 34 * k;
-    const h = 150 * k;
-    const el = node({ width: `${w}px`, height: `${h}px`, marginLeft: `${-w / 2}px`, marginTop: `${-h}px`, background: `linear-gradient(to top, ${theme.colors[0]}, ${theme.colors[1]}aa 40%, transparent)`, filter: `blur(${2 * k}px)`, mixBlendMode: 'screen', transformOrigin: '50% 100%' });
-    return play(el, [{ transform: at(p, 'scaleX(0.1) scaleY(0.2)'), opacity: 0 }, { transform: at(p, 'scaleX(1) scaleY(1)'), opacity: 0.95, offset: 0.3 }, { transform: at(p, 'scaleX(0.4) scaleY(1.1)'), opacity: 0 }], { duration: ms });
-  }
-
-  function ballTint(theme, ms, strength) {
-    const el = node({ inset: '0', background: theme.colors[1], mixBlendMode: theme.shadow ? 'multiply' : 'screen' });
-    return play(el, [{ opacity: 0 }, { opacity: strength, offset: 0.12 }, { opacity: 0 }], { duration: ms });
-  }
-
-  function ballShadow(p, k, theme, ms) {
-    const dark = theme.colors[2];
-    const el = node({ inset: '0', background: `radial-gradient(circle at ${p.x}px ${p.y}px, transparent 0 ${12 * k}px, ${dark}ee ${80 * k}px)` });
-    return play(el, [{ opacity: 0 }, { opacity: 0.9, offset: 0.2 }, { opacity: 0.75, offset: 0.65 }, { opacity: 0 }], { duration: ms });
-  }
-
-  function ballCrown(p, k, theme, ms) {
-    const count = 8;
-    return Promise.all(Array.from({ length: count }, (_, i) => {
-      const el = themedParticle(theme, k, 4.5, i % 2 === 1);
-      const frames = [0, 0.25, 0.5, 0.75, 1].map((t) => {
-        const ang = ((i / count) * 360 + t * 540) * (Math.PI / 180);
-        return { transform: at({ x: p.x + Math.cos(ang) * 26 * k, y: p.y - 22 * k + Math.sin(ang) * 9 * k }, `scale(${1 + Math.sin(t * Math.PI) * 0.4})`), opacity: t === 0 || t === 1 ? 0 : 1, offset: t };
-      });
-      return play(el, frames, { duration: ms, delay: 200, easing: 'linear' });
-    }));
-  }
-
-  function themedOpen(p, k, theme) {
-    const tier = theme.tier;
-    const ms = [0, 700, 900, 1150, 1400, 1800][tier];
-    const body = { x: p.x, y: p.y - 18 * k };
-    const jobs = [
-      ballFlash(p, k, theme, 30 + tier * 10, 380 + tier * 60),
-      ballRing(p, k, theme, { count: 12 + tier * 4, dist: 26 + tier * 4, size: 5 + tier * 0.6, ms: 520 + tier * 60 }),
-      ballMotes(p, k, theme, { count: 6 + tier * 6, ms, spread: 14 + tier * 6 }),
-      ballSparkles(p, k, theme, { count: 4 + tier * 4, ms, spread: 18 + tier * 5, rise: 10 }),
-    ];
-    if (tier >= 2) {
-      jobs.push(ballRing(p, k, theme, { count: 10 + tier * 2, dist: 16 + tier * 3, size: 4, ms: 600, delay: 90, accent: true }));
-      jobs.push(ballGroundGlow(p, k, theme, ms));
-    }
-    if (tier >= 3) {
-      jobs.push(ballShockwave(p, k, theme, 650));
-      jobs.push(ballRing(p, k, theme, { count: 16 + tier * 2, dist: 50 + tier * 4, size: 4.5, ms: 800, delay: 180, squash: 0.55 }));
-      jobs.push(ballMotes(p, k, theme, { count: 10 + tier * 3, ms: ms + 300, spread: 26, motion: 'swirl', size: [3, 5] }));
-      jobs.push(ballMotes(body, k, theme, { count: 8 + tier * 2, ms: ms + 500, spread: 18, motion: theme.motion === 'fall' ? 'fall' : 'rise', size: [2.5, 4] }));
-      if (theme.shadow) jobs.push(ballShadow(p, k, theme, ms + 400));
-    }
-    if (tier >= 4) {
-      jobs.push(ballRays(p, k, theme, ms));
-      jobs.push(ballShockwave(p, k, theme, 800, 220, 120));
-      jobs.push(ballPillar(p, k, theme, ms));
-      jobs.push(ballTint(theme, 700, theme.shadow ? 0.35 : 0.28));
-      jobs.push(ballSparkles(body, k, theme, { count: 18, ms: ms + 400, spread: 30, rise: 20 }));
-    }
-    if (tier >= 5) {
-      jobs.push(ballRays(p, k, theme, ms + 300, true));
-      jobs.push(ballShockwave(p, k, theme, 1000, 420, 170));
-      jobs.push(ballRing(p, k, theme, { count: 30, dist: 80, size: 5, ms: 1000, delay: 260, squash: 0.6 }));
-      jobs.push(ballMotes(p, k, theme, { count: 46, ms: ms + 500, spread: 90, motion: 'fall', size: [3, 6] }));
-      jobs.push(ballCrown(body, k, theme, 1600));
-      jobs.push(ballTint(theme, 900, 0.45));
-    }
-    return Promise.race([Promise.all(jobs), wait(520)]);
-  }
-
   async function throwBall(spot, mine, onOpen, ballKey = 'pb') {
     const kind = /^[a-z]{2}$/.test(ballKey) ? ballKey : 'pb';
     const k = fieldScale();
@@ -984,7 +801,7 @@ export function createFx(arena, field = arena) {
     ], { duration: 250, easing: 'cubic-bezier(0.12, 0, 0.39, 0)' });
     await Promise.all([
       play(open, [{ transform: at(land), opacity: 1 }, { transform: at(land), opacity: 0 }], { duration: 200 }),
-      ballFx(kind) ? themedOpen(land, k, ballFx(kind)) : openParticles(land, k),
+      ballFx(kind) ? bursts.play(land, k, ballFx(kind)) : openParticles(land, k),
       grow?.finished.catch(() => {}),
     ]);
   }
@@ -1098,6 +915,10 @@ export function createFx(arena, field = arena) {
     },
     stat(up, spot) {
       return statChange(up, spot);
+    },
+    warmBalls(keys) {
+      const themes = [...new Set(keys)].map(ballFx).filter(Boolean);
+      if (themes.length) bursts.warm(themes);
     },
     async sendOut(spot, mine, onOpen = () => {}, ball = 'pb') {
       if (reduced()) {

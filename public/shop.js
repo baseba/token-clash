@@ -87,5 +87,9 @@ export const SHOP_ITEMS = [
   })),
 ];
 
+export const AI_BALLS = [DEFAULT_BALL, ...SHOP_ITEMS.filter((item) => item.kind === 'ball' && ['common', 'rare'].includes(item.rarity)).map((item) => item.key)];
+
+export const aiBallFor = (roll) => AI_BALLS[Math.min(AI_BALLS.length - 1, Math.floor(roll * AI_BALLS.length))];
+
 export const shopItem = (id) => SHOP_ITEMS.find((i) => i.id === id) ?? null;
 export const shopItemOf = (kind, key) => shopItem(`${kind}:${key}`);

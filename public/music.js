@@ -288,6 +288,16 @@ export function createPlayer({ storage = null } = {}) {
   const cryBuffer = async (sprite) => firstBuffer(cryUrls(await loadManifest(CRY_MANIFEST), sprite));
   const moveCues = async (key, byPlayer) => moveSfxCues(await loadManifest(MOVE_SFX_MANIFEST), key, byPlayer);
 
+  const cueSources = new Set();
+  function stopCues() {
+    for (const source of cueSources) {
+      try {
+        source.stop();
+      } catch {}
+    }
+    cueSources.clear();
+  }
+
   function playBuffer(out, buffer, { rate = 1, gain = 0.3, when = 0 } = {}) {
     const source = ctx.createBufferSource();
     const level = ctx.createGain();
@@ -469,6 +479,39 @@ export function createPlayer({ storage = null } = {}) {
       const out = sample && sfxBus();
       if (!out || ctx.currentTime - lastSfxAt < UI_QUIET_AFTER_SFX_S) return;
       return playSampleOr(out, sample.url, () => sweep(out, ctx.currentTime + 0.01, { wave: 0.5, from: 1200 * sample.rate, to: 1200 * sample.rate, dur: 0.05, gain: 0.12 }), sample.rate);
+    },
+    cues(list, { maxMs = 1400 } = {}) {
+      const out = sfxBus();
+      if (!out || !list?.length) return;
+      Promise.all(list.map((cue) => loadBuffer(cue.url))).then((loaded) => {
+        if (ctx.state !== 'running') return;
+        stopCues();
+        const start = ctx.currentTime + 0.01;
+        const stopAt = start + maxMs / 1000;
+        list.forEach((cue, i) => {
+          if (!loaded[i]) return;
+          const when = start + (cue.at ?? 0) / 1000;
+          if (when >= stopAt) return;
+          const source = ctx.createBufferSource();
+          const level = ctx.createGain();
+          source.buffer = loaded[i];
+          source.playbackRate.value = cue.rate ?? 1;
+          level.gain.setValueAtTime(0.35 * (cue.gain ?? 1), when);
+          level.gain.setValueAtTime(0.35 * (cue.gain ?? 1), stopAt - 0.25);
+          level.gain.linearRampToValueAtTime(0, stopAt);
+          source.connect(level);
+          level.connect(out);
+          source.start(when);
+          source.stop(stopAt);
+          cueSources.add(source);
+          source.onended = () => cueSources.delete(source);
+        });
+      });
+    },
+    stopCues,
+    preloadCues(list) {
+      if (!ensure()) return;
+      for (const cue of list ?? []) loadBuffer(cue.url);
     },
     sfx(kind, opts = {}) {
       const out = sfxBus();
