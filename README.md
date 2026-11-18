@@ -36,21 +36,23 @@ En vivo: **https://clash.mirrordev.xyz**
      colores de la Super, Ultra, Lujo, Rogue y Master, que cambian el tono de cada parte sin perder el sombreado), 14 marcos de
      ventana para el texto de tus peleas, 14 marcos para tu foto de perfil y 35 entrenadores. Los precios van por rareza: Común 100 M, Raro 300 M, Épico 800 M, Legendario 2.000 M y Mítico
      5.000 M. Nada cambia cómo pelean tus Pokémon.
-   - **Entrenadores** (pestaña del perfil): eliges tu entrenador entre los ~300 sprites de PokeRogue y sus
-     variantes (con buscador y filtros por categoría y género). Las clases de entrenador, protagonistas y soldados están libres;
-     el resto se desbloquea con logros (`src/stats/domain/achievements.ts`): líderes de gimnasio con 3, 6, 10 y 15
-     especies de su tipo (el último, además, con un shiny del tipo), el Alto Mando con 12 de su tipo y 10 victorias
-     contra jugadores, los campeones con la Pokédex regional, torneos, rachas y el ranking, los villanos ganándole a
-     la IA y los especiales con shinies, tokens y peleas sin bajas. Un bloqueado muestra en silueta qué te falta.
-     Cada entrenador tiene además variantes de colores (403): los campeones y jefes villanos tienen 4, Team Star y
-     protagonistas 3, el resto 1. Las de personajes clave piden al original y a su Pokémon emblemático (Red Amarillo
-     con Pikachu, Cynthia Garchomp…); las demás se ganan con especies del tipo de su color (Carmesí → Fuego, Zafiro →
-     Agua…) o se compran en la tienda, más caras y pidiendo primero al original si este es difícil. `npm run variants`
-     las replanifica (`scripts/plan-trainer-variants.mjs` escribe `public/trainer-variants.js`) y las genera.
-     De esas, 22 están definidas a mano (`HANDMADE_VARIANTS` en `public/trainer-sprites.js`):
-     las de personajes de la historia piden desbloquear al original y tener a su Pokémon emblemático (Red Amarillo
-     con Pikachu, Lance Esmeralda con Rayquaza, Cynthia Garchomp, Maxie Aqua con Kyogre…), y las de protagonistas,
-     Nate, Rosa y Leon se venden en la tienda, más caras cuanto más difícil es el original. Ese sprite, en chico, es tu foto de perfil; en las peleas tu entrenador y el
+   - **Entrenadores** (pestaña del perfil): eliges tu entrenador entre los ~300 sprites de PokeRogue, agrupados por
+     personaje: al tocar uno ves el original y sus recolores, cada uno con su logro (también los ya conseguidos).
+     Todos los originales se ganan con logros (`src/stats/domain/achievements.ts`, metas en
+     `src/stats/domain/trainer-goals.ts`), más difíciles según su rareza: las clases comunes piden 3 Pokémon de su
+     tipo o un Pokémon temático (los reclutas, a los de su equipo; el ❔ de la meta dice cuáles cuentan), las raras 5,
+     las épicas 8; los protagonistas piden iniciales; los líderes de gimnasio 3, 6, 10 y 15 de su tipo, el Alto Mando
+     12 y victorias, los campeones la Pokédex regional, torneos o el ranking, los villanos ganarle a la IA. Líderes,
+     Alto Mando, campeones y villanos tienen además una vía con su Pokémon emblemático. Solo cuentan especies de la 1.ª
+     a la 5.ª generación. Los principiantes (Youngster, School Kid, Preschooler) llegan con el primer Pokémon.
+     Cada personaje tiene recolores (al menos uno simple; campeones y jefes villanos 4, protagonistas 3): siempre piden
+     desbloquear primero al original. Al menos uno se vende en la tienda, un nivel de rareza más caro que el original;
+     el resto se gana con Pokémon del tipo de su color (Carmesí → Fuego, Zafiro → Agua…). Los recolores con nombre de
+     Pokémon piden tenerlo y usan su paleta (Red Charizard, Lance Rayquaza, Maxie Kyogre…). `npm run variants` los
+     replanifica (`scripts/plan-trainer-variants.mjs` escribe `public/trainer-variants.js`) y los genera; al
+     instalar también se calcula dónde está la cara de cada sprite (`public/trainers/faces.json`) para centrar el
+     ícono de perfil. Al arrancar, el servidor devuelve los tokens de entrenadores que dejaron de venderse y cambia el
+     entrenador de quien usaba uno que ya no tiene. Ese sprite, en chico, es tu foto de perfil; en las peleas tu entrenador y el
      rival entran al campo, lanzan sus Pokémon y se retiran, y vuelven al terminar (el tuyo, en espejo y más grande).
      Las IAs usan un entrenador al azar por pelea (el mismo durante todo un torneo), como sus nombres.
 3. En **Colección** armas tus 6, los ordenas arrastrando (el primero es el líder) y eliges los
@@ -191,6 +193,9 @@ GAME FREAK inc.
 - Sprites de entrenadores: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (material de Nintendo,
   Creatures y GAME FREAK; `bug_type_superfan` es de Chani von Karpa y `aliana`, `celosia` y `mable` de Red, con
   CC BY-NC-SA 4.0). Se descargan al instalar y no se versionan.
+- Decoraciones de los marcos de perfil (`public/frames/`): recortes de los escenarios de
+  [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (`images/arenas`), de Pagefault Games y sus
+  colaboradores, con CC BY-NC-SA 4.0.
 - Animaciones de batalla, sus sonidos, la Poké Ball y los efectos de sonido: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets), de
   Pagefault Games y sus colaboradores. Las animaciones y los sonidos `PRSFX-` son de
   [Pokémon Reborn](https://www.rebornevo.com/); las animaciones `GEN8-` son del Gen 8 Animation Project
