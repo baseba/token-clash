@@ -1435,6 +1435,8 @@ async function recyclingPage(seq) {
       const strip = h('span', { class: 'shred-strip' });
       Object.assign(strip.style, { left: `${(i / SHRED_STRIPS) * 100}%`, width: `${100 / SHRED_STRIPS}%`, backgroundImage: `url("${spriteUrl}")`, backgroundSize: `${SHRED_STRIPS * 100}% 100%`, backgroundPosition: `${(i / (SHRED_STRIPS - 1)) * 100}% 0` });
       output.append(strip);
+      // A CSS background never retries, so each strip follows the host the feed image loaded from.
+      feed.addEventListener('load', () => (strip.style.backgroundImage = `url("${feed.currentSrc}")`));
       const sway = (i - (SHRED_STRIPS - 1) / 2) * 11 + (Math.random() - 0.5) * 24;
       const spin = (Math.random() - 0.5) * 70;
       return strip.animate([

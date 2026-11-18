@@ -152,7 +152,7 @@ input[type=text]:focus, .btn:focus-visible, .mon:focus-visible { outline: 3px so
 .spot .creature img, .spot .creature img.native { position: static; display: block; width: auto; height: auto; max-width: none; transform: none; object-fit: fill; image-rendering: pixelated; }
 .sub-doll { z-index: 2; pointer-events: none; visibility: hidden; }
 .sub-doll .creature { position: static; transform: none; }
-.sub-doll img[src*="substitute-back"][src*=".gif"] { zoom: 0.5; }
+.sub-doll img[src$="/back/substitute.gif"] { zoom: 0.5; }
 .spot.has-sub .sub-doll { visibility: visible; }
 .spot.has-sub > .creature, .spot.incoming > .creature, .spot.incoming .sub-doll, .spot.is-hidden-move .creature { visibility: hidden; }
 .spot.hit .creature { animation: dmg-blink .7s steps(1, end); }
