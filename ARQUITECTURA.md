@@ -9,12 +9,12 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 
 | Dominio | De qué se trata | Dueño de |
 | --- | --- | --- |
-| `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI y Pokémon Showdown) y la Pokédex | archivos `src/catalog/data/*.json` |
+| `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI y Pokémon Showdown), la Pokédex, los artículos de la tienda y los sprites de entrenador | archivos `src/catalog/data/*.json` y las listas compartidas de `public/` |
 | `combat` | Cómo se pelea: motor de batalla, qué movimientos se pueden usar, elegir 3 de 6, sorteo aleatorio, IA, Skynet | nada (es puro) |
 | `trainers` | Quién juega: entrenador, colección, equipo, sesión, importar el save | tablas `trainers`, `roster_entries` |
 | `arena` | Dónde se pelea: salas, emparejamiento, peleas en vivo, torneos | tablas `challenges`, `tournaments`, `tournament_seats`, `tournament_matches` |
 | `chat` | Mensajes en salas y torneos | memoria (se borra al reiniciar, a propósito) |
-| `stats` | La página de stats | nada: solo lee |
+| `stats` | La página de stats y los logros | nada: lee de los otros dominios y le pide los cambios a `trainers` |
 
 Más tres piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
 (archivos estáticos y health checks) y `shared` (configuración, errores, HTTP, base de datos).
@@ -74,8 +74,11 @@ exports: [TrainersService], // ← el repositorio NO se exporta
 `combat` y `catalog` son casi solo `domain/`: funciones puras con la aleatoriedad inyectada (`random = Math.random`),
 así que sus tests reproducen una pelea entera con una semilla fija. La única lectura es la del catálogo: sus JSON
 se leen una vez, al cargar el módulo, y la tabla de tipos es `public/types.js`, la misma que usa el navegador
-(`catalog/domain/type-chart.ts` explica cómo). En general, un dominio tiene solo las capas que
-usa: `chat` no tiene HTTP propio (sus mensajes le llegan por la arena) y `stats` no guarda nada.
+(`catalog/domain/type-chart.ts` explica cómo). La tienda (`public/shop.js`) y los entrenadores
+(`public/trainer-sprites.js`, `public/trainer-variants.js`) siguen el mismo camino: el catálogo les pone tipos en
+`catalog/domain/shop.ts` y `trainer-sprites.ts`, y `tsconfig.json` los incluye en el build.
+
+En general, un dominio tiene solo las capas que usa: `chat` no tiene HTTP propio (sus mensajes le llegan por la arena) y `stats` no guarda nada.
 
 Un puerto es opcional: vale la pena cuando el adaptador podría cambiar o hay que reemplazarlo en los tests, como
 el almacenamiento. `SkynetService` (`combat/application`) importa el cliente de Jev de `combat/infrastructure/`
@@ -117,9 +120,10 @@ pelea, un equipo que no repite especie), y para mostrar la regla de dependencia,
    `TeamPreviewService`, que arranca la cuenta regresiva de cada partido). Cuando una pelea de torneo termina, la
    pelea no llama al torneo: `LiveBattleService` publica `matchFinished` en `ArenaEvents` y el torneo, que está
    suscrito, avanza la llave.
-6. **Los modelos de lectura solo leen.** `stats` arma la página con consultas de solo lectura
+6. **Los modelos de lectura no guardan nada.** `stats` arma la página con consultas de solo lectura
    (`TrainersService.all()`, `ArenaQueries`). En un sistema grande tendría su propia proyección alimentada por
-   eventos; acá sería exagerado.
+   eventos; acá sería exagerado. Los logros desbloquean entrenadores y artículos de la tienda, pero comprar,
+   equipar y cambiar el look se lo pide a `TrainersService` (regla 2).
 
 ## 4. Recorrido de una petición
 
@@ -244,6 +248,12 @@ build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de 
   dominio; `src/architecture.spec.ts` lo revisa. Hay una excepción a propósito: la lista `INERT`
   (`catalog/domain/abilities.ts`) dice qué habilidades no hacen nada en Token Clash, con el texto que lee el jugador.
   Es conocimiento del motor, pero no crea ninguna flecha hacia `combat`, así que se quedó en el catálogo.
+- **La tienda entra por `stats`.** `AchievementsController` expone `GET /api/shop`, `POST /api/shop/buy` y
+  `PUT /api/me/equip`, porque comprar un entrenador pide tener al original. Esa regla es `buyBlocker`, una función
+  pura de `stats/domain/achievements.ts`, y `Trainer.buy` no la conoce. `equip` no depende de logros y podría pasar
+  a `TrainersController`.
+- **`combat` lleva cosméticos.** `BattleState` guarda el entrenador, el marco y la Poké Ball de cada lado para que
+  la vista los muestre. Son datos de presentación de la arena; el motor no los usa para pelear.
 - **El estado en vivo no se guarda.** Peleas, presencia y chat viven en memoria por diseño: es un juego entre
   amigos y retomar una pelea a medias tras un reinicio no vale la complejidad.
 

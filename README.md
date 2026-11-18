@@ -5,6 +5,13 @@ Batallas por turnos entre jugadores con los Pokémon que cada uno crió en
 
 En vivo: **https://clash.mirrordev.xyz**
 
+**Índice:** [Cómo se juega](#cómo-se-juega) · [Combate](#combate) · [Pokémon (PokeAPI)](#pokémon-pokeapi) ·
+[Créditos](#créditos) · [Desarrollo](#desarrollo) · [Dónde está cada cosa](#dónde-está-cada-cosa) ·
+[Datos](#datos) · [Deploy](#deploy-podman--cloudflare-tunnel)
+
+¿Vas a cambiar el código? Empieza por [Dónde está cada cosa](#dónde-está-cada-cosa), las convenciones de
+[AGENTS.md](AGENTS.md) y la estructura de [ARQUITECTURA.md](ARQUITECTURA.md).
+
 ## Cómo se juega
 
 1. En PokeTokenBar: Ajustes → Backup & Transfer → Exportar (`PokeTokenBar-Save-YYYY-MM-DD.json`).
@@ -40,7 +47,7 @@ En vivo: **https://clash.mirrordev.xyz**
      con Pikachu, Cynthia Garchomp…); las demás se ganan con especies del tipo de su color (Carmesí → Fuego, Zafiro →
      Agua…) o se compran en la tienda, más caras y pidiendo primero al original si este es difícil. `npm run variants`
      las replanifica (`scripts/plan-trainer-variants.mjs` escribe `public/trainer-variants.js`) y las genera.
-     Hay además 22 variantes de colores generadas al instalar (`TRAINER_VARIANTS` en `public/trainer-sprites.js`):
+     De esas, 22 están definidas a mano (`HANDMADE_VARIANTS` en `public/trainer-sprites.js`):
      las de personajes de la historia piden desbloquear al original y tener a su Pokémon emblemático (Red Amarillo
      con Pikachu, Lance Esmeralda con Rayquaza, Cynthia Garchomp, Maxie Aqua con Kyogre…), y las de protagonistas,
      Nate, Rosa y Leon se venden en la tienda, más caras cuanto más difícil es el original. Ese sprite, en chico, es tu foto de perfil; en las peleas tu entrenador y el
@@ -194,21 +201,58 @@ npm run db:generate  # tras cambiar un *.schema.ts: genera la migración SQL en 
 
 Node 22.13 o más (usa `node:sqlite`, que viene con Node: no hay módulos nativos que compilar).
 
+### Dónde está cada cosa
+
+Por carpeta:
+
 | Carpeta | Qué hay |
 | --- | --- |
-| `src/catalog/` | Especies, movimientos, habilidades y tipos de PokeAPI (`data/*.json`) y la Pokédex. Solo datos y reglas puras. |
+| `src/catalog/` | Especies, movimientos, habilidades y tipos de PokeAPI (`data/*.json`), la Pokédex y las listas que comparte con el navegador: la tienda y los entrenadores. Solo datos y reglas puras. |
 | `src/combat/` | El motor de batalla, la elección de 3, el sorteo aleatorio, la IA y Skynet (cliente y proxy de Jev). |
-| `src/trainers/` | Entrenadores: importar el save, la colección, el equipo, la sesión. Dueño de `trainers` y `roster_entries`. |
+| `src/trainers/` | Entrenadores: importar el save, la colección, el equipo, la sesión, el saldo, lo comprado y el reciclaje. Dueño de `trainers` y `roster_entries`. |
 | `src/arena/` | Salas 1 contra 1, emparejamiento, peleas en vivo y torneos. Dueño de `challenges` y `tournament*`. |
 | `src/chat/` | El chat de salas y torneos (en memoria). |
-| `src/stats/` | La página de stats: solo lee de los otros dominios. |
+| `src/stats/` | La página de stats y los logros. No guarda nada: los cambios del entrenador se los pide a `TrainersService`. |
 | `src/realtime/` | El protocolo WebSocket (`/ws`). |
 | `src/web/` | El frontend estático y los health checks. |
 | `src/shared/` | Configuración, errores de dominio, HTTP (guards, filtro de errores) y la base de datos. |
 | `src/legacy/` | La migración única desde `data/db.json`. |
+| `src/architecture.spec.ts` | El test que hace cumplir la regla de dependencia entre capas y dominios. |
 | `drizzle/` | Migraciones SQL generadas por drizzle-kit; la app las aplica al arrancar. |
 | `src/**/*.spec.ts` | Tests unitarios (`node:test`), al lado del código que prueban. |
 | `test/` | Tests e2e (`*.e2e-spec.ts`: levantan la app entera), los del frontend (`test/web/`, en JS) y el save de ejemplo (`fixtures/`). |
+| `public/` | El frontend: `index.html`, `style.css`, `app.js` (toda la interfaz) y un módulo por tema. |
+| `scripts/` | Descargas e importaciones de datos externos (detalle abajo). |
+| `deploy/` | Imagen, contenedores, redes y el deploy automático (ver [Deploy](#deploy-podman--cloudflare-tunnel)). |
+
+Por tema:
+
+| Tema | Reglas (servidor) | Entrada | Navegador |
+| --- | --- | --- | --- |
+| Importar el save | `src/trainers/domain/save-file.ts` | `POST /api/import` en `trainers/interface/trainers.controller.ts` | `public/savestore.js`, `public/savepatch.js` (save editado) |
+| Colección, equipo, movimientos | `src/trainers/domain/trainer.ts` | `PUT /api/me`, `PUT /api/me/mons/:id` | `public/app.js` |
+| Pokédex | `src/catalog/domain/pokedex.ts` | `GET /api/pokedex` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
+| Motor de batalla | `src/combat/domain/battle.ts` (mapa de archivos al principio), `move-rules.ts`, `ability-effects.ts` | WebSocket, por la arena | `public/battle-anims.js`, `public/fx.js` |
+| IA y Skynet | `src/combat/domain/ai.ts`, `src/combat/application/skynet.service.ts`, `src/combat/infrastructure/jev/` | | |
+| Salas y emparejamiento | `src/arena/domain/challenge.ts`, `lobby.ts` | `arena/interface/challenges.controller.ts` | `public/app.js` |
+| Pelea en vivo (fases de la sala) | `src/arena/application/duel.service.ts`, `team-preview.service.ts`, `live-battle.service.ts`, `presence.ts`; lo que ve cada cliente, en `room-frames.ts` | `src/realtime/game.gateway.ts`, mensajes en `client-messages.ts` | `public/app.js`, `public/battle-anims.js` |
+| Torneos | `src/arena/domain/tournament.ts`, `arena/application/tournaments.service.ts` | `arena/interface/tournaments.controller.ts` | `public/app.js` |
+| Chat | `src/chat/domain/chat.ts`, canales en `arena/application/arena-chat.service.ts` | WebSocket | `public/app.js` |
+| Ranking y stats | `src/trainers/domain/ranking.ts`, `src/stats/application/server-stats.ts` | `GET /api/stats` en `stats/interface/stats.controller.ts`, `GET /api/leaderboard` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
+| Logros y entrenador del perfil | `src/stats/domain/achievements.ts` | `GET /api/me/achievements`, `PUT /api/me/look` en `stats/interface/achievements.controller.ts` | `public/trainer-sprites.js` |
+| Variantes de colores de entrenadores | `public/trainer-sprites.js` (a mano), `public/trainer-variants.js` (lo genera `scripts/plan-trainer-variants.mjs`); `scripts/sync-trainers.js` pinta los sprites al instalar | | `public/app.js` |
+| Tienda | artículos y precios en `public/shop.js` (tipados en `src/catalog/domain/shop.ts`); saldo y compra en `src/trainers/domain/trainer.ts`; "pide al original" en `src/stats/domain/achievements.ts` | `GET /api/shop`, `POST /api/shop/buy`, `PUT /api/me/equip` en `stats/interface/achievements.controller.ts`, con los DTOs de `trainers/interface/dto/shop.dto.ts` | `public/shop.js`, `public/app.js` (la tienda está en `/perfil`) |
+| Tipos y efectividad | `public/types.js` (lo comparten servidor y navegador) | | |
+| Escenario de batalla y sprites de Pokémon | | | `public/backgrounds.js`, `public/creature.js` |
+| Reciclaje de repetidos | `src/trainers/domain/recycling.ts` (cuánto vale cada uno), `Trainer.recycle` en `trainer.ts`; los repetidos salen de `save-file.ts` | `GET` y `POST /api/me/recycling` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
+| Efectos al abrir la Poké Ball | | | `public/ball-fx.js` (efecto por Ball y rareza), `public/ball-burst.js` (los dibuja en un canvas) |
+| Música, radio y sonidos | | | `public/music.js`, `public/radio.js`, `public/fx.js` |
+| Notificaciones | | | `public/notify.js` |
+| Configuración y variables de entorno | `src/shared/config/app-config.ts` | | |
+| Seguridad HTTP y límites | `src/shared/http/` | | |
+| Base de datos | `*/infrastructure/*.schema.ts`, `src/shared/infrastructure/database/` | | |
+| CI | `.github/workflows/ci.yml` (`npm test` y la imagen) | | |
+
 
 Datos externos:
 

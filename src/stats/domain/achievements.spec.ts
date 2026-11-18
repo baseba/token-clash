@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isUnlocked, recordOf, spriteProgress, UNLOCKS } from './achievements.js';
+import { buyBlocker, isUnlocked, lookBlocker, recordOf, spriteProgress, UNLOCKS } from './achievements.js';
 import { isShopTrainer, STARTER_SPRITES, TRAINER_SPRITES } from '../../catalog/domain/trainer-sprites.js';
 
 const IV = { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 };
@@ -150,4 +150,26 @@ test('a trainer with several ways to unlock lists all of them, not only the clos
   const cyrus = spriteProgress(record()).find((p) => p.key === 'cyrus')!;
   assert.equal(cyrus.ways.length, 2);
   assert.ok(cyrus.ways.some((way) => JSON.stringify(way) === JSON.stringify(cyrus.goals)), 'the closest way is one of them');
+});
+
+test('the shop sells a color variant only once its original trainer is unlocked', () => {
+  const irisCrown = { id: 't4', status: 'finished', size: 4, champion: 0, seats: [{ id: 'me' }] };
+  assert.equal(buyBlocker(record(), 'trainer:iris__sapphire'), 'Primero desbloquea al entrenador original.');
+  assert.equal(buyBlocker(record({ tournaments: [irisCrown] }), 'trainer:iris__sapphire'), null);
+  assert.equal(buyBlocker(record(), 'ball:gb'), null, 'an item with no original is never blocked here');
+  assert.equal(buyBlocker(record(), 'ball:nope'), null, 'an unknown item is left for the purchase itself to reject as not found');
+});
+
+test('a look is blocked while locked, with a message that says how to get it', () => {
+  const ground = record({ roster: GROUND.slice(0, 3).map((id) => entry(id)) });
+  assert.equal(lookBlocker(record(), undefined, 'giovanni'), 'Todavía no desbloqueas a ese entrenador.');
+  assert.equal(lookBlocker(record(), undefined, 'jacinthe_holo'), 'Ese entrenador se compra en tu perfil.');
+  assert.equal(lookBlocker(ground, undefined, 'giovanni'), null);
+  assert.equal(lookBlocker(record(), null, 'hiker'), null, 'starters are always free');
+});
+
+test('the look a player already wears is never blocked, even if it is locked for them now', () => {
+  assert.equal(lookBlocker(record(), 'giovanni', 'giovanni'), null);
+  assert.equal(lookBlocker(record(), 'jacinthe_holo', 'jacinthe_holo'), null);
+  assert.equal(lookBlocker(record(), 'jacinthe_holo', 'giovanni'), 'Todavía no desbloqueas a ese entrenador.');
 });
