@@ -380,6 +380,32 @@ test('public rooms are listed and a matching search joins them; private ones sta
   assert.notEqual(page1.challenges[0].id, page2.challenges[0].id);
 });
 
+test('the shop sells, equips and guards what is still locked', async () => {
+  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Clienta', save }, ip: '10.9.0.3' })).data;
+  const shop = await call('/api/shop', { token });
+  assert.equal(shop.status, 200);
+  assert.equal(shop.data.shop.items.find((item: any) => item.id === 'window:sapphire').owned, false);
+  assert.equal(shop.data.shop.items.find((item: any) => item.id === 'trainer:iris__sapphire').available, false);
+  const achievements = await call('/api/me/achievements', { token });
+  assert.equal(achievements.status, 200);
+  assert.ok(achievements.data.sprites.some((sprite: any) => sprite.key === 'iris' && !sprite.unlocked));
+
+  const rejected = async (path: string, method: string, body: unknown) => {
+    const { status, data } = await call(path, { method, token, body });
+    return [status, data];
+  };
+  assert.deepEqual(await rejected('/api/shop/buy', 'POST', { item: 'ball:nope' }), [404, { error: 'Ese artículo no existe.' }]);
+  assert.deepEqual(await rejected('/api/shop/buy', 'POST', { item: 'trainer:iris__sapphire' }), [403, { error: 'Primero desbloquea al entrenador original.' }]);
+  assert.deepEqual(await rejected('/api/me/equip', 'PUT', { kind: 'window', key: 'sapphire' }), [403, { error: 'Primero cómpralo en la tienda.' }]);
+  assert.deepEqual(await rejected('/api/me/look', 'PUT', { avatar: 'iris' }), [403, { error: 'Todavía no desbloqueas a ese entrenador.' }]);
+
+  const bought = await call('/api/shop/buy', { method: 'POST', token, body: { item: 'window:sapphire' } });
+  assert.equal(bought.status, 200);
+  assert.ok(bought.data.shop.owned.includes('window:sapphire'));
+  assert.equal((await call('/api/me/equip', { method: 'PUT', token, body: { kind: 'window', key: 'sapphire' } })).status, 200);
+  assert.equal((await call('/api/me', { token })).data.me.shop.equipped.window, 'sapphire');
+});
+
 test('bad uploads get a clear error', async () => {
   const r = await call('/api/import', { method: 'POST', body: { name: 'X', save: '{"hello":1}' } });
   assert.equal(r.status, 400);
