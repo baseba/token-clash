@@ -215,7 +215,7 @@ async function resolveManifest(anims, failed) {
 const failure = (what, failed) => new Error(`No se pudieron procesar ${failed.length} ${what}: ${failed.slice(0, 10).join(', ')}${failed.length > 10 ? '…' : ''}`);
 
 /**
- * @throws {Promise<Error>} si algún recurso no se pudo descargar o el manifiesto no lo ubica
+ * @throws {Promise<Error>} if a resource can't be downloaded or the manifest can't place it
  */
 export async function syncBattleAnims({ writeManifest = false, log = (msg) => process.stderr.write(`${msg}\n`) } = {}) {
   for (const dir of [UI, MUSIC, new URL('./', CUES)]) mkdirSync(dir, { recursive: true });

@@ -5,12 +5,12 @@ import { upstreamURLs } from '../public/upstream.js';
 const HEADERS = { 'user-agent': 'token-clash-importer' };
 const CONCURRENCY = 32;
 
-/** A fetch that retries network errors and server failures. A 404 is an answer, not a failure. */
-export async function fetchRetry(url, init = {}, tries = 4) {
+/** A fetch that retries network errors and server failures. A status in `answers` is an answer, not a failure. */
+export async function fetchRetry(url, init = {}, { tries = 4, answers = [404] } = {}) {
   for (let attempt = 1; ; attempt++) {
     try {
       const response = await fetch(url, { ...init, headers: HEADERS });
-      if (response.ok || response.status === 404) return response;
+      if (response.ok || answers.includes(response.status)) return response;
       throw new Error(`${response.status} ${url}`);
     } catch (error) {
       if (attempt >= tries) throw error;
@@ -22,7 +22,8 @@ export async function fetchRetry(url, init = {}, tries = 4) {
 /** A file of an upstream repo at its pinned commit. If jsDelivr doesn't have it, raw GitHub's answer is final. */
 export async function fetchUpstream(upstream, path, init) {
   const [jsdelivr, raw] = upstreamURLs(upstream, path);
-  const response = await fetchRetry(jsdelivr, init).catch(() => null);
+  // jsDelivr answers 403 for a while when a repo goes over its size limit; raw GitHub has the file.
+  const response = await fetchRetry(jsdelivr, init, { answers: [403, 404] }).catch(() => null);
   return response?.ok ? response : fetchRetry(raw, init);
 }
 
