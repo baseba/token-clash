@@ -35,7 +35,8 @@ export interface TrainerState {
   recycled?: RecycledRecord[];
 }
 
-export type EquipKind = 'ball' | 'window' | 'frame';
+export const EQUIP_KINDS = ['ball', 'window', 'frame'] as const;
+export type EquipKind = (typeof EQUIP_KINDS)[number];
 export type Equipped = Partial<Record<EquipKind, string>>;
 
 const RARITY_RANK = { legendary: 3, rare: 2, uncommon: 1, common: 0 } as const;
