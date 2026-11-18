@@ -847,10 +847,9 @@ renderSound();
 let spritesRetry = null;
 function retrySprites() {
   if (spritesLoaded() || spritesRetry) return;
-  spritesRetry = loadSprites().then(() => {
-    spritesRetry = null;
-    if (spritesLoaded() && !unsaved?.()) route();
-  });
+  spritesRetry = loadSprites()
+    .finally(() => (spritesRetry = null))
+    .then(() => spritesLoaded() && !unsaved?.() && route(), () => {});
 }
 
 function route() {
