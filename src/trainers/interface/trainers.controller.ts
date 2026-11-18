@@ -12,7 +12,8 @@ import { ImportSaveDto } from './dto/import-save.dto.js';
 import { UpdateMonDto } from './dto/update-mon.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { Authenticated, CurrentTrainer, MaybeAuthenticated } from './session.guard.js';
-import { monDetail, myView, trainerSummary } from './trainer.presenter.js';
+import { monDetail, myView, recyclingView, trainerSummary } from './trainer.presenter.js';
+import { RecycleDto } from './dto/recycle.dto.js';
 
 @Controller('api')
 export class TrainersController {
@@ -29,6 +30,21 @@ export class TrainersController {
   import(@CurrentTrainer() current: Trainer | undefined, @Body({ schema: ImportSaveDto }) body: ImportSaveDto) {
     const { token, trainer } = this.trainers.importSave(current, body);
     return { token, me: myView(trainer, this.skynet.aiLevels) };
+  }
+
+  @Get('me/recycling')
+  @Authenticated()
+  recycling(@CurrentTrainer() trainer: Trainer) {
+    return { recycling: recyclingView(trainer) };
+  }
+
+  @Post('me/recycling')
+  @HttpCode(200)
+  @RateLimit({ bucket: 'recycle', by: 'trainer', max: 120, windowMs: 60_000, message: 'Más despacio con la trituradora.' })
+  @Authenticated()
+  recycle(@CurrentTrainer() trainer: Trainer, @Body({ schema: RecycleDto }) body: RecycleDto) {
+    const record = this.trainers.recycle(trainer, body.entry);
+    return { tokens: record.tokens, recycling: recyclingView(trainer) };
   }
 
   @Get('me')

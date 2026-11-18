@@ -49,7 +49,7 @@ export class AchievementsService {
 
   /** @throws {DomainError} the look is still locked, or is not a trainer sprite */
   chooseLook(trainer: Trainer, key: string): Trainer {
-    if (key !== trainer.avatar && !isUnlocked(this.recordFor(trainer), key)) throw forbidden(isShopTrainer(key) ? 'Ese entrenador se compra en la tienda.' : 'Todavía no desbloqueas a ese entrenador.');
+    if (key !== trainer.avatar && !isUnlocked(this.recordFor(trainer), key)) throw forbidden(isShopTrainer(key) ? 'Ese entrenador se compra en tu perfil.' : 'Todavía no desbloqueas a ese entrenador.');
     return this.trainers.updateProfile(trainer, { avatar: key });
   }
 }

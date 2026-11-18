@@ -60,7 +60,7 @@ test('only bought items can be equipped, and taking one off goes back to the def
 
 test('a shop trainer must be bought to be picked; one picked before it went on sale is swapped for a free one', () => {
   const ana = withTokens(2_000_000_000);
-  assert.throws(() => ana.chooseAvatar('jacinthe_holo'), /tienda/);
+  assert.throws(() => ana.chooseAvatar('jacinthe_holo'), /se compra en tu perfil/);
   ana.buy('trainer:jacinthe_holo');
   ana.chooseAvatar('jacinthe_holo');
   assert.equal(ana.releaseShopLook(), false);

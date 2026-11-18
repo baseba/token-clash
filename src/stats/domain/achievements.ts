@@ -233,7 +233,7 @@ function buildUnlocks(): Map<string, Unlock> {
     const original = unlocks.get(variant.base);
     const partner = GENERATED_PARTNERS[variant.key];
     if (original) add([variant.key], { group: 'variant', title, ways: original.ways.map((way) => [...way, partner ? ownsSpecies(partner) : ofType(type, VARIANT_TYPE_COUNT.locked)]) });
-    else if (isShopTrainer(variant.base)) add([variant.key], { group: 'variant', title, ways: [[(r) => goal(`Tener a ${displayName(variant.base)}, de la tienda`, r.owned.includes(`trainer:${variant.base}`), 1), ofType(type, VARIANT_TYPE_COUNT.shop)]] });
+    else if (isShopTrainer(variant.base)) add([variant.key], { group: 'variant', title, ways: [[(r) => goal(`Tener a ${displayName(variant.base)}, comprado en tu perfil`, r.owned.includes(`trainer:${variant.base}`), 1), ofType(type, VARIANT_TYPE_COUNT.shop)]] });
     else add([variant.key], { group: 'variant', title, ways: [[ofType(type, VARIANT_TYPE_COUNT.free)]] });
   }
   return unlocks;
@@ -258,7 +258,7 @@ export function spriteProgress(record: PlayerRecord): SpriteProgress[] {
     if (isShopTrainer(key)) {
       const item = shopItemOf('trainer', key)!;
       const owned = record.owned.includes(item.id);
-      const buy = { text: `Comprarlo en la tienda por ${(item.price / 1_000_000).toLocaleString('es')} M de tokens`, have: owned ? 1 : 0, need: 1 };
+      const buy = { text: `Comprarlo en tu perfil por ${(item.price / 1_000_000).toLocaleString('es')} M de tokens`, have: owned ? 1 : 0, need: 1 };
       const first = item.requires ? [{ text: `Desbloquear primero a ${displayName(item.requires)}`, have: owned || isUnlocked(record, item.requires) ? 1 : 0, need: 1 }] : [];
       const goals = [...first, buy];
       return { key, group: 'shop', title: `Tienda · ${RARITIES[item.rarity].label}`, unlocked: owned, goals, ways: [goals] };

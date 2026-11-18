@@ -18,14 +18,19 @@ En vivo: **https://clash.mirrordev.xyz**
      que tienes muestran sprite, stats base y línea evolutiva; una preevolución de algo que tienes también queda
      registrada. Cada una tiene un switch para verla shiny si la tienes shiny.
    - **Stats:** tus batallas y torneos, el ranking y las stats del servidor.
-   - **Tienda** (`/tienda`, con el tema de la GTS de fondo): gastas los tokens que usas desde que abrió la tienda
-     (se suman al actualizar tu save) en cosméticos: Poké Balls para lanzar tus Pokémon (Super, Ultra, Lujo, Rogue y
+   - **Reciclaje** (`/reciclaje`): los Pokémon repetidos de tu save (copias de una especie y variante que ya tienes;
+     la colección se queda con la primera) se arrastran a una trituradora que los convierte en tokens, más mientras
+     más raros y el triple si son shiny. Cada repetido se recicla una sola vez: queda en un registro aunque vuelvas
+     a subir el save.
+   - **Perfil** (`/perfil`, con el tema de la GTS de fondo; `/tienda` redirige aquí): arriba tu foto, tu nombre
+     (editable) y tu saldo, y debajo la tienda por categorías. Gastas los tokens que usas desde que abrió la tienda
+     (se suman al actualizar tu save) y los que ganas reciclando, en cosméticos: Poké Balls para lanzar tus Pokémon (Super, Ultra, Lujo, Rogue y
      Master de PokeRogue, seis propias generadas al instalar cambiando la paleta de la Poké Ball y once variantes de
      colores de la Super, Ultra, Lujo, Rogue y Master, que cambian el tono de cada parte sin perder el sombreado), 14 marcos de
      ventana para el texto de tus peleas, 14 marcos para tu foto de perfil y 35 entrenadores. Los precios van por rareza: Común 100 M, Raro 300 M, Épico 800 M, Legendario 2.000 M y Mítico
      5.000 M. Nada cambia cómo pelean tus Pokémon.
-   - **Perfil** (`/perfil`): cambias tu nombre y eliges tu entrenador entre los ~300 sprites de PokeRogue (con
-     buscador y filtros por categoría y género). Las clases de entrenador, protagonistas y soldados están libres;
+   - **Entrenadores** (pestaña del perfil): eliges tu entrenador entre los ~300 sprites de PokeRogue y sus
+     variantes (con buscador y filtros por categoría y género). Las clases de entrenador, protagonistas y soldados están libres;
      el resto se desbloquea con logros (`src/stats/domain/achievements.ts`): líderes de gimnasio con 3, 6, 10 y 15
      especies de su tipo (el último, además, con un shiny del tipo), el Alto Mando con 12 de su tipo y 10 victorias
      contra jugadores, los campeones con la Pokédex regional, torneos, rachas y el ranking, los villanos ganándole a

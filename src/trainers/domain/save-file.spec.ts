@@ -89,3 +89,20 @@ test('a team never carries the shiny and the plain one of a species together', (
   const roster: any[] = [{ id: 'p1', finalID: 25 }, { id: 's1', finalID: 25, shiny: true }, { id: 'b', finalID: 1 }];
   assert.deepEqual(carryTeam(['s1', 'b', 'p1'], roster, roster), ['s1', 'b']);
 });
+
+test('repeated copies of a species and variant are kept aside as duplicates, not in the roster', () => {
+  const save = JSON.parse(text);
+  const venusaur = save.state.dex.find((seen: { finalID: number }) => seen.finalID === 3);
+  venusaur.caughtAt = '2024-01-01T00:00:00Z';
+  const repeat = '22222222-2222-3333-4444-555555555555';
+  const shiny = '33333333-2222-3333-4444-555555555555';
+  save.state.dex.push({ ...venusaur, id: repeat, caughtAt: '2025-01-01T00:00:00Z' }, { ...venusaur, id: shiny, isShiny: true, caughtAt: '2025-01-02T00:00:00Z' });
+  const { roster, duplicates } = parseSave(JSON.stringify(save));
+  assert.ok(roster.some((e) => e.id === venusaur.id), 'the first one caught stays in the roster');
+  assert.ok(roster.some((e) => e.id === shiny), 'a shiny is a different variant, not a repeat');
+  assert.deepEqual(duplicates.map((d) => [d.id, d.finalID, d.shiny]), [[repeat, 3, false]]);
+});
+
+test('a save with no repeats has no duplicates', () => {
+  assert.deepEqual(parseSave(text).duplicates, []);
+});

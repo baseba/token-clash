@@ -4,6 +4,7 @@ import { abilityOptions, lineageLearnset, moveOrigins, speciesData } from '../..
 import { buildFighter, movepool, movesetFor, validMoveset, MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import type { Trainer } from '../domain/trainer.js';
+import { recycleReward } from '../domain/recycling.js';
 import { SHOP_ITEMS } from '../../catalog/domain/shop.js';
 
 export function trainerSummary(trainer: Trainer) {
@@ -37,11 +38,22 @@ export function saveEdit(entry: RosterEntry) {
 }
 
 export function shopSummary(trainer: Trainer) {
-  return { balance: trainer.balance, earned: trainer.earned, spent: trainer.shopSpent ?? 0, total: trainer.totalTokens, updatedAt: trainer.updatedAt ?? null, owned: trainer.owned ?? [], equipped: { ball: trainer.ball, window: trainer.equipped?.window ?? null, frame: trainer.equipped?.frame ?? null } };
+  return { balance: trainer.balance, earned: trainer.earned, recycled: trainer.recycledTokens, spent: trainer.shopSpent ?? 0, total: trainer.totalTokens, updatedAt: trainer.updatedAt ?? null, owned: trainer.owned ?? [], equipped: { ball: trainer.ball, window: trainer.equipped?.window ?? null, frame: trainer.equipped?.frame ?? null } };
 }
 
 export function shopView(trainer: Trainer) {
   return { ...shopSummary(trainer), avatar: trainer.look, items: SHOP_ITEMS.map((item) => ({ ...item, owned: trainer.owns(item.id) })) };
+}
+
+const recycledMon = ({ id, finalID, rarity, shiny }: Pick<RosterEntry, 'id' | 'finalID' | 'rarity' | 'shiny'>) => ({ id, name: speciesData(finalID)?.name ?? `#${finalID}`, sprite: String(finalID), rarity, shiny });
+
+/** What the recycling tab shows: the repeats left to shred and what already went through. */
+export function recyclingView(trainer: Trainer) {
+  return {
+    ...shopSummary(trainer),
+    duplicates: trainer.recyclable.map((duplicate) => ({ ...recycledMon(duplicate), level: duplicate.level, tokens: recycleReward(duplicate) })),
+    history: [...(trainer.recycled ?? [])].reverse().map((record) => ({ ...recycledMon(record), tokens: record.tokens, at: record.at })),
+  };
 }
 
 /** The logged-in trainer, with their whole collection. */
