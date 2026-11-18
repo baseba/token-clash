@@ -209,7 +209,7 @@ Por carpeta:
 | --- | --- |
 | `src/catalog/` | Especies, movimientos, habilidades y tipos de PokeAPI (`data/*.json`), la Pokédex y las listas que comparte con el navegador: la tienda y los entrenadores. Solo datos y reglas puras. |
 | `src/combat/` | El motor de batalla, la elección de 3, el sorteo aleatorio, la IA y Skynet (cliente y proxy de Jev). |
-| `src/trainers/` | Entrenadores: importar el save, la colección, el equipo, la sesión, el saldo y lo comprado. Dueño de `trainers` y `roster_entries`. |
+| `src/trainers/` | Entrenadores: importar el save, la colección, el equipo, la sesión, el saldo, lo comprado y el reciclaje. Dueño de `trainers` y `roster_entries`. |
 | `src/arena/` | Salas 1 contra 1, emparejamiento, peleas en vivo y torneos. Dueño de `challenges` y `tournament*`. |
 | `src/chat/` | El chat de salas y torneos (en memoria). |
 | `src/stats/` | La página de stats y los logros. No guarda nada: los cambios del entrenador se los pide a `TrainersService`. |
@@ -241,9 +241,11 @@ Por tema:
 | Ranking y stats | `src/trainers/domain/ranking.ts`, `src/stats/application/server-stats.ts` | `GET /api/stats` en `stats/interface/stats.controller.ts`, `GET /api/leaderboard` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
 | Logros y entrenador del perfil | `src/stats/domain/achievements.ts` | `GET /api/me/achievements`, `PUT /api/me/look` en `stats/interface/achievements.controller.ts` | `public/trainer-sprites.js` |
 | Variantes de colores de entrenadores | `public/trainer-sprites.js` (a mano), `public/trainer-variants.js` (lo genera `scripts/plan-trainer-variants.mjs`); `scripts/sync-trainers.js` pinta los sprites al instalar | | `public/app.js` |
-| Tienda | artículos y precios en `public/shop.js` (tipados en `src/catalog/domain/shop.ts`); saldo y compra en `src/trainers/domain/trainer.ts`; "pide al original" en `src/stats/domain/achievements.ts` | `GET /api/shop`, `POST /api/shop/buy`, `PUT /api/me/equip` en `stats/interface/achievements.controller.ts`, con los DTOs de `trainers/interface/dto/shop.dto.ts` | `public/shop.js`, `public/app.js` |
+| Tienda | artículos y precios en `public/shop.js` (tipados en `src/catalog/domain/shop.ts`); saldo y compra en `src/trainers/domain/trainer.ts`; "pide al original" en `src/stats/domain/achievements.ts` | `GET /api/shop`, `POST /api/shop/buy`, `PUT /api/me/equip` en `stats/interface/achievements.controller.ts`, con los DTOs de `trainers/interface/dto/shop.dto.ts` | `public/shop.js`, `public/app.js` (la tienda está en `/perfil`) |
 | Tipos y efectividad | `public/types.js` (lo comparten servidor y navegador) | | |
 | Escenario de batalla y sprites de Pokémon | | | `public/backgrounds.js`, `public/creature.js` |
+| Reciclaje de repetidos | `src/trainers/domain/recycling.ts` (cuánto vale cada uno), `Trainer.recycle` en `trainer.ts`; los repetidos salen de `save-file.ts` | `GET` y `POST /api/me/recycling` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
+| Efectos al abrir la Poké Ball | | | `public/ball-fx.js` (efecto por Ball y rareza), `public/ball-burst.js` (los dibuja en un canvas) |
 | Música, radio y sonidos | | | `public/music.js`, `public/radio.js`, `public/fx.js` |
 | Notificaciones | | | `public/notify.js` |
 | Configuración y variables de entorno | `src/shared/config/app-config.ts` | | |
