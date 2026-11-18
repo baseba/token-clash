@@ -1481,3 +1481,9 @@ body[data-watching="true"] .match-count { color: #5ec8ff; }
 .unlock-version.is-locked { border-style: dashed; }
 .unlock-version.is-locked small { color: var(--muted); }
 .unlock-version.is-current { border-color: var(--accent, #f7c948); }
+.shop-try { margin-top: .35rem; font-size: .72rem; }
+.shop-preview-body { width: min(560px, 92vw); }
+.shop-arena { max-width: 100%; margin: .6rem 0; }
+.win-moves .move { border-color: color-mix(in srgb, var(--win-edge) 22%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--win-deep) 18%, var(--card-2)), var(--card-2)); }
+.win-moves .move:hover:not(:disabled) { border-color: var(--win-edge); box-shadow: 0 0 0 1px color-mix(in srgb, var(--win-edge) 40%, transparent), 0 0 12px color-mix(in srgb, var(--win-edge) 25%, transparent); }
+.win-moves .move .mv { color: color-mix(in srgb, var(--win-edge) 18%, var(--text)); }

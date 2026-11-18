@@ -51,3 +51,12 @@ test('the shop sells at least twice as many balls, windows and frames as at firs
   for (const ball of [...CUSTOM_BALLS, ...BALL_VARIANTS]) assert.match(ball.key, /^[a-z]{2}$/);
   assert.ok(count('ball') >= 20);
 });
+
+test('every Ball on sale has an opening effect themed on it, as rich as its rarity', async () => {
+  const { ballFx, BALL_FX_KEYS } = await import('../../public/ball-fx.js');
+  const balls = SHOP_ITEMS.filter((item) => item.kind === 'ball');
+  assert.deepEqual([...BALL_FX_KEYS].sort(), balls.map((ball) => ball.key).sort());
+  for (const ball of balls) assert.equal(ballFx(ball.key).rarity, ball.rarity, ball.key);
+  assert.ok(ballFx('md').tier > ballFx('gb').tier);
+  assert.equal(ballFx('pb'), null, 'the free Poké Ball keeps the PokeRogue sparkles');
+});

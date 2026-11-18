@@ -1092,6 +1092,15 @@ const FREE_ITEMS = [
   { id: 'frame:none', kind: 'frame', key: null, name: 'Sin marco', rarity: null, price: 0, desc: 'Tu foto, sin aro.', owned: true, free: true },
 ];
 
+const BALL_FX_NOTE = {
+  free: 'los destellos clásicos de PokeRogue.',
+  common: 'un anillo de partículas con el tema de la Ball.',
+  rare: 'partículas, un destello central y detalles que se mueven según su tema.',
+  epic: 'doble anillo, más detalles y, si es oscura, una sombra que envuelve el campo.',
+  legendary: 'todo lo anterior más una onda expansiva.',
+  mythic: 'todo lo anterior más rayos de luz y una lluvia de destellos.',
+};
+
 function shopPreview(item) {
   if (item.kind === 'ball') return h('span', { class: 'shop-ball' }, h('img', { src: `/anims/ui/${item.key}.png?v=dev`, alt: '', draggable: 'false' }), h('img', { src: `/anims/ui/${item.key}_open.png?v=dev`, alt: '', draggable: 'false' }));
   if (item.kind === 'window') return h('span', { class: `say-sample${item.key ? ` win-theme win-${item.key}` : ''}` }, h('b', null, '¿Qué hará tu Pokémon?'), h('small', null, 'Tu Pikachu usó Impactrueno.'));
@@ -1163,6 +1172,55 @@ async function shopPage(seq) {
     ));
     if (!confirmDlg.open) confirmDlg.showModal();
   }
+  function previewBall(item) {
+    const scene = sceneFor(`shop-${item.key}`);
+    const spot = { me: h('div', { class: 'spot me' }), foe: h('div', { class: 'spot foe' }) };
+    spot.me.innerHTML = creatureHTML({ sprite: '25' }, { back: true, eager: true });
+    spot.foe.innerHTML = creatureHTML({ sprite: '133' }, { eager: true });
+    const field = h('div', { class: 'battle-field' },
+      h('img', { class: 'arena-bg', src: scene.image, alt: '', draggable: 'false' }),
+      h('div', { class: 'battle-pad foe', 'aria-hidden': 'true' }),
+      h('div', { class: 'battle-pad me', 'aria-hidden': 'true' }),
+      spot.foe, spot.me,
+    );
+    const arena = h('div', { class: 'arena shop-arena' }, field);
+    for (const side of ['me', 'foe']) {
+      arena.style.setProperty(`--pad-${side}-fill`, scene[side][0]);
+      arena.style.setProperty(`--pad-${side}-rim`, scene[side][1]);
+    }
+    const scale = () => arena.style.setProperty('--s', String(arena.clientWidth / 320));
+    const fit = new ResizeObserver(scale);
+    fit.observe(arena);
+    const fx = createFx(arena, field);
+    let running = false;
+    const replay = h('button', { class: 'btn', type: 'button', onclick: () => run() }, '↻ Repetir');
+    async function run() {
+      if (running) return;
+      running = true;
+      replay.disabled = true;
+      for (const side of ['foe', 'me']) {
+        spot[side].classList.add('incoming');
+        music.sfx('throw');
+        await fx.sendOut(spot[side], side === 'me', () => {
+          music.sfx('switch');
+          spot[side].classList.remove('incoming');
+        }, item.key ?? 'pb');
+        await sleep(450);
+      }
+      running = false;
+      replay.disabled = false;
+    }
+    confirmDlg.replaceChildren(h('div', { class: 'confirm-body shop-preview-body' },
+      h('h2', null, label(item)),
+      arena,
+      h('p', { class: 'muted small' }, `${item.rarity ? RARITIES[item.rarity].label : 'Gratis'}: ${BALL_FX_NOTE[item.rarity ?? 'free']}`),
+      h('div', { class: 'row confirm-actions' }, h('button', { class: 'btn', type: 'button', onclick: () => confirmDlg.close() }, 'Cerrar'), replay),
+    ));
+    confirmDlg.addEventListener('close', () => fit.disconnect(), { once: true });
+    if (!confirmDlg.open) confirmDlg.showModal();
+    scale();
+    requestAnimationFrame(() => requestAnimationFrame(() => run()));
+  }
   function action(item) {
     if (!item.owned && item.available === false) return h('span', { class: 'muted small shop-locked', 'data-tip': `Desbloquea a ${trainerLabel(item.requires)} para poder comprarla` }, `🔒 Primero ${trainerLabel(item.requires)} · 🪙 ${tokensM(item.price)}`);
     if (!item.owned) {
@@ -1189,7 +1247,7 @@ async function shopPage(seq) {
       .filter((item) => (!kind || item.kind === kind) && (!hideOwned || !item.owned) && (!query || label(item).toLowerCase().includes(query)))
       .sort((a, b) => a.price - b.price || label(a).localeCompare(label(b), 'es', { numeric: true, sensitivity: 'base' }));
     grid.replaceChildren(...(items.length ? items.map((item) => h('div', { class: `shop-card${item.owned ? ' is-owned' : ''}${isEquipped(item) ? ' is-equipped' : ''}${item.rarity ? ` rarity-${item.rarity}` : ''}` },
-      h('div', { class: 'shop-preview' }, shopPreview(item)),
+      h('div', { class: 'shop-preview' }, shopPreview(item), item.kind === 'ball' ? h('button', { class: 'btn sm ghost shop-try', type: 'button', onclick: () => previewBall(item) }, '▶ Ver en combate') : null),
       h('div', { class: 'shop-info' }, h('b', null, label(item)), h('span', { class: 'row shop-tags' }, h('span', { class: `chip rarity-chip${item.rarity ? ` rarity-${item.rarity}` : ''}` }, item.rarity ? RARITIES[item.rarity].label : 'Gratis'), h('span', { class: 'muted small' }, SHOP_KINDS[item.kind])), h('small', { class: 'muted' }, item.desc)),
       h('div', { class: 'shop-action' }, action(item)),
     )) : [h('p', { class: 'muted' }, 'No hay nada con ese filtro.')]));
@@ -3645,7 +3703,8 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
   }
   const windowSkin = me?.shop?.equipped?.window;
   const skinClass = windowSkin ? ` win-theme win-${windowSkin}` : '';
-  for (const el of [els.say, els.log]) el.className += skinClass;
+  els.say.className += skinClass;
+  els.controls.className += windowSkin ? ` win-moves win-${windowSkin}` : '';
   const scene = sceneFor(c.id);
   const field = h(
     'div',
