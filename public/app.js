@@ -1,4 +1,4 @@
-import { creatureHTML, loadAnimatedSprites, preloadSprites, spriteURL } from './creature.js?v=dev';
+import { creatureHTML, loadSprites, preloadSprites, spritesLoaded, spriteURL } from './creature.js?v=dev';
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
@@ -11,6 +11,7 @@ import { TRAINER_SPRITES, TRAINER_VARIANTS, trainerSpriteFor, VARIANT_COLOR_NAME
 import { RADIO_KINDS, RADIO_REGIONS, RADIO_TRACKS, radioTrack } from './radio.js?v=dev';
 import { createNotifier } from './notify.js?v=dev';
 import { RARITIES, SHOP_KINDS } from './shop.js?v=dev';
+import { fallBackToRaw } from './upstream.js?v=dev';
 
 const $app = document.getElementById('app');
 const $who = document.getElementById('who');
@@ -841,8 +842,19 @@ function renderSound() {
 }
 renderSound();
 
+// Without the sprite manifest every Pokémon would stay blank for the session, so each navigation
+// asks for it again. One request at a time, and the repaint waits if it would drop unsaved edits.
+let spritesRetry = null;
+function retrySprites() {
+  if (spritesLoaded() || spritesRetry) return;
+  spritesRetry = loadSprites()
+    .finally(() => (spritesRetry = null))
+    .then(() => spritesLoaded() && !unsaved?.() && route(), () => {});
+}
+
 function route() {
   hideTip();
+  retrySprites();
   if (TAB_MUSIC[location.pathname]) music.play(TAB_MUSIC[location.pathname]);
   else if (location.pathname.startsWith('/t/')) music.play('tab:home');
   else if (location.pathname.startsWith('/b/')) music.play('prep');
@@ -1277,11 +1289,11 @@ async function profilePage(seq) {
 // ---------- recycling ----------
 const RECYCLE_RARITY = { common: 'Común', uncommon: 'Poco común', rare: 'Raro', legendary: 'Legendario' };
 const SHRED_SOUNDS = [
-  { url: '/sfx/moves/audio/prsfx-shift-gear.wav', at: 0, gain: 0.6 },
-  { url: '/sfx/moves/audio/prsfx-drill-run.wav', at: 120, gain: 0.55 },
-  { url: '/sfx/moves/audio/prsfx-gear-grind.wav', at: 200, gain: 0.7 },
-  { url: '/sfx/moves/audio/prsfx-crunch.wav', at: 420, gain: 0.65 },
-  { url: '/sfx/moves/audio/prsfx-pay-day1.wav', at: 950, gain: 0.7 },
+  { sound: 'prsfx-shift-gear.wav', at: 0, gain: 0.6 },
+  { sound: 'prsfx-drill-run.wav', at: 120, gain: 0.55 },
+  { sound: 'prsfx-gear-grind.wav', at: 200, gain: 0.7 },
+  { sound: 'prsfx-crunch.wav', at: 420, gain: 0.65 },
+  { sound: 'prsfx-pay-day1.wav', at: 950, gain: 0.7 },
 ];
 const SHRED_CRY_MS = 380;
 const SHRED_STRIPS = 9;
@@ -1434,6 +1446,8 @@ async function recyclingPage(seq) {
       const strip = h('span', { class: 'shred-strip' });
       Object.assign(strip.style, { left: `${(i / SHRED_STRIPS) * 100}%`, width: `${100 / SHRED_STRIPS}%`, backgroundImage: `url("${spriteUrl}")`, backgroundSize: `${SHRED_STRIPS * 100}% 100%`, backgroundPosition: `${(i / (SHRED_STRIPS - 1)) * 100}% 0` });
       output.append(strip);
+      // A CSS background never retries, so each strip follows the host the feed image loaded from.
+      feed.addEventListener('load', () => (strip.style.backgroundImage = `url("${feed.currentSrc}")`));
       const sway = (i - (SHRED_STRIPS - 1) / 2) * 11 + (Math.random() - 0.5) * 24;
       const spin = (Math.random() - 0.5) * 70;
       return strip.animate([
@@ -5048,5 +5062,6 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
   };
 }
 
+fallBackToRaw(document);
 document.querySelector('footer.credits')?.append(feedbackButton());
-loadAnimatedSprites().finally(route);
+loadSprites().finally(route);

@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { assetName, compactAnim, compactFrame, pngSize, resourcesOf } from '../../scripts/sync-battle-anims.js';
-import { animLength, causeAnim, hpTweenMs, chargeAnim, conditionAnim, moveLands, pickVariant, placeEntry, statusAnim, TARGET_GRAPHIC, TARGET_TARGET, TARGET_USER, terrainAnim, weatherAnim } from '../../public/battle-anims.js';
-import { animSoundFor, moveSfxCues, sampleFor } from '../../public/music.js';
+import { assetName, compactAnim, compactFrame, missingAssets, resourcesOf } from '../../scripts/sync-battle-anims.js';
+import { animLength, causeAnim, sheetColumns, hpTweenMs, chargeAnim, conditionAnim, moveLands, pickVariant, placeEntry, statusAnim, TARGET_GRAPHIC, TARGET_TARGET, TARGET_USER, terrainAnim, weatherAnim } from '../../public/battle-anims.js';
+import { animSoundFor, moveSfxCues, sampleFor, SOUNDS } from '../../public/music.js';
 
 const sound = (frameIndex, resourceName, volume = 100, pitch = 100) => ({ frameIndex, resourceName, volume, pitch, eventType: 'AnimTimedSoundEvent' });
 const frame = (target, x, y, focus, extra = {}) => ({ target, x, y, zoomX: 100, zoomY: 100, visible: true, opacity: 255, focus, graphicFrame: 0, ...extra });
@@ -14,7 +14,7 @@ test('frames compact to fixed arrays, with PokeRogue defaults for missing fields
   assert.deepEqual(compactFrame({ target: 1, tone: [-60, -60, -60, 0], mirror: true }).slice(-1), [[-60, -60, -60, 0]]);
 });
 
-test('an animation keeps its sheet, background events and sound cues at 50 ms per frame', () => {
+test('an animation keeps its sheet, background events and sound cues at 50 ms per frame, by their keys', () => {
   const thunderbolt = {
     graphic: 'PRAS- Electric',
     frames: [[frame(0, 0, 0, 2)], [frame(0, 0, 0, 2)]],
@@ -24,10 +24,10 @@ test('an animation keeps its sheet, background events and sound cues at 50 ms pe
       14: [sound(14, 'PRSFX- Thunderbolt1.wav', 100, 120), sound(14, '')],
     },
   };
-  const [side] = compactAnim(thunderbolt, () => 5);
-  assert.deepEqual(side.graphic, { url: '/anims/graphics/pras-electric.png', columns: 5 });
-  assert.deepEqual(side.bg, [[0, 'add', '/anims/graphics/pras-black-bg.png', 0, 0, 0, 5]]);
-  assert.deepEqual(side.sounds, [[50, '/sfx/moves/audio/prsfx-thunderbolt2.wav', 0.7, 1], [700, '/sfx/moves/audio/prsfx-thunderbolt1.wav', 1, 1.2]]);
+  const [side] = compactAnim(thunderbolt);
+  assert.equal(side.graphic, 'pras-electric');
+  assert.deepEqual(side.bg, [[0, 'add', 'pras-black-bg', 0, 0, 0, 5]]);
+  assert.deepEqual(side.sounds, [[50, 'prsfx-thunderbolt2.wav', 0.7, 1], [700, 'prsfx-thunderbolt1.wav', 1, 1.2]]);
   assert.deepEqual(resourcesOf(thunderbolt), { graphics: ['PRAS- Electric', 'PRAS- Black BG'], sounds: ['PRSFX- Thunderbolt2.wav', 'PRSFX- Thunderbolt1.wav'] });
 });
 
@@ -42,15 +42,21 @@ test('the opponent version is kept only when it differs', () => {
   assert.equal(pickVariant(null, true), null);
 });
 
-test('asset names are url-safe and PNG headers give the sheet size', () => {
+test('asset keys are url-safe and a sheet has one column per 96 pixels of width', () => {
   assert.equal(assetName('PRSFX- Thunderbolt2.wav'), 'prsfx-thunderbolt2.wav');
   assert.equal(assetName('PRAS- Black BG'), 'pras-black-bg');
-  const header = Buffer.alloc(24);
-  header.write('IHDR', 12, 'ascii');
-  header.writeUInt32BE(480, 16);
-  header.writeUInt32BE(192, 20);
-  assert.deepEqual(pngSize(header), { width: 480, height: 192 });
-  assert.equal(pngSize(Buffer.alloc(8)), null);
+  assert.equal(assetName('!'), '!', 'a name with no letters still has a key');
+  assert.equal(sheetColumns(480), 5);
+  assert.equal(sheetColumns(500), 5);
+  assert.equal(sheetColumns(40), 1);
+});
+
+test('the build fails on an animation that names a file the manifest cannot place', () => {
+  const anim = [{ graphic: 'pras-fire', frames: [], bg: [[0, 'add', 'pras-black-bg', 0, 0, 0, 5], [3, 'update', null, 1, 1, 1, 1]], sounds: [[0, 'prsfx-ember.wav', 1, 1]] }];
+  const manifest = { graphics: { 'pras-fire': 'images/battle_anims/PRAS- Fire.png', 'pras-black-bg': 'images/battle_anims/PRAS- Black BG.png' }, moveSounds: { 'prsfx-ember.wav': 'audio/battle_anims/PRSFX- Ember.wav' } };
+  assert.deepEqual(missingAssets(anim, manifest), []);
+  assert.deepEqual(missingAssets(anim, { ...manifest, moveSounds: {} }), ['prsfx-ember.wav']);
+  assert.deepEqual(missingAssets(anim, { moveSounds: manifest.moveSounds }), ['pras-fire', 'pras-black-bg']);
 });
 
 test('entries are placed on our field from the user, the target, the line between them or the screen', () => {
@@ -88,21 +94,22 @@ test('battle events pick the PokeRogue animation that matches them', () => {
 });
 
 test('sound effects use the PokeRogue samples and animation cues', () => {
-  assert.equal(sampleFor('hit', { eff: 2 }), '/sfx/se/hit_strong.wav');
-  assert.equal(sampleFor('hit', { eff: 0.5 }), '/sfx/se/hit_weak.wav');
+  assert.equal(sampleFor('hit', { eff: 2 }), 'hit_strong');
+  assert.equal(sampleFor('hit', { eff: 0.5 }), 'hit_weak');
   assert.equal(sampleFor('hit', { eff: 0 }), null);
-  assert.equal(sampleFor('throw'), '/sfx/se/pb_throw.wav');
+  assert.equal(sampleFor('throw'), 'pb_throw');
   assert.equal(sampleFor('miss'), null);
-  assert.equal(sampleFor('reveal'), '/sfx/se/pb_tray_ball.wav');
+  assert.equal(sampleFor('reveal'), 'pb_tray_ball');
+  for (const kind of ['hit', 'throw', 'switch', 'faint', 'up', 'down', 'heal', 'reveal']) assert.ok(SOUNDS.includes(sampleFor(kind)), kind);
   assert.equal(animSoundFor('status', { status: 'par' }), 'common-paralysis');
   assert.equal(animSoundFor('weather', { weather: 'rain' }), 'common-rain');
   assert.equal(animSoundFor('miss'), null);
 });
 
 test('the player and the opponent hear their own side of the move', () => {
-  const manifest = { tackle: [[[0, '/a.wav', 1, 1]]], 'u-turn': [[[0, '/me.wav', 0.5, 1]], [[100, '/foe.wav', 1, 0.9]]] };
-  assert.deepEqual(moveSfxCues(manifest, 'tackle', false), [{ at: 0, url: '/a.wav', gain: 1, rate: 1 }]);
-  assert.deepEqual(moveSfxCues(manifest, 'u-turn', false), [{ at: 100, url: '/foe.wav', gain: 1, rate: 0.9 }]);
+  const manifest = { tackle: [[[0, 'a.wav', 1, 1]]], 'u-turn': [[[0, 'me.wav', 0.5, 1]], [[100, 'foe.wav', 1, 0.9]]] };
+  assert.deepEqual(moveSfxCues(manifest, 'tackle', false), [{ at: 0, sound: 'a.wav', gain: 1, rate: 1 }]);
+  assert.deepEqual(moveSfxCues(manifest, 'u-turn', false), [{ at: 100, sound: 'foe.wav', gain: 1, rate: 0.9 }]);
   assert.deepEqual(moveSfxCues(null, 'tackle'), []);
 });
 

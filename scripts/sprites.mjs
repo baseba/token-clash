@@ -1,147 +1,108 @@
 #!/usr/bin/env node
-import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { Buffer } from 'node:buffer';
+// Writes public/upstream/sprites.json: the four sprites of every species and form (front, front
+// shiny, back, back shiny) as files of PokeAPI/sprites at the commit pinned in public/upstream.js.
+// Black/White animated GIFs where the species has one, PNGs otherwise. The fallbacks are resolved
+// here, once, so the browser loads each sprite with no guessing.
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { UPSTREAM } from '../public/upstream.js';
+import { fetchRetry, firstExisting, manifestJSON, mapLimit } from './upstream-files.js';
 
 const API = 'https://pokeapi.co/api/v2';
-const RAW = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
-const BW = `${RAW}/versions/generation-v/black-white/animated`;
+const PNG_DIR = 'sprites/pokemon/';
+const GIF_DIR = 'sprites/pokemon/versions/generation-v/black-white/animated/';
 const LAST_BW_SPECIES = 649;
+const API_SPRITE = /^https:\/\/raw\.githubusercontent\.com\/PokeAPI\/sprites\/[^/]+\/(.+)$/;
 const DATA = new URL('../src/catalog/data/pokeapi.json', import.meta.url);
-const SPRITES = new URL('../public/sprites/', import.meta.url);
-const CONCURRENCY = 16;
-const HEADERS = { 'user-agent': 'token-clash-importer' };
-const VARIANTS = ['front', 'front-shiny', 'back', 'back-shiny'];
+const MANIFEST = new URL('../public/upstream/sprites.json', import.meta.url);
 
-async function fetchRetry(url, tries = 4) {
-  for (let i = 1; ; i++) {
-    try {
-      const res = await fetch(url, { headers: HEADERS });
-      if (res.ok || res.status === 404) return res;
-      throw new Error(`${res.status} ${url}`);
-    } catch (err) {
-      if (i >= tries) throw err;
-      await new Promise((r) => setTimeout(r, 500 * 2 ** i));
-    }
-  }
+// The manifest lists front, front shiny, back and back shiny. Each variant after the front tries
+// these sprites in order and then falls back to the front: a missing back-shiny shows the
+// front-shiny before a plain back, so a shiny still looks shiny.
+const FALLBACKS = [['frontShiny'], ['back'], ['backShiny', 'frontShiny', 'back']];
+
+/** The four sprites of a set, or null if it has no front. `firstOf` answers which of some paths exists first. */
+export async function resolveVariants(candidates, firstOf) {
+  const front = await firstOf(candidates.front);
+  if (!front) return null;
+  const rest = await Promise.all(FALLBACKS.map((kinds) => firstOf(kinds.flatMap((kind) => candidates[kind]))));
+  return [front, ...rest.map((path) => path ?? front)];
 }
+
+const fromStem = (dir, ext, stem) => ({
+  front: [`${dir}${stem}.${ext}`],
+  frontShiny: [`${dir}shiny/${stem}.${ext}`],
+  back: [`${dir}back/${stem}.${ext}`],
+  backShiny: [`${dir}back/shiny/${stem}.${ext}`],
+});
 
 async function getJson(url) {
   const res = await fetchRetry(url);
   return res.ok ? res.json() : null;
 }
 
-async function firstAvailable(urls) {
-  for (const url of urls.filter(Boolean)) {
-    const res = await fetchRetry(url);
-    if (res.ok) return Buffer.from(await res.arrayBuffer());
-  }
-  return null;
-}
-
-async function mapLimit(items, fn) {
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: CONCURRENCY }, async () => {
-      while (next < items.length) await fn(items[next++]);
-    }),
-  );
-}
-
-const fallbacks = ({ front = [], back = [], frontShiny = [], backShiny = [] }) => ({
-  front: [...front],
-  'front-shiny': [...frontShiny, ...front],
-  back: [...back, ...front],
-  'back-shiny': [...backShiny, ...frontShiny, ...back, ...front],
-});
-
-const fromStems = (base, ext, stems) => ({
-  front: stems.map((s) => `${base}/${s}.${ext}`),
-  back: stems.map((s) => `${base}/back/${s}.${ext}`),
-  frontShiny: stems.map((s) => `${base}/shiny/${s}.${ext}`),
-  backShiny: stems.map((s) => `${base}/back/shiny/${s}.${ext}`),
-});
-
-const fileFor = (slug, variant, ext) => new URL(`${slug}-${variant}.${ext}`, SPRITES);
-const complete = (slug, ext) => VARIANTS.every((v) => existsSync(fileFor(slug, v, ext)));
-
-async function writeSet(slug, ext, sources) {
-  for (const [variant, urls] of Object.entries(fallbacks(sources))) {
-    const file = fileFor(slug, variant, ext);
-    if (existsSync(file)) continue;
-    const data = await firstAvailable(urls);
-    if (!data) return false;
-    writeFileSync(file, data);
-  }
-  return true;
-}
+const apiPath = (url) => (url ? [API_SPRITE.exec(url)?.[1]].filter(Boolean) : []);
 
 function speciesTarget(id) {
-  const animated = Number(id) <= LAST_BW_SPECIES;
-  return {
-    slug: id,
-    animated,
-    sources: async () => ({ png: fromStems(RAW, 'png', [id]), gif: animated ? fromStems(BW, 'gif', [id]) : null }),
-  };
+  return { slug: id, candidates: async () => ({ gif: Number(id) <= LAST_BW_SPECIES ? fromStem(GIF_DIR, 'gif', id) : null, png: fromStem(PNG_DIR, 'png', id) }) };
 }
 
+// A form's sprites come from the PokeAPI API; its GIF is named after the species and the form.
 function formTarget(name) {
   return {
     slug: name,
-    animated: true,
-    sources: async () => {
+    candidates: async () => {
       const form = await getJson(`${API}/pokemon-form/${name}`);
       if (!form) return null;
-      const sp = form.sprites || {};
-      const mon = await getJson(form.pokemon.url);
-      const speciesId = Number(mon?.species?.url.match(/\/(\d+)\/?$/)?.[1]);
-      const one = (url) => (url ? [url] : []);
-      const png = { front: one(sp.front_default), back: one(sp.back_default), frontShiny: one(sp.front_shiny), backShiny: one(sp.back_shiny) };
-      if (!(speciesId <= LAST_BW_SPECIES)) return { png, gif: null };
-      const bw = sp.versions?.['generation-v']?.['black-white']?.animated || {};
-      const byName = fromStems(BW, 'gif', [`${speciesId}-${form.form_name}`]);
+      const sprites = form.sprites || {};
+      const pokemon = await getJson(form.pokemon.url);
+      const speciesId = Number(pokemon?.species?.url.match(/\/(\d+)\/?$/)?.[1]);
+      const png = { front: apiPath(sprites.front_default), frontShiny: apiPath(sprites.front_shiny), back: apiPath(sprites.back_default), backShiny: apiPath(sprites.back_shiny) };
+      if (!(speciesId <= LAST_BW_SPECIES)) return { gif: null, png };
+      const blackWhite = sprites.versions?.['generation-v']?.['black-white']?.animated || {};
+      const byName = fromStem(GIF_DIR, 'gif', `${speciesId}-${form.form_name}`);
       const gif = {
-        front: [...byName.front, ...one(bw.front_default)],
-        back: [...byName.back, ...one(bw.back_default)],
-        frontShiny: [...byName.frontShiny, ...one(bw.front_shiny)],
-        backShiny: [...byName.backShiny, ...one(bw.back_shiny)],
+        front: [...byName.front, ...apiPath(blackWhite.front_default)],
+        frontShiny: [...byName.frontShiny, ...apiPath(blackWhite.front_shiny)],
+        back: [...byName.back, ...apiPath(blackWhite.back_default)],
+        backShiny: [...byName.backShiny, ...apiPath(blackWhite.back_shiny)],
       };
-      return { png, gif };
+      return { gif, png };
     },
   };
 }
 
-const substituteTarget = {
-  slug: 'substitute',
-  animated: true,
-  sources: async () => ({ png: fromStems(RAW, 'png', ['substitute']), gif: fromStems(BW, 'gif', ['substitute']) }),
-};
+const substituteTarget = { slug: 'substitute', candidates: async () => ({ gif: fromStem(GIF_DIR, 'gif', 'substitute'), png: fromStem(PNG_DIR, 'png', 'substitute') }) };
 
 export async function syncSprites({ log = (msg) => process.stderr.write(`${msg}\n`) } = {}) {
-  mkdirSync(SPRITES, { recursive: true });
   const data = JSON.parse(readFileSync(DATA, 'utf8'));
-  const targets = [...Object.keys(data.species).map(speciesTarget), ...Object.values(data.forms ?? {}).map((f) => formTarget(f.sprite)), substituteTarget];
-  const missing = targets.filter((t) => !complete(t.slug, 'png') || (t.animated && !complete(t.slug, 'gif')));
-  log(`Sprites: ${targets.length - missing.length}/${targets.length} listos; revisando ${missing.length}.`);
-
-  let done = 0;
-  let animated = 0;
+  const targets = [...Object.keys(data.species).map(speciesTarget), ...Object.values(data.forms ?? {}).map((form) => formTarget(form.sprite)), substituteTarget];
+  log(`Sprites: resolviendo ${targets.length} Pokémon y formas en PokeAPI/sprites@${UPSTREAM.sprites.commit.slice(0, 7)}.`);
+  const firstOf = (paths) => firstExisting(UPSTREAM.sprites, paths);
+  const resolved = new Map();
   const failed = [];
-  await mapLimit(missing, async (t) => {
+  let done = 0;
+  await mapLimit(targets, async (target) => {
     try {
-      const src = await t.sources();
-      if (!src) throw new Error('sin sprites en PokeAPI');
-      if (!(await writeSet(t.slug, 'png', src.png))) throw new Error('sin PNG');
-      if (src.gif && (await writeSet(t.slug, 'gif', src.gif))) animated += 1;
+      const candidates = await target.candidates();
+      if (!candidates) throw new Error('sin sprites en PokeAPI');
+      const gif = candidates.gif && (await resolveVariants(candidates.gif, firstOf));
+      const sprites = gif ? { dir: GIF_DIR, paths: gif } : { dir: PNG_DIR, paths: await resolveVariants(candidates.png, firstOf) };
+      if (!sprites.paths) throw new Error('sin PNG');
+      const outside = sprites.paths.find((path) => !path.startsWith(sprites.dir));
+      if (outside) throw new Error(`${outside} queda fuera de ${sprites.dir}`);
+      resolved.set(target.slug, { dir: sprites.dir, files: sprites.paths.map((path) => path.slice(sprites.dir.length)) });
     } catch (err) {
-      failed.push(`${t.slug} (${err.message})`);
+      failed.push(`${target.slug} (${err.message})`);
     }
-    if (++done % 100 === 0) log(`  ${done}/${missing.length}`);
+    if (++done % 100 === 0) log(`  ${done}/${targets.length}`);
   });
-  const animatedSlugs = targets.filter((t) => complete(t.slug, 'gif')).map((t) => t.slug);
-  writeFileSync(new URL('animated.json', SPRITES), `${JSON.stringify(animatedSlugs)}\n`);
-  if (failed.length) throw new Error(`No se pudieron descargar ${failed.length} sprites: ${failed.slice(0, 10).join(', ')}${failed.length > 10 ? '…' : ''}`);
-  log(`Sprites listos en public/sprites/ (${animated} con animación nueva de Negro/Blanco).`);
+  if (failed.length) throw new Error(`No se pudieron resolver ${failed.length} sprites: ${failed.slice(0, 10).join(', ')}${failed.length > 10 ? '…' : ''}`);
+
+  const manifest = { [GIF_DIR]: {}, [PNG_DIR]: {} };
+  for (const { slug } of targets) manifest[resolved.get(slug).dir][slug] = resolved.get(slug).files;
+  writeFileSync(MANIFEST, manifestJSON(manifest));
+  log(`Sprites listos en public/upstream/sprites.json: ${Object.keys(manifest[GIF_DIR]).length} animados de Negro/Blanco y ${Object.keys(manifest[PNG_DIR]).length} PNG.`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

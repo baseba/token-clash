@@ -1,5 +1,5 @@
 const TIERS = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 };
-const SFX = (name) => `/sfx/moves/audio/prsfx-${name}.wav`;
+const SFX = (name) => `prsfx-${name}.wav`;
 
 const DARK = ['#c8c6d0', '#5c5966', '#22202a'];
 const GOLD = ['#fff4c2', '#e6b422', '#a8740f'];
@@ -37,5 +37,5 @@ export function ballFx(key) {
 export const BALL_FX_KEYS = Object.keys(THEMES);
 
 export function ballSounds(key) {
-  return (THEMES[key]?.sounds ?? []).map(([name, at, gain, rate = 1]) => ({ url: SFX(name), at, gain, rate }));
+  return (THEMES[key]?.sounds ?? []).map(([name, at, gain, rate = 1]) => ({ sound: SFX(name), at, gain, rate }));
 }

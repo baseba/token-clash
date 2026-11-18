@@ -132,14 +132,25 @@ defecto, cada Pokémon usa los últimos cuatro movimientos que aprende por nivel
 Pokémon evolucionado también puede usar lo que aprendían sus preevoluciones (Raichu tiene los de Pichu, Pikachu
 y Raichu).
 
-Los datos viven en `src/catalog/data/` (`pokeapi.json`, `movedex.json` y `abilities.json`). Los sprites y los gritos no
-se versionan: `npm install` descarga los sprites en `public/sprites/` (o `npm run sprites`) y los gritos reales
-de [PokeAPI/cries](https://github.com/PokeAPI/cries) en `public/cries/` (o `npm run cries`).
+Los datos viven en `src/catalog/data/` (`pokeapi.json`, `movedex.json` y `abilities.json`).
+
+Los sprites, los gritos, los sonidos y la música no los sirve el juego. El navegador los baja de
+[jsDelivr](https://www.jsdelivr.com/), que responde desde cerca, de los repos donde viven:
+[PokeAPI/sprites](https://github.com/PokeAPI/sprites), los gritos reales de
+[PokeAPI/cries](https://github.com/PokeAPI/cries) y
+[pokerogue-assets](https://github.com/pagefaultgames/pokerogue-assets). Cada repo está fijado a un commit en
+`public/upstream.js`, así que una URL nunca cambia de contenido, y si jsDelivr falla el navegador pide el mismo archivo
+una vez a raw.githubusercontent.com. Los manifiestos de `public/upstream/` (`sprites.json`, `cries.json` y
+`pokerogue.json`) dicen dónde está cada archivo en su repo y se versionan; `npm run sprites`, `npm run cries` y
+`npm run anims` los regeneran contra el commit fijado, resolviendo una vez, con peticiones HEAD, el sprite que
+reemplaza a uno que falta (un shiny de espalda que no existe muestra el shiny de frente).
+
 Las animaciones de batalla y sus sonidos vienen de [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets):
-`npm install` (o `npm run anims`; `-- --refresh` para bajar todo de nuevo) descarga la animación de cada movimiento
-de `src/catalog/data/movedex.json`, las de estados, ataduras, protección, clima, campos y cargas, sus hojas de sprites y
-fondos (`public/anims/`), sus sonidos y los efectos de Poké Ball, golpes, debilitado y stats (`public/sfx/`).
-El mismo script baja la música de PokeRogue a `public/music/` con sus puntos de loop: cada escena de batalla toca
+`npm install` convierte la animación de cada movimiento de `src/catalog/data/movedex.json` y las de estados,
+ataduras, protección, clima, campos y cargas a `public/anims/`, junta los tiempos de sus sonidos en
+`public/sfx/moves/moves.json` y pinta las Poké Balls de la tienda en `public/anims/ui/`. Sus hojas de sprites, fondos y
+sonidos, los efectos de Poké Ball, golpes, debilitado y stats, y la música se cargan desde jsDelivr; el mismo script
+guarda los puntos de loop de la música en `public/music/loops.json`. Cada escena de batalla toca
 un tema de combate contra entrenadores acorde a lo que muestra (Alola en la playa, el gimnasio de Sinnoh en la cueva,
 el Team Aqua en el océano, la campeona de Sinnoh en la nieve, etc.; la lista está en `public/music.js`), los menús
 tocan las pistas tranquilas de bioma (`town`, `tall_grass`, `laboratory`, `plains`), la preparación
@@ -155,7 +166,7 @@ estilo del resto de la app, y los mismos tiempos de golpe
 PokeAPI (en producción no tiene salida a internet). Para refrescar los datos, con Node 22 o más:
 
 ```sh
-node scripts/import-pokeapi.mjs   # ~2-3 min, reescribe los JSON de src/catalog/data/ y los sprites
+node scripts/import-pokeapi.mjs   # unos minutos, reescribe los JSON de src/catalog/data/ y los manifiestos de sprites y gritos
 ```
 
 Las especies que la PokeAPI no conoce quedan como tipo Normal, con stats según su rareza.
@@ -176,14 +187,14 @@ GAME FREAK inc.
 - Movimientos y su texto: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) (MIT).
 - Música: las pistas de [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (las
   composiciones de la comunidad, como `cave`, `tall_grass`, `snowy_forest`, `lake`, `sea` o `plains`, son de Bird_Obsession,
-  Lmz, Andr06 y Firel con CC BY-NC-SA 4.0; el resto lo marcan como material de Nintendo). Se descargan al instalar.
+  Lmz, Andr06 y Firel con CC BY-NC-SA 4.0; el resto lo marcan como material de Nintendo). El navegador las carga de jsDelivr.
 - Sprites de entrenadores: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (material de Nintendo,
   Creatures y GAME FREAK; `bug_type_superfan` es de Chani von Karpa y `aliana`, `celosia` y `mable` de Red, con
   CC BY-NC-SA 4.0). Se descargan al instalar y no se versionan.
 - Animaciones de batalla, sus sonidos, la Poké Ball y los efectos de sonido: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets), de
   Pagefault Games y sus colaboradores. Las animaciones y los sonidos `PRSFX-` son de
   [Pokémon Reborn](https://www.rebornevo.com/); las animaciones `GEN8-` son del Gen 8 Animation Project
-  (CC BY-NC-SA 4.0). Los audios se descargan al instalar y no se versionan.
+  (CC BY-NC-SA 4.0). El navegador carga las hojas y los audios de jsDelivr; no se versionan.
 
 ## Desarrollo
 
@@ -222,6 +233,7 @@ Por carpeta:
 | `src/**/*.spec.ts` | Tests unitarios (`node:test`), al lado del código que prueban. |
 | `test/` | Tests e2e (`*.e2e-spec.ts`: levantan la app entera), los del frontend (`test/web/`, en JS) y el save de ejemplo (`fixtures/`). |
 | `public/` | El frontend: `index.html`, `style.css`, `app.js` (toda la interfaz) y un módulo por tema. |
+| `public/upstream.js`, `public/upstream/` | De qué commit de cada repo externo salen los sprites, gritos, sonidos y música, y los manifiestos que dicen dónde está cada archivo. |
 | `scripts/` | Descargas e importaciones de datos externos (detalle abajo). |
 | `deploy/` | Imagen, contenedores, redes y el deploy automático (ver [Deploy](#deploy-podman--cloudflare-tunnel)). |
 
@@ -243,7 +255,8 @@ Por tema:
 | Variantes de colores de entrenadores | `public/trainer-sprites.js` (a mano), `public/trainer-variants.js` (lo genera `scripts/plan-trainer-variants.mjs`); `scripts/sync-trainers.js` pinta los sprites al instalar | | `public/app.js` |
 | Tienda | artículos y precios en `public/shop.js` (tipados en `src/catalog/domain/shop.ts`); saldo y compra en `src/trainers/domain/trainer.ts`; "pide al original" en `src/stats/domain/achievements.ts` | `GET /api/shop`, `POST /api/shop/buy`, `PUT /api/me/equip` en `stats/interface/achievements.controller.ts`, con los DTOs de `trainers/interface/dto/shop.dto.ts` | `public/shop.js`, `public/app.js` (la tienda está en `/perfil`) |
 | Tipos y efectividad | `public/types.js` (lo comparten servidor y navegador) | | |
-| Escenario de batalla y sprites de Pokémon | | | `public/backgrounds.js`, `public/creature.js` |
+| Escenario de batalla y sprites de Pokémon | | | `public/backgrounds.js`, `public/creature.js` (URL de cada sprite según `public/upstream/sprites.json`) |
+| Archivos externos (jsDelivr y respaldo en GitHub) | | | `public/upstream.js` (commits fijados, URLs y respaldo), `public/upstream/*.json`; la CSP que los permite está en `src/shared/http/security-headers.middleware.ts` |
 | Reciclaje de repetidos | `src/trainers/domain/recycling.ts` (cuánto vale cada uno), `Trainer.recycle` en `trainer.ts`; los repetidos salen de `save-file.ts` | `GET` y `POST /api/me/recycling` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
 | Efectos al abrir la Poké Ball | | | `public/ball-fx.js` (efecto por Ball y rareza), `public/ball-burst.js` (los dibuja en un canvas) |
 | Música, radio y sonidos | | | `public/music.js`, `public/radio.js`, `public/fx.js` |
@@ -257,11 +270,13 @@ Por tema:
 Datos externos:
 
 - `scripts/import-pokeapi.mjs`: genera `src/catalog/data/pokeapi.json`, `movedex.json` y `abilities.json`.
-- `scripts/sprites.mjs`: descarga los sprites a `public/sprites/` (corre solo en `npm install`).
-- `scripts/sync-battle-anims.js`: compacta las animaciones de PokeRogue en `public/anims/<clave>.json` (versión del jugador y del rival cuando difieren), baja sus imágenes y sonidos y arma `public/sfx/moves/moves.json` con los tiempos de cada sonido (corre solo en `npm install`).
+- `scripts/sprites.mjs` (`npm run sprites`): escribe `public/upstream/sprites.json`, los cuatro sprites de cada especie y forma (de frente, shiny, de espalda y de espalda shiny) en PokeAPI/sprites, con el reemplazo de cada uno que falta ya resuelto.
+- `scripts/sync-cries.js` (`npm run cries`): escribe `public/upstream/cries.json`, el grito de cada especie y forma en PokeAPI/cries (el actual o, si no hay, el antiguo).
+- `scripts/sync-battle-anims.js`: compacta las animaciones de PokeRogue en `public/anims/<clave>.json` (versión del jugador y del rival cuando difieren), arma `public/sfx/moves/moves.json` con los tiempos de cada sonido y pinta las Poké Balls (corre solo en `npm install` y en la imagen). Falla si una animación nombra un archivo que `public/upstream/pokerogue.json` no ubica; `npm run anims` (`--manifest`) reescribe ese manifiesto: hojas, sonidos de movimientos, efectos y música.
 - `scripts/sync-trainers.js`: descarga los entrenadores de la lista de `public/trainer-sprites.js` a `public/trainers/`,
-  recortando el primer cuadro de cada hoja de sprites (corre solo en `npm install`, o `npm run trainers`).
-- `scripts/sync-cries.js`: descarga los gritos (`latest` y `legacy`) a `public/cries/` y escribe `cries.json`, que el navegador usa para elegir el archivo según el sprite (corre solo en `npm install`).
+  recortando el primer cuadro de cada hoja de sprites (corre solo en `npm install`, o `npm run trainers`). Los sirve el
+  juego porque no son copias exactas: el recorte y las variantes de colores salen de acá.
+- `scripts/upstream-files.js`: lo que comparten esos scripts para leer los repos externos en el commit fijado (reintentos, HEAD, manifiestos con una entrada por línea).
 - `public/battle-anims.js`: intérprete propio del formato de animación de PokeRogue (cuadros de 50 ms, focos en atacante, objetivo o pantalla, fondos).
 - `public/types.js`: tipos y tabla de efectividad, compartidos por el navegador y el servidor.
 - Skynet (`src/combat/infrastructure/jev/`) le pasa a Jev solo lo que vería un jugador de ese lado (sin nombres de

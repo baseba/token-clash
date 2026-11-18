@@ -20,6 +20,13 @@
 
 - El servidor no tiene salida a internet en producción: nada en `src/` puede llamar APIs externas en
   tiempo de ejecución. Los datos externos se bajan con scripts en `scripts/` y se commitean.
+- Los sprites, gritos, sonidos y música los carga el navegador desde jsDelivr, fijados a un commit en
+  `public/upstream.js`. Si cambias ese commit o agregas especies, formas, movimientos, sonidos o música, corre
+  `npm run sprites`, `npm run cries` o `npm run anims` y commitea lo que cambie en `public/upstream/`
+  (`test/web/upstream.test.js` o la instalación fallan si falta algo). Un archivo que transformamos (recortado, pintado, convertido) no
+  va por ahí: se genera al instalar. La CSP abre a esos hosts solo `img-src` y `connect-src`.
+  El navegador guarda esos manifiestos un año bajo la versión del deploy, que se calcula al arrancar:
+  después de regenerar uno, reinicia `npm run dev`.
 - Los datos de PokeAPI (`src/catalog/data/*.json`) se commitean: si tocas
   `scripts/import-pokeapi.mjs`, córrelo (Node 22+) y sube lo que genera.
 - Los cambios a `deploy/*.container`, `*.network`, `*.service`, `*.timer` y `deploy/deploy.sh` no se aplican solos:

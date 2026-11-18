@@ -1,3 +1,5 @@
+import { UPSTREAM, upstreamManifest, upstreamURLs } from './upstream.js?v=dev';
+
 const FRAME_MS = 50;
 const FIELD = { width: 320, height: 180 };
 const USER_FOCUS = { x: 106, y: 116 };
@@ -80,6 +82,9 @@ export function placeEntry(entry, { user, target, scale, width, height }) {
   return { x: px, y: py, scaleX: (zoomX / 100) * flip, scaleY: zoomY / 100, angle: -angle };
 }
 
+/** How many 96-pixel cells a sheet has per row. */
+export const sheetColumns = (width) => Math.max(1, Math.floor(width / CELL));
+
 export function animLength(config) {
   const bgEnd = (config.bg ?? []).reduce((end, [frame, , , , , , duration]) => Math.max(end, frame + duration), 0);
   return Math.max(config.frames.length, bgEnd);
@@ -99,17 +104,30 @@ export function createAnimPlayer(field) {
   const images = new Map();
   const reduced = () => document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  function loadImage(url) {
-    if (!url) return Promise.resolve(null);
-    if (!images.has(url)) {
-      images.set(url, new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
-        img.src = url;
+  const imageFrom = (url) =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+
+  // A sheet by its key, from the first of its URLs that loads: CSS backgrounds have no error
+  // fallback of their own, so they use the loaded image's src.
+  function loadImage(graphic) {
+    if (!graphic) return Promise.resolve(null);
+    if (!images.has(graphic)) {
+      images.set(graphic, upstreamManifest('pokerogue').then(async (manifest) => {
+        const path = manifest.graphics?.[graphic];
+        if (typeof path !== 'string') return null;
+        for (const url of upstreamURLs(UPSTREAM.pokerogue, path)) {
+          const img = await imageFrom(url);
+          if (img) return img;
+        }
+        return null;
       }));
     }
-    return images.get(url);
+    return images.get(graphic);
   }
 
   function load(key) {
@@ -119,8 +137,8 @@ export function createAnimPlayer(field) {
         .then((res) => (res.ok ? res.json() : null))
         .then(async (data) => {
           if (!data) return null;
-          const urls = data.flatMap((side) => [side.graphic?.url, ...side.bg.map((e) => e[2])]);
-          await Promise.all(urls.map(loadImage));
+          const graphics = data.flatMap((side) => [side.graphic, ...side.bg.map((event) => event[2])]);
+          await Promise.all(graphics.map(loadImage));
           return data;
         })
         .catch(() => null);
@@ -147,14 +165,15 @@ export function createAnimPlayer(field) {
     return el;
   }
 
-  function addBg(url, { bgX, bgY, opacity }, scale, current) {
+  function addBg(graphic, { bgX, bgY, opacity }, scale, current) {
     current?.remove();
-    const el = sprite({ zIndex: '0', left: '0', top: '0', width: `${1120 * scale}px`, height: `${720 * scale}px`, background: url ? '' : '#000', opacity: String((opacity ?? 0) / 255) });
-    if (url) {
-      el.style.backgroundImage = `url("${url}")`;
+    const el = sprite({ zIndex: '0', left: '0', top: '0', width: `${1120 * scale}px`, height: `${720 * scale}px`, background: graphic ? '' : '#000', opacity: String((opacity ?? 0) / 255) });
+    if (graphic) {
       el.style.backgroundRepeat = 'repeat';
-      loadImage(url).then((img) => {
-        if (img) el.style.backgroundSize = `${img.naturalWidth * 1.25 * scale}px ${img.naturalHeight * 1.25 * scale}px`;
+      loadImage(graphic).then((img) => {
+        if (!img) return;
+        el.style.backgroundImage = `url("${img.src}")`;
+        el.style.backgroundSize = `${img.naturalWidth * 1.25 * scale}px ${img.naturalHeight * 1.25 * scale}px`;
       });
     }
     el.bgAt = { x: ((bgX ?? 0) - 320) * scale, y: ((bgY ?? 0) - 284) * scale };
@@ -192,8 +211,8 @@ export function createAnimPlayer(field) {
     const same = userEl === targetEl;
     const geo = { user: center(userEl), target: center(targetEl), scale: 1, width: FIELD.width, height: FIELD.height };
     const cell = CELL * geo.scale;
-    const sheet = config.graphic ? await loadImage(config.graphic.url) : null;
-    const columns = config.graphic?.columns ?? 5;
+    const sheet = await loadImage(config.graphic);
+    const columns = sheet ? sheetColumns(sheet.naturalWidth) : 1;
     const mons = [userEl, targetEl].map(shownSprite);
     const graphics = [];
     let bg = null;
@@ -222,7 +241,7 @@ export function createAnimPlayer(field) {
         zIndex: entry[11] === 2 ? '0' : '1',
         width: `${cell}px`,
         height: `${cell}px`,
-        backgroundImage: sheet ? `url("${config.graphic.url}")` : '',
+        backgroundImage: sheet ? `url("${sheet.src}")` : '',
         backgroundSize: sheet ? `${(sheet.naturalWidth / CELL) * cell}px ${(sheet.naturalHeight / CELL) * cell}px` : '',
         backgroundPosition: `${-(frame % columns) * cell}px ${-Math.floor(frame / columns) * cell}px`,
         transform: `translate(${p.x - cell / 2}px, ${p.y - cell / 2}px) rotate(${p.angle}deg) scale(${p.scaleX}, ${p.scaleY})`,
@@ -251,8 +270,8 @@ export function createAnimPlayer(field) {
     const showBg = (f) => {
       for (const event of config.bg) {
         if (event[0] !== f) continue;
-        const [, type, url, bgX, bgY, opacity, duration] = event;
-        if (type === 'add') bg = addBg(url, { bgX, bgY, opacity }, geo.scale, bg);
+        const [, type, graphic, bgX, bgY, opacity, duration] = event;
+        if (type === 'add') bg = addBg(graphic, { bgX, bgY, opacity }, geo.scale, bg);
         else updateBg(bg, { bgX, bgY, opacity, duration }, geo.scale);
       }
     };
