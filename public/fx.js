@@ -82,6 +82,8 @@ const STAT_COLOR = { atk: 'fighting', def: 'steel', satk: 'psychic', sdef: 'wate
 const STATUS_TYPE = { brn: 'fire', par: 'electric', psn: 'poison', tox: 'poison', frz: 'ice', slp: 'normal' };
 
 const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
+const NEAR_SCALE = 1.4;
+const SHAKE_TIER = 5;
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -769,12 +771,21 @@ export function createFx(arena, field = arena) {
     return Promise.all(jobs);
   }
 
+  function shakeField(k) {
+    const amp = 0.9 * k;
+    const steps = [0, 1, -0.7, 0.45, -0.25, 0.1, 0];
+    const frames = steps.map((f, i) => ({ translate: `${(f * amp).toFixed(1)}px ${((i % 2 ? -0.4 : 0.4) * Math.abs(f) * amp).toFixed(1)}px` }));
+    return arena.animate(frames, { duration: 380, easing: 'ease-out' }).finished.catch(() => {});
+  }
+
   async function throwBall(spot, mine, onOpen, ballKey = 'pb') {
     const kind = /^[a-z]{2}$/.test(ballKey) ? ballKey : 'pb';
     const k = fieldScale();
     const a = arena.getBoundingClientRect();
     const anchor = spot.getBoundingClientRect();
     const land = { x: anchor.left - a.left, y: anchor.top - a.top + (mine ? -16 : 2) * k };
+    const ground = { x: land.x, y: anchor.top - a.top + 2 * k };
+    const near = mine ? NEAR_SCALE : 1;
     const offset = mine ? { x: -64, y: -52, peak: -62 } : { x: 12, y: -42, peak: -52 };
     const start = { x: land.x + offset.x * k, y: land.y + offset.y * k };
     const peakY = land.y + offset.peak * k;
@@ -801,7 +812,8 @@ export function createFx(arena, field = arena) {
     ], { duration: 250, easing: 'cubic-bezier(0.12, 0, 0.39, 0)' });
     await Promise.all([
       play(open, [{ transform: at(land), opacity: 1 }, { transform: at(land), opacity: 0 }], { duration: 200 }),
-      ballFx(kind) ? bursts.play(land, k, ballFx(kind)) : openParticles(land, k),
+      ballFx(kind) ? bursts.play(ground, k * near, ballFx(kind)) : openParticles(ground, k * near),
+      ballFx(kind)?.tier >= SHAKE_TIER ? shakeField(k) : null,
       grow?.finished.catch(() => {}),
     ]);
   }
