@@ -3,6 +3,7 @@ import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
 import { createFx, moveShape } from './fx.js?v=dev';
+import { ballSounds } from './ball-fx.js?v=dev';
 import { chargeAnim, COMMON_PRELOAD, hpTweenMs, moveLands } from './battle-anims.js?v=dev';
 import { patchSave } from './savepatch.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
@@ -1093,12 +1094,12 @@ const FREE_ITEMS = [
 ];
 
 const BALL_FX_NOTE = {
-  free: 'los destellos clásicos de PokeRogue.',
-  common: 'un anillo de partículas con el tema de la Ball.',
-  rare: 'partículas, un destello central y detalles que se mueven según su tema.',
-  epic: 'doble anillo, más detalles y, si es oscura, una sombra que envuelve el campo.',
-  legendary: 'todo lo anterior más una onda expansiva.',
-  mythic: 'todo lo anterior más rayos de luz y una lluvia de destellos.',
+  free: 'Los destellos clásicos de PokeRogue.',
+  common: 'Un destello y un anillo de partículas con su tema.',
+  rare: 'Más partículas, un segundo anillo y brillo en el suelo.',
+  epic: 'Ondas, espirales y detalles alrededor de tu Pokémon.',
+  legendary: 'Rayos, un pilar de luz y ondas expansivas.',
+  mythic: 'El efecto completo: rayos dobles, lluvia de destellos y una corona de estrellas.',
 };
 
 function shopPreview(item) {
@@ -1124,7 +1125,7 @@ async function shopPage(seq) {
     return;
   }
   if (stale(seq)) return;
-  let kind = '';
+  let kind = 'ball';
   let hideOwned = false;
   let query = '';
   const balance = h('div', { class: 'shop-balance' });
@@ -1140,18 +1141,19 @@ async function shopPage(seq) {
     renderWho();
     paint();
   };
-  async function equip(item, off = false) {
+  async function equip(item) {
     try {
       if (item.kind === 'trainer') {
         me.avatar = (await api('/api/me/look', { method: 'PUT', body: { avatar: item.key } })).avatar;
         refresh({ ...shop, avatar: me.avatar });
-      } else refresh((await api('/api/me/equip', { method: 'PUT', body: { kind: item.kind, key: off || item.free ? null : item.key } })).shop);
-      toast(off ? `Quitaste ${label(item)}` : `Equipaste ${label(item)}`);
+      } else refresh((await api('/api/me/equip', { method: 'PUT', body: { kind: item.kind, key: item.free ? null : item.key } })).shop);
+      toast(`Equipaste ${label(item)}`);
     } catch (e) {
       toast(e.message);
     }
   }
   function askBuy(item) {
+    stopPreview?.();
     const go = h('button', { class: 'btn primary', type: 'button', onclick: async () => {
       go.disabled = true;
       try {
@@ -1172,6 +1174,7 @@ async function shopPage(seq) {
     ));
     if (!confirmDlg.open) confirmDlg.showModal();
   }
+  let stopPreview = null;
   function previewBall(item) {
     const scene = sceneFor(`shop-${item.key}`);
     const spot = { me: h('div', { class: 'spot me' }), foe: h('div', { class: 'spot foe' }) };
@@ -1184,6 +1187,7 @@ async function shopPage(seq) {
       spot.foe, spot.me,
     );
     const arena = h('div', { class: 'arena shop-arena' }, field);
+    const stage = h('div', { class: 'shop-stage' }, arena);
     for (const side of ['me', 'foe']) {
       arena.style.setProperty(`--pad-${side}-fill`, scene[side][0]);
       arena.style.setProperty(`--pad-${side}-rim`, scene[side][1]);
@@ -1192,17 +1196,23 @@ async function shopPage(seq) {
     const fit = new ResizeObserver(scale);
     fit.observe(arena);
     const fx = createFx(arena, field);
+    fx.warmBalls([item.key]);
+    music.preloadCues(ballSounds(item.key));
     let running = false;
+    let closed = false;
     const replay = h('button', { class: 'btn', type: 'button', onclick: () => run() }, '↻ Repetir');
     async function run() {
-      if (running) return;
+      if (running || closed) return;
       running = true;
       replay.disabled = true;
       for (const side of ['foe', 'me']) {
+        if (closed) break;
         spot[side].classList.add('incoming');
         music.sfx('throw');
         await fx.sendOut(spot[side], side === 'me', () => {
+          if (closed) return;
           music.sfx('switch');
+          music.cues(ballSounds(item.key));
           spot[side].classList.remove('incoming');
         }, item.key ?? 'pb');
         await sleep(450);
@@ -1210,13 +1220,24 @@ async function shopPage(seq) {
       running = false;
       replay.disabled = false;
     }
-    confirmDlg.replaceChildren(h('div', { class: 'confirm-body shop-preview-body' },
-      h('h2', null, label(item)),
-      arena,
-      h('p', { class: 'muted small' }, `${item.rarity ? RARITIES[item.rarity].label : 'Gratis'}: ${BALL_FX_NOTE[item.rarity ?? 'free']}`),
-      h('div', { class: 'row confirm-actions' }, h('button', { class: 'btn', type: 'button', onclick: () => confirmDlg.close() }, 'Cerrar'), replay),
+    confirmDlg.replaceChildren(h('div', { class: 'confirm-body ball-preview' },
+      h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => confirmDlg.close() }, '×'),
+      h('header', { class: 'ball-preview-head' },
+        h('span', { class: 'ball-preview-icon' }, h('img', { src: `/anims/ui/${item.key ?? 'pb'}.png?v=dev`, alt: '', draggable: 'false' })),
+        h('div', null, h('h2', null, label(item)), h('span', { class: `chip rarity-chip${item.rarity ? ` rarity-${item.rarity}` : ''}` }, item.rarity ? RARITIES[item.rarity].label : 'Gratis')),
+      ),
+      stage,
+      h('p', { class: 'ball-preview-note' }, `✨ ${BALL_FX_NOTE[item.rarity ?? 'free']}`),
+      h('div', { class: 'row confirm-actions' }, replay, action(item)),
     ));
-    confirmDlg.addEventListener('close', () => fit.disconnect(), { once: true });
+    const stop = () => {
+      closed = true;
+      fit.disconnect();
+      music.stopCues();
+    };
+    stopPreview?.();
+    stopPreview = stop;
+    confirmDlg.addEventListener('close', stop, { once: true });
     if (!confirmDlg.open) confirmDlg.showModal();
     scale();
     requestAnimationFrame(() => requestAnimationFrame(() => run()));
@@ -1228,36 +1249,33 @@ async function shopPage(seq) {
       return h('button', { class: 'btn sm primary', type: 'button', disabled: short > 0 || null, 'data-tip': short > 0 ? `Te faltan ${tokensM(short)}` : null, onclick: () => askBuy(item) }, `🪙 ${tokensM(item.price)}`);
     }
     if (isEquipped(item)) {
-      const off = item.kind === 'trainer' ? (item.free ? h('a', { class: 'btn sm ghost', href: '/perfil', 'data-link': true }, 'Cambiar en Perfil') : null) : item.free ? null : h('button', { class: 'btn sm ghost', type: 'button', onclick: () => equip(item, true) }, 'Quitar');
+      const off = item.kind === 'trainer' && item.free ? h('a', { class: 'btn sm ghost', href: '/perfil', 'data-link': true }, 'Cambiar en Perfil') : null;
       return h('span', { class: 'row shop-owned' }, h('span', { class: 'chip ready-chip' }, '✓ Equipado'), off);
     }
     return h('button', { class: 'btn sm', type: 'button', onclick: () => equip(item) }, item.free ? 'Usar' : 'Equipar');
   }
   function paint() {
+    const ledger = `${tokensM(shop.total)} en tu último save${shop.updatedAt ? ` (subido ${ago(shop.updatedAt)})` : ''} − ${tokensM(shop.spent)} gastados aquí`;
     balance.replaceChildren(
-      h('div', null, h('small', { class: 'muted' }, 'Tu saldo'), h('b', { class: 'shop-coins' }, `🪙 ${tokensM(shop.balance)}`)),
-      h('dl', { class: 'shop-ledger' },
-        h('dt', null, 'Tokens en tu último save'), h('dd', null, tokensM(shop.total), shop.updatedAt ? h('small', { class: 'muted' }, ` · subido ${ago(shop.updatedAt)}`) : null),
-        h('dt', null, 'Gastados en la tienda'), h('dd', null, `−${tokensM(shop.spent)}`),
-      ),
-      h('p', { class: 'muted small' }, 'Tu saldo son los tokens que has usado según tu save, menos lo que gastas aquí. Crece cuando subes tu save nuevo. ', h('a', { href: '/coleccion', 'data-link': true }, 'Actualizar save en Colección →')),
+      h('span', { class: 'shop-coins', tabindex: 0, 'data-tip': ledger, 'data-tip-note': 'Crece cada vez que subes tu save.' }, `🪙 ${tokensM(shop.balance)}`),
+      h('a', { class: 'btn sm ghost', href: '/coleccion', 'data-link': true, 'data-tip': 'Sube tu save nuevo para sumar tokens' }, '↻ Actualizar save'),
     );
     const currentTrainer = shop.items.some((item) => item.kind === 'trainer' && item.key === me.avatar) ? [] : [{ id: 'trainer:current', kind: 'trainer', key: me.avatar, name: trainerLabel(me.avatar), rarity: null, price: 0, desc: 'Tu entrenador actual, de los gratis. Cámbialo por otro gratis en tu perfil.', owned: true, free: true }];
     const items = [...FREE_ITEMS, ...currentTrainer, ...shop.items]
-      .filter((item) => (!kind || item.kind === kind) && (!hideOwned || !item.owned) && (!query || label(item).toLowerCase().includes(query)))
+      .filter((item) => item.kind === kind && (!hideOwned || !item.owned) && (!query || label(item).toLowerCase().includes(query)))
       .sort((a, b) => a.price - b.price || label(a).localeCompare(label(b), 'es', { numeric: true, sensitivity: 'base' }));
     grid.replaceChildren(...(items.length ? items.map((item) => h('div', { class: `shop-card${item.owned ? ' is-owned' : ''}${isEquipped(item) ? ' is-equipped' : ''}${item.rarity ? ` rarity-${item.rarity}` : ''}` },
-      h('div', { class: 'shop-preview' }, shopPreview(item), item.kind === 'ball' ? h('button', { class: 'btn sm ghost shop-try', type: 'button', onclick: () => previewBall(item) }, '▶ Ver en combate') : null),
-      h('div', { class: 'shop-info' }, h('b', null, label(item)), h('span', { class: 'row shop-tags' }, h('span', { class: `chip rarity-chip${item.rarity ? ` rarity-${item.rarity}` : ''}` }, item.rarity ? RARITIES[item.rarity].label : 'Gratis'), h('span', { class: 'muted small' }, SHOP_KINDS[item.kind])), h('small', { class: 'muted' }, item.desc)),
-      h('div', { class: 'shop-action' }, action(item)),
+      h('div', { class: 'shop-preview' }, shopPreview(item)),
+      h('div', { class: 'shop-info' }, h('b', { 'data-tip': item.desc }, label(item)), h('span', { class: `rarity-tag${item.rarity ? ` rarity-${item.rarity}` : ''}` }, item.rarity ? RARITIES[item.rarity].label : 'Gratis')),
+      h('div', { class: 'shop-action' }, item.kind === 'ball' ? h('button', { class: 'btn sm ghost shop-try', type: 'button', 'data-tip': 'Ver en combate', 'aria-label': `Ver ${label(item)} en combate`, onclick: () => previewBall(item) }, '▶ Probar') : null, action(item)),
     )) : [h('p', { class: 'muted' }, 'No hay nada con ese filtro.')]));
   }
   paint();
   $app.replaceChildren(
-    h('section', { class: 'card shop-head' }, h('div', { class: 'nb-head' }, h('h1', null, '🛒 Tienda'), h('p', { class: 'muted small' }, 'Cosméticos para tus peleas y tu perfil. No cambian cómo pelean tus Pokémon.')), balance),
+    h('section', { class: 'card shop-head' }, h('h1', null, '🛒 Tienda'), balance),
     h('section', { class: 'card' },
       h('div', { class: 'coll-bar' },
-        h('div', { class: 'segmented', role: 'group', 'aria-label': 'Categoría' }, [['', 'Todo'], ...Object.entries(SHOP_KINDS)].map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === kind), onclick: (e) => { kind = value; e.currentTarget.parentElement.querySelectorAll('.seg-item').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); paint(); } }, text))),
+        h('div', { class: 'segmented', role: 'group', 'aria-label': 'Categoría' }, Object.entries(SHOP_KINDS).map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === kind), onclick: (e) => { kind = value; e.currentTarget.parentElement.querySelectorAll('.seg-item').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); paint(); } }, text))),
         h('input', { type: 'search', placeholder: 'Buscar…', 'aria-label': 'Buscar en la tienda', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } }),
         h('label', { class: 'toggle' }, h('input', { type: 'checkbox', onchange: (e) => { hideOwned = e.target.checked; paint(); } }), ' Ocultar lo que ya tengo'),
       ),
@@ -3783,6 +3801,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     sound('throw');
     await fx.sendOut(spot, pos(side) === 'me', () => {
       sound('switch');
+      if (!dead) music.cues(ballSounds(view.sides[side].ball));
       spot.classList.remove('incoming');
       cry(side);
     }, view.sides[side].ball);
@@ -4731,6 +4750,9 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
       const animKeys = [...moveKeys, ...moveKeys.map(chargeAnim), ...COMMON_PRELOAD];
       music.preload({ sprites: fighters.map((f) => f.sprite), moves: animKeys });
       fx.preload(animKeys);
+      const balls = view.sides.map((side) => side.ball ?? 'pb');
+      fx.warmBalls(balls);
+      music.preloadCues(balls.flatMap(ballSounds));
       for (const p of ['me', 'foe']) delete els.spot[p].dataset.key;
       paintAll();
       if (msg.state.status === 'active' && !els.log.childElementCount) {
