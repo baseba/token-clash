@@ -249,14 +249,9 @@ build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de 
   (`catalog/domain/abilities.ts`) dice qué habilidades no hacen nada en Token Clash, con el texto que lee el jugador.
   Es conocimiento del motor, pero no crea ninguna flecha hacia `combat`, así que se quedó en el catálogo.
 - **La tienda entra por `stats`.** `AchievementsController` expone `GET /api/shop`, `POST /api/shop/buy` y
-  `PUT /api/me/equip`, porque comprar un entrenador pide tener al original. Esa regla vive hoy en
-  `AchievementsService.buy`, no en el dominio: `Trainer.buy` no la conoce. Lo limpio sería una función pura en
-  `stats/domain/achievements.ts` con su spec, y `equip`, que no depende de logros, en `TrainersController`.
-  Además, sus cinco endpoints (`/api/shop`, `/api/shop/buy`, `/api/me/equip`, `/api/me/look` y
-  `/api/me/achievements`) no están en el e2e, sus DTOs (`BuyDto`, `EquipDto`, `ChooseLookDto`) no tienen spec y
-  `EquipDto` repite a mano la unión `EquipKind` de `trainer.ts`.
-- **Un test depende de una descarga.** `test/web/trainer-variants.test.js` lee `public/trainers/`, que baja
-  `npm install` y no se versiona. Sin conexión al instalar, `npm test` falla ahí.
+  `PUT /api/me/equip`, porque comprar un entrenador pide tener al original. Esa regla es `buyBlocker`, una función
+  pura de `stats/domain/achievements.ts`, y `Trainer.buy` no la conoce. `equip` no depende de logros y podría pasar
+  a `TrainersController`.
 - **`combat` lleva cosméticos.** `BattleState` guarda el entrenador, el marco y la Poké Ball de cada lado para que
   la vista los muestre. Son datos de presentación de la arena; el motor no los usa para pelear.
 - **El estado en vivo no se guarda.** Peleas, presencia y chat viven en memoria por diseño: es un juego entre
