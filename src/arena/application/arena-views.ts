@@ -3,6 +3,7 @@
 import { Injectable } from '@nestjs/common';
 import { buildFighter } from '../../combat/domain/fighter.js';
 import { aiLevelOf } from '../../combat/domain/ai.js';
+import { aiBallFor, DEFAULT_BALL } from '../../catalog/domain/shop.js';
 import { STARTER_SPRITES, trainerSpriteFor } from '../../catalog/domain/trainer-sprites.js';
 import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
@@ -174,7 +175,8 @@ export class ArenaViews {
   }
 
   ballOf(id: string): string {
-    return aiLevelOf(id) ? 'pb' : this.trainers.byId(id)?.ball ?? 'pb';
+    if (aiLevelOf(id)) return aiBallFor(Math.random());
+    return this.trainers.byId(id)?.ball ?? DEFAULT_BALL;
   }
 
   countdownPlayer(id: string, fallbackName: string, challenge: Challenge): CountdownPlayer {
