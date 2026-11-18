@@ -58,13 +58,30 @@ test('only bought items can be equipped, and taking one off goes back to the def
   assert.deepEqual(ana.equipped, { frame: 'gold' });
 });
 
-test('a shop trainer must be bought to be picked; one picked before it went on sale is swapped for a free one', () => {
-  const ana = withTokens(2_000_000_000);
-  assert.throws(() => ana.chooseAvatar('jacinthe_holo'), /se compra en tu perfil/);
-  ana.buy('trainer:jacinthe_holo');
-  ana.chooseAvatar('jacinthe_holo');
+test('a recolor on sale must be bought to be picked; one worn without buying it is swapped for a default one', () => {
+  const ana = withTokens(6_000_000_000);
+  assert.throws(() => ana.chooseAvatar('leon_shadow'), /se compra en tu perfil/);
+  ana.buy('trainer:leon_shadow');
+  ana.chooseAvatar('leon_shadow');
   assert.equal(ana.releaseShopLook(), false);
-  const old = Trainer.restore({ id: 'o1', name: 'Beto', tokenHash: 'h', roster: [], team: [], wins: 0, losses: 0, totalTokens: 0, createdAt: 0, avatar: 'nate' });
+  const old = Trainer.restore({ id: 'o1', name: 'Beto', tokenHash: 'h', roster: [], team: [], wins: 0, losses: 0, totalTokens: 0, createdAt: 0, avatar: 'leon_shadow' });
   assert.equal(old.releaseShopLook(), true);
   assert.ok(STARTER_SPRITES.includes(old.look));
+});
+
+test('a trainer that left the shop gives back what was paid for it, once', () => {
+  const beto = Trainer.restore({ id: 'b1', name: 'Beto', tokenHash: 'h', roster: [], team: [], wins: 0, losses: 0, totalTokens: 2_000_000_000, createdAt: 0, shopSpent: 400_000_000, owned: ['trainer:nate', 'ball:gb'] });
+  const before = beto.balance;
+  assert.equal(beto.refundRetired({ nate: 300_000_000 }), 300_000_000);
+  assert.equal(beto.balance, before + 300_000_000);
+  assert.deepEqual(beto.owned, ['ball:gb']);
+  assert.equal(beto.refundRetired({ nate: 300_000_000 }), 0);
+});
+
+test('a free Ball is owned by everyone and can be equipped without buying it', () => {
+  const ana = Trainer.register({ id: 'f1', name: 'Ana', tokenHash: 'h', at: 0 });
+  for (const key of ['mt', 'sk', 'oc', 'li', 'ma']) assert.ok(ana.owns(`ball:${key}`), key);
+  assert.ok(!ana.owns('ball:gb'), 'a common one still has to be bought');
+  ana.equip('ball', 'oc');
+  assert.equal(ana.ball, 'oc');
 });

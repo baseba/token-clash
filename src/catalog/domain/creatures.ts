@@ -149,6 +149,10 @@ export function speciesData(id: number): SpeciesData | null {
   return { ...species, base: { hp, attack, defense, spAttack, spDefense, speed } };
 }
 
+const SPECIES_BY_NAME = new Map(Object.entries(POKEAPI).map(([id, data]) => [data.name, Number(id)]));
+
+export const speciesIdByName = (name: string): number | null => SPECIES_BY_NAME.get(name) ?? null;
+
 export function formData(name: string): FormData | null {
   const form = FORMS[name];
   return form ? { types: form.types, base: form.stats, sprite: form.sprite } : null;
@@ -211,6 +215,18 @@ export function family(id: number): { id: number; stage: number }[] {
   };
   visit(root, 0);
   return out;
+}
+
+/** The fully evolved species a Pokémon can become (itself when it doesn't evolve), up to `maxId`. */
+export function finalForms(id: number, maxId = Infinity): number[] {
+  const finals: number[] = [];
+  const visit = (cur: number) => {
+    const next = (CHILDREN.get(cur) ?? []).filter((child) => child <= maxId);
+    if (!next.length) finals.push(cur);
+    next.forEach(visit);
+  };
+  if (POKEAPI[id]) visit(id);
+  return finals;
 }
 
 export function lineageLearnset(id: number): Map<string, { level: number; from: number }> {

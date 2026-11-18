@@ -1,32 +1,38 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
 import { decodePng } from './sync-trainers.js';
-import { CHAMPIONS, DOWNLOADED_SPRITES, HANDMADE_VARIANTS, VILLAINS } from '../public/trainer-sprites.js';
+import { CHAMPIONS, DOWNLOADED_SPRITES, HANDMADE_VARIANTS, SHOP_TRAINERS, VILLAINS } from '../public/trainer-sprites.js';
 
 const TRAINERS = new URL('../public/trainers/', import.meta.url);
+const SHIPPED_RECOLORS = JSON.parse(readFileSync(new URL('./shipped-recolors.json', import.meta.url), 'utf8'));
 const OUT = new URL('../public/trainer-variants.js', import.meta.url);
 
 export const VARIANT_COLORS = [
   { key: 'crimson', name: 'Carmesí', type: 'fire', hue: 355, sat: 1, light: 1 },
-  { key: 'coral', name: 'Coral', type: 'fighting', hue: 10, sat: 0.95, light: 1.15 },
+  { key: 'coral', name: 'Coral', type: 'fighting', hue: 10, sat: 0.9, light: 1 },
   { key: 'bronze', name: 'Bronce', type: 'rock', hue: 26, sat: 0.6, light: 0.85 },
-  { key: 'amber', name: 'Ámbar', type: 'ground', hue: 34, sat: 1, light: 1 },
-  { key: 'gold', name: 'Dorado', type: 'electric', hue: 48, sat: 1, light: 1.08 },
-  { key: 'ivory', name: 'Marfil', type: 'normal', hue: 45, sat: 0.3, light: 1.3 },
-  { key: 'olive', name: 'Oliva', type: 'bug', hue: 70, sat: 0.55, light: 0.8 },
-  { key: 'lime', name: 'Lima', type: 'grass', hue: 88, sat: 0.95, light: 1.08 },
+  { key: 'amber', name: 'Ámbar', type: 'ground', hue: 34, sat: 0.95, light: 0.9 },
+  { key: 'gold', name: 'Dorado', type: 'electric', hue: 48, sat: 1, light: 1.08, look: { hue: 43, sat: 0.92, light: 0.98, spread: 0.2 } },
+  { key: 'ivory', name: 'Marfil', type: 'normal', hue: 45, sat: 0.3, light: 1.12 },
+  { key: 'olive', name: 'Oliva', type: 'bug', hue: 70, sat: 0.55, light: 0.72 },
+  { key: 'lime', name: 'Lima', type: 'grass', hue: 92, sat: 0.8, light: 0.82 },
   { key: 'emerald', name: 'Esmeralda', type: 'grass', hue: 140, sat: 0.9, light: 0.92 },
-  { key: 'mint', name: 'Menta', type: 'ice', hue: 158, sat: 0.6, light: 1.22 },
-  { key: 'teal', name: 'Turquesa', type: 'water', hue: 180, sat: 0.9, light: 0.95 },
-  { key: 'sky', name: 'Celeste', type: 'flying', hue: 200, sat: 0.75, light: 1.2 },
+  { key: 'mint', name: 'Menta', type: 'ice', hue: 158, sat: 0.55, light: 1 },
+  { key: 'teal', name: 'Turquesa', type: 'water', hue: 182, sat: 0.62, light: 0.78 },
+  { key: 'sky', name: 'Celeste', type: 'flying', hue: 200, sat: 0.75, light: 1.05, look: { hue: 207, sat: 0.85, light: 1.05, spread: 0.15 } },
   { key: 'sapphire', name: 'Zafiro', type: 'water', hue: 218, sat: 1, light: 0.9 },
   { key: 'slate', name: 'Pizarra', type: 'steel', hue: 215, sat: 0.22, light: 0.95 },
   { key: 'indigo', name: 'Índigo', type: 'dragon', hue: 240, sat: 0.85, light: 0.8 },
   { key: 'violet', name: 'Violeta', type: 'ghost', hue: 272, sat: 0.95, light: 0.95 },
-  { key: 'lavender', name: 'Lavanda', type: 'psychic', hue: 268, sat: 0.5, light: 1.25 },
+  { key: 'lavender', name: 'Lavanda', type: 'psychic', hue: 268, sat: 0.5, light: 1.05 },
   { key: 'magenta', name: 'Magenta', type: 'poison', hue: 305, sat: 0.95, light: 1 },
-  { key: 'rose', name: 'Rosa', type: 'fairy', hue: 332, sat: 0.85, light: 1.15 },
-  { key: 'wine', name: 'Burdeos', type: 'dark', hue: 345, sat: 0.75, light: 0.7 },
+  { key: 'rose', name: 'Rosa', type: 'fairy', hue: 332, sat: 0.85, light: 1 },
+  { key: 'rust', name: 'Óxido', type: 'steel', hue: 16, sat: 0.7, light: 0.72 },
+  { key: 'peach', name: 'Durazno', type: 'normal', hue: 22, sat: 0.6, light: 1 },
+  { key: 'forest', name: 'Bosque', type: 'grass', hue: 128, sat: 0.55, light: 0.62 },
+  { key: 'navy', name: 'Marino', type: 'water', hue: 225, sat: 0.65, light: 0.6 },
+  { key: 'plum', name: 'Ciruela', type: 'poison', hue: 292, sat: 0.55, light: 0.68 },
+  { key: 'wine', name: 'Burdeos', type: 'dark', hue: 345, sat: 0.75, light: 0.7, look: { hue: 352, sat: 0.8, light: 0.6, spread: 0.15 } },
 ];
 
 const STORY = new Set([...CHAMPIONS, ...VILLAINS.boss, ...VILLAINS.legend]);
@@ -37,9 +43,42 @@ const NEIGHBOR_SHARE = 0.25;
 const SEED_RANGE = 40;
 const SHADE_RANGE = 55;
 const MIN_CHANGE = 70;
+const MIN_VISIBLE = 55;
 const SECOND_SHARE = 0.5;
-const SKIN_SHADE_SHARE = 0.5;
-const SKIN_TOUCH = 0.25;
+const PARTNER_VARIANTS = new Set(['red__magenta']);
+const SKIN_TOUCH = 0.3;
+const HEAD_BAND = 0.32;
+const SKIN_SEED_LIGHT = 0.4;
+const SKIN_HEAD_SHARE = 0.02;
+const HAIR_SHADES = { alder: [0xa54a31, 0x733121] };
+const SIMILAR_RANGE = 25;
+const SIMILAR_SAT = 0.12;
+const GRAY_WEIGHT = 0.4;
+const THIRD_SHARE = 0.08;
+const REGION_SHARE = 0.06;
+const POKEMON_REGION_SHARE = 0.03;
+const HAIR_SHARE = 0.75;
+const PANTS_LINE = 0.66;
+const TORSO_BAND = [0.28, 0.58];
+const BODY_SHARE = 0.25;
+const SUIT_TONE_GAP = 0.4;
+const MAX_LUMA = 0.58;
+const VARIANT_MIN_CHANGE = 52;
+const DULL_SAT = 0.38;
+const DARK_MAX_SAT = 0.6;
+const DARK_LIFT = 0.05;
+const DARK_GAIN = 1.15;
+const DARK_MAX_LIGHT = 0.55;
+const WHITE_FROM = 0.8;
+const WHITE_BASE = 0.8;
+const WHITE_CONTRAST = 1.15;
+const CHROMA_BASE_MAX = 0.5;
+const CHROMA_MIN_CONTRAST = 0.9;
+const CHROMA_MAX_SAT = 0.82;
+const HIGHLIGHT_FROM = 0.6;
+const HIGHLIGHT_FADE = 1.7;
+const CHROMA_MAX_LIGHT = 0.82;
+const COMPARABLE = 0.4;
 
 export const variantsWanted = (key) => (STORY.has(key) ? 4 : MAIN.has(key) ? 3 : 1);
 
@@ -69,18 +108,41 @@ const signed = (a, b) => ((a - b + 540) % 360) - 180;
 export const isSkin = ([h, s, l]) => h >= 6 && h <= 38 && ((s >= 0.15 && s <= 0.7 && l >= 0.18 && l <= 0.93) || (l >= 0.72 && s >= 0.15));
 const isOutline = ([, , l]) => l < 0.07;
 
-function paletteOf(image) {
+const loadTrainer = (base) => ({ ...decodePng(readFileSync(new URL(`${base}.png`, TRAINERS))), hairShades: HAIR_SHADES[base] });
+
+export function paletteOf(image) {
   const colors = new Map();
   const at = (i) => image.rgba.readUIntBE(i * 4, 3);
   const touch = (a, b) => {
     const entry = colors.get(a);
     entry.neighbors.set(b, (entry.neighbors.get(b) ?? 0) + 1);
   };
+  let top = image.height;
+  let bottom = 0;
+  let sumX = 0;
+  let opaque = 0;
+  for (let i = 0; i < image.width * image.height; i++) {
+    if (!image.rgba[i * 4 + 3]) continue;
+    const y = Math.floor(i / image.width);
+    top = Math.min(top, y);
+    bottom = Math.max(bottom, y);
+    sumX += i % image.width;
+    opaque += 1;
+  }
+  const axis = opaque ? sumX / opaque : image.width / 2;
+  const span = Math.max(1, bottom - top + 1);
   for (let i = 0; i < image.width * image.height; i++) {
     if (!image.rgba[i * 4 + 3]) continue;
     const c = at(i);
-    if (!colors.has(c)) colors.set(c, { rgb: [c >> 16, (c >> 8) & 255, c & 255], count: 0, neighbors: new Map() });
-    colors.get(c).count += 1;
+    if (!colors.has(c)) colors.set(c, { rgb: [c >> 16, (c >> 8) & 255, c & 255], count: 0, sumY: 0, torso: 0, legs: 0, offAxis: 0, neighbors: new Map() });
+    const entry = colors.get(c);
+    const y = Math.floor(i / image.width);
+    const along = (y - top) / span;
+    entry.count += 1;
+    entry.sumY += y / image.height;
+    if (along >= TORSO_BAND[0] && along < TORSO_BAND[1]) entry.torso += 1;
+    if (along >= TORSO_BAND[1]) entry.legs += 1;
+    entry.offAxis += Math.abs((i % image.width) - axis) / image.width;
   }
   for (let y = 0; y < image.height; y++)
     for (let x = 0; x < image.width; x++) {
@@ -93,37 +155,73 @@ function paletteOf(image) {
       }
     }
   for (const entry of colors.values()) entry.hsl = hsl(entry.rgb);
+  markSkin(image, colors);
   return colors;
 }
 
-const isCoreSkin = ([h, s, l]) => isSkin([h, s, l]) && l >= 0.45;
-const warm = (h) => h >= 330 || h <= 40;
-
-function touchesSkin(colors, entry) {
-  const total = [...entry.neighbors.values()].reduce((a, b) => a + b, 0);
-  const skin = [...entry.neighbors].filter(([n]) => isCoreSkin(colors.get(n).hsl)).reduce((a, [, k]) => a + k, 0);
-  return warm(entry.hsl[0]) && entry.hsl[1] >= 0.15 && total > 0 && skin / total >= SKIN_TOUCH;
+function markSkin(image, colors) {
+  let top = image.height;
+  let bottom = -1;
+  for (let y = 0; y < image.height; y++)
+    for (let x = 0; x < image.width; x++)
+      if (image.rgba[(y * image.width + x) * 4 + 3]) {
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+  const headEnd = top + (bottom - top + 1) * HEAD_BAND;
+  const inHead = new Map();
+  for (let y = top; y < headEnd; y++)
+    for (let x = 0; x < image.width; x++) {
+      const i = y * image.width + x;
+      if (image.rgba[i * 4 + 3]) inHead.set(image.rgba.readUIntBE(i * 4, 3), (inHead.get(image.rgba.readUIntBE(i * 4, 3)) ?? 0) + 1);
+    }
+  for (const [c, entry] of colors) {
+    entry.head = inHead.get(c) ?? 0;
+    entry.skin = isSkin(entry.hsl) && entry.hsl[2] >= SKIN_SEED_LIGHT && entry.head >= 2 && entry.head >= entry.count * SKIN_HEAD_SHARE;
+  }
+  for (const c of image.hairShades ?? []) if (colors.has(c)) colors.get(c).skin = false;
+  const share = (entry) => {
+    const total = [...entry.neighbors.values()].reduce((a, b) => a + b, 0);
+    const near = [...entry.neighbors].filter(([n]) => colors.get(n).skin).reduce((a, [, k]) => a + k, 0);
+    return total ? near / total : 0;
+  };
+  for (const entry of colors.values()) if (!entry.skin && warm(entry.hsl[0]) && entry.hsl[1] >= 0.15 && entry.hsl[1] <= 0.75 && share(entry) >= SKIN_TOUCH) entry.touchesSkin = true;
+  for (const entry of colors.values()) if (entry.touchesSkin) entry.skin = true;
 }
 
+const warm = (h) => h >= 330 || h <= 40;
+
 function growRegion(colors, kind, center, taken) {
-  const free = (c, entry) => !taken.has(c) && !isSkin(entry.hsl) && !isOutline(entry.hsl) && !touchesSkin(colors, entry);
+  const free = (c, entry) => !taken.has(c) && !entry.skin && !isOutline(entry.hsl);
   const neutralFits = ([, s, l]) => (kind === 'dark' ? l <= 0.6 : kind === 'light' ? l >= 0.3 : true) && !(s < 0.1 && (l > 0.9 || l < 0.1) && kind === 'hue');
   const inSeed = ([h, s, l]) => (kind === 'hue' ? (s >= 0.15 && distance(h, center) <= SEED_RANGE) || (s >= 0.1 && l < 0.45 && distance(h, center) <= SHADE_RANGE) : kind === 'light' ? s < 0.25 && l >= 0.55 : s < 0.25 && l >= 0.1 && l < 0.45);
   const region = new Set([...colors].filter(([c, entry]) => free(c, entry) && inSeed(entry.hsl)).map(([c]) => c));
   for (let round = 0; round < 3; round++)
     for (const [c, entry] of colors) {
-      if (region.has(c) || taken.has(c) || isOutline(entry.hsl) || touchesSkin(colors, entry) || !neutralFits(entry.hsl)) continue;
+      if (region.has(c) || taken.has(c) || isOutline(entry.hsl) || entry.skin || !neutralFits(entry.hsl)) continue;
       const total = [...entry.neighbors.values()].reduce((a, b) => a + b, 0);
       const near = [...entry.neighbors].filter(([n]) => region.has(n)).reduce((a, [, k]) => a + k, 0);
       const share = total ? near / total : 0;
-      const fits = kind !== 'hue' || distance(entry.hsl[0], center) <= 100 || entry.hsl[1] < 0.35;
-      const shadeOfRegion = kind !== 'hue' ? entry.hsl[1] < 0.45 : distance(entry.hsl[0], center) <= 45;
-      if (isSkin(entry.hsl) ? share >= SKIN_SHADE_SHARE && shadeOfRegion : share >= NEIGHBOR_SHARE && fits) region.add(c);
+      const fits = kind !== 'hue' ? entry.hsl[1] < 0.35 : distance(entry.hsl[0], center) <= 100 || entry.hsl[1] < 0.35;
+      if (share >= NEIGHBOR_SHARE && fits) region.add(c);
     }
+  if (kind === 'hue') {
+    for (const [c, entry] of colors) {
+      if (region.has(c) || taken.has(c) || entry.skin || isOutline(entry.hsl)) continue;
+      const [h, sat] = entry.hsl;
+      if (sat >= SIMILAR_SAT && distance(h, center) <= SIMILAR_RANGE) region.add(c);
+    }
+  }
   const members = [...region].map((c) => colors.get(c));
   const weight = members.reduce((sum, e) => sum + e.count, 0);
+  const height = weight ? members.reduce((sum, e) => sum + e.sumY, 0) / weight : 0;
+  const headShare = weight ? members.reduce((sum, e) => sum + (e.head ?? 0), 0) / weight : 0;
+  const share = (field) => (weight ? members.reduce((sum, e) => sum + e[field], 0) / weight : 0);
+  const torso = share('torso');
+  const legs = share('legs');
+  const offAxis = share('offAxis');
   const mean = (i) => (weight ? members.reduce((sum, e) => sum + e.hsl[i] * e.count, 0) / weight : 0);
-  return { kind, hue: center, colors: members, weight, keys: region, dull: mean(1) < 0.35, dim: mean(2) < 0.3 };
+  return { kind, hue: center, colors: members, weight, keys: region, height, headShare, torso, legs, offAxis, dull: mean(1) < 0.35, dim: mean(2) < 0.3 };
 }
 
 function candidatesOf(colors) {
@@ -131,9 +229,11 @@ function candidatesOf(colors) {
   let opaque = 0;
   let light = 0;
   let dark = 0;
-  for (const { hsl: [h, s, l], count } of colors.values()) {
+  for (const entry of colors.values()) {
+    const [h, s, l] = entry.hsl;
+    const count = entry.count;
     opaque += count;
-    if (isOutline([h, s, l]) || isSkin([h, s, l])) continue;
+    if (isOutline(entry.hsl) || entry.skin) continue;
     if (s < 0.25) {
       if (l >= 0.55) light += count;
       else if (l >= 0.1 && l < 0.45) dark += count;
@@ -148,7 +248,7 @@ function candidatesOf(colors) {
     const best = left.reduce((a, b) => (around(b) > around(a) ? b : a));
     if (!around(best)) break;
     const binCenter = best * BIN + BIN / 2;
-    const seeds = [...colors.values()].filter((e) => !isSkin(e.hsl) && !isOutline(e.hsl) && e.hsl[1] >= 0.2 && distance(e.hsl[0], binCenter) <= SEED_RANGE);
+    const seeds = [...colors.values()].filter((e) => !e.skin && !isOutline(e.hsl) && e.hsl[1] >= 0.2 && distance(e.hsl[0], binCenter) <= SEED_RANGE);
     hues.push({ kind: 'hue', hue: meanHue(seeds), weight: around(best) });
     for (const i of [best - 2, best - 1, best, best + 1, best + 2]) left.splice(left.indexOf((i + bins.length) % bins.length), left.includes((i + bins.length) % bins.length) ? 1 : 0);
   }
@@ -168,6 +268,100 @@ export function colorRegions(image) {
 }
 
 export const dominantRegion = (image) => colorRegions(image)[0];
+
+export function topRegions(image, n, minShare = REGION_SHARE) {
+  const colors = paletteOf(image);
+  let opaque = 0;
+  for (const { count } of colors.values()) opaque += count;
+  const bins = new Map();
+  let light = 0;
+  let dark = 0;
+  for (const entry of colors.values()) {
+    const [h, s, l] = entry.hsl;
+    if (isOutline(entry.hsl) || entry.skin) continue;
+    if (s < 0.25) {
+      if (l >= 0.55) light += entry.count;
+      else if (l >= 0.1 && l < 0.45) dark += entry.count;
+      continue;
+    }
+    const bin = Math.floor(h / BIN) % (360 / BIN);
+    bins.set(bin, (bins.get(bin) ?? 0) + entry.count);
+  }
+  const candidates = [
+    ...[...bins].map(([bin, weight]) => {
+      const center = bin * BIN + BIN / 2;
+      const seeds = [...colors.values()].filter((e) => !e.skin && !isOutline(e.hsl) && e.hsl[1] >= 0.2 && distance(e.hsl[0], center) <= BIN);
+      return { kind: 'hue', hue: meanHue(seeds), weight };
+    }),
+    { kind: 'light', hue: null, weight: light },
+    { kind: 'dark', hue: null, weight: dark },
+  ].sort((a, b) => b.weight - a.weight);
+  const regions = [];
+  const taken = new Set();
+  for (const candidate of candidates) {
+    if (regions.length >= n || candidate.weight < opaque * minShare) continue;
+    if (candidate.kind === 'hue' && regions.some((r) => r.kind === 'hue' && distance(r.hue, candidate.hue) < 40)) continue;
+    const region = growRegion(colors, candidate.kind, candidate.hue, taken);
+    if (region.weight < opaque * minShare) continue;
+    region.keys.forEach((key) => taken.add(key));
+    regions.push(region);
+  }
+  return regions;
+}
+
+export function pokemonPalette(image, n = 3) {
+  const clusters = new Map();
+  for (let i = 0; i < image.width * image.height; i++) {
+    if (!image.rgba[i * 4 + 3]) continue;
+    const rgb = [image.rgba[i * 4], image.rgba[i * 4 + 1], image.rgba[i * 4 + 2]];
+    const [h, s, l] = hsl(rgb);
+    if (l < 0.12) continue;
+    const neutral = s < 0.18 || l >= 0.78;
+    const key = neutral ? (l >= 0.7 ? 'light' : 'gray') : `h${Math.floor(((h + 12) % 360) / 24)}`;
+    const cluster = clusters.get(key) ?? { neutral, count: 0, tones: new Map() };
+    cluster.count += 1;
+    const tone = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
+    cluster.tones.set(tone, (cluster.tones.get(tone) ?? 0) + 1);
+    clusters.set(key, cluster);
+  }
+  const colors = [...clusters.values()].map((cluster) => {
+    const tones = [...cluster.tones].map(([tone, count]) => ({ hsl: hsl([tone >> 16, (tone >> 8) & 255, tone & 255]), count }));
+    const mid = tones.filter(({ hsl: [, , l] }) => l >= 0.3 && l <= 0.8);
+    const [hue, sat, light] = (mid.length ? mid : tones).reduce((a, b) => (b.count > a.count ? b : a)).hsl;
+    return { hue, sat, light, count: cluster.count, neutral: cluster.neutral };
+  });
+  const merged = [];
+  for (const color of colors.sort((a, b) => b.count - a.count)) {
+    const near = merged.find((m) => m.neutral === color.neutral && (color.neutral ? Math.abs(m.light - color.light) < 0.2 : distance(m.hue, color.hue) < 30));
+    if (near) near.count += color.count;
+    else merged.push(color);
+  }
+  const weightOf = (color) => (color.neutral && color.light < 0.7 ? color.count * GRAY_WEIGHT : color.count);
+  return merged.sort((a, b) => weightOf(b) - weightOf(a)).slice(0, n);
+}
+
+export function paintRegion(region, color) {
+  const weight = region.colors.reduce((sum, e) => sum + e.count, 0) || 1;
+  const meanS = region.colors.reduce((sum, e) => sum + e.hsl[1] * e.count, 0) / weight;
+  const meanL = region.colors.reduce((sum, e) => sum + e.hsl[2] * e.count, 0) / weight;
+  const lights = region.colors.map((e) => e.hsl[2]);
+  const up = Math.max(...lights) - meanL;
+  const down = meanL - Math.min(...lights);
+  const white = color.light >= WHITE_FROM;
+  const chromatic = !white && !color.neutral;
+  const base = white ? WHITE_BASE : chromatic ? Math.min(color.light, CHROMA_BASE_MAX) : color.light;
+  const contrast = white ? WHITE_CONTRAST : Math.max(CHROMA_MIN_CONTRAST, Math.min(1, up > 0 ? (CHROMA_MAX_LIGHT - base) / up : 1, down > 0 ? (base - 0.06) / down : 1));
+  return region.colors.map(({ rgb, hsl: [h, s, l] }) => {
+    const from = `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    const hue = color.hue + (region.hue === null ? 0 : clamp(signed(h, region.hue), -30, 30) * 0.1);
+    const sat = color.neutral ? clamp(color.sat + (s - meanS) * 0.3, 0, 0.22) : clamp(Math.min(color.sat, CHROMA_MAX_SAT) + (s - meanS) * 0.6, 0.12, CHROMA_MAX_SAT);
+    const light = clamp(base + (l - meanL) * Math.max(contrast, 0.35), white ? 0.3 : 0.04, white ? 0.98 : 0.96);
+    const capped = color.neutral ? light : Math.min(light, CHROMA_MAX_LIGHT);
+    return [from, hex(hue, color.neutral ? sat : pastel(sat, capped), capped)];
+  });
+}
+
+const pastel = (sat, light) => sat * clamp(1 - Math.max(0, light - HIGHLIGHT_FROM) * HIGHLIGHT_FADE, 0.35, 1);
 
 function meanHue(entries) {
   let x = 0;
@@ -216,59 +410,162 @@ function rankFor(region, colors) {
   return [...candidates.filter((c) => c.change >= MIN_CHANGE), ...candidates.filter((c) => c.change < MIN_CHANGE).sort((a, b) => b.change - a.change)].map((c) => c.color);
 }
 
-export function pickTargets(base, region, count) {
-  const clash = (picked, color) => picked.some((p) => distance(p.hue, color.hue) < 35 && Math.abs(p.light - color.light) < 0.25);
-  const picked = [];
-  for (const color of rankFor(region, shuffledColors(base))) {
+export function pickTargets(base, region, count, usage = new Map(), already = []) {
+  const clash = (picked, color) => picked.some((p) => p.key === color.key || (distance(p.hue, color.hue) < 35 && Math.abs(p.light - color.light) < 0.25));
+  const handmadeNames = HANDMADE_VARIANTS.filter((variant) => variant.base === base).map((variant) => variant.name ?? '');
+  const picked = [...already];
+  const ranked = rankFor(region, shuffledColors(base));
+  const strong = ranked.filter((color) => visibleChange(region, colorMap(region, color)) >= MIN_VISIBLE);
+  const order = [...strong.sort((a, b) => (usage.get(a.key) ?? 0) - (usage.get(b.key) ?? 0)), ...ranked.filter((color) => !strong.includes(color))];
+  for (const color of order.filter((color) => !handmadeNames.some((name) => name.endsWith(color.name)))) {
     if (picked.length >= count) break;
     if (!clash(picked, color)) picked.push(color);
   }
+  for (const color of picked.slice(already.length)) usage.set(color.key, (usage.get(color.key) ?? 0) + 1);
   return picked;
+}
+
+function paintedLuma(region, map) {
+  const to = new Map(map);
+  let sum = 0;
+  let weight = 0;
+  for (const { rgb, count } of region.colors) {
+    const target = to.get(`#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`);
+    if (!target) continue;
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(target.slice(i, i + 2), 16));
+    sum += ((0.299 * r + 0.587 * g + 0.114 * b) / 255) * count;
+    weight += count;
+  }
+  return weight ? sum / weight : 0;
 }
 
 export function pickSecond(base, region, main) {
   return rankFor(region, shuffledColors(`${base}:${main.key}`)).find((color) => farFrom(color, main)) ?? null;
 }
 
-export function colorMap(region, target) {
+export function colorMap(region, target, paint = false) {
+  const spreadOf = paint ? target.look?.spread ?? 0.3 : 0.5;
+  const limit = paint ? 30 : 45;
+  if (paint && target.look) target = { ...target, ...target.look };
+  const finish = (hue, sat, light) => {
+    if (!paint) return hex(hue, clamp(sat, 0, 1), light);
+    const capped = Math.min(light, CHROMA_MAX_LIGHT);
+    return hex(hue, pastel(clamp(sat, 0, CHROMA_MAX_SAT), capped), capped);
+  };
   return region.colors.map(({ rgb, hsl: [h, s, l] }) => {
     const from = `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
     if (region.kind === 'hue') {
-      const sat = (region.dull ? Math.max(s, 0.5) * Math.max(target.sat, 0.45) : s * target.sat);
-      const light = region.dim ? (0.1 + l * 1.35) * target.light : l * target.light;
-      return [from, hex(target.hue + clamp(signed(h, region.hue), -45, 45) * 0.5, clamp(sat, 0, 1), clamp(light, 0.04, 0.96))];
+      const sat = region.dull ? Math.min(Math.max(s, DULL_SAT) * Math.max(target.sat, 0.45), DARK_MAX_SAT) : s * target.sat;
+      const light = region.dim ? Math.min((DARK_LIFT + l * DARK_GAIN) * target.light, DARK_MAX_LIGHT) : l * target.light;
+      return [from, finish(target.hue + clamp(signed(h, region.hue), -limit, limit) * spreadOf, sat, clamp(light, 0.04, 0.96))];
     }
-    if (region.kind === 'dark') return [from, hex(target.hue, clamp(Math.max(s, 0.55) * Math.max(target.sat, 0.45), 0, 1), clamp((0.1 + l * 1.35) * target.light, 0.08, 0.7))];
-    return [from, hex(target.hue, clamp(Math.max(s, 0.42) * Math.max(target.sat, 0.45), 0, 1), clamp(l * 0.92 * Math.min(target.light, 1.05), 0.04, 0.93))];
+    if (region.kind === 'dark') return [from, finish(target.hue, Math.min(Math.max(s, DULL_SAT) * Math.max(target.sat, 0.45), DARK_MAX_SAT), clamp((DARK_LIFT + l * DARK_GAIN) * target.light, 0.06, DARK_MAX_LIGHT))];
+    return [from, finish(target.hue, Math.max(s, 0.42) * Math.max(target.sat, 0.45), clamp(l * 0.92 * Math.min(target.light, 1.05), 0.04, 0.93))];
   });
 }
 
 function plan() {
+  const usage = new Map();
   const handmade = new Map();
-  for (const variant of HANDMADE_VARIANTS) handmade.set(variant.base, (handmade.get(variant.base) ?? 0) + 1);
+  for (const variant of HANDMADE_VARIANTS) if (!variant.pokemon) handmade.set(variant.base, (handmade.get(variant.base) ?? 0) + 1);
   const variants = [];
   for (const base of DOWNLOADED_SPRITES) {
-    const count = Math.max(0, variantsWanted(base) - (handmade.get(base) ?? 0));
+    const soldHandmade = HANDMADE_VARIANTS.some((variant) => variant.base === base && variant.key in SHOP_TRAINERS);
+    const count = Math.max(1, variantsWanted(base) - (handmade.get(base) ?? 0));
     if (!count) continue;
-    const [main, second] = colorRegions(decodePng(readFileSync(new URL(`${base}.png`, TRAINERS))));
-    pickTargets(base, main, count).forEach((target, i) => {
-      const other = second && pickSecond(base, second, target);
-      const map = [...colorMap(main, target), ...(other ? colorMap(second, other) : [])];
-      variants.push({ key: `${base}__${target.key}`, base, color: target.key, ...(i % 2 === 0 ? { earn: true } : {}), map });
+    const [main, second] = colorRegions(loadTrainer(base));
+    const earnedAt = (targets, target, i) => PARTNER_VARIANTS.has(`${base}__${target.key}`) || (targets.length > 1 && i % 2 === 0);
+    const bought = Object.keys(SHIPPED_RECOLORS).filter((key) => key.startsWith(`${base}__`)).map((key) => VARIANT_COLORS.find((color) => color.key === key.slice(base.length + 2))).filter(Boolean);
+    for (const color of bought) usage.set(color.key, (usage.get(color.key) ?? 0) + 1);
+    let targets = pickTargets(base, main, Math.max(count, bought.length), usage, bought);
+    if (!soldHandmade && targets.every((target, i) => earnedAt(targets, target, i))) targets = pickTargets(base, main, targets.length + 1, usage, targets);
+    const total = (handmade.get(base) ?? 0) + targets.length;
+    const neutralSuit = (region) => region && region.kind !== 'hue' && region.torso >= BODY_SHARE && region.legs >= BODY_SHARE;
+    const meanLight = (region) => region.colors.reduce((sum, e) => sum + e.hsl[2] * e.count, 0) / Math.max(1, region.colors.reduce((sum, e) => sum + e.count, 0));
+    const oneOutfit = neutralSuit(main) && neutralSuit(second) && Math.abs(meanLight(main) - meanLight(second)) <= SUIT_TONE_GAP;
+    const extra = total === 1 ? pickTargets(base, main, targets.length + 4).find((color) => !targets.some((t) => t.key === color.key || (Math.abs(((t.hue - color.hue + 540) % 360) - 180) < 35 && Math.abs(t.light - color.light) < 0.25))) : null;
+    const sold = new Set();
+    if (extra) {
+      targets = [...targets, extra];
+      sold.add(extra.key);
+    }
+    const counts = new Map([...main.colors, ...(second?.colors ?? [])].map((e) => [`#${e.rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`, e.count]));
+    const changeOf = (map) => {
+      let change = 0;
+      let weight = 0;
+      for (const [from, to] of map) {
+        const n = counts.get(from) ?? 0;
+        const [a, b] = [from, to].map((hex) => [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16)));
+        change += n * Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+        weight += n;
+      }
+      return weight ? change / weight : 0;
+    };
+    const mapFor = (target) => {
+      const other = second && (oneOutfit ? target : pickSecond(base, second, target));
+      const visible = (color) => visibleChange(main, colorMap(main, color, true)) >= MIN_VISIBLE;
+      const scaled = (factor) => ({ ...target, light: target.light * factor, look: target.look && { ...target.look, light: target.look.light * factor } });
+      const bright = (color) => paintedLuma(main, colorMap(main, color, true)) > MAX_LUMA;
+      const painted = [target, ...[0.7, 0.55].map(scaled)].find((color) => visible(color) && !bright(color)) ?? [0.85, 0.7, 0.55].map(scaled).find((color) => !bright(color)) ?? target;
+      const build = (color) => [...colorMap(main, color, true), ...(other ? colorMap(second, other, true) : [])];
+      const maps = [painted, ...[1.2, 1.4].map(scaled)].map(build);
+      return maps.find((map) => changeOf(map) >= VARIANT_MIN_CHANGE) ?? maps[0];
+    };
+    targets = targets.map((target) => {
+      if (bought.includes(target) || changeOf(mapFor(target)) >= VARIANT_MIN_CHANGE) return target;
+      const spare = [...VARIANT_COLORS]
+        .filter((color) => !targets.some((t) => t.key === color.key))
+        .sort((a, b) => (usage.get(a.key) ?? 0) - (usage.get(b.key) ?? 0))
+        .find((color) => changeOf(mapFor(color)) >= VARIANT_MIN_CHANGE);
+      if (!spare) return target;
+      usage.set(target.key, (usage.get(target.key) ?? 1) - 1);
+      usage.set(spare.key, (usage.get(spare.key) ?? 0) + 1);
+      return spare;
+    });
+    targets.forEach((target, i) => {
+      const map = mapFor(target);
+      const earned = sold.has(target.key) || bought.includes(target) ? false : earnedAt(targets, target, i);
+      variants.push({ key: `${base}__${target.key}`, base, color: target.key, ...(earned ? { earn: true } : {}), map });
     });
   }
   return variants;
 }
 
+function pokemonMaps() {
+  const maps = {};
+  for (const variant of HANDMADE_VARIANTS.filter((v) => v.pokemon)) {
+    const trainer = loadTrainer(variant.base);
+    const [front, back] = ['front', 'back'].map((side) => decodePng(readFileSync(new URL(`../public/sprites/${variant.pokemon}-${side}.png`, import.meta.url))));
+    const sprite = { width: front.width, height: front.height + back.height, rgba: Buffer.concat([front.rgba, back.rgba]) };
+    const palette = pokemonPalette(sprite, 3);
+    const opaque = trainer.rgba.filter((_, i) => i % 4 === 3 && trainer.rgba[i] > 0).length;
+    const found = topRegions(trainer, 3, POKEMON_REGION_SHARE);
+    const suits = found.filter((region) => region.torso >= BODY_SHARE && region.legs >= BODY_SHARE && region.headShare < HAIR_SHARE);
+    const suit = suits.length ? suits.reduce((a, b) => (b.torso > a.torso ? b : a)) : null;
+    const [first, second] = found;
+    const pantsFirst = !suit && first && second && first.height >= PANTS_LINE && second.height < first.height && second.headShare < HAIR_SHARE && second.weight >= first.weight * COMPARABLE;
+    const ordered = suit ? [suit, ...found.filter((region) => region !== suit)] : pantsFirst ? [second, first, ...found.slice(2)] : found;
+    const regions = ordered.filter((region, i) => i < 2 || region.weight >= opaque * THIRD_SHARE);
+    const colors = suit ? [palette[0], ...palette.slice(1).filter((color) => !color.neutral), ...palette.slice(1).filter((color) => color.neutral)] : palette;
+    maps[variant.key] = regions.flatMap((region, i) => (colors[i] ? paintRegion(region, colors[i]) : []));
+  }
+  return maps;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const variants = plan();
+  const soldNow = new Set(variants.filter((v) => !v.earn).map((v) => v.key));
+  const retired = Object.fromEntries(Object.entries(SHIPPED_RECOLORS).filter(([key]) => !soldNow.has(key)));
+  const maps = pokemonMaps();
   const quote = (value) => JSON.stringify(value).replace(/"/g, "'");
   const lines = variants.map((v) => `  { key: ${quote(v.key)}, base: ${quote(v.base)}, color: ${quote(v.color)},${v.earn ? ' earn: true,' : ''} map: ${quote(v.map)} },`);
   writeFileSync(
     OUT,
     `export const VARIANT_COLOR_NAMES = ${quote(Object.fromEntries(VARIANT_COLORS.map((c) => [c.key, c.name])))};\n\n` +
       `export const VARIANT_COLOR_TYPES = ${quote(Object.fromEntries(VARIANT_COLORS.map((c) => [c.key, c.type])))};\n\n` +
-      `export const GENERATED_VARIANTS = [\n${lines.join('\n')}\n];\n`,
+      `export const RETIRED_GENERATED = ${quote(retired)};\n\n` +
+      `export const GENERATED_VARIANTS = [\n${lines.join('\n')}\n];\n\n` +
+      `export const POKEMON_VARIANT_MAPS = {\n${Object.entries(maps).map(([key, map]) => `  ${key}: ${quote(map)},`).join('\n')}\n};\n`,
   );
   const uses = {};
   for (const v of variants) uses[v.color] = (uses[v.color] ?? 0) + 1;

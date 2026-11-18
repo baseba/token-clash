@@ -1,6 +1,7 @@
-import { lineage, speciesData } from '../../catalog/domain/creatures.js';
+import { finalForms, lineage, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { EARNED_VARIANTS, ELITE_FOUR, GYM_LEADERS, isShopTrainer, TRAINER_SPRITES, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
+import { EARNED_VARIANTS, ELITE_FOUR, GYM_LEADERS, isShopTrainer, originalTier, TRAINER_SPRITES, TRAINER_VARIANTS, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
+import { CLASS_TRAINERS, SIGNATURE, SPECIES_NEED, STARTER_IDS, STARTER_NEED, TYPE_NEED, type ClassTrainer, type TrainerRarity } from './trainer-goals.js';
 import { RARITIES, shopItem, shopItemOf } from '../../catalog/domain/shop.js';
 import { TYPES } from '../../catalog/domain/type-chart.js';
 import type { ChallengeState } from '../../arena/domain/challenge.js';
@@ -16,26 +17,7 @@ const GYM_STEPS = [3, 6, 10, 15];
 const ELITE_SPECIES = 12;
 const ELITE_WINS = 10;
 const LOW_LEVEL = 30;
-const KYOGRE = 382;
-const GROUDON = 383;
-const RAYQUAZA = 384;
-const VARIANT_TYPE_COUNT = { free: 5, shop: 6, locked: 8 };
-const BLASTOISE = 9;
-const CHARIZARD = 6;
-const GENERATED_PARTNERS: Readonly<Record<string, number>> = { red__magenta: CHARIZARD };
-const VARIANT_PARTNERS: readonly [string, string, number][] = [
-  ['red_yellow', 'red', 25],
-  ['red_green', 'red', 3],
-  ['blue_red', 'blue', 6],
-  ['lance_dragonite', 'lance', 149],
-  ['misty_starmie', 'misty', 121],
-  ['steven_metagross', 'steven', 376],
-  ['wallace_milotic', 'wallace', 350],
-  ['cynthia_garchomp', 'cynthia', 445],
-  ['cynthia_platinum', 'cynthia', 487],
-  ['iris_haxorus', 'iris', 612],
-  ['diantha_gardevoir', 'diantha', 282],
-];
+const VARIANT_TYPE_COUNT = { class: 5, shop: 6, gym: 8, villain: 10, elite: 10, special: 10, champion: 12 } as const;
 
 export interface PlayerRecord {
   speciesByType: Record<string, number>;
@@ -153,16 +135,23 @@ export interface Goal {
   text: string;
   have: number;
   need: number;
+  /** Which Pokémon count, when the text names a group of them. */
+  hint?: string;
 }
 
 type GoalRule = (r: PlayerRecord) => Goal;
 interface Unlock {
-  group: 'gym' | 'elite' | 'champion' | 'villain' | 'special' | 'variant';
+  group: 'class' | 'gym' | 'elite' | 'champion' | 'villain' | 'special' | 'variant';
   title: string;
   ways: GoalRule[][];
 }
 
-const displayName = (key: string) => key.replace(/_/g, ' ').replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
+const displayName = (key: string) =>
+  key
+    .replace(/_([mf])(?=$|_)/, (_, g: string) => (g === 'm' ? ' ♂' : ' ♀'))
+    .replace(/_(\d)$/, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
 const typeName = (type: string) => TYPES[type]?.label ?? type;
 const goal = (text: string, have: number | boolean, need = 1): Goal => ({ text, have: Math.min(Number(have), need), need });
 const ofType = (type: string, need: number): GoalRule => (r) => goal(`Pokémon tipo ${typeName(type)} en tu colección`, r.speciesByType[type] ?? 0, need);
@@ -173,13 +162,57 @@ const crowns = (need: number): GoalRule => (r) => goal('Torneos ganados', r.tour
 const beatAi = (level: AiLevel, label: string): GoalRule => (r) => goal(`Ganarle a la IA en ${label} o más difícil`, r.aiWinsAtLeast[level], 1);
 const shinies = (need: number): GoalRule => (r) => goal('Pokémon shiny en tu colección', r.shinies, need);
 const tokens = (need: number, label: string): GoalRule => (r) => goal(`Tokens en PokeTokenBar (${label})`, r.tokens, need);
+const available = (id: number | null): id is number => id !== null && id <= DEX_SIZE;
+const nameOf = (id: number) => speciesData(id)?.name ?? `#${id}`;
+const finalsOf = (ids: readonly number[]) => [...new Set(ids.filter(available).flatMap((id) => finalForms(id, DEX_SIZE)))];
+const listNames = (ids: readonly number[]) => ids.map(nameOf).join(ids.length > 2 ? ', ' : ' o ').replace(/, ([^,]+)$/, ' o $1');
+const ownsAnyOf = (ids: readonly number[]): GoalRule => {
+  const finals = finalsOf(ids);
+  return (r) => ({ ...goal(`Tener a ${listNames(finals)} en tu colección`, finals.some((id) => r.species.includes(id)), 1), ...(finals.length > 1 ? { hint: `Cuenta cualquiera: ${finals.map(nameOf).join(', ')}` } : {}) });
+};
+const ownsNamed = (name: string): GoalRule => ownsAnyOf([speciesIdByName(name) ?? 0]);
+const REGION_NAMES: Readonly<Record<string, string>> = { kanto: 'Kanto', johto: 'Johto', hoenn: 'Hoenn', sinnoh: 'Sinnoh', unova: 'Teselia', kalos: 'Kalos', alola: 'Alola', galar: 'Galar', paldea: 'Paldea' };
+
+function classRule({ rarity, goal: aim }: ClassTrainer): GoalRule {
+  switch (aim.kind) {
+    case 'type':
+      return ofType(aim.type, TYPE_NEED[rarity]);
+    case 'total':
+      return (r) => goal('Especies en tu colección', r.species.length, aim.need);
+    case 'tokens':
+      return tokens(aim.need, aim.label);
+    case 'species': {
+      const ids = finalsOf(aim.names.map(speciesIdByName).filter(available));
+      const need = Math.min(SPECIES_NEED[rarity], ids.length);
+      const hint = `Cuentan: ${ids.map(nameOf).join(', ')}`;
+      const team = aim.label.startsWith('Pokémon ');
+      const text = need === ids.length ? `Tener a ${ids.map(nameOf).join(' y ')} en tu colección` : team ? (need === 1 ? `Tener ${aim.label} en tu colección` : `${aim.label} distintos en tu colección`) : `Tener a ${listNames(ids)} en tu colección`;
+      return (r) => ({ ...goal(text, ids.filter((id) => r.species.includes(id)).length, need), ...(ids.length > 1 ? { hint } : {}) });
+    }
+    case 'starter': {
+      const ranges = (aim.region ? [STARTER_IDS[aim.region]] : Object.values(STARTER_IDS)).filter(([from]) => from <= DEX_SIZE);
+      const ids = finalsOf(ranges.flatMap(([from]) => [from, from + 3, from + 6]));
+      const label = aim.region ? `Iniciales de ${REGION_NAMES[aim.region]} evolucionados en tu colección` : 'Iniciales evolucionados en tu colección';
+      const hint = `Cuentan: ${ids.map(nameOf).join(', ')}`;
+      return (r) => ({ ...goal(label, r.species.filter((id) => ids.includes(id)).length, STARTER_NEED[rarity]), hint });
+    }
+  }
+}
+
+const VARIANT_BASE = new Map(TRAINER_VARIANTS.map((variant) => [variant.key, variant.base]));
+export const trainerRarity = (key: string): TrainerRarity => {
+  const base = VARIANT_BASE.get(key) ?? key;
+  return CLASS_TRAINERS[base]?.rarity ?? originalTier(base);
+};
 
 function buildUnlocks(): Map<string, Unlock> {
   const unlocks = new Map<string, Unlock>();
   const add = (keys: readonly string[], unlock: Unlock) => keys.forEach((key) => unlocks.set(key, unlock));
+  const gymNeed = new Map<string, number>();
   for (const [type, leaders] of Object.entries(GYM_LEADERS))
     leaders.forEach((key, i) => {
       const step = i === 0 ? 0 : i === 1 ? 1 : i === leaders.length - 1 && leaders.length >= 4 ? 3 : 2;
+      gymNeed.set(key, GYM_STEPS[step]);
       add([key], { group: 'gym', title: `Líder de gimnasio · ${typeName(type)}`, ways: [[ofType(type, GYM_STEPS[step]), ...(step === 3 ? [shinyOfType(type)] : [])]] });
     });
   for (const [key, type] of Object.entries(ELITE_FOUR)) add([key], { group: 'elite', title: `Alto Mando · ${typeName(type)}`, ways: [[ofType(type, ELITE_SPECIES), rankedWins(ELITE_WINS)]] });
@@ -209,16 +242,31 @@ function buildUnlocks(): Map<string, Unlock> {
   unlocks.set('lusamine', { ...unlocks.get('lusamine')!, ways: [[beatAi('veryhard', 'Muy difícil')], [legendaries]] });
   unlocks.set('rose', { ...unlocks.get('rose')!, ways: [[beatAi('skynet', 'Skynet')], [tokens(10_000_000_000, '10.000 millones')]] });
   const special = (key: string, ways: GoalRule[][]) => add([key], { group: 'special', title: 'Especial', ways });
-  const ownsSpecies = (id: number): GoalRule => (r) => goal(`Tener a ${speciesData(id)?.name ?? `#${id}`} en tu colección`, r.species.includes(id), 1);
+  for (const [key, trainer] of Object.entries(CLASS_TRAINERS)) add([key], { group: 'class', title: trainer.title, ways: [[classRule(trainer)]] });
+  const typeOfGym = new Map(Object.entries(GYM_LEADERS).flatMap(([type, leaders]) => leaders.map((key) => [key, type] as const)));
+  const villainLevel = (key: string): [AiLevel, string] =>
+    VILLAINS.legend.includes(key) ? ['veryhard', 'Muy difícil'] : VILLAINS.boss.includes(key) ? ['hard', 'Difícil'] : ['mid', 'Normal'];
+  for (const [key, ace] of Object.entries(SIGNATURE)) {
+    const unlock = unlocks.get(key);
+    if (!unlock || !available(speciesIdByName(ace))) continue;
+    const gymType = typeOfGym.get(key);
+    const second =
+      unlock.group === 'gym' && gymType ? ofType(gymType, Math.max(2, Math.ceil((gymNeed.get(key) ?? 4) / 2)))
+      : unlock.group === 'elite' ? ofType(ELITE_FOUR[key as keyof typeof ELITE_FOUR], ELITE_SPECIES / 2)
+      : unlock.group === 'champion' ? rankedWins(10)
+      : beatAi(...villainLevel(key));
+    unlocks.set(key, { ...unlock, ways: [...unlock.ways, [ownsNamed(ace), second]] });
+  }
+  const ownsSpecies = (id: number): GoalRule => ownsAnyOf([id]);
+  const reached = (rule: GoalRule, r: PlayerRecord) => {
+    const g = rule(r);
+    return g.have >= g.need;
+  };
+  const hasOriginal = (base: string): GoalRule => (r) => goal(`Desbloquear a ${displayName(base)}`, unlocks.get(base)?.ways.some((way) => way.every((rule) => reached(rule, r))) ?? true, 1);
   const variantOf = (key: string, base: string, extra: GoalRule) => {
     const original = unlocks.get(base)!;
-    add([key], { group: original.group, title: `${original.title} · variante de colores`, ways: original.ways.map((way) => [...way, extra]) });
+    add([key], { group: original.group, title: `${original.title} · variante de colores`, ways: [[hasOriginal(base), extra]] });
   };
-  variantOf('red_blue', 'red', ownsSpecies(BLASTOISE));
-  variantOf('maxie_aqua', 'maxie', ownsSpecies(KYOGRE));
-  variantOf('archie_magma', 'archie', ownsSpecies(GROUDON));
-  variantOf('lance_emerald', 'lance', ownsSpecies(RAYQUAZA));
-  for (const [key, base, species] of VARIANT_PARTNERS) variantOf(key, base, ownsSpecies(species));
 
   special('collector', [[shinies(1)]]);
   special('colress', [[shinies(5)]]);
@@ -228,14 +276,14 @@ function buildUnlocks(): Map<string, Unlock> {
   for (const key of ['cheren', 'hugh']) special(key, [[(r) => goal('Equipo de 6 sin tipos repetidos', r.diverseTeam, 1)]]);
   for (const key of ['emmet', 'ingo']) special(key, [[(r) => goal('Victoria sin que se debilite ninguno de tus Pokémon', r.flawlessWins, 1)]]);
   for (const key of ['bede', 'marnie']) special(key, [[(r) => goal(`Victoria con Pokémon de nivel menor a ${LOW_LEVEL} en tu save`, r.lowLevelWins, 1)]]);
+  for (const variant of TRAINER_VARIANTS) if (variant.pokemon) variantOf(variant.key, variant.base, ownsSpecies(variant.pokemon));
   for (const variant of EARNED_VARIANTS) {
     const type = VARIANT_COLOR_TYPES[variant.color];
     const title = `Variante ${VARIANT_COLOR_NAMES[variant.color]}`;
     const original = unlocks.get(variant.base);
-    const partner = GENERATED_PARTNERS[variant.key];
-    if (original) add([variant.key], { group: 'variant', title, ways: original.ways.map((way) => [...way, partner ? ownsSpecies(partner) : ofType(type, VARIANT_TYPE_COUNT.locked)]) });
-    else if (isShopTrainer(variant.base)) add([variant.key], { group: 'variant', title, ways: [[(r) => goal(`Tener a ${displayName(variant.base)}, comprado en tu perfil`, r.owned.includes(`trainer:${variant.base}`), 1), ofType(type, VARIANT_TYPE_COUNT.shop)]] });
-    else add([variant.key], { group: 'variant', title, ways: [[ofType(type, VARIANT_TYPE_COUNT.free)]] });
+    const count = original ? VARIANT_TYPE_COUNT[original.group as keyof typeof VARIANT_TYPE_COUNT] ?? VARIANT_TYPE_COUNT.gym : VARIANT_TYPE_COUNT.class;
+    const own = ofType(type, count);
+    add([variant.key], { group: 'variant', title, ways: [[hasOriginal(variant.base), own]] });
   }
   return unlocks;
 }
@@ -244,7 +292,8 @@ export const UNLOCKS = buildUnlocks();
 
 export interface SpriteProgress {
   key: string;
-  group: Unlock['group'] | 'starter' | 'shop';
+  group: Unlock['group'] | 'shop';
+  rarity: TrainerRarity;
   title: string | null;
   unlocked: boolean;
   goals: Goal[];
@@ -260,20 +309,21 @@ export function spriteProgress(record: PlayerRecord): SpriteProgress[] {
       const item = shopItemOf('trainer', key)!;
       const owned = record.owned.includes(item.id);
       const buy = { text: `Comprarlo en tu perfil por ${(item.price / 1_000_000).toLocaleString('es')} M de tokens`, have: owned ? 1 : 0, need: 1 };
-      const first = item.requires ? [{ text: `Desbloquear primero a ${displayName(item.requires)}`, have: owned || isUnlocked(record, item.requires) ? 1 : 0, need: 1 }] : [];
+      const first = item.requires ? [{ text: `Desbloquear a ${displayName(item.requires)}`, have: owned || isUnlocked(record, item.requires) ? 1 : 0, need: 1 }] : [];
       const goals = [...first, buy];
-      return { key, group: 'shop', title: `Tienda · ${RARITIES[item.rarity].label}`, unlocked: owned, goals, ways: [goals] };
+      return { key, group: 'shop', rarity: trainerRarity(key), title: `Tienda · ${RARITIES[item.rarity].label}`, unlocked: owned, goals, ways: [goals] };
     }
     const unlock = UNLOCKS.get(key);
-    if (!unlock) return { key, group: 'starter', title: null, unlocked: true, goals: [], ways: [] };
+    if (!unlock) return { key, group: 'class', rarity: trainerRarity(key), title: null, unlocked: true, goals: [], ways: [] };
     const ways = unlock.ways.map((way) => way.map((rule) => rule(record)));
     const best = ways.find(done) ?? ways.reduce((a, b) => (share(b) > share(a) ? b : a));
-    return { key, group: unlock.group, title: unlock.title, unlocked: ways.some(done), goals: best, ways };
+    return { key, group: unlock.group, rarity: trainerRarity(key), title: unlock.title, unlocked: record.owned.includes(`trainer:${key}`) || ways.some(done), goals: best, ways };
   });
 }
 
 export const isUnlocked = (record: PlayerRecord, key: string): boolean => {
-  if (isShopTrainer(key)) return record.owned.includes(`trainer:${key}`);
+  if (record.owned.includes(`trainer:${key}`)) return true;
+  if (isShopTrainer(key)) return false;
   const unlock = UNLOCKS.get(key);
   return !unlock || unlock.ways.some((way) => done(way.map((rule) => rule(record))));
 };

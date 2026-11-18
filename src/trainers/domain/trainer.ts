@@ -8,7 +8,7 @@ import { uniqueSpecies, uniqueVariants, type RosterEntry } from '../../catalog/d
 import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
 import { conflict, forbidden, invalid, notFound } from '../../shared/domain/errors.js';
 import { isShopTrainer, isTrainerSprite, STARTER_SPRITES, trainerSpriteFor } from '../../catalog/domain/trainer-sprites.js';
-import { DEFAULT_BALL, shopItem, shopItemOf, type ShopItem } from '../../catalog/domain/shop.js';
+import { DEFAULT_BALL, isFreeItem, shopItem, shopItemOf, type ShopItem } from '../../catalog/domain/shop.js';
 import { carryTeam, type ParsedSave } from './save-file.js';
 import { recycledTokens, recycleReward, type Duplicate, type RecycledRecord } from './recycling.js';
 
@@ -110,6 +110,21 @@ export class Trainer implements TrainerState {
     return true;
   }
 
+  /** Trainers that left the shop give back what was paid for them. Returns the tokens refunded. */
+  refundRetired(prices: Readonly<Record<string, number>>): number {
+    const retired = (this.owned ?? []).filter((id) => id.startsWith('trainer:') && id.slice('trainer:'.length) in prices);
+    if (!retired.length) return 0;
+    const refund = retired.reduce((sum, id) => sum + prices[id.slice('trainer:'.length)], 0);
+    this.owned = (this.owned ?? []).filter((id) => !retired.includes(id));
+    this.shopSpent = Math.max(0, (this.shopSpent ?? 0) - refund);
+    return refund;
+  }
+
+  /** Puts back a look the trainer no longer has: one they do have, or the default one. */
+  replaceLook(key: string | null): void {
+    this.avatar = key ?? undefined;
+  }
+
   get earned(): number {
     return Math.max(0, this.totalTokens - (this.shopBaseline ?? 0));
   }
@@ -139,7 +154,7 @@ export class Trainer implements TrainerState {
   }
 
   owns(itemId: string): boolean {
-    return (this.owned ?? []).includes(itemId);
+    return isFreeItem(itemId) || (this.owned ?? []).includes(itemId);
   }
 
   get ball(): string {

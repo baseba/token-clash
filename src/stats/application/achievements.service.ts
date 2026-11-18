@@ -1,13 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ArenaQueries } from '../../arena/application/arena-queries.js';
 import { forbidden } from '../../shared/domain/errors.js';
+import { TRAINER_SPRITES } from '../../catalog/domain/trainer-sprites.js';
+import { hash } from '../../catalog/domain/creatures.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { EquipKind, Trainer } from '../../trainers/domain/trainer.js';
 import { buyBlocker, isUnlocked, lookBlocker, recordOf, spriteProgress, type PlayerRecord } from '../domain/achievements.js';
 import { rankingOf } from './server-stats.js';
 
 @Injectable()
-export class AchievementsService {
+export class AchievementsService implements OnApplicationBootstrap {
+  private readonly logger = new Logger('Achievements');
+
   constructor(
     private readonly trainers: TrainersService,
     private readonly arena: ArenaQueries,
@@ -22,6 +26,20 @@ export class AchievementsService {
       tournaments: this.arena.allTournaments(),
       rankedFirst: leader?.id === trainer.id,
     });
+  }
+
+  /** Anyone wearing a trainer they no longer have gets one they do have (or the default one). */
+  onApplicationBootstrap(): void {
+    let relooked = 0;
+    for (const trainer of this.trainers.all()) {
+      if (!trainer.avatar) continue;
+      const record = this.recordFor(trainer);
+      if (isUnlocked(record, trainer.avatar)) continue;
+      const choices = TRAINER_SPRITES.filter((key) => isUnlocked(record, key));
+      this.trainers.replaceLook(trainer, choices.length ? choices[hash(`${trainer.id}:look`) % choices.length] : null);
+      relooked += 1;
+    }
+    if (relooked) this.logger.log(`${relooked} entrenador(es) tenían un entrenador que ya no les corresponde: les tocó uno que sí tienen.`);
   }
 
   progress(trainer: Trainer) {

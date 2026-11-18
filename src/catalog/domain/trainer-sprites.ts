@@ -1,12 +1,16 @@
 import * as sprites from '../../../public/trainer-sprites.js';
 
 export const TRAINER_SPRITES: readonly string[] = sprites.TRAINER_SPRITES;
-export const TRAINER_VARIANTS: readonly { key: string; base: string }[] = sprites.TRAINER_VARIANTS;
+export const TRAINER_VARIANTS: readonly { key: string; base: string; pokemon?: number }[] = sprites.TRAINER_VARIANTS;
 export const EARNED_VARIANTS: readonly { key: string; base: string; color: string }[] = sprites.EARNED_VARIANTS;
 export const VARIANT_COLOR_TYPES: Readonly<Record<string, string>> = sprites.VARIANT_COLOR_TYPES;
 export const VARIANT_COLOR_NAMES: Readonly<Record<string, string>> = sprites.VARIANT_COLOR_NAMES;
 export const VARIANT_KEYS: ReadonlySet<string> = new Set(TRAINER_VARIANTS.map((variant) => variant.key));
 export const STARTER_SPRITES: readonly string[] = sprites.STARTER_SPRITES;
+export const DOWNLOADED_SPRITES: readonly string[] = sprites.DOWNLOADED_SPRITES;
+export const originalTier = (key: string) => sprites.originalTier(key) as 'common' | 'rare' | 'epic' | 'legendary';
+export const RETIRED_RECOLORS = sprites.RETIRED_RECOLORS as Readonly<Record<string, 'common' | 'rare' | 'epic' | 'legendary' | 'mythic'>>;
+export const RETIRED_SHOP_TRAINERS = sprites.RETIRED_SHOP_TRAINERS as Readonly<Record<string, 'common' | 'rare' | 'epic' | 'legendary'>>;
 export const GYM_LEADERS: Readonly<Record<string, readonly string[]>> = sprites.GYM_LEADERS;
 export const ELITE_FOUR: Readonly<Record<string, string>> = sprites.ELITE_FOUR;
 export const CHAMPIONS: readonly string[] = sprites.CHAMPIONS;
