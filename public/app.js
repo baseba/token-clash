@@ -681,14 +681,14 @@ document.addEventListener(
 );
 
 function markNav() {
-  const current = { '/stats': 'stats', '/': 'home', '/coleccion': 'collection', '/pokedex': 'pokedex', '/perfil': 'profile', '/tienda': 'shop' }[location.pathname] ?? null;
+  const current = { '/stats': 'stats', '/': 'home', '/coleccion': 'collection', '/pokedex': 'pokedex', '/perfil': 'profile', '/reciclaje': 'recycling' }[location.pathname] ?? null;
   for (const a of document.querySelectorAll('[data-nav]')) {
     if (a.dataset.nav === current) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   }
 }
 
-const TAB_MUSIC = { '/': 'tab:home', '/coleccion': 'tab:collection', '/pokedex': 'tab:pokedex', '/stats': 'tab:stats', '/perfil': 'tab:profile', '/tienda': 'tab:shop' };
+const TAB_MUSIC = { '/': 'tab:home', '/coleccion': 'tab:collection', '/pokedex': 'tab:pokedex', '/stats': 'tab:stats', '/perfil': 'tab:shop', '/reciclaje': 'tab:recycling' };
 const music = createPlayer({
   storage: {
     getItem: (k) => ls.get(k),
@@ -862,8 +862,12 @@ function route() {
   if (location.pathname === '/coleccion') return teamPage(seq);
   if (location.pathname === '/pokedex') return pokedexPage(seq);
   if (location.pathname === '/stats') return statsPage(seq);
+  if (location.pathname === '/tienda') {
+    history.replaceState(null, '', `/perfil${location.search}`);
+    return route();
+  }
   if (location.pathname === '/perfil') return profilePage(seq);
-  if (location.pathname === '/tienda') return shopPage(seq);
+  if (location.pathname === '/reciclaje') return recyclingPage(seq);
   const t = /^\/t\/([A-Za-z0-9_-]{4,20})$/.exec(location.pathname);
   if (t) return tournamentPage(t[1], seq);
   return homePage(seq);
@@ -950,141 +954,6 @@ function importCard({ onDone, compact: small = false } = {}) {
 }
 
 // ---------- profile ----------
-async function profilePage(seq) {
-  document.title = 'Perfil · Token Clash';
-  await loadMe();
-  if (stale(seq)) return;
-  renderWho();
-  if (!me) return renderLanding();
-  const preview = h('div', { class: 'profile-look' });
-  const nameInput = h('input', { type: 'text', maxlength: 24, value: me.name, 'aria-label': 'Nombre de entrenador', autocomplete: 'nickname' });
-  const saveName = h('button', { class: 'btn primary', type: 'submit' }, 'Guardar nombre');
-  const nameForm = h('form', { class: 'profile-name', onsubmit: async (e) => {
-    e.preventDefault();
-    const name = nameInput.value.trim();
-    if (!name || name === me.name) return;
-    saveName.disabled = true;
-    try {
-      me = (await api('/api/me', { method: 'PUT', body: { name } })).me;
-      nameInput.value = me.name;
-      renderWho();
-      paintPreview();
-      toast('Nombre guardado');
-    } catch (err) {
-      toast(err.message);
-    } finally {
-      saveName.disabled = false;
-    }
-  } }, nameInput, saveName);
-  let query = '';
-  let gender = '';
-  let group = '';
-  let progress = new Map();
-  const count = h('span', { class: 'muted small' });
-  const detail = h('div', { class: 'unlock-detail', hidden: true });
-  const grid = h('div', { class: 'trainer-grid', role: 'listbox', 'aria-label': 'Entrenadores' });
-  function paintPreview() {
-    preview.replaceChildren(
-      h('div', { class: 'profile-stage' }, trainerImg(me.avatar, 'profile-sprite')),
-      h('div', { class: 'profile-id' }, avatarPic(me.avatar, 'lg', me.frame), h('div', null, h('h1', null, me.name), h('p', { class: 'muted' }, trainerLabel(me.avatar)), h('div', { class: 'row' }, h('span', { class: 'chip' }, h('span', { class: 'w' }, `${me.wins}V`), ' · ', h('span', { class: 'l' }, `${me.losses}D`)), h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`)))),
-    );
-  }
-  const usable = (key) => key === me.avatar || progress.get(key)?.unlocked !== false;
-  const goalState = (g) => (g.need === 1 ? (g.have >= 1 ? 'listo' : 'pendiente') : `${g.have.toLocaleString('es')}/${g.need.toLocaleString('es')}`);
-  function unlockTip(key) {
-    const p = progress.get(key);
-    if (!p) return { tip: trainerLabel(key), note: null };
-    if (p.group === 'starter') return { tip: `${trainerLabel(key)} · disponible desde el inicio`, note: null };
-    if (p.unlocked) return { tip: `🔓 ${trainerLabel(key)} · ${p.title}`, note: `Lo desbloqueaste con: ${p.goals.map((g) => (g.need === 1 ? g.text : `${g.text} (${g.need.toLocaleString('es')})`)).join(' y ')}` };
-    return { tip: `🔒 ${trainerLabel(key)} · ${p.title}`, note: `Te falta: ${p.goals.filter((g) => g.have < g.need).map((g) => `${g.text} ${goalState(g)}`).join(' · ')}` };
-  }
-  const goalList = (goals) => h('ul', { class: 'unlock-goals' }, goals.map((g) => h('li', { class: g.have >= g.need ? 'is-done' : null }, h('span', null, g.text), h('span', { class: 'unlock-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': g.need, 'aria-valuenow': g.have }, h('i', { style: { width: `${(g.have / g.need) * 100}%` } })), h('small', { class: 'muted' }, g.need === 1 ? (g.have >= 1 ? 'Listo' : 'Pendiente') : `${g.have.toLocaleString('es')} / ${g.need.toLocaleString('es')}`))));
-  const versionsOf = (key) => {
-    const base = VARIANTS_BY_KEY.get(key)?.base ?? key;
-    return [base, ...TRAINER_VARIANTS.filter((variant) => variant.base === base).map((variant) => variant.key)].sort(byLabel);
-  };
-  function showDetail(key) {
-    const p = progress.get(key);
-    if (!p || p.unlocked) {
-      detail.hidden = true;
-      return;
-    }
-    const ways = p.ways?.length ? p.ways : [p.goals];
-    const versions = versionsOf(key);
-    detail.hidden = false;
-    detail.replaceChildren(...[
-      h('div', { class: 'unlock-head' }, h('span', { class: 'trainer-frame' }, trainerImg(key)), h('div', null, h('b', null, `🔒 ${trainerLabel(key)}`), p.title ? h('p', { class: 'muted small' }, p.title) : null)),
-      ways.length > 1
-        ? h('div', { class: 'unlock-ways' }, ways.flatMap((goals, i) => [i ? h('p', { class: 'unlock-or' }, 'o bien') : null, h('div', { class: 'unlock-way' }, h('small', { class: 'muted' }, `Opción ${i + 1}`), goalList(goals))]))
-        : goalList(ways[0]),
-      versions.length > 1
-        ? h('div', { class: 'unlock-versions' }, h('small', { class: 'muted' }, 'Versiones'), h('div', { class: 'unlock-version-row' }, versions.map((other) => {
-            const locked = !usable(other);
-            const { tip, note } = unlockTip(other);
-            return h('button', { type: 'button', class: `unlock-version${other === key ? ' is-current' : ''}${locked ? ' is-locked' : ''}`, 'data-tip': tip, 'data-tip-note': note, onclick: () => (locked ? showDetail(other) : choose(other, null)) }, h('span', { class: 'trainer-frame' }, trainerImg(other)), h('small', null, `${locked ? '🔒 ' : ''}${trainerLabel(other)}`));
-          })))
-        : null,
-      p.group === 'shop' ? h('a', { class: 'btn sm primary', href: '/tienda', 'data-link': true }, '🛒 Ir a la tienda') : null,
-    ].filter(Boolean));
-  }
-  async function choose(key, btn) {
-    if (!usable(key)) return showDetail(key);
-    detail.hidden = true;
-    if (key === me.avatar) return;
-    if (btn) btn.disabled = true;
-    try {
-      me.avatar = (await api('/api/me/look', { method: 'PUT', body: { avatar: key } })).avatar;
-      renderWho();
-      paintPreview();
-      paintGrid();
-    } catch (err) {
-      toast(err.message);
-      if (btn) btn.disabled = false;
-    }
-  }
-  function paintGrid() {
-    const words = query.toLowerCase();
-    const shown = TRAINER_SPRITES.filter((key) => {
-      const label = trainerLabel(key);
-      if (gender && !label.includes(gender)) return false;
-      if (group === 'unlocked' && !usable(key)) return false;
-      if (group === 'locked' && usable(key)) return false;
-      if (group && !['unlocked', 'locked'].includes(group) && (progress.get(key)?.group ?? 'starter') !== group) return false;
-      return !words || label.toLowerCase().includes(words) || key.includes(words);
-    }).sort(byLabel);
-    const open = TRAINER_SPRITES.filter(usable).length;
-    count.textContent = `${shown.length === TRAINER_SPRITES.length ? '' : `${shown.length} de ${TRAINER_SPRITES.length} · `}${open} desbloqueados`;
-    grid.replaceChildren(...(shown.length ? shown.map((key) => {
-      const locked = !usable(key);
-      const { tip, note } = unlockTip(key);
-      return h('button', { type: 'button', class: `trainer-cell${key === me.avatar ? ' is-picked' : ''}${locked ? ' is-locked' : ''}`, 'data-tip': tip, 'data-tip-note': note, role: 'option', 'aria-selected': String(key === me.avatar), 'aria-label': locked ? `${trainerLabel(key)}, bloqueado` : trainerLabel(key), onclick: (e) => choose(key, e.currentTarget) }, h('span', { class: 'trainer-frame' }, trainerImg(key), locked ? h('span', { class: 'lock-badge', 'aria-hidden': 'true' }, '🔒') : null), h('small', null, trainerLabel(key)));
-    }) : [h('p', { class: 'muted' }, 'Ningún entrenador coincide con el filtro.')]));
-  }
-  paintPreview();
-  paintGrid();
-  loadAchievements().then((sprites) => {
-    if (stale(seq) || !sprites) return;
-    progress = new Map(sprites.map((p) => [p.key, p]));
-    paintGrid();
-  });
-  $app.replaceChildren(
-    h('section', { class: 'card profile-card' }, preview, h('label', { class: 'field-label' }, 'Nombre de entrenador'), nameForm),
-    h('section', { class: 'card' },
-      h('div', { class: 'nb-head' }, h('h2', null, 'Tu entrenador'), h('p', { class: 'muted small' }, 'Es tu foto de perfil y el que lanza tus Pokémon en las peleas. Líderes, Alto Mando, campeones y villanos se desbloquean con logros: toca uno bloqueado para ver qué te falta.')),
-      h('div', { class: 'coll-bar' },
-        h('div', { class: 'row' },
-          h('input', { type: 'search', placeholder: 'Buscar entrenador…', 'aria-label': 'Buscar entrenador', oninput: (e) => { query = e.target.value.trim(); paintGrid(); } }),
-          h('select', { 'aria-label': 'Filtrar por categoría', onchange: (e) => { group = e.target.value; paintGrid(); } }, Object.entries(TRAINER_GROUPS).map(([value, label]) => h('option', { value }, label))),
-          h('select', { 'aria-label': 'Filtrar por género', onchange: (e) => { gender = e.target.value; paintGrid(); } }, h('option', { value: '' }, 'Todos'), h('option', { value: '♂' }, '♂ Hombres'), h('option', { value: '♀' }, '♀ Mujeres')),
-        ),
-        count,
-      ),
-      detail,
-      grid,
-    ),
-  );
-}
-
 // ---------- shop ----------
 const tokensM = (n) => `${Math.floor(n / 1_000_000).toLocaleString('es')} M`;
 const FREE_ITEMS = [
@@ -1109,27 +978,115 @@ function shopPreview(item) {
   return h('span', { class: 'trainer-frame' }, trainerImg(item.key));
 }
 
-async function shopPage(seq) {
-  document.title = 'Tienda · Token Clash';
+async function profilePage(seq) {
+  document.title = 'Perfil · Token Clash';
   await loadMe();
   if (stale(seq)) return;
   renderWho();
   if (!me) return renderLanding();
-  $app.replaceChildren(h('p', { class: 'muted center pad' }, 'Abriendo la tienda…'));
+  $app.replaceChildren(h('p', { class: 'muted center pad' }, 'Abriendo tu perfil…'));
   let shop;
   try {
     shop = (await api('/api/shop')).shop;
   } catch (e) {
     if (stale(seq)) return;
-    $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No pude abrir la tienda'), h('p', { class: 'muted' }, e.message)));
+    $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No pude abrir tu perfil'), h('p', { class: 'muted' }, e.message)));
     return;
   }
   if (stale(seq)) return;
   let kind = 'ball';
   let hideOwned = false;
   let query = '';
+  let group = '';
+  let gender = '';
+  let progress = new Map();
+  const identity = h('div', { class: 'profile-identity' });
   const balance = h('div', { class: 'shop-balance' });
   const grid = h('div', { class: 'shop-grid' });
+  const detail = h('div', { class: 'unlock-detail', hidden: true });
+  const trainerFilters = h('div', { class: 'row trainer-filters', hidden: true },
+    h('select', { 'aria-label': 'Filtrar por categoría', onchange: (e) => { group = e.target.value; paint(); } }, Object.entries(TRAINER_GROUPS).filter(([value]) => !['unlocked', 'locked'].includes(value)).map(([value, text]) => h('option', { value }, text))),
+    h('select', { 'aria-label': 'Filtrar por género', onchange: (e) => { gender = e.target.value; paint(); } }, h('option', { value: '' }, 'Todos'), h('option', { value: '♂' }, '♂ Hombres'), h('option', { value: '♀' }, '♀ Mujeres')),
+  );
+  let editingName = false;
+  function paintIdentity() {
+    const nameInput = h('input', { type: 'text', maxlength: 24, value: me.name, 'aria-label': 'Nombre de entrenador', autocomplete: 'nickname' });
+    const saveName = h('button', { class: 'btn sm primary', type: 'submit' }, 'Guardar');
+    const nameLine = editingName
+      ? h('form', { class: 'profile-name', onsubmit: async (e) => {
+          e.preventDefault();
+          const name = nameInput.value.trim();
+          if (!name || name === me.name) {
+            editingName = false;
+            return paintIdentity();
+          }
+          saveName.disabled = true;
+          try {
+            me = { ...me, ...(await api('/api/me', { method: 'PUT', body: { name } })).me };
+            editingName = false;
+            renderWho();
+            paintIdentity();
+            toast('Nombre guardado');
+          } catch (err) {
+            toast(err.message);
+            saveName.disabled = false;
+          }
+        } }, nameInput, saveName, h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { editingName = false; paintIdentity(); } }, 'Cancelar'))
+      : h('div', { class: 'profile-name-line' }, h('h1', null, me.name), h('button', { class: 'btn sm ghost icon-btn', type: 'button', 'data-tip': 'Cambiar nombre', 'aria-label': 'Cambiar nombre', onclick: () => { editingName = true; paintIdentity(); nameInput.focus(); } }, '✏️'));
+    identity.replaceChildren(
+      avatarPic(me.avatar, 'lg', me.frame),
+      h('div', { class: 'profile-who' }, nameLine, h('div', { class: 'row profile-meta' }, h('span', { class: 'muted' }, trainerLabel(me.avatar)), h('span', { class: 'chip' }, h('span', { class: 'w' }, `${me.wins}V`), ' · ', h('span', { class: 'l' }, `${me.losses}D`)))),
+    );
+    if (editingName) requestAnimationFrame(() => nameInput.focus());
+  }
+  const usable = (key) => key === me.avatar || progress.get(key)?.unlocked !== false;
+  const goalState = (g) => (g.need === 1 ? (g.have >= 1 ? 'listo' : 'pendiente') : `${g.have.toLocaleString('es')}/${g.need.toLocaleString('es')}`);
+  function unlockTip(key) {
+    const p = progress.get(key);
+    if (!p) return { tip: trainerLabel(key), note: null };
+    if (p.group === 'starter') return { tip: `${trainerLabel(key)} · disponible desde el inicio`, note: null };
+    if (p.unlocked) return { tip: `🔓 ${trainerLabel(key)} · ${p.title}`, note: `Lo desbloqueaste con: ${p.goals.map((g) => (g.need === 1 ? g.text : `${g.text} (${g.need.toLocaleString('es')})`)).join(' y ')}` };
+    return { tip: `🔒 ${trainerLabel(key)} · ${p.title}`, note: `Te falta: ${p.goals.filter((g) => g.have < g.need).map((g) => `${g.text} ${goalState(g)}`).join(' · ')}` };
+  }
+  const goalList = (goals) => h('ul', { class: 'unlock-goals' }, goals.map((g) => h('li', { class: g.have >= g.need ? 'is-done' : null }, h('span', null, g.text), h('span', { class: 'unlock-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': g.need, 'aria-valuenow': g.have }, h('i', { style: { width: `${(g.have / g.need) * 100}%` } })), h('small', { class: 'muted' }, g.need === 1 ? (g.have >= 1 ? 'Listo' : 'Pendiente') : `${g.have.toLocaleString('es')} / ${g.need.toLocaleString('es')}`))));
+  const versionsOf = (key) => {
+    const base = VARIANTS_BY_KEY.get(key)?.base ?? key;
+    return [base, ...TRAINER_VARIANTS.filter((variant) => variant.base === base).map((variant) => variant.key)].sort(byLabel);
+  };
+  function showDetail(key) {
+    const p = progress.get(key);
+    if (!p || p.unlocked) {
+      detail.hidden = true;
+      return;
+    }
+    const ways = p.ways?.length ? p.ways : [p.goals];
+    const versions = versionsOf(key);
+    const item = trainerItem(key);
+    detail.hidden = false;
+    detail.replaceChildren(...[
+      h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => { detail.hidden = true; } }, '×'),
+      h('div', { class: 'unlock-head' }, h('span', { class: 'trainer-frame' }, trainerImg(key)), h('div', null, h('b', null, `🔒 ${trainerLabel(key)}`), p.title ? h('p', { class: 'muted small' }, p.title) : null)),
+      ways.length > 1
+        ? h('div', { class: 'unlock-ways' }, ways.flatMap((goals, i) => [i ? h('p', { class: 'unlock-or' }, 'o bien') : null, h('div', { class: 'unlock-way' }, h('small', { class: 'muted' }, `Opción ${i + 1}`), goalList(goals))]))
+        : goalList(ways[0]),
+      versions.length > 1
+        ? h('div', { class: 'unlock-versions' }, h('small', { class: 'muted' }, 'Versiones'), h('div', { class: 'unlock-version-row' }, versions.map((other) => {
+            const locked = !usable(other);
+            const { tip, note } = unlockTip(other);
+            return h('button', { type: 'button', class: `unlock-version${other === key ? ' is-current' : ''}${locked ? ' is-locked' : ''}`, 'data-tip': tip, 'data-tip-note': note, onclick: () => (locked ? showDetail(other) : equip(trainerItem(other))) }, h('span', { class: 'trainer-frame' }, trainerImg(other)), h('small', null, `${locked ? '🔒 ' : ''}${trainerLabel(other)}`));
+          })))
+        : null,
+      p.group === 'shop' ? h('div', { class: 'row confirm-actions' }, action(item)) : null,
+    ].filter(Boolean));
+    detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function trainerItem(key) {
+    const sold = shop.items.find((item) => item.kind === 'trainer' && item.key === key);
+    if (sold) return sold;
+    const p = progress.get(key);
+    const open = usable(key);
+    return { id: `trainer:${key}`, kind: 'trainer', key, name: trainerLabel(key), rarity: null, price: 0, desc: p?.title ?? 'Disponible desde el inicio', owned: open, free: true, locked: !open, tag: p?.title ?? 'Gratis', group: p?.group ?? 'starter' };
+  }
   const confirmDlg = h('dialog', { class: 'info-dlg confirm-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() });
   const isEquipped = (item) => (item.kind === 'trainer' ? me.avatar === item.key : (shop.equipped[item.kind] ?? null) === item.key);
   const label = (item) => (item.kind === 'trainer' ? trainerLabel(item.key) : item.name);
@@ -1139,6 +1096,7 @@ async function shopPage(seq) {
     me.frame = next.equipped.frame;
     me.avatar = next.avatar;
     renderWho();
+    paintIdentity();
     paint();
   };
   async function equip(item) {
@@ -1243,45 +1201,297 @@ async function shopPage(seq) {
     requestAnimationFrame(() => requestAnimationFrame(() => run()));
   }
   function action(item) {
+    if (item.locked) return h('button', { class: 'btn sm ghost', type: 'button', onclick: () => showDetail(item.key) }, '🔒 ¿Cómo?');
     if (!item.owned && item.available === false) return h('span', { class: 'muted small shop-locked', 'data-tip': `Desbloquea a ${trainerLabel(item.requires)} para poder comprarla` }, `🔒 Primero ${trainerLabel(item.requires)} · 🪙 ${tokensM(item.price)}`);
     if (!item.owned) {
       const short = item.price - shop.balance;
       return h('button', { class: 'btn sm primary', type: 'button', disabled: short > 0 || null, 'data-tip': short > 0 ? `Te faltan ${tokensM(short)}` : null, onclick: () => askBuy(item) }, `🪙 ${tokensM(item.price)}`);
     }
     if (isEquipped(item)) {
-      const off = item.kind === 'trainer' && item.free ? h('a', { class: 'btn sm ghost', href: '/perfil', 'data-link': true }, 'Cambiar en Perfil') : null;
-      return h('span', { class: 'row shop-owned' }, h('span', { class: 'chip ready-chip' }, '✓ Equipado'), off);
+      return h('span', { class: 'chip ready-chip' }, '✓ Equipado');
     }
     return h('button', { class: 'btn sm', type: 'button', onclick: () => equip(item) }, item.free ? 'Usar' : 'Equipar');
   }
-  function paint() {
-    const ledger = `${tokensM(shop.total)} en tu último save${shop.updatedAt ? ` (subido ${ago(shop.updatedAt)})` : ''} − ${tokensM(shop.spent)} gastados aquí`;
-    balance.replaceChildren(
-      h('span', { class: 'shop-coins', tabindex: 0, 'data-tip': ledger, 'data-tip-note': 'Crece cada vez que subes tu save.' }, `🪙 ${tokensM(shop.balance)}`),
-      h('a', { class: 'btn sm ghost', href: '/coleccion', 'data-link': true, 'data-tip': 'Sube tu save nuevo para sumar tokens' }, '↻ Actualizar save'),
-    );
-    const currentTrainer = shop.items.some((item) => item.kind === 'trainer' && item.key === me.avatar) ? [] : [{ id: 'trainer:current', kind: 'trainer', key: me.avatar, name: trainerLabel(me.avatar), rarity: null, price: 0, desc: 'Tu entrenador actual, de los gratis. Cámbialo por otro gratis en tu perfil.', owned: true, free: true }];
-    const items = [...FREE_ITEMS, ...currentTrainer, ...shop.items]
-      .filter((item) => item.kind === kind && (!hideOwned || !item.owned) && (!query || label(item).toLowerCase().includes(query)))
-      .sort((a, b) => a.price - b.price || label(a).localeCompare(label(b), 'es', { numeric: true, sensitivity: 'base' }));
-    grid.replaceChildren(...(items.length ? items.map((item) => h('div', { class: `shop-card${item.owned ? ' is-owned' : ''}${isEquipped(item) ? ' is-equipped' : ''}${item.rarity ? ` rarity-${item.rarity}` : ''}` },
-      h('div', { class: 'shop-preview' }, shopPreview(item)),
-      h('div', { class: 'shop-info' }, h('b', { 'data-tip': item.desc }, label(item)), h('span', { class: `rarity-tag${item.rarity ? ` rarity-${item.rarity}` : ''}` }, item.rarity ? RARITIES[item.rarity].label : 'Gratis')),
-      h('div', { class: 'shop-action' }, item.kind === 'ball' ? h('button', { class: 'btn sm ghost shop-try', type: 'button', 'data-tip': 'Ver en combate', 'aria-label': `Ver ${label(item)} en combate`, onclick: () => previewBall(item) }, '▶ Probar') : null, action(item)),
-    )) : [h('p', { class: 'muted' }, 'No hay nada con ese filtro.')]));
+  function itemsFor() {
+    if (kind !== 'trainer') {
+      return [...FREE_ITEMS, ...shop.items]
+        .filter((item) => item.kind === kind)
+        .sort((a, b) => a.price - b.price || label(a).localeCompare(label(b), 'es', { numeric: true, sensitivity: 'base' }));
+    }
+    return TRAINER_SPRITES.map(trainerItem)
+      .filter((item) => (!group || (progress.get(item.key)?.group ?? 'starter') === group) && (!gender || trainerLabel(item.key).includes(gender)))
+      .sort((a, b) => byLabel(a.key, b.key));
   }
+  function card(item) {
+    const locked = item.locked || (item.available === false && !item.owned);
+    const tag = item.rarity ? RARITIES[item.rarity].label : item.tag ?? 'Gratis';
+    const { tip, note } = item.kind === 'trainer' ? unlockTip(item.key) : { tip: item.desc, note: null };
+    return h('div', { class: `shop-card${item.owned ? ' is-owned' : ''}${isEquipped(item) ? ' is-equipped' : ''}${item.locked ? ' is-locked' : ''}${item.rarity ? ` rarity-${item.rarity}` : ''}` },
+      h('div', { class: 'shop-preview' }, shopPreview(item)),
+      h('div', { class: 'shop-info' }, h('b', { 'data-tip': tip, 'data-tip-note': note }, label(item)), h('span', { class: `rarity-tag${item.rarity ? ` rarity-${item.rarity}` : ''}${locked ? ' is-locked' : ''}` }, tag)),
+      h('div', { class: 'shop-action' }, item.kind === 'ball' ? h('button', { class: 'btn sm ghost shop-try', type: 'button', 'data-tip': 'Ver en combate', 'aria-label': `Ver ${label(item)} en combate`, onclick: () => previewBall(item) }, '▶ Probar') : null, action(item)),
+    );
+  }
+  let shownCount = 0;
+  const PAGE = 60;
+  const more = h('button', { class: 'btn ghost shop-more', type: 'button', hidden: true, onclick: () => paint(shownCount + PAGE) }, 'Ver más');
+  function paint(limit = PAGE) {
+    const ledger = `${tokensM(shop.total)} de tu save${shop.updatedAt ? ` (subido ${ago(shop.updatedAt)})` : ''} + ${tokensM(shop.recycled ?? 0)} reciclados − ${tokensM(shop.spent)} gastados`;
+    balance.replaceChildren(
+      h('span', { class: 'shop-coins', tabindex: 0, 'data-tip': ledger, 'data-tip-note': 'Crece cuando subes tu save o reciclas repetidos.' }, `🪙 ${tokensM(shop.balance)}`),
+      h('a', { class: 'btn sm ghost', href: '/reciclaje', 'data-link': true, 'data-tip': 'Tritura tus Pokémon repetidos para ganar tokens' }, '♻️ Reciclar'),
+    );
+    trainerFilters.hidden = kind !== 'trainer';
+    if (kind !== 'trainer') detail.hidden = true;
+    const all = itemsFor().filter((item) => (!hideOwned || !item.owned) && (!query || label(item).toLowerCase().includes(query)));
+    const list = kind === 'trainer' ? all.slice(0, limit) : all;
+    shownCount = list.length;
+    more.hidden = list.length >= all.length;
+    more.textContent = `Ver más (${all.length - list.length})`;
+    grid.replaceChildren(...(list.length ? list.map(card) : [h('p', { class: 'muted' }, 'No hay nada con ese filtro.')]));
+  }
+  paintIdentity();
   paint();
+  loadAchievements().then((sprites) => {
+    if (stale(seq) || !sprites) return;
+    progress = new Map(sprites.map((p) => [p.key, p]));
+    if (kind === 'trainer') paint(shownCount);
+  });
   $app.replaceChildren(
-    h('section', { class: 'card shop-head' }, h('h1', null, '🛒 Tienda'), balance),
+    h('section', { class: 'card shop-head' }, identity, balance),
     h('section', { class: 'card' },
       h('div', { class: 'coll-bar' },
         h('div', { class: 'segmented', role: 'group', 'aria-label': 'Categoría' }, Object.entries(SHOP_KINDS).map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === kind), onclick: (e) => { kind = value; e.currentTarget.parentElement.querySelectorAll('.seg-item').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); paint(); } }, text))),
-        h('input', { type: 'search', placeholder: 'Buscar…', 'aria-label': 'Buscar en la tienda', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } }),
+        h('input', { type: 'search', placeholder: 'Buscar…', 'aria-label': 'Buscar', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } }),
         h('label', { class: 'toggle' }, h('input', { type: 'checkbox', onchange: (e) => { hideOwned = e.target.checked; paint(); } }), ' Ocultar lo que ya tengo'),
+        trainerFilters,
       ),
+      detail,
       grid,
+      more,
     ),
     confirmDlg,
+  );
+}
+
+// ---------- recycling ----------
+const RECYCLE_RARITY = { common: 'Común', uncommon: 'Poco común', rare: 'Raro', legendary: 'Legendario' };
+const SHRED_SOUNDS = [
+  { url: '/sfx/moves/audio/prsfx-shift-gear.wav', at: 0, gain: 0.6 },
+  { url: '/sfx/moves/audio/prsfx-drill-run.wav', at: 120, gain: 0.55 },
+  { url: '/sfx/moves/audio/prsfx-gear-grind.wav', at: 200, gain: 0.7 },
+  { url: '/sfx/moves/audio/prsfx-crunch.wav', at: 420, gain: 0.65 },
+  { url: '/sfx/moves/audio/prsfx-pay-day1.wav', at: 950, gain: 0.7 },
+];
+const SHRED_CRY_MS = 380;
+const SHRED_STRIPS = 9;
+
+async function rescanSave() {
+  const stored = await storedSave();
+  if (!stored?.text) return;
+  const mark = `${me.id}:${stored.savedAt}`;
+  if (ls.get('tc_rescanned') === mark) return;
+  try {
+    me = (await api('/api/import', { method: 'POST', body: { save: stored.text } })).me;
+    renderWho();
+  } catch {
+    return;
+  }
+  ls.set('tc_rescanned', mark);
+}
+
+async function recyclingPage(seq) {
+  document.title = 'Reciclaje · Token Clash';
+  await loadMe();
+  if (stale(seq)) return;
+  renderWho();
+  if (!me) return renderLanding();
+  $app.replaceChildren(h('p', { class: 'muted center pad' }, 'Buscando repetidos en tu save…'));
+  let data;
+  try {
+    await rescanSave();
+    data = (await api('/api/me/recycling')).recycling;
+  } catch (e) {
+    if (stale(seq)) return;
+    $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No pude abrir el reciclaje'), h('p', { class: 'muted' }, e.message)));
+    return;
+  }
+  if (stale(seq)) return;
+  music.preloadCues(SHRED_SOUNDS);
+  music.preload({ sprites: data.duplicates.map((mon) => mon.sprite) });
+  let busy = false;
+  let shownBalance = data.balance;
+  const coins = h('span', { class: 'shop-coins', tabindex: 0, 'data-tip': 'Tu saldo para comprar en tu perfil' }, `🪙 ${tokensM(shownBalance)}`);
+  const pile = h('div', { class: 'duplicate-grid' });
+  const history = h('div', { class: 'recycle-log' });
+  const mouth = h('div', { class: 'shred-mouth' }, h('span', { class: 'shred-hint' }, 'Arrastra aquí'));
+  const output = h('div', { class: 'shred-output' });
+  const tray = h('div', { class: 'shred-tray' });
+  const gain = h('div', { class: 'shred-gain', 'aria-live': 'polite' });
+  const machine = h('div', { class: 'shredder', role: 'region', 'aria-label': 'Trituradora' },
+    mouth,
+    h('div', { class: 'shred-body' }, h('span', { class: 'shred-teeth' }), h('span', { class: 'shred-light' }), h('b', null, 'TRITURADORA'), h('small', null, 'Pokémon repetidos → tokens')),
+    output,
+    tray,
+    gain,
+  );
+
+  function countTo(target) {
+    const from = shownBalance;
+    const start = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - start) / 900);
+      shownBalance = Math.round(from + (target - from) * (1 - (1 - k) ** 3));
+      coins.textContent = `🪙 ${tokensM(shownBalance)}`;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    coins.classList.add('is-bumping');
+    setTimeout(() => coins.classList.remove('is-bumping'), 900);
+    requestAnimationFrame(step);
+  }
+
+  function paintPile() {
+    pile.replaceChildren(...(data.duplicates.length
+      ? data.duplicates.map((mon) => h('div', {
+          class: `duplicate-card rarity-${mon.rarity}${mon.shiny ? ' is-shiny' : ''}`,
+          tabindex: 0,
+          role: 'button',
+          'aria-label': `${mon.name}${mon.shiny ? ' shiny' : ''}, ${RECYCLE_RARITY[mon.rarity]}, ${tokensM(mon.tokens)}. Arrástralo a la trituradora o presiona Enter.`,
+          'data-tip': `${mon.name}${mon.shiny ? ' ✨' : ''} · Nv ${mon.level}`,
+          'data-tip-note': 'Arrástralo a la trituradora',
+          onpointerdown: (e) => startDrag(e, mon),
+          onkeydown: (e) => e.key === 'Enter' && shred(mon, e.currentTarget),
+        }, h('div', { html: creatureHTML({ sprite: mon.sprite, shiny: mon.shiny }) }), h('b', null, mon.name), h('span', { class: `rarity-tag recycle-${mon.rarity}` }, RECYCLE_RARITY[mon.rarity]), h('span', { class: 'duplicate-reward' }, `+${tokensM(mon.tokens)}`)))
+      : [h('p', { class: 'muted recycle-empty' }, 'No tienes repetidos por triturar. Los repetidos son copias de la misma especie y variante que ya tienes en tu colección; aparecen al subir tu save. ', h('a', { href: '/coleccion', 'data-link': true }, 'Subir save en Colección →'))]));
+  }
+
+  function paintHistory() {
+    history.replaceChildren(...(data.history.length
+      ? data.history.slice(0, 50).map((row) => h('div', { class: 'recycle-row' }, h('div', { class: 'recycle-row-sprite', html: creatureHTML({ sprite: row.sprite, shiny: row.shiny }) }), h('span', null, h('b', null, row.name), row.shiny ? ' ✨' : '', h('small', { class: 'muted' }, ` · ${RECYCLE_RARITY[row.rarity]} · ${ago(row.at)}`)), h('b', { class: 'recycle-row-tokens' }, `+${tokensM(row.tokens)}`)))
+      : [h('p', { class: 'muted' }, 'Todavía no trituras nada.')]));
+  }
+
+  function startDrag(e, mon) {
+    if (busy || e.button !== 0) return;
+    const source = e.currentTarget;
+    const rect = source.getBoundingClientRect();
+    const offset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    let ghost = null;
+    const begin = { x: e.clientX, y: e.clientY };
+    const over = (x, y) => {
+      const r = mouth.getBoundingClientRect();
+      return x >= r.left - 24 && x <= r.right + 24 && y >= r.top - 40 && y <= r.bottom + 30;
+    };
+    const move = (ev) => {
+      if (!ghost) {
+        if (Math.hypot(ev.clientX - begin.x, ev.clientY - begin.y) < 6) return;
+        ghost = source.cloneNode(true);
+        ghost.classList.add('drag-ghost');
+        Object.assign(ghost.style, { width: `${rect.width}px`, height: `${rect.height}px` });
+        document.body.append(ghost);
+        source.classList.add('is-dragging');
+        machine.classList.add('is-waiting');
+      }
+      ghost.style.transform = `translate(${ev.clientX - offset.x}px, ${ev.clientY - offset.y}px) rotate(${Math.max(-8, Math.min(8, (ev.movementX ?? 0) * 0.6))}deg)`;
+      machine.classList.toggle('is-hot', over(ev.clientX, ev.clientY));
+    };
+    const end = (ev) => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', end);
+      removeEventListener('pointercancel', end);
+      machine.classList.remove('is-waiting', 'is-hot');
+      if (!ghost) return;
+      const drop = ev.type === 'pointerup' && over(ev.clientX, ev.clientY);
+      if (drop) {
+        ghost.remove();
+        shred(mon, source);
+        return;
+      }
+      const back = source.getBoundingClientRect();
+      ghost.animate([{ transform: ghost.style.transform }, { transform: `translate(${back.left}px, ${back.top}px)` }], { duration: 220, easing: 'ease-out' }).finished.finally(() => {
+        ghost.remove();
+        source.classList.remove('is-dragging');
+      });
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', end);
+    addEventListener('pointercancel', end);
+  }
+
+  async function shred(mon, source) {
+    if (busy) return;
+    busy = true;
+    source.classList.add('is-dragging');
+    const request = api('/api/me/recycling', { method: 'POST', body: { entry: mon.id } });
+    const spriteUrl = spriteURL({ sprite: mon.sprite, shiny: mon.shiny });
+    const feed = h('img', { class: 'shred-feed', src: spriteUrl, alt: '', draggable: 'false' });
+    mouth.append(feed);
+    machine.classList.add('is-running');
+    music.cues(SHRED_SOUNDS, { maxMs: 1900 });
+    setTimeout(() => music.sfx('cry', { sprite: mon.sprite, faint: true }), SHRED_CRY_MS);
+    const sink = feed.animate([{ transform: 'translate(-50%, -8%) scale(1.05)' }, { transform: 'translate(-50%, 4%) rotate(-3deg)', offset: 0.2 }, { transform: 'translate(-50%, 130%) rotate(2deg)' }], { duration: 900, easing: 'cubic-bezier(.5, 0, .7, 1)', fill: 'forwards' }).finished;
+    const strips = Array.from({ length: SHRED_STRIPS }, (_, i) => {
+      const strip = h('span', { class: 'shred-strip' });
+      Object.assign(strip.style, { left: `${(i / SHRED_STRIPS) * 100}%`, width: `${100 / SHRED_STRIPS}%`, backgroundImage: `url("${spriteUrl}")`, backgroundSize: `${SHRED_STRIPS * 100}% 100%`, backgroundPosition: `${(i / (SHRED_STRIPS - 1)) * 100}% 0` });
+      output.append(strip);
+      const sway = (i - (SHRED_STRIPS - 1) / 2) * 11 + (Math.random() - 0.5) * 24;
+      const spin = (Math.random() - 0.5) * 70;
+      return strip.animate([
+        { transform: 'translateY(-105%) rotate(0deg)', opacity: 1 },
+        { transform: `translate(${sway * 0.35}px, 15%) rotate(${spin * 0.3}deg)`, opacity: 1, offset: 0.35 },
+        { transform: `translate(${sway}px, 120%) rotate(${spin}deg)`, opacity: 1, offset: 0.75 },
+        { transform: `translate(${sway * 1.2}px, 165%) rotate(${spin * 1.2}deg)`, opacity: 0 },
+      ], { duration: 1400, delay: 300 + Math.random() * 260, easing: 'ease-in', fill: 'both' }).finished.then(() => strip.remove());
+    });
+    let result;
+    try {
+      [result] = await Promise.all([request, sink]);
+    } catch (e) {
+      toast(e.message);
+      feed.remove();
+      machine.classList.remove('is-running');
+      source.classList.remove('is-dragging');
+      busy = false;
+      return;
+    }
+    feed.remove();
+    dropCoins(result.tokens);
+    await Promise.all(strips);
+    machine.classList.remove('is-running');
+    data = result.recycling;
+    if (me.shop) me.shop.balance = data.balance;
+    countTo(data.balance);
+    paintPile();
+    paintHistory();
+    busy = false;
+  }
+
+  function dropCoins(tokens) {
+    const count = Math.min(14, 3 + Math.round(Math.log2(tokens / 20_000_000 + 1) * 3));
+    gain.textContent = `+${tokensM(tokens)}`;
+    gain.animate([{ transform: 'translate(-50%, 0) scale(.6)', opacity: 0 }, { transform: 'translate(-50%, -18px) scale(1.15)', opacity: 1, offset: 0.25 }, { transform: 'translate(-50%, -40px) scale(1)', opacity: 0 }], { duration: 1500, easing: 'ease-out' });
+    for (let i = 0; i < count; i++) {
+      const coin = h('span', { class: 'shred-coin', 'aria-hidden': 'true' });
+      tray.append(coin);
+      const x = (Math.random() - 0.5) * 120;
+      coin.animate([
+        { transform: 'translate(0, -70px) scale(.5) rotate(0deg)', opacity: 0 },
+        { transform: `translate(${x * 0.5}px, -40px) scale(1) rotate(180deg)`, opacity: 1, offset: 0.3 },
+        { transform: `translate(${x}px, 0) scale(1) rotate(360deg)`, opacity: 1, offset: 0.75 },
+        { transform: `translate(${x}px, 0) scale(.9) rotate(360deg)`, opacity: 0 },
+      ], { duration: 1200, delay: 450 + i * 60, easing: 'cubic-bezier(.3, .7, .4, 1)', fill: 'both' }).finished.then(() => coin.remove());
+    }
+  }
+
+  paintPile();
+  paintHistory();
+  $app.replaceChildren(
+    h('section', { class: 'card shop-head' }, h('div', { class: 'profile-who' }, h('h1', null, '♻️ Reciclaje'), h('p', { class: 'muted small recycle-lead' }, 'Tritura tus Pokémon repetidos para ganar tokens. Mientras más raro, más tokens; un shiny vale el triple.')), h('div', { class: 'shop-balance' }, coins, h('a', { class: 'btn sm ghost', href: '/perfil', 'data-link': true }, '🧢 Ir al perfil'))),
+    h('section', { class: 'card recycle-stage' },
+      h('div', { class: 'recycle-pile' }, h('h2', null, `Tus repetidos`), pile),
+      h('div', { class: 'recycle-machine' }, machine),
+    ),
+    h('section', { class: 'card recycle-history' }, h('h2', null, 'Registro'), history),
   );
 }
 

@@ -56,6 +56,7 @@ const SCREEN_TRACKS = {
   'tab:stats': 'plains',
   'tab:profile': 'title',
   'tab:shop': 'mystery_encounter_gen_5_gts',
+  'tab:recycling': 'factory',
   prep: 'menu',
   'victory:win': 'bw/victory_trainer',
   'victory:champion': 'bw/victory_champion',

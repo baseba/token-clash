@@ -10,6 +10,7 @@ import { conflict, forbidden, invalid, notFound } from '../../shared/domain/erro
 import { isShopTrainer, isTrainerSprite, STARTER_SPRITES, trainerSpriteFor } from '../../catalog/domain/trainer-sprites.js';
 import { DEFAULT_BALL, shopItem, shopItemOf, type ShopItem } from '../../catalog/domain/shop.js';
 import { carryTeam, type ParsedSave } from './save-file.js';
+import { recycledTokens, recycleReward, type Duplicate, type RecycledRecord } from './recycling.js';
 
 export interface TrainerState {
   id: string;
@@ -30,6 +31,8 @@ export interface TrainerState {
   shopSpent?: number;
   owned?: string[];
   equipped?: Equipped;
+  duplicates?: Duplicate[];
+  recycled?: RecycledRecord[];
 }
 
 export type EquipKind = 'ball' | 'window' | 'frame';
@@ -70,6 +73,8 @@ export class Trainer implements TrainerState {
   shopSpent?: number;
   owned?: string[];
   equipped?: Equipped;
+  duplicates?: Duplicate[];
+  recycled?: RecycledRecord[];
 
   private constructor(state: TrainerState) {
     Object.assign(this, state);
@@ -92,7 +97,7 @@ export class Trainer implements TrainerState {
   /** @throws {DomainError} the sprite is not one of the trainer sprites, or is sold in the shop and not bought */
   chooseAvatar(key: string): void {
     if (!isTrainerSprite(key)) throw invalid('Ese entrenador no existe.');
-    if (isShopTrainer(key) && !this.owns(`trainer:${key}`) && key !== this.avatar) throw forbidden('Ese entrenador se compra en la tienda.');
+    if (isShopTrainer(key) && !this.owns(`trainer:${key}`) && key !== this.avatar) throw forbidden('Ese entrenador se compra en tu perfil.');
     this.avatar = key;
   }
 
@@ -106,8 +111,28 @@ export class Trainer implements TrainerState {
     return Math.max(0, this.totalTokens - (this.shopBaseline ?? 0));
   }
 
+  get recycledTokens(): number {
+    return recycledTokens(this.recycled ?? []);
+  }
+
   get balance(): number {
-    return Math.max(0, this.earned - (this.shopSpent ?? 0));
+    return Math.max(0, this.earned + this.recycledTokens - (this.shopSpent ?? 0));
+  }
+
+  /** The repeated Pokémon of the last save that haven't gone through the shredder yet. */
+  get recyclable(): Duplicate[] {
+    const done = new Set((this.recycled ?? []).map((record) => record.id));
+    return (this.duplicates ?? []).filter((duplicate) => !done.has(duplicate.id));
+  }
+
+  /** @throws {DomainError} the Pokémon is not a repeated one, or it was already recycled */
+  recycle(entryId: string, at: number): RecycledRecord {
+    if ((this.recycled ?? []).some((record) => record.id === entryId)) throw conflict('Ese Pokémon ya pasó por la trituradora.');
+    const duplicate = (this.duplicates ?? []).find((entry) => entry.id === entryId);
+    if (!duplicate) throw notFound('Ese Pokémon no está entre tus repetidos.');
+    const record: RecycledRecord = { id: duplicate.id, finalID: duplicate.finalID, rarity: duplicate.rarity, shiny: duplicate.shiny, tokens: recycleReward(duplicate), at };
+    this.recycled = [...(this.recycled ?? []), record];
+    return record;
   }
 
   owns(itemId: string): boolean {
@@ -134,7 +159,7 @@ export class Trainer implements TrainerState {
     if (key !== null) {
       const item = shopItemOf(kind, key);
       if (!item) throw notFound('Ese artículo no existe.');
-      if (!this.owns(item.id)) throw forbidden('Primero cómpralo en la tienda.');
+      if (!this.owns(item.id)) throw forbidden('Primero cómpralo en tu perfil.');
     }
     const { [kind]: _, ...rest } = this.equipped ?? {};
     this.equipped = key === null ? rest : { ...rest, [kind]: key };
@@ -174,6 +199,7 @@ export class Trainer implements TrainerState {
   importSave(parsed: ParsedSave, at: number): void {
     const previous = this.roster;
     const kept = new Map(previous.map((e) => [e.id, { nickname: e.nickname, moveset: e.moveset, abilityChoice: e.abilityChoice }]));
+    this.duplicates = parsed.duplicates;
     this.roster = parsed.roster.map((entry) => {
       const keptFields = kept.get(entry.id);
       if (!keptFields) return entry;

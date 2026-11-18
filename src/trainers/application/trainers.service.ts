@@ -5,6 +5,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { newId, newToken, now, sha256 } from '../../shared/domain/clock.js';
 import { invalid } from '../../shared/domain/errors.js';
+import type { RecycledRecord } from '../domain/recycling.js';
 import { parseSave } from '../domain/save-file.js';
 import { cleanName, Trainer, type EquipKind } from '../domain/trainer.js';
 import { TrainerRepository } from '../domain/trainer.repository.js';
@@ -104,6 +105,14 @@ export class TrainersService implements OnModuleInit {
     trainer.touch(now());
     this.trainers.save(trainer);
     return trainer;
+  }
+
+  /** @throws {DomainError} the Pokémon is not a repeated one, or it was already recycled */
+  recycle(trainer: Trainer, entryId: string): RecycledRecord {
+    const record = trainer.recycle(entryId, now());
+    trainer.touch(now());
+    this.trainers.save(trainer);
+    return record;
   }
 
   /** @throws {DomainError} the item doesn't exist or wasn't bought */

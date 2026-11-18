@@ -7,11 +7,13 @@
 
 import { hash, NATURE_NAMES } from '../../catalog/domain/creatures.js';
 import { uniqueSpecies, variantKey, type Gender, type Ivs, type Rarity, type RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { toDuplicate, type Duplicate } from './recycling.js';
 import { invalid } from '../../shared/domain/errors.js';
 
 const RARITIES = new Set(['common', 'uncommon', 'rare', 'legendary']);
 const UUID = /^[0-9a-fA-F-]{8,40}$/;
 const MAX_ROSTER = 300;
+const MAX_DUPLICATES = 1000;
 const ABILITY_KEY = /^[a-z0-9-]{1,40}$/;
 const GENDERS = new Set(['male', 'female']);
 const MOVE_KEY = /^[a-z0-9-]{1,40}$/;
@@ -19,6 +21,8 @@ const MAX_LEARNED = 120;
 
 export interface ParsedSave {
   roster: RosterEntry[];
+  /** The repeated copies the roster leaves out (it keeps one per species and variant). */
+  duplicates: Duplicate[];
   totalTokens: number;
 }
 
@@ -189,12 +193,18 @@ export function parseSave(text: string): ParsedSave {
   }
 
   const roster = firstOfEachSpecies(candidates).slice(0, MAX_ROSTER);
+  const kept = new Set(roster.map((entry) => entry.id));
+  const duplicates = candidates
+    .filter(({ entry }) => !kept.has(entry.id) && !entry.active && roster.some((first) => variantKey(first) === variantKey(entry)))
+    .map(({ entry }) => toDuplicate(entry))
+    .slice(0, MAX_DUPLICATES);
 
   if (roster.length === 0) throw invalid('Tu save no tiene Pokémon todavía (¿solo un huevo?). Vuelve cuando nazca el primero.');
 
   const used = Number(state.usedSinceInstall);
   return {
     roster,
+    duplicates,
     totalTokens: Number.isFinite(used) && used > 0 ? Math.min(used, 1e15) : 0,
   };
 }

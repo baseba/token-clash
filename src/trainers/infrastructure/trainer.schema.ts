@@ -4,6 +4,7 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { Ivs } from '../../catalog/domain/roster-entry.js';
+import type { Duplicate, RecycledRecord } from '../domain/recycling.js';
 
 export const trainers = sqliteTable(
   'trainers',
@@ -24,6 +25,8 @@ export const trainers = sqliteTable(
     shopSpent: integer('shop_spent').notNull().default(0),
     owned: text({ mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
     equipped: text({ mode: 'json' }).$type<Record<string, string>>(),
+    duplicates: text({ mode: 'json' }).$type<Duplicate[]>().notNull().default(sql`'[]'`),
+    recycled: text({ mode: 'json' }).$type<RecycledRecord[]>().notNull().default(sql`'[]'`),
   },
 );
 
