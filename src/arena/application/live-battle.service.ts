@@ -48,7 +48,7 @@ export class LiveBattleService {
       kind: 'battle',
       battle: createBattle({
         id: room.challenge.id,
-        sides: preview.sides.map((side, sideIndex) => ({ trainerId: side.trainerId, name: side.name, avatar: side.avatar ?? this.views.avatarOf(side.trainerId, room.challenge), entries: chosenEntries(preview, sideIndex) })),
+        sides: preview.sides.map((side, sideIndex) => ({ trainerId: side.trainerId, name: side.name, avatar: side.avatar ?? this.views.avatarOf(side.trainerId, room.challenge), frame: side.frame ?? this.views.frameOf(side.trainerId), ball: this.views.ballOf(side.trainerId), entries: chosenEntries(preview, sideIndex) })),
       }),
       startedAt: now(),
       deadline: null,

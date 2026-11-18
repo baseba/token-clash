@@ -13,6 +13,7 @@ export interface CountdownPlayer {
   id: string;
   name: string;
   avatar: string;
+  frame: string | null;
   ai: string | null;
   wins: number;
   losses: number;

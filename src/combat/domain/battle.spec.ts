@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseSave } from '../../trainers/domain/save-file.js';
-import { createBattle, submit, autoAction, forfeit, needsAction, validActions, shownTarget } from './battle.js';
+import { createBattle, submit, autoAction, forfeit, needsAction, validActions, shownTarget, publicState } from './battle.js';
 import { rng, species, speciesData, effectiveness, learnedMoves, statsFor } from '../../catalog/domain/creatures.js';
 import { BATTLE_LEVEL, defaultMoveset, validMoveset, movesetFor, buildFighter } from './fighter.js';
 import { moveData } from './moves.js';
@@ -167,4 +167,9 @@ test('a side that forfeits loses at once, and a finished battle cannot be forfei
   assert.equal(b.winner, 1);
   assert.equal(b.sides[0].action, null);
   assert.throws(() => forfeit(b, 1), /ya terminó/);
+});
+
+test('each side throws its own Poké Ball, and every viewer sees both', () => {
+  const b = createBattle({ id: 'balls', random: rng(1), sides: [{ trainerId: 'a', name: 'A', ball: 'mb', entries: roster.slice(0, 1) }, { trainerId: 'b', name: 'B', entries: roster.slice(1, 2) }] });
+  for (const viewer of [0, 1, null]) assert.deepEqual(publicState(b, viewer).sides.map((side) => side.ball), ['mb', 'pb']);
 });

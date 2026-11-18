@@ -6,7 +6,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { newId, newToken, now, sha256 } from '../../shared/domain/clock.js';
 import { invalid } from '../../shared/domain/errors.js';
 import { parseSave } from '../domain/save-file.js';
-import { cleanName, Trainer } from '../domain/trainer.js';
+import { cleanName, Trainer, type EquipKind } from '../domain/trainer.js';
 import { TrainerRepository } from '../domain/trainer.repository.js';
 
 const TOKEN_FORMAT = /^[A-Za-z0-9_-]{20,100}$/;
@@ -27,13 +27,16 @@ export class TrainersService implements OnModuleInit {
   onModuleInit(): void {
     // Saves imported by older versions kept repeated species: tidy them once at startup.
     let fixed = 0;
+    let relooked = 0;
     for (const trainer of this.trainers.all()) {
-      if (trainer.dropRepeatedSpecies()) {
-        this.trainers.save(trainer);
-        fixed += 1;
-      }
+      const dropped = trainer.dropRepeatedSpecies();
+      const released = trainer.releaseShopLook();
+      if (dropped || released) this.trainers.save(trainer);
+      if (dropped) fixed += 1;
+      if (released) relooked += 1;
     }
     if (fixed) this.logger.log(`Quité especies repetidas de ${fixed} entrenador(es).`);
+    if (relooked) this.logger.log(`${relooked} entrenador(es) tenían un entrenador que ahora se vende en la tienda: les tocó otro.`);
   }
 
   byId(id: string | null | undefined): Trainer | undefined {
@@ -90,6 +93,22 @@ export class TrainersService implements OnModuleInit {
     if (changes.avatar !== undefined) trainer.chooseAvatar(changes.avatar);
     if (changes.team) trainer.chooseTeam(changes.team);
     if (changes.nickname) trainer.setNickname(changes.nickname.id, changes.nickname.name);
+    trainer.touch(now());
+    this.trainers.save(trainer);
+    return trainer;
+  }
+
+  /** @throws {DomainError} the item doesn't exist, is already owned, or the balance is short */
+  buy(trainer: Trainer, itemId: string): Trainer {
+    trainer.buy(itemId);
+    trainer.touch(now());
+    this.trainers.save(trainer);
+    return trainer;
+  }
+
+  /** @throws {DomainError} the item doesn't exist or wasn't bought */
+  equip(trainer: Trainer, kind: EquipKind, key: string | null): Trainer {
+    trainer.equip(kind, key);
     trainer.touch(now());
     this.trainers.save(trainer);
     return trainer;

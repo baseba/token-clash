@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isUnlocked, recordOf, spriteProgress, UNLOCKS } from './achievements.js';
-import { STARTER_SPRITES, TRAINER_SPRITES } from '../../catalog/domain/trainer-sprites.js';
+import { isShopTrainer, STARTER_SPRITES, TRAINER_SPRITES } from '../../catalog/domain/trainer-sprites.js';
 
 const IV = { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 };
 const entry = (finalID: number, extra: any = {}): any => ({ id: `e${finalID}-${extra.shiny ? 's' : 'n'}`, finalID, baseID: finalID, rarity: 'common', shiny: false, level: 50, ivs: IV, ...extra });
@@ -10,8 +10,9 @@ const record = ({ roster = [], wins = 0, losses = 0, challenges = [], tournament
   recordOf({ trainer: { id: 'me', roster, wins, losses, totalTokens }, team, challenges, tournaments, rankedFirst });
 const duel = (n: number, winnerId: string, extra: any = {}): any => ({ id: `c${n}`, hostId: 'me', guestId: 'rival', hostTeam: [], status: 'finished', mode: 'team', createdAt: n, finishedAt: n, winnerId, ...extra });
 
-test('every trainer sprite is either a starter or has a way to unlock it', () => {
-  for (const key of TRAINER_SPRITES) assert.ok(STARTER_SPRITES.includes(key) !== UNLOCKS.has(key), key);
+test('every trainer sprite is either a starter, sold in the shop, or has an achievement to unlock it', () => {
+  for (const key of TRAINER_SPRITES) assert.equal([STARTER_SPRITES.includes(key), UNLOCKS.has(key), isShopTrainer(key)].filter(Boolean).length, 1, key);
+  assert.ok(STARTER_SPRITES.length >= 90, 'a decent free selection');
   assert.ok(STARTER_SPRITES.includes('player_m') && STARTER_SPRITES.includes('hiker'));
 });
 
@@ -86,9 +87,67 @@ test('specials: shinies, tokens, a team without repeated types, flawless and low
   assert.ok(isUnlocked(record({ challenges: [duel(1, 'me', { hostTeam: lowTeam, final: final([1, 1, 1]) })] }), 'marnie'));
 });
 
+test('a shop trainer unlocks when it is bought', () => {
+  assert.ok(!isUnlocked(record(), 'jacinthe_holo'));
+  const bought = recordOf({ trainer: { id: 'me', roster: [], wins: 0, losses: 0, owned: ['trainer:jacinthe_holo'] }, team: [], challenges: [], tournaments: [], rankedFirst: false });
+  assert.ok(isUnlocked(bought, 'jacinthe_holo'));
+  assert.equal(spriteProgress(bought).find((p) => p.key === 'jacinthe_holo')!.group, 'shop');
+});
+
 test('a locked sprite shows the way closest to done', () => {
   const progress = spriteProgress(record({ roster: [entry(27)] })).find((p) => p.key === 'giovanni')!;
   assert.equal(progress.unlocked, false);
   assert.equal(progress.group, 'gym');
   assert.deepEqual(progress.goals.map((g) => [g.have, g.need]), [[1, 3]]);
+});
+
+test('a recolored trainer needs its original first, plus what its colors are about', () => {
+  const champion = { rankedFirst: true, wins: 30 };
+  assert.ok(!isUnlocked(record({ roster: [entry(9), entry(6)] }), 'red_blue'), 'Red is not unlocked yet');
+  assert.ok(!isUnlocked(record({ roster: [entry(6)], ...champion }), 'red_blue'));
+  assert.ok(isUnlocked(record({ roster: [entry(9)], ...champion }), 'red_blue'), 'Red Azul is Blastoise');
+  assert.ok(!isUnlocked(record({ roster: [entry(9)], ...champion }), 'red__magenta'));
+  assert.ok(isUnlocked(record({ roster: [entry(6)], ...champion }), 'red__magenta'), 'Red Magenta is Charizard');
+  const beatVeryHard = [duel(1, 'me', { ai: 'veryhard', guestId: 'ai:veryhard' })];
+  for (const [key, id] of [['maxie_aqua', 382], ['archie_magma', 383]] as const) {
+    assert.ok(!isUnlocked(record({ roster: [entry(id)] }), key), key);
+    assert.ok(isUnlocked(record({ roster: [entry(id)], challenges: beatVeryHard }), key), key);
+  }
+  const johto = Array.from({ length: 75 }, (_, i) => entry(152 + i));
+  assert.ok(!isUnlocked(record({ roster: johto }), 'lance_emerald'));
+  assert.ok(isUnlocked(record({ roster: [...johto, entry(384)] }), 'lance_emerald'));
+  const lance = spriteProgress(record()).find((p) => p.key === 'lance_emerald')!;
+  assert.equal(lance.group, 'champion');
+  assert.deepEqual(lance.goals.map((g) => g.need), [75, 1]);
+});
+
+test('each partner variant asks for its trainer\'s signature Pokémon on top of the trainer', () => {
+  const kanto = Array.from({ length: 75 }, (_, i) => entry(i + 1));
+  assert.ok(isUnlocked(record({ roster: kanto }), 'blue'));
+  assert.ok(isUnlocked(record({ roster: kanto }), 'blue_red'), 'Charizard (#6) is in the first 75');
+  const sinnoh = Array.from({ length: 100 }, (_, i) => entry(387 + i)).filter((e) => e.finalID !== 445);
+  assert.ok(!isUnlocked(record({ roster: sinnoh }), 'cynthia_garchomp'));
+  assert.ok(isUnlocked(record({ roster: [...sinnoh, entry(445), entry(486)] }), 'cynthia_garchomp'));
+});
+
+test('a shop variant of a locked trainer shows both steps: the original first, then buying it', () => {
+  const variant = spriteProgress(record()).find((p) => p.key.startsWith('cynthia__') && p.group === 'shop')!;
+  assert.deepEqual(variant.goals.map((g) => [g.have, g.need]), [[0, 1], [0, 1]]);
+  assert.match(variant.goals[0].text, /Cynthia/);
+});
+
+test('an earned color variant asks for its original and Pokémon of the type its color stands for', () => {
+  const progress = spriteProgress(record());
+  const cynthia = progress.find((p) => p.key.startsWith('cynthia__') && p.group === 'variant')!;
+  assert.equal(cynthia.goals.at(-1)!.need, 8);
+  assert.ok(cynthia.goals.length >= 2, 'the original comes first');
+  const free = progress.find((p) => p.key.startsWith('hiker__'))!;
+  assert.equal(free.group, 'variant');
+  assert.deepEqual(free.goals.map((g) => g.need), [5]);
+});
+
+test('a trainer with several ways to unlock lists all of them, not only the closest', () => {
+  const cyrus = spriteProgress(record()).find((p) => p.key === 'cyrus')!;
+  assert.equal(cyrus.ways.length, 2);
+  assert.ok(cyrus.ways.some((way) => JSON.stringify(way) === JSON.stringify(cyrus.goals)), 'the closest way is one of them');
 });
