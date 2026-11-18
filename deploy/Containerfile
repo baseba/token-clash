@@ -14,12 +14,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && rm -rf /root/.npm
-# Cries, battle animations and trainers are downloaded at build time (the server has no egress).
-COPY src/catalog/data/pokeapi.json ./src/catalog/data/pokeapi.json
-COPY scripts/sync-cries.js ./scripts/sync-cries.js
-RUN node scripts/sync-cries.js
+# Battle animations and trainers are downloaded at build time (the server has no egress).
 COPY scripts/sync-battle-anims.js ./scripts/sync-battle-anims.js
-COPY public/music.js public/battle-anims.js public/radio.js public/shop.js public/trainer-sprites.js public/trainer-variants.js ./public/
+COPY public/music.js public/battle-anims.js public/radio.js public/shop.js public/trainer-sprites.js public/trainer-variants.js public/upstream.js ./public/
 COPY src/catalog/data/movedex.json ./src/catalog/data/movedex.json
 RUN node scripts/sync-battle-anims.js
 COPY scripts/sync-trainers.js ./scripts/sync-trainers.js

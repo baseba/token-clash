@@ -1,5 +1,6 @@
 import { causeAnim, chargeAnim, conditionAnim, statusAnim, terrainAnim, weatherAnim } from './battle-anims.js?v=dev';
 import { radioTrack, RADIO_TRACKS } from './radio.js?v=dev';
+import { fetchFirst, UPSTREAM, upstreamManifest, upstreamURLs } from './upstream.js?v=dev';
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
@@ -13,14 +14,12 @@ function pulseWave(ctx, duty) {
 
 const TYPE_PITCH = { normal: 1, fire: 1.1, water: 0.9, electric: 1.35, grass: 1, ice: 1.45, fighting: 0.8, poison: 0.85, ground: 0.6, flying: 1.2, psychic: 1.15, bug: 1.25, rock: 0.7, ghost: 0.75, dragon: 0.8, dark: 0.7, steel: 1.2, fairy: 1.4 };
 
-const CRY_VARIANTS = ['latest', 'legacy'];
-
-const CRY_MANIFEST = '/cries/cries.json';
 const MOVE_SFX_MANIFEST = '/sfx/moves/moves.json';
 
-export function cryUrls(manifest, sprite) {
-  const entry = manifest?.[String(sprite)];
-  return entry ? CRY_VARIANTS.map((v) => entry[v]).filter(Boolean) : [];
+/** Where a sprite's cry loads from, in order, per public/upstream/cries.json; none if it has no cry. */
+export function cryURLs(manifest, sprite) {
+  const path = manifest?.[String(sprite)];
+  return typeof path === 'string' ? upstreamURLs(UPSTREAM.cries, path) : [];
 }
 
 const SCENE_TRACKS = {
@@ -267,26 +266,23 @@ export function createPlayer({ storage = null } = {}) {
     return manifests.get(url);
   }
 
-  function loadBuffer(url) {
-    if (!buffers.has(url)) {
-      const buffer = fetch(url)
-        .then((res) => (res.ok ? res.arrayBuffer() : null))
+  // A sound from the first of its URLs that answers, cached by the first one.
+  function loadBuffer(urls) {
+    const [key] = urls;
+    if (!buffers.has(key)) {
+      const buffer = fetchFirst(urls)
+        .then((res) => (res ? res.arrayBuffer() : null))
         .then((data) => (data ? ctx.decodeAudioData(data) : null))
         .catch(() => null);
-      buffers.set(url, buffer);
+      buffers.set(key, buffer);
     }
-    return buffers.get(url);
+    return buffers.get(key);
   }
 
-  async function firstBuffer(urls) {
-    for (const url of urls) {
-      const buffer = await loadBuffer(url);
-      if (buffer) return buffer;
-    }
-    return null;
-  }
-
-  const cryBuffer = async (sprite) => firstBuffer(cryUrls(await loadManifest(CRY_MANIFEST), sprite));
+  const cryBuffer = async (sprite) => {
+    const urls = cryURLs(await upstreamManifest('cries'), sprite);
+    return urls.length ? loadBuffer(urls) : null;
+  };
   const moveCues = async (key, byPlayer) => moveSfxCues(await loadManifest(MOVE_SFX_MANIFEST), key, byPlayer);
 
   const cueSources = new Set();
@@ -318,7 +314,7 @@ export function createPlayer({ storage = null } = {}) {
 
   async function playMove(out, { key, byPlayer = true, shape, type }) {
     const cues = key ? await moveCues(key, byPlayer) : [];
-    const buffers = await Promise.all(cues.map((cue) => loadBuffer(cue.url)));
+    const buffers = await Promise.all(cues.map((cue) => loadBuffer([cue.url])));
     if (ctx.state !== 'running') return;
     const start = ctx.currentTime + 0.01;
     if (!buffers.some(Boolean)) return SHAPE_SFX[shape]?.(out, start, TYPE_PITCH[type] ?? 1);
@@ -372,7 +368,7 @@ export function createPlayer({ storage = null } = {}) {
   }
 
   async function playSampleOr(out, url, fallback, rate = 1) {
-    const buffer = await loadBuffer(url);
+    const buffer = await loadBuffer([url]);
     if (ctx.state !== 'running') return;
     if (buffer) playBuffer(out, buffer, { gain: 0.35, rate });
     else fallback();
@@ -380,7 +376,7 @@ export function createPlayer({ storage = null } = {}) {
 
   async function playCuesOr(out, key, byPlayer, fallback) {
     const cues = await moveCues(key, byPlayer);
-    const buffers = await Promise.all(cues.map((cue) => loadBuffer(cue.url)));
+    const buffers = await Promise.all(cues.map((cue) => loadBuffer([cue.url])));
     if (ctx.state !== 'running') return;
     if (!buffers.some(Boolean)) return fallback();
     const start = ctx.currentTime + 0.01;
@@ -415,7 +411,7 @@ export function createPlayer({ storage = null } = {}) {
   }
 
   async function stream(id, track, gain, loop) {
-    const [buffer, loops] = await Promise.all([loadBuffer(musicFile(track)), loadManifest('/music/loops.json')]);
+    const [buffer, loops] = await Promise.all([loadBuffer([musicFile(track)]), loadManifest('/music/loops.json')]);
     if (current?.id !== id || trackGain !== gain || !buffer) return;
     const source = ctx.createBufferSource();
     const level = ctx.createGain();
@@ -446,7 +442,7 @@ export function createPlayer({ storage = null } = {}) {
     },
     unlock() {
       if (!ensure()) return;
-      for (const kind of UI_SOUND_KINDS) loadBuffer(uiSampleFor(kind).url);
+      for (const kind of UI_SOUND_KINDS) loadBuffer([uiSampleFor(kind).url]);
       if (ctx.state === 'suspended') ctx.resume().then(() => shown() && start(shown()));
       else if (shown()) start(shown());
     },
@@ -467,12 +463,12 @@ export function createPlayer({ storage = null } = {}) {
       if (!ensure()) return;
       for (const kind of [...Object.keys(SE_FILES), 'hit']) for (const eff of [0.5, 1, 2]) {
         const url = sampleFor(kind, { eff });
-        if (url) loadBuffer(url);
+        if (url) loadBuffer([url]);
       }
       for (const sprite of new Set(sprites)) if (sprite != null) cryBuffer(sprite);
       for (const key of new Set(moves)) {
         if (!key) continue;
-        for (const byPlayer of [true, false]) moveCues(key, byPlayer).then((cues) => cues.forEach((cue) => loadBuffer(cue.url)));
+        for (const byPlayer of [true, false]) moveCues(key, byPlayer).then((cues) => cues.forEach((cue) => loadBuffer([cue.url])));
       }
     },
     ui(kind) {
@@ -484,7 +480,7 @@ export function createPlayer({ storage = null } = {}) {
     cues(list, { maxMs = 1400 } = {}) {
       const out = sfxBus();
       if (!out || !list?.length) return;
-      Promise.all(list.map((cue) => loadBuffer(cue.url))).then((loaded) => {
+      Promise.all(list.map((cue) => loadBuffer([cue.url]))).then((loaded) => {
         if (ctx.state !== 'running') return;
         stopCues();
         const start = ctx.currentTime + 0.01;
@@ -512,7 +508,7 @@ export function createPlayer({ storage = null } = {}) {
     stopCues,
     preloadCues(list) {
       if (!ensure()) return;
-      for (const cue of list ?? []) loadBuffer(cue.url);
+      for (const cue of list ?? []) loadBuffer([cue.url]);
     },
     sfx(kind, opts = {}) {
       const out = sfxBus();

@@ -5,19 +5,24 @@ import { MUSIC_TRACKS, musicFile, trackFor, UI_SOUND_KINDS, uiSampleFor } from '
 
 const scenes = [...new Set([...readFileSync(new URL('../../public/backgrounds.js', import.meta.url), 'utf8').matchAll(/file: '([a-z0-9-]+)'/g)].map((m) => m[1]))];
 
+test('a cry loads from jsDelivr, then raw GitHub, at the path its manifest resolved', async () => {
+  const { cryURLs } = await import('../../public/music.js');
+  const { UPSTREAM, upstreamURLs } = await import('../../public/upstream.js');
+  const manifest = { 25: 'cries/pokemon/latest/25.ogg', 'darmanitan-zen': 'cries/pokemon/latest/10017.ogg' };
+  assert.deepEqual(cryURLs(manifest, '25'), upstreamURLs(UPSTREAM.cries, 'cries/pokemon/latest/25.ogg'));
+  assert.deepEqual(cryURLs(manifest, 25), cryURLs(manifest, '25'));
+  assert.match(cryURLs(manifest, 'darmanitan-zen')[0], /^https:\/\/cdn\.jsdelivr\.net\/gh\/PokeAPI\/cries@[0-9a-f]{40}\/cries\/pokemon\/latest\/10017\.ogg$/);
+  assert.deepEqual(cryURLs(manifest, 'missingno'), []);
+  assert.deepEqual(cryURLs(manifest, 'constructor'), []);
+  assert.deepEqual(cryURLs(null, '25'), []);
+});
+
 test('cries prefer the latest recording and fall back to the legacy one', async () => {
-  const { cryUrls } = await import('../../public/music.js');
-  const manifest = {
-    25: { latest: '/cries/latest/25.ogg', legacy: '/cries/legacy/25.ogg' },
-    'darmanitan-zen': { latest: '/cries/latest/10017.ogg' },
-    906: { legacy: '/cries/legacy/906.ogg' },
-  };
-  assert.deepEqual(cryUrls(manifest, '25'), ['/cries/latest/25.ogg', '/cries/legacy/25.ogg']);
-  assert.deepEqual(cryUrls(manifest, 25), ['/cries/latest/25.ogg', '/cries/legacy/25.ogg']);
-  assert.deepEqual(cryUrls(manifest, 'darmanitan-zen'), ['/cries/latest/10017.ogg']);
-  assert.deepEqual(cryUrls(manifest, '906'), ['/cries/legacy/906.ogg']);
-  assert.deepEqual(cryUrls(manifest, 'missingno'), []);
-  assert.deepEqual(cryUrls(null, '25'), []);
+  const { resolveCry } = await import('../../scripts/sync-cries.js');
+  const upstreamHas = (...paths) => async (tried) => tried.find((path) => paths.includes(path)) ?? null;
+  assert.equal(await resolveCry(25, upstreamHas('cries/pokemon/latest/25.ogg', 'cries/pokemon/legacy/25.ogg')), 'cries/pokemon/latest/25.ogg');
+  assert.equal(await resolveCry(906, upstreamHas('cries/pokemon/legacy/906.ogg')), 'cries/pokemon/legacy/906.ogg');
+  assert.equal(await resolveCry(0, upstreamHas()), null);
 });
 
 test('every battle scene plays a PokeRogue trainer battle theme that fits it', () => {

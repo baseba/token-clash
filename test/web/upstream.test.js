@@ -81,3 +81,9 @@ test('a missing sprite falls back to the closest one: back shiny to front shiny,
   assert.deepEqual(await resolveVariants(candidates, upstreamHas('front')), ['front', 'front', 'front', 'front']);
   assert.equal(await resolveVariants(candidates, upstreamHas('front-shiny', 'back')), null, 'no front, no sprite');
 });
+
+test('every species and form has a cry on jsDelivr', async () => {
+  const { cryURLs } = await import('../../public/music.js');
+  const cries = readManifest('/upstream/cries.json');
+  for (const sprite of creatures) assert.match(cryURLs(cries, sprite)[0] ?? '', jsdelivr('PokeAPI/cries'), sprite);
+});
