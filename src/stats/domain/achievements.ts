@@ -1,7 +1,7 @@
 import { lineage, speciesData } from '../../catalog/domain/creatures.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { EARNED_VARIANTS, ELITE_FOUR, GYM_LEADERS, isShopTrainer, TRAINER_SPRITES, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
-import { RARITIES, shopItemOf } from '../../catalog/domain/shop.js';
+import { RARITIES, shopItem, shopItemOf } from '../../catalog/domain/shop.js';
 import { TYPES } from '../../catalog/domain/type-chart.js';
 import type { ChallengeState } from '../../arena/domain/challenge.js';
 import { isHumanDuel } from '../../arena/domain/challenge.js';
@@ -276,3 +276,16 @@ export const isUnlocked = (record: PlayerRecord, key: string): boolean => {
   const unlock = UNLOCKS.get(key);
   return !unlock || unlock.ways.some((way) => done(way.map((rule) => rule(record))));
 };
+
+/** Why this player can't buy the item yet, or null if the shop may sell it: a variant needs its original trainer unlocked first. */
+export function buyBlocker(record: PlayerRecord, itemId: string): string | null {
+  const requires = shopItem(itemId)?.requires;
+  if (requires && !isUnlocked(record, requires)) return 'Primero desbloquea al entrenador original.';
+  return null;
+}
+
+/** Why this player can't wear the look, or null if they can. The look they already wear stays theirs even if it would be locked now. */
+export function lookBlocker(record: PlayerRecord, currentAvatar: string | null | undefined, key: string): string | null {
+  if (key === currentAvatar || isUnlocked(record, key)) return null;
+  return isShopTrainer(key) ? 'Ese entrenador se compra en tu perfil.' : 'Todavía no desbloqueas a ese entrenador.';
+}
