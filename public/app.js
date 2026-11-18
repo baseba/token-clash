@@ -1,4 +1,4 @@
-import { creatureHTML, loadAnimatedSprites, preloadSprites, spriteURL } from './creature.js?v=dev';
+import { creatureHTML, loadSprites, preloadSprites, spriteURL } from './creature.js?v=dev';
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
@@ -5051,4 +5051,4 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
 
 fallBackToRaw(document);
 document.querySelector('footer.credits')?.append(feedbackButton());
-loadAnimatedSprites().finally(route);
+loadSprites().finally(route);

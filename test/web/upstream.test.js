@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolveVariants } from '../../scripts/sprites.mjs';
 import { ASSET_ORIGINS, fallBackToRaw, fetchFirst, rawFallback, UPSTREAM, upstreamURLs } from '../../public/upstream.js';
 
 const pokerogue = { repo: 'pagefaultgames/pokerogue-assets', commit: 'b7ce1013491141864da412fa733d5ac585b5d453' };
@@ -49,4 +51,33 @@ test('a fetched file comes from the first URL that answers OK', async () => {
   assert.equal((await fetchFirst(['a', 'b', 'c'], fetchURL)).url, 'c');
   assert.deepEqual(asked, ['a', 'b', 'c']);
   assert.equal(await fetchFirst(['a', 'b'], fetchURL), null);
+});
+
+// The committed manifests, served to the browser as /upstream/<name>.json.
+const readManifest = (url) => JSON.parse(readFileSync(new URL(`../../public${url}`, import.meta.url), 'utf8'));
+globalThis.fetch = async (url) => ({ ok: true, json: async () => readManifest(url) });
+
+const pokeapi = JSON.parse(readFileSync(new URL('../../src/catalog/data/pokeapi.json', import.meta.url), 'utf8'));
+const creatures = [...Object.keys(pokeapi.species), ...Object.values(pokeapi.forms).map((form) => form.sprite)];
+const jsdelivr = (repo) => new RegExp(`^https://cdn\\.jsdelivr\\.net/gh/${repo}@[0-9a-f]{40}/`);
+
+test('every species, form and the substitute has its four sprites on jsDelivr', async () => {
+  const { loadSprites, spriteURL } = await import('../../public/creature.js');
+  await loadSprites();
+  for (const sprite of [...creatures, 'substitute']) {
+    for (const back of [false, true]) for (const shiny of [false, true]) assert.match(spriteURL({ sprite, shiny }, { back }), jsdelivr('PokeAPI/sprites'), `${sprite}${back ? ' back' : ''}${shiny ? ' shiny' : ''}`);
+  }
+  assert.match(spriteURL({ sprite: '25', shiny: true }, { back: true }), /\/sprites\/pokemon\/versions\/generation-v\/black-white\/animated\/back\/shiny\/25\.gif$/, 'Black/White species animate');
+  assert.match(spriteURL({ sprite: 906 }), /\/sprites\/pokemon\/906\.png$/, 'later species are still PNGs');
+  assert.equal(spriteURL({ sprite: 'missingno' }), '');
+});
+
+test('a missing sprite falls back to the closest one: back shiny to front shiny, then back, then front', async () => {
+  const candidates = { front: ['front'], frontShiny: ['front-shiny'], back: ['back'], backShiny: ['back-shiny'] };
+  const upstreamHas = (...paths) => async (tried) => tried.find((path) => paths.includes(path)) ?? null;
+  assert.deepEqual(await resolveVariants(candidates, upstreamHas('front', 'front-shiny', 'back', 'back-shiny')), ['front', 'front-shiny', 'back', 'back-shiny']);
+  assert.deepEqual(await resolveVariants(candidates, upstreamHas('front', 'front-shiny', 'back')), ['front', 'front-shiny', 'back', 'front-shiny']);
+  assert.deepEqual(await resolveVariants(candidates, upstreamHas('front', 'back')), ['front', 'front', 'back', 'back']);
+  assert.deepEqual(await resolveVariants(candidates, upstreamHas('front')), ['front', 'front', 'front', 'front']);
+  assert.equal(await resolveVariants(candidates, upstreamHas('front-shiny', 'back')), null, 'no front, no sprite');
 });

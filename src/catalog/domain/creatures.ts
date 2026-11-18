@@ -1,9 +1,9 @@
 // Creatures. Everything comes from PokeAPI (https://pokeapi.co), downloaded into the game by
 // scripts/import-pokeapi.mjs: src/catalog/data/pokeapi.json holds the name, base stats, real types
-// and evolution placement of every species, and public/sprites/ holds each species' official
-// front/back sprites by dex number. The server never calls PokeAPI (production has no egress). The
-// type chart and labels live in public/types.js, shared with the browser. src/catalog/data/movedex.json
-// holds every learnable move.
+// and evolution placement of every species, and public/upstream/sprites.json says where each
+// species' front/back sprites live in PokeAPI/sprites (the browser loads them from a CDN). The
+// server never calls PokeAPI (production has no egress). The type chart and labels live in
+// public/types.js, shared with the browser. src/catalog/data/movedex.json holds every learnable move.
 
 import { readFileSync } from 'node:fs';
 import { catalogFile } from '../../shared/paths.js';
