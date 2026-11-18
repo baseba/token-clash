@@ -81,7 +81,7 @@ export function placeEntry(entry, { user, target, scale, width, height }) {
 }
 
 export function animLength(config) {
-  const bgEnd = (config.bg ?? []).reduce((end, [frame, , , , , , duration]) => Math.max(end, frame + duration * 2), 0);
+  const bgEnd = (config.bg ?? []).reduce((end, [frame, , , , , , duration]) => Math.max(end, frame + duration), 0);
   return Math.max(config.frames.length, bgEnd);
 }
 
@@ -165,7 +165,7 @@ export function createAnimPlayer(field) {
 
   function updateBg(el, { bgX, bgY, opacity, duration }, scale) {
     if (!el) return;
-    const ms = Math.max(1, duration * 3 * (1000 / 60));
+    const ms = Math.max(1, duration * FRAME_MS);
     if (bgX != null || bgY != null) {
       const from = new DOMMatrixReadOnly(getComputedStyle(el).transform);
       const to = { x: bgX != null ? (bgX * 0.5 - 320) * scale : el.bgAt.x, y: bgY != null ? (bgY * 0.5 - 284) * scale : el.bgAt.y };
