@@ -22,7 +22,7 @@ test('every variant has a downloaded base and is either earned or sold', () => {
   for (const variant of TRAINER_VARIANTS) {
     assert.ok(DOWNLOADED_SPRITES.includes(variant.base), variant.key);
     assert.ok(TRAINER_SPRITES.includes(variant.key), variant.key);
-    assert.ok((SPECIALS.includes(variant.key) || !!variant.earn) !== variant.key in SHOP_TRAINERS, variant.key);
+    assert.ok((SPECIALS.includes(variant.key) || !!variant.earn || !!variant.pokemon) !== variant.key in SHOP_TRAINERS, variant.key);
   }
 });
 
@@ -35,18 +35,18 @@ test('every trainer has at least one color variant, and story characters have th
   assert.equal(new Set(TRAINER_VARIANTS.map((variant) => variant.key)).size, TRAINER_VARIANTS.length);
 });
 
-test('a variant of a hard trainer costs more and needs the original first; one of a free trainer does not', async () => {
+test('a recolor on sale costs a tier above its original and always needs the original first', async () => {
   const { VARIANT_REQUIRES } = await import('../../public/trainer-sprites.js');
   const { shopItemOf } = await import('../../public/shop.js');
   const champion = TRAINER_VARIANTS.find((variant) => variant.base === 'cynthia' && !variant.name && !variant.earn);
   assert.equal(VARIANT_REQUIRES[champion.key], 'cynthia');
   assert.equal(shopItemOf('trainer', champion.key).rarity, 'mythic');
-  const { STARTER_SPRITES } = await import('../../public/trainer-sprites.js');
-  const free = TRAINER_VARIANTS.find((variant) => STARTER_SPRITES.includes(variant.base) && !variant.name && !variant.earn);
-  assert.equal(VARIANT_REQUIRES[free.key], undefined);
-  assert.equal(shopItemOf('trainer', free.key).rarity, 'common');
-  const sold = TRAINER_VARIANTS.filter((variant) => variant.key in SHOP_TRAINERS).length;
-  assert.ok(sold * 2 <= TRAINER_VARIANTS.length, 'at most half the variants are sold');
+  const fisherman = TRAINER_VARIANTS.find((variant) => variant.base === 'fisherman' && variant.key in SHOP_TRAINERS);
+  assert.equal(VARIANT_REQUIRES[fisherman.key], 'fisherman');
+  assert.equal(shopItemOf('trainer', fisherman.key).rarity, 'rare');
+  for (const key of Object.keys(SHOP_TRAINERS)) assert.ok(VARIANT_REQUIRES[key], key);
+  for (const base of DOWNLOADED_SPRITES) assert.ok(TRAINER_VARIANTS.some((variant) => variant.base === base && variant.key in SHOP_TRAINERS), `${base} has a recolor on sale`);
+  for (const base of DOWNLOADED_SPRITES) assert.ok(!(base in SHOP_TRAINERS), `${base} is earned, not sold`);
 });
 
 test('skin of every tone is protected, while vivid orange clothes are not', async () => {
@@ -93,4 +93,32 @@ test('every generated variant changes its colors visibly instead of landing on a
     }
     assert.ok(change / weight >= 50, `${variant.key}: ${Math.round(change / weight)}`);
   }
+});
+
+test('every recolor on sale of a trainer that is not free needs the original first, handmade ones too', async () => {
+  const { SHOP_TRAINERS, STARTER_SPRITES, TRAINER_VARIANTS, VARIANT_REQUIRES } = await import('../../public/trainer-sprites.js');
+  assert.equal(VARIANT_REQUIRES.leon_shadow, 'leon');
+  for (const variant of TRAINER_VARIANTS.filter((v) => v.key in SHOP_TRAINERS)) assert.equal(VARIANT_REQUIRES[variant.key], variant.base, variant.key);
+});
+
+test('the avatar centers on the head even when an arm is raised higher than it', async () => {
+  const { faceOf } = await import('../../scripts/sync-trainers.js');
+  const width = 40;
+  const height = 60;
+  const rgba = Buffer.alloc(width * height * 4);
+  const paint = (x0, y0, x1, y1, color) => {
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) rgba.set([...color, 255], (y * width + x) * 4);
+  };
+  paint(4, 0, 6, 30, [60, 60, 200]);
+  paint(22, 6, 32, 16, [222, 165, 123]);
+  paint(18, 16, 36, 60, [60, 60, 200]);
+  const face = faceOf({ width, height, rgba });
+  assert.ok(Math.abs(face.x * width - 27) < 3, `centered on the head, not the arm: ${face.x * width}`);
+  assert.ok(face.y * height > 6 && face.y * height < 18, `at head height: ${face.y * height}`);
+});
+
+test('every legendary and mythical Pokémon of the game unlocks a recolor of a related trainer', async () => {
+  const LEGENDS = [144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649];
+  const withPokemon = new Set(TRAINER_VARIANTS.filter((variant) => variant.pokemon).map((variant) => variant.pokemon));
+  for (const id of LEGENDS) assert.ok(withPokemon.has(id), `#${id}`);
 });

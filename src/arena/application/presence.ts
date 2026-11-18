@@ -72,6 +72,11 @@ export interface Room {
   timer: NodeJS.Timeout | null;
 }
 
+/** Watchers are allowed per tournament, or per duel when it isn't part of one. */
+export const watchKey = (challenge: Pick<Challenge, 'id' | 'tournamentId'>): string => (challenge.tournamentId ? tournamentWatchKey(challenge.tournamentId) : `c:${challenge.id}`);
+
+export const tournamentWatchKey = (tournamentId: string): string => `t:${tournamentId}`;
+
 export function inRoom(room: Room, trainerId: string | null | undefined): boolean {
   return [...room.sockets].some((ws) => ws.trainerId === trainerId && ws.open);
 }
@@ -91,6 +96,15 @@ export class Presence {
   readonly rooms = new Map<string, Room>();
   readonly lobby = new Set<ClientConnection>();
   private readonly tours = new Map<string, Set<ClientConnection>>();
+  private readonly openToWatch = new Set<string>();
+
+  watchable(key: string): boolean {
+    return this.openToWatch.has(key);
+  }
+
+  allowWatchers(key: string): void {
+    this.openToWatch.add(key);
+  }
 
   /** The live room of a challenge, created on first use. */
   room(challenge: Challenge): Room {

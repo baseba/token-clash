@@ -5,6 +5,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { newId, newToken, now, sha256 } from '../../shared/domain/clock.js';
 import { invalid } from '../../shared/domain/errors.js';
+import { RARITIES } from '../../catalog/domain/shop.js';
+import { RETIRED_RECOLORS, RETIRED_SHOP_TRAINERS } from '../../catalog/domain/trainer-sprites.js';
 import type { RecycledRecord } from '../domain/recycling.js';
 import { parseSave } from '../domain/save-file.js';
 import { cleanName, Trainer, type EquipKind } from '../domain/trainer.js';
@@ -29,14 +31,19 @@ export class TrainersService implements OnModuleInit {
     // Saves imported by older versions kept repeated species: tidy them once at startup.
     let fixed = 0;
     let relooked = 0;
+    let refunded = 0;
+    const retiredPrices = Object.fromEntries(Object.entries({ ...RETIRED_SHOP_TRAINERS, ...RETIRED_RECOLORS }).map(([key, rarity]) => [key, RARITIES[rarity].price]));
     for (const trainer of this.trainers.all()) {
       const dropped = trainer.dropRepeatedSpecies();
       const released = trainer.releaseShopLook();
-      if (dropped || released) this.trainers.save(trainer);
+      const refund = trainer.refundRetired(retiredPrices);
+      if (dropped || released || refund) this.trainers.save(trainer);
       if (dropped) fixed += 1;
       if (released) relooked += 1;
+      if (refund) refunded += 1;
     }
     if (fixed) this.logger.log(`Quité especies repetidas de ${fixed} entrenador(es).`);
+    if (refunded) this.logger.log(`Devolví los tokens de entrenadores que ya no se venden a ${refunded} entrenador(es).`);
     if (relooked) this.logger.log(`${relooked} entrenador(es) tenían un entrenador que ahora se vende en la tienda: les tocó otro.`);
   }
 
@@ -46,6 +53,11 @@ export class TrainersService implements OnModuleInit {
 
   all(): Trainer[] {
     return this.trainers.all();
+  }
+
+  replaceLook(trainer: Trainer, key: string | null): void {
+    trainer.replaceLook(key);
+    this.trainers.save(trainer);
   }
 
   /** Who owns a session token, without marking them as seen (the lobby list does this). */

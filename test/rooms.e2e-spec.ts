@@ -135,7 +135,7 @@ test('a room nobody joined yet: the host waits and gets the chat log', async () 
   const host = await trainer('Espera');
   const id = (await call('/api/challenges', { method: 'POST', token: host.token, body: { visibility: 'private' } })).data.challenge.id;
   const client = await Client.room(id, host.token);
-  assert.deepEqual(client.raw, ['{"t":"waiting","watchers":1}', '{"t":"chatLog","messages":[]}']);
+  assert.deepEqual(client.raw, ['{"t":"waiting","watchers":1}', '{"t":"chatLog","messages":[]}', '{"t":"watch","open":false}']);
   await client.close();
 });
 

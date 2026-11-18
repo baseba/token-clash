@@ -190,15 +190,121 @@ export function recolorTrainer(image, swaps) {
   return { width: image.width, height: image.height, rgba };
 }
 
-export function recolorByMap(image, map) {
+const EYE_REACH = 0.4;
+
+const isEyeWhite = ([r, g, b]) => Math.min(r, g, b) >= 190 && Math.max(r, g, b) - Math.min(r, g, b) <= 40;
+
+const inEyes = (image, face, i) => {
+  const reach = face.h * image.height * EYE_REACH;
+  return Math.abs((i % image.width) - face.x * image.width) <= reach && Math.abs(Math.floor(i / image.width) - face.y * image.height) <= reach;
+};
+
+export function recolorByMap(image, map, face) {
   const rgba = Buffer.from(image.rgba);
   const table = new Map(map.map(([from, to]) => [parseInt(from.slice(1), 16), [1, 3, 5].map((i) => parseInt(to.slice(i, i + 2), 16))]));
   for (let i = 0; i < image.width * image.height; i++) {
     if (!rgba[i * 4 + 3]) continue;
+    if (face && isEyeWhite([rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2]]) && inEyes(image, face, i)) continue;
     const to = table.get(rgba.readUIntBE(i * 4, 3));
     if (to) to.forEach((value, c) => (rgba[i * 4 + c] = value));
   }
   return { width: image.width, height: image.height, rgba };
+}
+
+const HEAD_SHARE = 0.26;
+const AXIS_SHARE = 0.45;
+const FACE_DROP = 0.58;
+const MIN_SKIN = 10;
+
+function skinPixel(image, x, y) {
+  const i = (y * image.width + x) * 4;
+  const [r, g, b] = [image.rgba[i] / 255, image.rgba[i + 1] / 255, image.rgba[i + 2] / 255];
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min || max !== r) return false;
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = (((g - b) / d + 6) % 6) * 60;
+  return h >= 8 && h <= 38 && s >= 0.18 && s <= 0.75 && l >= 0.3 && l <= 0.9;
+}
+
+export function faceOf(image) {
+  const opaque = (x, y) => image.rgba[(y * image.width + x) * 4 + 3] > 0;
+  let top = image.height;
+  let bottom = -1;
+  for (let y = 0; y < image.height; y++)
+    for (let x = 0; x < image.width; x++)
+      if (opaque(x, y)) {
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+  if (bottom < 0) return null;
+  const height = bottom - top + 1;
+  const headH = Math.max(4, Math.round(height * HEAD_SHARE));
+  const axisBand = Math.min(image.height, top + Math.round(height * AXIS_SHARE));
+  const column = Array.from({ length: image.width }, (_, x) => {
+    let n = 0;
+    for (let y = top; y < axisBand; y++) if (opaque(x, y)) n += 1;
+    return n;
+  });
+  const span = Math.max(3, Math.round(headH * 0.85));
+  let best = 0;
+  let bestSum = -1;
+  for (let x = 0; x + span <= image.width; x++) {
+    const sum = column.slice(x, x + span).reduce((a, b) => a + b, 0);
+    if (sum > bestSum) {
+      bestSum = sum;
+      best = x;
+    }
+  }
+  let headTop = top;
+  while (headTop < bottom && !column.slice(best, best + span).some((_, i) => opaque(best + i, headTop))) headTop += 1;
+  let sumX = 0;
+  let count = 0;
+  for (let y = headTop; y < Math.min(image.height, headTop + headH); y++)
+    for (let x = best; x < best + span; x++)
+      if (opaque(x, y)) {
+        sumX += x;
+        count += 1;
+      }
+  let sumY = (headTop + headH * FACE_DROP) * count;
+  const skinIn = (from, to) => {
+    const found = [];
+    for (let y = Math.round(from); y < Math.min(image.height, Math.round(to)); y++)
+      for (let x = best; x < Math.min(image.width, best + span); x++) if (opaque(x, y) && skinPixel(image, x, y)) found.push([x, y]);
+    return found;
+  };
+  let skin = skinIn(headTop, headTop + headH * 1.15);
+  if (skin.length < MIN_SKIN) skin = skinIn(headTop + headH * 0.6, headTop + headH * 1.7);
+  if (skin.length >= MIN_SKIN) {
+    sumX = skin.reduce((a, [x]) => a + x, 0) * (count / skin.length);
+    sumY = skin.reduce((a, [, y]) => a + y, 0) * (count / skin.length);
+  }
+  let minX = image.width;
+  let maxX = -1;
+  for (let y = headTop; y < Math.min(image.height, headTop + headH); y++)
+    for (let x = Math.max(0, Math.round(best - span * 0.6)); x < Math.min(image.width, Math.round(best + span * 1.6)); x++)
+      if (opaque(x, y)) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+      }
+  const headW = maxX >= minX ? maxX - minX + 1 : headH;
+  const size = Math.max(headH, headW * 0.85);
+  const round = (n) => Math.round(n * 1000) / 1000;
+  return { x: round((sumX / count + 0.5) / image.width), y: round((sumY / count + 0.5) / image.height), h: round(size / image.height) };
+}
+
+export function writeFaces() {
+  const faces = {};
+  for (const key of DOWNLOADED_SPRITES) {
+    const file = new URL(`${key}.png`, OUT);
+    if (!existsSync(file)) continue;
+    const face = faceOf(decodePng(readFileSync(file)));
+    if (face) faces[key] = [face.x, face.y, face.h];
+  }
+  writeFileSync(new URL('faces.json', OUT), `${JSON.stringify(faces)}\n`);
+  return Object.keys(faces).length;
 }
 
 export function generateVariants() {
@@ -206,7 +312,7 @@ export function generateVariants() {
   for (const variant of TRAINER_VARIANTS) {
     try {
       const base = decodePng(readFileSync(new URL(`${variant.base}.png`, OUT)));
-      writeFileSync(new URL(`${variant.key}.png`, OUT), encodePng(variant.map ? recolorByMap(base, variant.map) : recolorTrainer(base, variant.swaps)));
+      writeFileSync(new URL(`${variant.key}.png`, OUT), encodePng(variant.map ? recolorByMap(base, variant.map, faceOf(base)) : recolorTrainer(base, variant.swaps)));
     } catch (err) {
       failed.push(`${variant.key} (${err.message})`);
     }
@@ -236,8 +342,9 @@ async function main() {
     }
   });
   const variantsFailed = generateVariants();
+  const faces = writeFaces();
   for (const failure of variantsFailed) log(`  ${failure}`);
-  log(`Entrenadores listos en public/trainers/: ${counts.new} nuevos, ${counts.existing} existentes, ${counts.missing} no disponibles, ${counts.failed} con error; ${TRAINER_VARIANTS.length - variantsFailed.length} variantes de colores.`);
+  log(`Entrenadores listos en public/trainers/: ${counts.new} nuevos, ${counts.existing} existentes, ${counts.missing} no disponibles, ${counts.failed} con error; ${TRAINER_VARIANTS.length - variantsFailed.length} variantes de colores; ${faces} caras ubicadas.`);
   if (variantsFailed.length) process.exitCode = 1;
   if (counts.failed) process.exitCode = 1;
 }

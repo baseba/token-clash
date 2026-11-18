@@ -36,6 +36,8 @@ export const ClientMessage = z.discriminatedUnion('t', [
   /** A move or a switch. */
   z.object({ t: z.literal('act'), action: BattleAction.nullable().catch(null) }),
   z.object({ t: z.literal('surrender') }),
+  /** A player lets their match, or their tournament, show up in the live list. */
+  z.object({ t: z.literal('watch') }),
   /** A message to the room's or the tournament's chat. */
   z.object({ t: z.literal('chat'), text: z.string().catch('') }),
 ]);

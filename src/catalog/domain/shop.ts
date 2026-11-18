@@ -18,3 +18,4 @@ export const DEFAULT_BALL: string = shop.DEFAULT_BALL;
 export const aiBallFor = (roll: number): string => shop.aiBallFor(roll);
 export const shopItem = (id: string): ShopItem | null => shop.shopItem(id) as ShopItem | null;
 export const shopItemOf = (kind: ShopKind, key: string): ShopItem | null => shop.shopItemOf(kind, key) as ShopItem | null;
+export const isFreeItem = (id: string): boolean => shop.isFreeItem(id);

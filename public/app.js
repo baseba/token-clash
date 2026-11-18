@@ -534,8 +534,14 @@ const trainerURL = (key) => `/trainers/${key}.png`;
 function trainerImg(key, cls = '') {
   return h('img', { class: `trainer-img${cls ? ` ${cls}` : ''}`, src: trainerURL(key), alt: '', draggable: 'false', loading: 'lazy' });
 }
+let FACES = {};
+const loadFaces = () => fetch('/trainers/faces.json?v=dev').then((res) => (res.ok ? res.json() : {})).then((faces) => { FACES = faces; }).catch(() => {});
+const FACE_SHARE = 52;
 function avatarPic(key, size = 'sm', frame = null) {
-  return key ? h('span', { class: `avatar avatar-${size}${frame ? ` ring-${frame}` : ''}`, 'aria-hidden': 'true' }, trainerImg(key)) : null;
+  if (!key) return null;
+  const face = FACES[VARIANTS_BY_KEY.get(key)?.base ?? key];
+  const style = face ? { '--fx': String(face[0]), '--fy': String(face[1]), '--zoom': String(Math.round(FACE_SHARE / face[2])) } : null;
+  return h('span', { class: `avatar avatar-${size}${face ? ' has-face' : ''}${frame ? ` ring-${frame}` : ''}`, style, 'aria-hidden': 'true' }, h('span', { class: 'avatar-clip' }, trainerImg(key)));
 }
 const VARIANTS_BY_KEY = new Map(TRAINER_VARIANTS.map((variant) => [variant.key, variant]));
 const byLabel = (a, b) => trainerLabel(a).localeCompare(trainerLabel(b), 'es', { numeric: true, sensitivity: 'base' });
@@ -546,7 +552,7 @@ const trainerLabel = (key) => {
 };
 const baseTrainerLabel = (key) => key.replace(/_([mf])(?=$|_)/, (_, g) => (g === 'm' ? ' ♂' : ' ♀')).replace(/_(\d)$/, ' $1').replace(/_/g, ' ').replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
 
-const TRAINER_GROUPS = { '': 'Todas las categorías', unlocked: 'Desbloqueados', locked: 'Bloqueados', starter: 'Básicos', shop: 'Tienda', variant: 'Variantes de colores', gym: 'Líderes de gimnasio', elite: 'Alto Mando', champion: 'Campeones', villain: 'Villanos', special: 'Especiales' };
+const TRAINER_GROUPS = { '': 'Todas las categorías', unlocked: 'Desbloqueados', locked: 'Bloqueados', class: 'Clases de entrenador', shop: 'En venta', variant: 'Variantes de colores', gym: 'Líderes de gimnasio', elite: 'Alto Mando', champion: 'Campeones', villain: 'Villanos', special: 'Especiales' };
 
 async function loadAchievements() {
   if (!me) return null;
@@ -637,6 +643,8 @@ document.body.append($tip);
 let tipTarget = null;
 function showTip(el) {
   tipTarget = el;
+  const layer = el.closest('dialog[open]') ?? document.body;
+  if ($tip.parentElement !== layer) layer.append($tip);
   $tip.replaceChildren(el.dataset.tip, ...(el.dataset.tipNote ? [h('span', { class: 'tip-note' }, el.dataset.tipNote)] : []));
   $tip.hidden = false;
   const r = el.getBoundingClientRect();
@@ -1007,7 +1015,8 @@ async function profilePage(seq) {
   }
   if (stale(seq)) return;
   let kind = 'ball';
-  let hideOwned = false;
+  let ownership = '';
+  let rarity = '';
   let query = '';
   let group = '';
   let gender = '';
@@ -1015,10 +1024,9 @@ async function profilePage(seq) {
   const identity = h('div', { class: 'profile-identity' });
   const balance = h('div', { class: 'shop-balance' });
   const grid = h('div', { class: 'shop-grid' });
-  const detail = h('div', { class: 'unlock-detail', hidden: true });
   const trainerFilters = h('div', { class: 'row trainer-filters', hidden: true },
     h('select', { 'aria-label': 'Filtrar por categoría', onchange: (e) => { group = e.target.value; paint(); } }, Object.entries(TRAINER_GROUPS).filter(([value]) => !['unlocked', 'locked'].includes(value)).map(([value, text]) => h('option', { value }, text))),
-    h('select', { 'aria-label': 'Filtrar por género', onchange: (e) => { gender = e.target.value; paint(); } }, h('option', { value: '' }, 'Todos'), h('option', { value: '♂' }, '♂ Hombres'), h('option', { value: '♀' }, '♀ Mujeres')),
+    h('select', { 'aria-label': 'Filtrar por género', onchange: (e) => { gender = e.target.value; paint(); } }, h('option', { value: '' }, 'Ambos géneros'), h('option', { value: '♂' }, '♂ Hombres'), h('option', { value: '♀' }, '♀ Mujeres')),
   );
   let editingName = false;
   function paintIdentity() {
@@ -1047,7 +1055,7 @@ async function profilePage(seq) {
       : h('div', { class: 'profile-name-line' }, h('h1', null, me.name), h('button', { class: 'btn sm ghost icon-btn', type: 'button', 'data-tip': 'Cambiar nombre', 'aria-label': 'Cambiar nombre', onclick: () => { editingName = true; paintIdentity(); nameInput.focus(); } }, '✏️'));
     identity.replaceChildren(
       avatarPic(me.avatar, 'lg', me.frame),
-      h('div', { class: 'profile-who' }, nameLine, h('div', { class: 'row profile-meta' }, h('span', { class: 'muted' }, trainerLabel(me.avatar)), h('span', { class: 'chip' }, h('span', { class: 'w' }, `${me.wins}V`), ' · ', h('span', { class: 'l' }, `${me.losses}D`)))),
+      h('div', { class: 'profile-who' }, nameLine, h('div', { class: 'row profile-meta' }, skinTitle(me.avatar, 'span'), h('span', { class: 'chip' }, h('span', { class: 'w' }, `${me.wins}V`), ' · ', h('span', { class: 'l' }, `${me.losses}D`)))),
     );
     if (editingName) requestAnimationFrame(() => nameInput.focus());
   }
@@ -1060,37 +1068,57 @@ async function profilePage(seq) {
     if (p.unlocked) return { tip: `🔓 ${trainerLabel(key)} · ${p.title}`, note: `Lo desbloqueaste con: ${p.goals.map((g) => (g.need === 1 ? g.text : `${g.text} (${g.need.toLocaleString('es')})`)).join(' y ')}` };
     return { tip: `🔒 ${trainerLabel(key)} · ${p.title}`, note: `Te falta: ${p.goals.filter((g) => g.have < g.need).map((g) => `${g.text} ${goalState(g)}`).join(' · ')}` };
   }
-  const goalList = (goals) => h('ul', { class: 'unlock-goals' }, goals.map((g) => h('li', { class: g.have >= g.need ? 'is-done' : null }, h('span', null, g.text), h('span', { class: 'unlock-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': g.need, 'aria-valuenow': g.have }, h('i', { style: { width: `${(g.have / g.need) * 100}%` } })), h('small', { class: 'muted' }, g.need === 1 ? (g.have >= 1 ? 'Listo' : 'Pendiente') : `${g.have.toLocaleString('es')} / ${g.need.toLocaleString('es')}`))));
-  const versionsOf = (key) => {
-    const base = VARIANTS_BY_KEY.get(key)?.base ?? key;
-    return [base, ...TRAINER_VARIANTS.filter((variant) => variant.base === base).map((variant) => variant.key)].sort(byLabel);
+  const goalList = (goals) => h('ul', { class: 'unlock-goals' }, goals.map((g) => h('li', { class: g.have >= g.need ? 'is-done' : null }, h('span', null, g.text, g.hint ? h('span', { class: 'goal-hint', tabindex: 0, 'data-tip': g.hint, 'aria-label': g.hint }, '?') : null), h('span', { class: 'unlock-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': g.need, 'aria-valuenow': g.have }, h('i', { style: { width: `${(g.have / g.need) * 100}%` } })), h('small', { class: 'muted' }, g.need === 1 ? (g.have >= 1 ? 'Listo' : 'Pendiente') : `${g.have.toLocaleString('es')} / ${g.need.toLocaleString('es')}`))));
+  const baseOf = (key) => VARIANTS_BY_KEY.get(key)?.base ?? key;
+  const familyKeys = (base) => [base, ...TRAINER_VARIANTS.filter((variant) => variant.base === base).map((variant) => variant.key).sort(byLabel)];
+  const versionName = (key) => {
+    const variant = VARIANTS_BY_KEY.get(key);
+    if (!variant) return 'Original';
+    const base = trainerLabel(variant.base);
+    return variant.name ? (variant.name.startsWith(`${base} `) ? variant.name.slice(base.length + 1) : variant.name) : VARIANT_COLOR_NAMES[variant.color] ?? variant.color;
   };
-  function showDetail(key) {
-    const p = progress.get(key);
-    if (!p || p.unlocked) {
-      detail.hidden = true;
-      return;
-    }
-    const ways = p.ways?.length ? p.ways : [p.goals];
-    const versions = versionsOf(key);
-    const item = trainerItem(key);
-    detail.hidden = false;
-    detail.replaceChildren(...[
-      h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => { detail.hidden = true; } }, '×'),
-      h('div', { class: 'unlock-head' }, h('span', { class: 'trainer-frame' }, trainerImg(key)), h('div', null, h('b', null, `🔒 ${trainerLabel(key)}`), p.title ? h('p', { class: 'muted small' }, p.title) : null)),
-      ways.length > 1
-        ? h('div', { class: 'unlock-ways' }, ways.flatMap((goals, i) => [i ? h('p', { class: 'unlock-or' }, 'o bien') : null, h('div', { class: 'unlock-way' }, h('small', { class: 'muted' }, `Opción ${i + 1}`), goalList(goals))]))
-        : goalList(ways[0]),
-      versions.length > 1
-        ? h('div', { class: 'unlock-versions' }, h('small', { class: 'muted' }, 'Versiones'), h('div', { class: 'unlock-version-row' }, versions.map((other) => {
-            const locked = !usable(other);
-            const { tip, note } = unlockTip(other);
-            return h('button', { type: 'button', class: `unlock-version${other === key ? ' is-current' : ''}${locked ? ' is-locked' : ''}`, 'data-tip': tip, 'data-tip-note': note, onclick: () => (locked ? showDetail(other) : equip(trainerItem(other))) }, h('span', { class: 'trainer-frame' }, trainerImg(other)), h('small', null, `${locked ? '🔒 ' : ''}${trainerLabel(other)}`));
-          })))
-        : null,
-      p.group === 'shop' ? h('div', { class: 'row confirm-actions' }, action(item)) : null,
-    ].filter(Boolean));
-    detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  let openBase = null;
+  let focusKey = null;
+  function versionState(item) {
+    if (isEquipped(item)) return 'equipped';
+    if (item.owned) return 'owned';
+    if (item.locked || item.available === false) return 'locked';
+    return 'buy';
+  }
+  const VERSION_STATUS = { equipped: '★ En uso', owned: '✓ Obtenido', locked: '🔒 Por desbloquear', buy: '🪙 En venta' };
+  function versionAction(item, state) {
+    if (state === 'equipped') return h('span', { class: 'chip ready-chip' }, 'En uso');
+    if (state === 'owned') return h('button', { class: 'btn sm primary', type: 'button', onclick: (e) => { e.stopPropagation(); equip(item); } }, 'Equipar');
+    if (state === 'locked') return item.key === focusKey ? h('small', { class: 'muted' }, 'Metas arriba ↑') : h('button', { class: 'btn sm ghost', type: 'button', onclick: (e) => { e.stopPropagation(); openFamily(baseOf(item.key), item.key); } }, 'Ver metas');
+    if (state === 'buy' && item.key === focusKey) return action(item);
+    return action(item);
+  }
+  function openFamily(base, focus = null) {
+    const members = familyKeys(base).map(trainerItem);
+    focus ??= members.find((item) => versionState(item) === 'locked')?.key ?? base;
+    openBase = base;
+    focusKey = focus;
+    const focused = progress.get(focus);
+    const ways = focused?.ways?.length ? focused.ways : focused?.goals?.length ? [focused.goals] : null;
+    const p = progress.get(base);
+    confirmDlg.replaceChildren(h('div', { class: 'confirm-body family' },
+      h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => confirmDlg.close() }, '×'),
+      h('header', { class: 'family-head' }, h('h2', null, trainerLabel(base)), h('p', { class: 'muted small' }, [p?.rarity ? RARITIES[p.rarity].label : null, p?.title, members.length > 1 ? `${members.length - 1} ${members.length === 2 ? 'recolor' : 'recolores'}, después del original` : null].filter(Boolean).join(' · '))),
+      ways ? h('div', { class: `family-goals${focused.unlocked ? ' is-done' : ''}` }, h('b', null, focused.unlocked ? `✓ Cómo conseguiste a ${trainerLabel(focus)}` : `🔒 Cómo conseguir a ${trainerLabel(focus)}`), ways.length > 1 ? h('div', { class: 'unlock-ways' }, ways.flatMap((goals, i) => [i ? h('p', { class: 'unlock-or' }, 'o bien') : null, h('div', { class: 'unlock-way' }, h('small', { class: 'muted' }, `Opción ${i + 1}`), goalList(goals))])) : goalList(ways[0])) : null,
+      h('div', { class: 'family-grid' }, members.map((item) => {
+        const state = versionState(item);
+        const { tip, note } = unlockTip(item.key);
+        const pickable = item.key !== focus && !!progress.get(item.key)?.goals?.length;
+        return h('div', { class: `family-card state-${state}${item.key === focus ? ' is-focus' : ''}${pickable ? ' is-pickable' : ''}`, onclick: pickable ? () => openFamily(base, item.key) : null },
+          h('div', { class: 'tile-stage', 'data-tip': tip, 'data-tip-note': note }, trainerImg(item.key)),
+          h('b', null, versionName(item.key)),
+          h('small', { class: `family-status state-${state}` }, VERSION_STATUS[state]),
+          versionAction(item, state),
+        );
+      })),
+    ));
+    confirmDlg.addEventListener('close', () => { openBase = null; }, { once: true });
+    if (!confirmDlg.open) confirmDlg.showModal();
   }
   function trainerItem(key) {
     const sold = shop.items.find((item) => item.kind === 'trainer' && item.key === key);
@@ -1109,7 +1137,8 @@ async function profilePage(seq) {
     me.avatar = next.avatar;
     renderWho();
     paintIdentity();
-    paint();
+    paint(shownCount);
+    if (openBase && confirmDlg.open) openFamily(openBase, focusKey);
   };
   async function equip(item) {
     try {
@@ -1135,12 +1164,19 @@ async function profilePage(seq) {
         toast(e.message);
         go.disabled = false;
       }
-    } }, `Comprar por ${tokensM(item.price)}`);
-    confirmDlg.replaceChildren(h('div', { class: 'confirm-body' },
-      h('div', { class: 'shop-confirm-preview' }, shopPreview(item)),
-      h('h2', null, `¿Comprar ${label(item)}?`),
-      h('p', null, `${item.desc} Te quedarán ${tokensM(shop.balance - item.price)} de saldo.`),
-      h('div', { class: 'row confirm-actions' }, h('button', { class: 'btn', type: 'button', autofocus: true, onclick: () => confirmDlg.close() }, 'Cancelar'), go),
+    } }, 'Comprar');
+    confirmDlg.replaceChildren(h('div', { class: 'confirm-body buy-confirm' },
+      h('div', { class: `shop-confirm-preview kind-${item.kind}` }, shopPreview(item)),
+      h('div', { class: 'buy-head' },
+        item.rarity ? h('span', { class: `rarity-tag rarity-${item.rarity}` }, RARITIES[item.rarity].label) : null,
+        h('h2', null, label(item)),
+        h('p', null, item.desc),
+      ),
+      h('dl', { class: 'buy-summary' },
+        h('div', null, h('dt', null, 'Precio'), h('dd', null, `🪙 ${tokensM(item.price)}`)),
+        h('div', null, h('dt', null, 'Saldo después'), h('dd', null, tokensM(shop.balance - item.price))),
+      ),
+      h('div', { class: 'confirm-actions buy-actions' }, h('button', { class: 'btn', type: 'button', autofocus: true, onclick: () => confirmDlg.close() }, 'Cancelar'), go),
     ));
     if (!confirmDlg.open) confirmDlg.showModal();
   }
@@ -1213,7 +1249,7 @@ async function profilePage(seq) {
     requestAnimationFrame(() => requestAnimationFrame(() => run()));
   }
   function action(item) {
-    if (item.locked) return h('button', { class: 'btn sm ghost', type: 'button', onclick: () => showDetail(item.key) }, '🔒 ¿Cómo?');
+    if (item.locked) return h('button', { class: 'btn sm ghost', type: 'button', onclick: () => openFamily(baseOf(item.key), item.key) }, '🔒 ¿Cómo?');
     if (!item.owned && item.available === false) return h('span', { class: 'muted small shop-locked', 'data-tip': `Desbloquea a ${trainerLabel(item.requires)} para poder comprarla` }, `🔒 Primero ${trainerLabel(item.requires)} · 🪙 ${tokensM(item.price)}`);
     if (!item.owned) {
       const short = item.price - shop.balance;
@@ -1222,31 +1258,63 @@ async function profilePage(seq) {
     if (isEquipped(item)) {
       return h('span', { class: 'chip ready-chip' }, '✓ Equipado');
     }
-    return h('button', { class: 'btn sm', type: 'button', onclick: () => equip(item) }, item.free ? 'Usar' : 'Equipar');
+    return h('button', { class: 'btn sm', type: 'button', onclick: () => equip(item) }, 'Equipar');
   }
+  const RARITY_ORDER = Object.keys(RARITIES);
+  const rankOf = (item) => {
+    const rank = RARITY_ORDER.indexOf(rarityOf(item));
+    return rank === -1 ? 0 : rank;
+  };
+  const byRarityThenName = (a, b) => rankOf(a) - rankOf(b) || label(a).localeCompare(label(b), 'es', { numeric: true, sensitivity: 'base' });
   function itemsFor() {
-    if (kind !== 'trainer') {
-      return [...FREE_ITEMS, ...shop.items]
-        .filter((item) => item.kind === kind)
-        .sort((a, b) => a.price - b.price || label(a).localeCompare(label(b), 'es', { numeric: true, sensitivity: 'base' }));
-    }
-    return TRAINER_SPRITES.map(trainerItem)
-      .filter((item) => (!group || (progress.get(item.key)?.group ?? 'starter') === group) && (!gender || trainerLabel(item.key).includes(gender)))
-      .sort((a, b) => byLabel(a.key, b.key));
+    if (kind !== 'trainer') return [...FREE_ITEMS, ...shop.items].filter((item) => item.kind === kind).sort(byRarityThenName);
+    return TRAINER_SPRITES.filter((key) => !VARIANTS_BY_KEY.has(key))
+      .filter((base) => (!group || familyKeys(base).some((key) => progress.get(key)?.group === group)) && (!gender || trainerLabel(base).includes(gender)))
+      .map((base) => {
+        const members = familyKeys(base).map(trainerItem);
+        return { kind: 'trainer', key: base, members, owned: !!members[0].owned };
+      })
+      .sort(byRarityThenName);
   }
+  function trainerTile(family) {
+    const [original] = family.members;
+    const shown = family.members.find(isEquipped) ?? original;
+    const state = versionState(shown);
+    const owned = family.members.filter((item) => item.owned).length;
+    const p = progress.get(family.key);
+    const sub = state === 'equipped' ? 'En uso' : p?.rarity ? RARITIES[p.rarity].label : 'Común';
+    const { tip, note } = unlockTip(shown.key);
+    return h('button', { type: 'button', class: `trainer-tile state-${state}${p?.rarity ? ` rarity-${p.rarity}` : ''}`, 'data-tip': tip, 'data-tip-note': note, 'aria-label': `${trainerLabel(family.key)}: ${VERSION_STATUS[state]}`, onclick: () => openFamily(family.key) },
+      h('span', { class: `tile-corner state-${state}`, 'aria-hidden': 'true' }, CORNER[state]),
+      h('span', { class: 'tile-stage' }, trainerImg(shown.key)),
+      h('b', { class: 'tile-name' }, trainerLabel(family.key)),
+      h('small', { class: 'tile-sub' }, sub),
+      family.members.length > 1 ? h('small', { class: `tile-colors${owned === family.members.length ? ' is-complete' : ''}` }, `🎨 ${owned}/${family.members.length}`) : h('small', { class: 'tile-colors is-empty' }, ' '),
+    );
+  }
+  const CORNER = { equipped: '★', owned: '✓', locked: '🔒', buy: '🪙' };
+  const rarityOf = (item) => (item.kind === 'trainer' && !item.price ? progress.get(item.key)?.rarity ?? 'common' : item.rarity ?? 'free');
+  const raritySelect = h('select', { class: 'rarity-select', 'aria-label': 'Filtrar por rareza', onchange: (e) => { rarity = e.target.value; paint(); } }, h('option', { value: '' }, 'Todas las rarezas'), Object.entries(RARITIES).map(([value, { label: text }]) => h('option', { value }, text)));
   function card(item) {
-    const locked = item.locked || (item.available === false && !item.owned);
-    const tag = item.rarity ? RARITIES[item.rarity].label : item.tag ?? 'Gratis';
-    const { tip, note } = item.kind === 'trainer' ? unlockTip(item.key) : { tip: item.desc, note: null };
-    return h('div', { class: `shop-card${item.owned ? ' is-owned' : ''}${isEquipped(item) ? ' is-equipped' : ''}${item.locked ? ' is-locked' : ''}${item.rarity ? ` rarity-${item.rarity}` : ''}` },
-      h('div', { class: 'shop-preview' }, shopPreview(item)),
-      h('div', { class: 'shop-info' }, h('b', { 'data-tip': tip, 'data-tip-note': note }, label(item)), h('span', { class: `rarity-tag${item.rarity ? ` rarity-${item.rarity}` : ''}${locked ? ' is-locked' : ''}` }, tag)),
+    const state = versionState(item);
+    const tag = RARITIES[rarityOf(item)]?.label ?? 'Gratis';
+    const cornerTip = { equipped: 'En uso', owned: 'Obtenido', locked: 'Bloqueado', buy: 'En venta' }[state];
+    return h('div', { class: `shop-card state-${state}${isEquipped(item) ? ' is-equipped' : ''}${item.rarity ? ` rarity-${item.rarity}` : ''}` },
+      h('div', { class: 'shop-preview' }, shopPreview(item), h('span', { class: `tile-corner state-${state}`, 'data-tip': cornerTip, 'aria-label': cornerTip }, CORNER[state])),
+      h('div', { class: 'shop-info' }, h('b', { 'data-tip': item.desc }, label(item)), h('span', { class: `rarity-tag rarity-${rarityOf(item)}` }, tag)),
       h('div', { class: 'shop-action' }, item.kind === 'ball' ? h('button', { class: 'btn sm ghost shop-try', type: 'button', 'data-tip': 'Ver en combate', 'aria-label': `Ver ${label(item)} en combate`, onclick: () => previewBall(item) }, '▶ Probar') : null, action(item)),
     );
   }
   let shownCount = 0;
-  const PAGE = 60;
+  const PAGE = 72;
   const more = h('button', { class: 'btn ghost shop-more', type: 'button', hidden: true, onclick: () => paint(shownCount + PAGE) }, 'Ver más');
+  const OWNERSHIP = [['', 'Todo'], ['mine', 'Obtenidos'], ['missing', 'No obtenidos']];
+  const ownCounts = OWNERSHIP.map(() => h('small', { class: 'pill-count' }));
+  const ownPills = h('div', { class: 'pill-group', role: 'group', 'aria-label': 'Mostrar' }, OWNERSHIP.map(([value, text], i) => h('button', { type: 'button', class: 'pill', 'aria-pressed': String(value === ownership), onclick: (e) => {
+    ownership = value;
+    e.currentTarget.parentElement.querySelectorAll('.pill').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
+    paint();
+  } }, text, ownCounts[i])));
   function paint(limit = PAGE) {
     const ledger = `${tokensM(shop.total)} de tu save${shop.updatedAt ? ` (subido ${ago(shop.updatedAt)})` : ''} + ${tokensM(shop.recycled ?? 0)} reciclados − ${tokensM(shop.spent)} gastados`;
     balance.replaceChildren(
@@ -1254,13 +1322,18 @@ async function profilePage(seq) {
       h('a', { class: 'btn sm ghost', href: '/reciclaje', 'data-link': true, 'data-tip': 'Tritura tus Pokémon repetidos para ganar tokens' }, '♻️ Reciclar'),
     );
     trainerFilters.hidden = kind !== 'trainer';
-    if (kind !== 'trainer') detail.hidden = true;
-    const all = itemsFor().filter((item) => (!hideOwned || !item.owned) && (!query || label(item).toLowerCase().includes(query)));
+    const matchesText = (item) => !query || (item.members ?? [item]).some((member) => label(member).toLowerCase().includes(query));
+    const matchesRarity = (item) => !rarity || rarityOf(item) === rarity;
+    const matching = itemsFor().filter((item) => matchesText(item) && matchesRarity(item));
+    const mine = matching.filter((item) => item.owned).length;
+    [matching.length, mine, matching.length - mine].forEach((n, i) => (ownCounts[i].textContent = String(n)));
+    const all = matching.filter((item) => !ownership || (ownership === 'mine') === !!item.owned);
     const list = kind === 'trainer' ? all.slice(0, limit) : all;
     shownCount = list.length;
     more.hidden = list.length >= all.length;
     more.textContent = `Ver más (${all.length - list.length})`;
-    grid.replaceChildren(...(list.length ? list.map(card) : [h('p', { class: 'muted' }, 'No hay nada con ese filtro.')]));
+    grid.className = kind === 'trainer' ? 'trainer-tiles' : 'shop-grid';
+    grid.replaceChildren(...(list.length ? list.map(kind === 'trainer' ? trainerTile : card) : [h('p', { class: 'muted' }, 'No hay nada con ese filtro.')]));
   }
   paintIdentity();
   paint();
@@ -1272,13 +1345,13 @@ async function profilePage(seq) {
   $app.replaceChildren(
     h('section', { class: 'card shop-head' }, identity, balance),
     h('section', { class: 'card' },
-      h('div', { class: 'coll-bar' },
-        h('div', { class: 'segmented', role: 'group', 'aria-label': 'Categoría' }, Object.entries(SHOP_KINDS).map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === kind), onclick: (e) => { kind = value; e.currentTarget.parentElement.querySelectorAll('.seg-item').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); paint(); } }, text))),
-        h('input', { type: 'search', placeholder: 'Buscar…', 'aria-label': 'Buscar', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } }),
-        h('label', { class: 'toggle' }, h('input', { type: 'checkbox', onchange: (e) => { hideOwned = e.target.checked; paint(); } }), ' Ocultar lo que ya tengo'),
+      h('div', { class: 'segmented shop-tabs', role: 'group', 'aria-label': 'Categoría' }, Object.entries(SHOP_KINDS).map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === kind), onclick: (e) => { kind = value; e.currentTarget.parentElement.querySelectorAll('.seg-item').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); paint(); } }, text))),
+      h('div', { class: 'shop-toolbar' },
+        h('label', { class: 'search-field' }, h('span', { 'aria-hidden': 'true' }, '🔍'), h('input', { type: 'search', placeholder: 'Buscar por nombre', 'aria-label': 'Buscar por nombre', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } })),
+        ownPills,
+        raritySelect,
         trainerFilters,
       ),
-      detail,
       grid,
       more,
     ),
@@ -2018,6 +2091,39 @@ async function statsPage(seq) {
     topMonsSection(topMons),
     h('section', null, h('p', { class: 'muted small center' }, `Versión ${live.version} · servidor encendido ${ago(live.startedAt)}`)),
   );
+  foldSections($app, STATS_OPEN);
+}
+
+const STATS_OPEN = new Set(['🏆 Ranking', 'Tus batallas']);
+function foldSections(root, openByDefault) {
+  let saved = {};
+  try {
+    saved = JSON.parse(ls.get('tc_stats_folds') || '{}');
+  } catch {}
+  for (const title of root.querySelectorAll('h2')) {
+    const box = title.closest('.card') ?? title.closest('section');
+    if (!box || box.classList.contains('foldable')) continue;
+    const head = [...box.children].find((child) => child === title || child.contains(title));
+    const key = title.textContent.trim();
+    const setOpen = (open) => {
+      box.classList.toggle('is-folded', !open);
+      title.setAttribute('aria-expanded', String(open));
+    };
+    box.classList.add('foldable');
+    head.classList.add('fold-head');
+    title.classList.add('fold-title');
+    title.tabIndex = 0;
+    title.setAttribute('role', 'button');
+    const toggle = () => {
+      const open = box.classList.contains('is-folded');
+      setOpen(open);
+      saved[key] = open;
+      ls.set('tc_stats_folds', JSON.stringify(saved));
+    };
+    title.addEventListener('click', toggle);
+    title.addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), toggle()));
+    setOpen(saved[key] ?? openByDefault.has(key));
+  }
 }
 
 // ---------- pokedex ----------
@@ -2215,10 +2321,30 @@ const nameSize = (name) => {
   const length = trainerShort(name).length;
   return length > 16 ? 'name-xl' : length > 10 ? 'name-l' : null;
 };
-function trainerName(name, attrs = {}) {
-  const title = trainerTitle(name);
+const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+const nameTitle = (name, avatar) => {
+  const difficulty = trainerTitle(name);
+  if (difficulty) return h('small', { class: 'trainer-title is-ai' }, `🤖 ${capitalize(difficulty)}`);
+  return avatar ? skinTitle(avatar) : null;
+};
+const shortTrainer = (key) => {
+  const label = baseTrainerLabel(key).replace(/ (\d+|Alternate)$/, '');
+  const gender = label.match(/ [♂♀]$/)?.[0] ?? '';
+  const words = label.replace(/ [♂♀]$/, '').split(' ');
+  return `${words.length > 2 ? words.at(-1) : words.join(' ')}${gender}`;
+};
+function skinTitle(key, tag = 'small') {
+  const variant = VARIANTS_BY_KEY.get(key);
+  const text = variant?.name ?? (variant ? `${shortTrainer(variant.base)} ${VARIANT_COLOR_NAMES[variant.color] ?? variant.color}` : shortTrainer(key));
+  return h(tag, { class: 'trainer-title skin-title', 'data-tip': trainerLabel(key) }, text);
+}
+function playerPill(side, by, you = false) {
+  return h('span', { class: `who who-pill by-${by}` }, avatarPic(side.avatar, 'sm', side.frame), trainerName(side.name, {}, side.avatar), you ? h('span', { class: 'chip match-you' }, 'Tú') : null);
+}
+function trainerName(name, attrs = {}, avatar = null) {
+  const title = nameTitle(name, avatar);
   if (!title) return h('b', { ...attrs, class: [attrs.class, nameSize(name)].filter(Boolean).join(' ') || null }, name);
-  return h('span', { ...attrs, class: `trainer-name${attrs.class ? ` ${attrs.class}` : ''}` }, h('b', { class: nameSize(name) }, trainerShort(name)), h('small', { class: 'trainer-title' }, title));
+  return h('span', { ...attrs, class: `trainer-name${attrs.class ? ` ${attrs.class}` : ''}` }, h('b', { class: nameSize(name) }, trainerShort(name)), title);
 }
 const AI_NOTES = {
   easy: {
@@ -2679,7 +2805,7 @@ async function battlePage(id, seq) {
   let prep = null;
   let match = null;
   let duel = null;
-  const bar = roomBar(c);
+  const bar = roomBar(c, () => send({ t: 'watch' }));
   const alerts = roomAlerts(c);
   const chat = chatPanel((msg) => send(msg));
   let dock = null;
@@ -2709,6 +2835,7 @@ async function battlePage(id, seq) {
       if (msg.t === 'error') return toast(msg.error);
       if (msg.t === 'chatLog') return chat.load(msg.messages);
       if (msg.t === 'chat') return chat.add(msg.message);
+      if (msg.t === 'watch') return bar.setWatch(msg.open);
       dock ??= chatDock(chat);
       alerts.check(msg);
       if (msg.t === 'closed') {
@@ -2912,7 +3039,7 @@ function aiColor(name) {
 }
 
 const avatar = (p) => (p.avatar
-  ? h('div', { class: `match-avatar has-sprite${p.ai ? ' is-ai' : ''}${p.frame ? ` ring-${p.frame}` : ''}`, 'aria-hidden': 'true' }, trainerImg(p.avatar))
+  ? avatarPic(p.avatar, 'seat', p.frame)
   : h('div', { class: `match-avatar${p.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true', style: p.ai ? { background: aiColor(p.name) } : null }, p.ai ? '🤖' : (p.name.trim()[0] ?? '?').toUpperCase()));
 
 function seatCard(p, { you = false, host = false, onRemove = null } = {}) {
@@ -2921,7 +3048,7 @@ function seatCard(p, { you = false, host = false, onRemove = null } = {}) {
     'div',
     { class: `seat${you ? ' is-you' : ''}${p.ready ? ' is-ready' : ''}${p.online === false ? ' is-away' : ''}` },
     avatar(p),
-    h('div', { class: 'seat-body' }, h('span', { class: 'seat-name' }, h('b', { class: nameSize(p.name) }, trainerShort(p.name)), host ? h('span', { 'data-tip': 'Dueño de la sala' }, '👑') : null, you ? h('span', { class: 'chip match-you' }, 'Tú') : null), h('span', { class: 'seat-meta' }, p.ai ? h('span', { class: 'trainer-title' }, trainerTitle(p.name) ?? (AI_LABEL[p.ai] ?? '').toLowerCase()) : record(p), status), p.online === false ? h('span', { class: 'muted small' }, 'Desconectado') : null),
+    h('div', { class: 'seat-body' }, h('span', { class: 'seat-name' }, trainerName(p.name, {}, p.avatar), host ? h('span', { 'data-tip': 'Dueño de la sala' }, '👑') : null, you ? h('span', { class: 'chip match-you' }, 'Tú') : null), h('span', { class: 'seat-meta' }, p.ai ? null : record(p), status), p.online === false ? h('span', { class: 'muted small' }, 'Desconectado') : null),
     onRemove ? h('button', { class: 'btn sm ghost seat-x', type: 'button', 'aria-label': `Quitar a ${trainerShort(p.name)}`, 'data-tip': 'Quitar', onclick: (e) => { e.currentTarget.disabled = true; onRemove(); } }, '✕') : null,
   );
 }
@@ -2991,7 +3118,26 @@ function duelLobbyUI(c, send) {
   };
 }
 
-function roomBar(c) {
+function watchControl(request) {
+  const el = h('span', { class: 'watch-control' });
+  let open = false;
+  let asked = false;
+  const paint = () => el.replaceChildren(open
+    ? h('span', { class: 'chip watch-on', 'data-tip': 'Tu pelea aparece en Juegos en vivo' }, '👁 Espectadores habilitados')
+    : h('button', { type: 'button', class: 'btn sm ghost watch-btn', disabled: asked || null, 'data-tip': 'Deja que tu pelea aparezca en Juegos en vivo para que otros entren a mirar', onclick: () => { asked = true; paint(); request(); } }, '👁 Habilitar espectadores'));
+  paint();
+  return {
+    el,
+    set(next) {
+      open = next;
+      asked = false;
+      paint();
+    },
+  };
+}
+
+function roomBar(c, requestWatchers) {
+  const watch = watchControl(requestWatchers);
   const el = h('div', { class: 'room-bar', hidden: true });
   const header = document.querySelector('header.top');
   const menuBtn = h('button', { class: 'menu-btn', type: 'button', 'aria-label': 'Menú', 'aria-expanded': 'false', onclick: () => setMenu(!document.body.classList.contains('menu-open')) }, '☰');
@@ -3014,12 +3160,13 @@ function roomBar(c) {
     const { you, names } = last;
     const watching = you === null;
     document.body.dataset.watching = String(watching);
-    const who = (p) => h('span', { class: 'bar-who' }, avatarPic(p.avatar, 'sm', p.frame), trainerShort(p.name));
-    const vs = !status && names?.length === 2 ? [who(names[0]), ' vs ', who(names[1])] : null;
+    const byOf = (i) => ((watching ? i === 0 : i === you) ? 'me' : 'foe');
+    const vs = !status && names?.length === 2 ? h('span', { class: 'vs-line' }, playerPill(names[0], byOf(0), you === 0), h('span', { class: 'muted' }, 'vs'), playerPill(names[1], byOf(1), you === 1)) : null;
     const tour = c.tournament;
     el.hidden = false;
     document.body.classList.add('in-room');
-    el.className = `room-bar ${watching ? 'is-watching' : 'is-playing'}${status ? ' is-battle' : ''}`;
+    const windowSkin = !watching && me?.shop?.equipped?.window;
+    el.className = `room-bar ${watching ? 'is-watching' : 'is-playing'}${status ? ' is-battle' : ''}${windowSkin ? ` win-bar win-${windowSkin}` : ''}`;
     el.replaceChildren(
       menuBtn,
       h('span', { class: 'room-bar-tag' }, watching ? '👁 Estás mirando' : '⚔︎ Tu pelea'),
@@ -3027,9 +3174,13 @@ function roomBar(c) {
       h('span', { class: 'room-bar-text' }, tour ? `🏆 ${tour.round} · Pelea ${tour.number} de ${tour.total}` : null, tour && vs ? ' · ' : null, vs),
       ...(status ? [status.field, status.timer, status.forfeit] : []),
       ...(tour ? [h('a', { class: 'btn sm', href: `/t/${tour.id}`, 'data-link': true }, 'Ver llaves')] : []),
+      watching ? null : watch.el,
     );
   }
   return {
+    setWatch(open) {
+      watch.set(open);
+    },
     update(you, names = null) {
       last = { you, names };
       render();
@@ -3049,7 +3200,7 @@ function roomBar(c) {
   };
 }
 
-function tournamentFeed(id, onFrame, chat = null) {
+function tournamentFeed(id, onFrame, chat = null, onWatch = null) {
   let ws = null;
   let closed = false;
   let retry = 0;
@@ -3063,6 +3214,7 @@ function tournamentFeed(id, onFrame, chat = null) {
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.t === 'tour') onFrame(msg.tournament);
+      else if (msg.t === 'watch') onWatch?.(msg.open);
       else if (msg.t === 'chatLog') chat?.load(msg.messages);
       else if (msg.t === 'chat') chat?.add(msg.message);
       else if (msg.t === 'error') toast(msg.error);
@@ -3146,7 +3298,8 @@ async function tournamentPage(id, seq) {
     ui.update(next);
     if (cur && cur !== lastCurrent) follow(cur);
     lastCurrent = cur;
-  }, chat);
+  }, chat, (open) => ui.setWatch(open));
+  ui.onWatchRequest(() => stop.send({ t: 'watch' }));
   cleanup = () => {
     clearTimeout(timer);
     stop();
@@ -3190,6 +3343,8 @@ function tournamentUI(id, justPlayed = null) {
   let drew = false;
   let tick = null;
   let aiChoice = 'mid';
+  let requestWatch = null;
+  const watch = watchControl(() => requestWatch?.());
   const act = async (path, opts = {}, after = null) => {
     try {
       await api(`/api/tournaments/${id}${path}`, { method: 'POST', ...opts });
@@ -3207,7 +3362,7 @@ function tournamentUI(id, justPlayed = null) {
     return h(
       'section',
       { class: 'tour-head' },
-      h('h1', null, `🏆 Torneo de ${T.size}`),
+      h('div', { class: 'row between' }, h('h1', null, `🏆 Torneo de ${T.size}`), T.you !== null && T.status !== 'finished' ? watch.el : null),
       h('div', { class: 'row' }, h('span', { class: 'chip' }, `${MODE_ICON[T.mode]} ${MODE_LABEL[T.mode]}`), h('span', { class: 'chip' }, T.visibility === 'public' ? '🌐 Público' : '🔒 Privado'), h('span', { class: `chip${T.status === 'running' ? ' pulse' : ''}` }, status)),
     );
   }
@@ -3258,12 +3413,12 @@ function tournamentUI(id, justPlayed = null) {
     const done = m.winner !== null;
     const won = done && m.winner === i;
     const cls = ['bk-slot', seat ? '' : 'is-tbd', seat && i === T.you ? 'is-you' : '', won ? 'won' : '', done && !won ? 'lost' : ''].filter(Boolean).join(' ');
-    const sub = !seat ? 'Espera ganador' : seat.ai ? trainerTitle(seat.name) ?? `IA ${(AI_LABEL[seat.ai] ?? '').toLowerCase()}` : i === T.you ? 'Tú' : `${seat.wins}V ${seat.losses}D`;
+    const sub = !seat ? 'Espera ganador' : seat.ai ? `🤖 ${capitalize(trainerTitle(seat.name) ?? AI_LABEL[seat.ai] ?? 'IA')}` : seat.avatar ? skinTitle(seat.avatar, 'span') : `${seat.wins}V ${seat.losses}D`;
     return h(
       'div',
       { class: cls, 'data-round': round, 'data-side': side },
       h('span', { class: 'bk-seed' }, seat ? seedOf(i) : ''),
-      h('span', { class: `bk-av${seat?.ai ? ' is-ai' : ''}${!seat ? ' is-empty' : ''}`, 'aria-hidden': 'true', style: seat?.ai ? { background: aiColor(seat.name) } : null }, !seat ? '?' : seat.ai ? '🤖' : (seat.name.trim()[0] ?? '?').toUpperCase()),
+      seat?.avatar ? h('span', { class: 'bk-av has-sprite', 'aria-hidden': 'true' }, avatarPic(seat.avatar, 'sm', seat.frame)) : h('span', { class: `bk-av${seat?.ai ? ' is-ai' : ''}${!seat ? ' is-empty' : ''}`, 'aria-hidden': 'true', style: seat?.ai ? { background: aiColor(seat.name) } : null }, !seat ? '?' : seat.ai ? '🤖' : (seat.name.trim()[0] ?? '?').toUpperCase()),
       h('span', { class: 'bk-who', title: seat?.name ?? null }, h('span', { class: `bk-name${seat && nameSize(seat.name) ? ` ${nameSize(seat.name)}` : ''}` }, seat ? (trainerShort(seat.name)) : 'Por definir'), h('small', { class: 'bk-sub' }, sub)),
       h('span', { class: 'bk-mark', 'aria-label': won ? 'Ganó' : done && seat ? 'Perdió' : null }, won ? (m.coinFlip ? h('span', { 'data-tip': 'Empate: avanzó por sorteo' }, '🪙') : '✔') : done && seat ? '✕' : ''),
     );
@@ -3418,6 +3573,12 @@ function tournamentUI(id, justPlayed = null) {
   }
 
   return {
+    setWatch(open) {
+      watch.set(open);
+    },
+    onWatchRequest(fn) {
+      requestWatch = fn;
+    },
     update(next) {
       offset = next.serverNow - Date.now();
       const key = JSON.stringify({ ...next, serverNow: 0 });
@@ -3469,7 +3630,7 @@ function countdownUI(c) {
       'div',
       { class: `match-player side-${side}${you ? ' is-you' : ''}` },
       avatar(p),
-      trainerName(p.name, { class: 'match-name' }),
+      trainerName(p.name, { class: 'match-name' }, p.avatar),
       you ? h('span', { class: 'chip match-you' }, 'Tú') : null,
       p.ai ? h('span', { class: 'chip' }, '🤖 IA') : record(p),
       p.ai ? null : h('span', { class: 'muted small' }, `📚 ${p.rosterSize} Pokémon · ✨ ${p.shinies} shiny`),
@@ -3693,15 +3854,15 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
 
   function build(p, you) {
     if (you == null) {
-      const sides = [0, 1].map((s) => sideView(s, [avatarPic(p.sides[s].avatar, 'md', p.sides[s].frame), trainerName(p.sides[s].name)]));
+      const sides = [0, 1].map((s) => sideView(s, [playerPill(p.sides[s], s === 0 ? 'me' : 'foe')]));
       root.replaceChildren(sides[0].el, h('div', { class: 'vs-mark' }, 'VS'), sides[1].el);
       return { sides, mine: null };
     }
     const foeSide = 1 - you;
-    const foe = sideView(foeSide, [avatarPic(p.sides[foeSide].avatar, 'md', p.sides[foeSide].frame), 'Equipo de ', trainerName(p.sides[foeSide].name)]);
+    const foe = sideView(foeSide, [playerPill(p.sides[foeSide], 'foe')]);
     const mine = { title: h('h2'), note: h('p', { class: 'muted small' }), grid: h('div', { class: 'prep-grid' }), foot: h('div', { class: 'prep-foot' }), footMode: null, footNote: h('p', { class: 'pulse' }), slots: [] };
     mine.pickBtn = h('button', { type: 'button', class: 'btn primary', onclick: () => { sent = true; sendPick(picks.slice()); render(); } });
-    root.replaceChildren(h('div', { class: 'card prep-side mine' }, h('div', { class: 'with-avatar' }, avatarPic(p.sides[you].avatar, 'md', p.sides[you].frame), mine.title), mine.note, mine.grid, mine.foot), h('div', { class: 'vs-mark' }, 'VS'), foe.el);
+    root.replaceChildren(h('div', { class: 'card prep-side mine' }, h('div', { class: 'with-avatar' }, playerPill(p.sides[you], 'me', true), mine.title), mine.note, mine.grid, mine.foot), h('div', { class: 'vs-mark' }, 'VS'), foe.el);
     return { sides: [foe], mine };
   }
 
@@ -4096,7 +4257,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
   }
 
   async function splash() {
-    const who = (side, p) => h('div', { class: `vs-who ${p}` }, avatarPic(view.sides[side].avatar, 'xl', view.sides[side].frame), trainerName(view.sides[side].name));
+    const who = (side, p) => h('div', { class: `vs-who ${p}` }, avatarPic(view.sides[side].avatar, 'xl', view.sides[side].frame), trainerName(view.sides[side].name, {}, view.sides[side].avatar));
     const el = h('div', { class: 'vs-splash' }, who(mine, 'me'), h('span', null, 'VS'), who(1 - mine, 'foe'));
     arena.append(el);
     await wait(1700);
@@ -4129,7 +4290,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
         }[kind]
       : { win: `Venciste a ${trainerShort(view.sides[1 - mine].name)}.`, lose: `${trainerShort(view.sides[1 - mine].name)} ganó esta vez.`, draw: 'Nadie quedó en pie.', watch: `${trainerShort(view.sides[0].name)} vs ${trainerShort(view.sides[1].name)}` }[kind];
     const icon = { win: '🏆', lose: '💀', draw: '🤝', watch: champ ? '🏆' : '🏁' }[kind];
-    const duel = winner === null ? null : h('div', { class: 'result-duel' }, [0, 1].map((side) => h('span', { class: `result-side ${side === winner ? 'won' : 'lost'}` }, side === winner ? '👑 ' : '', avatarPic(view.sides[side].avatar, 'md', view.sides[side].frame), trainerName(view.sides[side].name))));
+    const duel = winner === null ? null : h('div', { class: 'result-duel' }, [0, 1].map((side) => h('span', { class: `result-side ${side === winner ? 'won' : 'lost'}` }, side === winner ? '👑 ' : '', playerPill(view.sides[side], pos(side), isYou(side)))));
     const el = h('div', { class: `result ${kind}`, onclick: () => el.remove() }, h('div', { class: 'result-card' }, h('span', { class: 'result-icon' }, icon), h('h2', null, title), duel, h('p', null, sub), h('small', null, tour ? 'Siguen las llaves del torneo' : 'Toca para cerrar')));
     arena.append(el);
     if (kind === 'win' || kind === 'watch') confetti(el);
@@ -4341,7 +4502,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
         'header',
         { class: 'team-panel-head' },
         h('span', { class: 'team-role' }, role),
-        h('span', { class: 'team-owner-wrap' }, avatarPic(sd.avatar, 'md', sd.frame), trainerName(sd.name, { class: 'team-owner' })),
+        h('span', { class: 'team-owner-wrap' }, playerPill(sd, pos(side))),
         h('span', { class: 'team-alive', 'aria-label': `${alive} de ${sd.team.length} en pie` }, sd.team.map((f, i) => h('i', { class: f && !f.hidden && f.hp <= 0 ? 'out' : i === sd.active ? 'on' : null }))),
       );
       els.team[p].replaceChildren(head, ...cards);
@@ -4353,7 +4514,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     paint(1);
     paintField();
     els.turn.textContent = view.status === 'finished' ? 'Fin de la batalla' : `Turno ${view.turn}`;
-    const tag = (side) => h('span', { class: `who by-${pos(side)}${nameSize(view.sides[side].name) ? ` ${nameSize(view.sides[side].name)}` : ''}` }, avatarPic(view.sides[side].avatar, 'sm', view.sides[side].frame), isYou(side) ? `${trainerShort(view.sides[side].name)} (tú)` : trainerShort(view.sides[side].name));
+    const tag = (side) => playerPill(view.sides[side], pos(side), isYou(side));
     els.vs.replaceChildren(tag(mine), h('span', { class: 'muted' }, ' vs '), tag(1 - mine));
   }
 
@@ -5064,4 +5225,4 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
 
 fallBackToRaw(document);
 document.querySelector('footer.credits')?.append(feedbackButton());
-loadSprites().finally(route);
+Promise.all([loadSprites(), loadFaces()]).finally(route);
