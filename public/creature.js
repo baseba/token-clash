@@ -4,6 +4,9 @@ import { UPSTREAM, upstreamManifest, upstreamURLs } from './upstream.js?v=dev';
 // scripts/sprites.mjs resolves. If jsDelivr fails, the page's image fallback retries raw GitHub.
 let sprites = new Map();
 
+/** Whether the sprite manifest is in. A failed load leaves it empty, and loadSprites can run again. */
+export const spritesLoaded = () => sprites.size > 0;
+
 export async function loadSprites() {
   const manifest = await upstreamManifest('sprites');
   sprites = new Map(Object.entries(manifest).flatMap(([dir, slugs]) => Object.entries(slugs).map(([slug, files]) => [slug, files.map((file) => upstreamURLs(UPSTREAM.sprites, dir + file)[0])])));

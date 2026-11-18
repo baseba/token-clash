@@ -2,10 +2,10 @@
 // not served by us. Our domain answers from a far Cloudflare edge for many players, and every file
 // took a long round trip, while jsDelivr answers from nearby. The browser loads each file from
 // jsDelivr pinned to a commit (the URL never changes content, so it is cached for a year) and
-// retries once at raw.githubusercontent.com if jsDelivr fails. That retry carries real traffic: these
-// repos are over jsDelivr's package size limit, and it sometimes answers 403 for a while. The manifests in public/upstream/
-// map our keys (a sprite slug, a music track…) to paths inside these repos; the scripts in
-// scripts/ resolve them against these same commits.
+// retries once at raw.githubusercontent.com if jsDelivr fails. That retry carries real traffic:
+// these repos are over jsDelivr's package size limit, and it sometimes answers 403 for a while.
+// The manifests in public/upstream/ map our keys (a sprite slug, a music track…) to paths inside
+// these repos; the scripts in scripts/ resolve them against these same commits.
 
 const JSDELIVR = 'https://cdn.jsdelivr.net';
 const RAW = 'https://raw.githubusercontent.com';

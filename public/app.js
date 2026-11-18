@@ -1,4 +1,4 @@
-import { creatureHTML, loadSprites, preloadSprites, spriteURL } from './creature.js?v=dev';
+import { creatureHTML, loadSprites, preloadSprites, spritesLoaded, spriteURL } from './creature.js?v=dev';
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
@@ -844,6 +844,9 @@ renderSound();
 
 function route() {
   hideTip();
+  // Without the sprite manifest every Pokémon would stay blank for the session, so each navigation
+  // asks for it again and repaints once it arrives.
+  if (!spritesLoaded()) loadSprites().then(() => spritesLoaded() && route());
   if (TAB_MUSIC[location.pathname]) music.play(TAB_MUSIC[location.pathname]);
   else if (location.pathname.startsWith('/t/')) music.play('tab:home');
   else if (location.pathname.startsWith('/b/')) music.play('prep');

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolveVariants } from '../../scripts/sprites.mjs';
-import { ASSET_ORIGINS, fallBackToRaw, fetchFirst, rawFallback, UPSTREAM, upstreamURLs } from '../../public/upstream.js';
+import { ASSET_ORIGINS, fallBackToRaw, fetchFirst, rawFallback, UPSTREAM, upstreamManifest, upstreamURLs } from '../../public/upstream.js';
 
 const pokerogue = { repo: 'pagefaultgames/pokerogue-assets', commit: 'b7ce1013491141864da412fa733d5ac585b5d453' };
 
@@ -51,6 +51,24 @@ test('a fetched file comes from the first URL that answers OK', async () => {
   assert.equal((await fetchFirst(['a', 'b', 'c'], fetchURL)).url, 'c');
   assert.deepEqual(asked, ['a', 'b', 'c']);
   assert.equal(await fetchFirst(['a', 'b'], fetchURL), null);
+});
+
+test('a manifest that fails to load is asked for again on the next call', async () => {
+  const realFetch = globalThis.fetch;
+  const asked = [];
+  globalThis.fetch = async (url) => {
+    asked.push(url);
+    if (asked.length === 1) throw new Error('offline');
+    return { ok: true, json: async () => ({ loaded: true }) };
+  };
+  try {
+    assert.deepEqual(await upstreamManifest('flaky'), {});
+    assert.deepEqual(await upstreamManifest('flaky'), { loaded: true });
+    assert.deepEqual(await upstreamManifest('flaky'), { loaded: true });
+    assert.equal(asked.length, 2, 'a loaded manifest is not asked for again');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 // The committed manifests, served to the browser as /upstream/<name>.json.
