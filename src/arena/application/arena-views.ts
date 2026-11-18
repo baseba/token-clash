@@ -40,8 +40,8 @@ export class ArenaViews {
       visibility: challenge.visibility,
       tournament: tournament?.bracket ? tournament.label({ round: challenge.round!, index: challenge.match! }) : null,
       createdAt: challenge.createdAt,
-      host: { id: challenge.hostId, name: host?.name ?? challenge.hostName, avatar: this.avatarOf(challenge.hostId, challenge) },
-      guest: challenge.guestId ? { id: challenge.guestId, name: this.nameOf(challenge.guestId, challenge.guestName), avatar: this.avatarOf(challenge.guestId, challenge) } : null,
+      host: { id: challenge.hostId, name: host?.name ?? challenge.hostName, avatar: this.avatarOf(challenge.hostId, challenge), frame: this.frameOf(challenge.hostId) },
+      guest: challenge.guestId ? { id: challenge.guestId, name: this.nameOf(challenge.guestId, challenge.guestName), avatar: this.avatarOf(challenge.guestId, challenge), frame: this.frameOf(challenge.guestId) } : null,
       hostTeam: viewerId === challenge.hostId || challenge.status === 'finished' ? hostTeam : [],
       hostTeamSize: challenge.mode === 'random' ? Math.min(PARTY_SIZE, host?.roster.length ?? 0) : hostTeam.length,
       winnerId: challenge.winnerId ?? null,
@@ -58,7 +58,7 @@ export class ArenaViews {
       kind: 'duel',
       mode: challenge.mode,
       createdAt: challenge.createdAt,
-      host: { name: host?.name ?? challenge.hostName, avatar: this.avatarOf(challenge.hostId, challenge), wins: host?.wins ?? 0, losses: host?.losses ?? 0 },
+      host: { name: host?.name ?? challenge.hostName, avatar: this.avatarOf(challenge.hostId, challenge), frame: this.frameOf(challenge.hostId), wins: host?.wins ?? 0, losses: host?.losses ?? 0 },
       mine: challenge.hostId === viewerId,
     };
   }
@@ -69,7 +69,7 @@ export class ArenaViews {
       id: challenge.id,
       mode: challenge.mode,
       startedAt: phase.startedAt,
-      sides: phase.battle.sides.map((side) => ({ name: side.name, avatar: side.avatar, ai: aiLevelOf(side.trainerId) ?? null })),
+      sides: phase.battle.sides.map((side) => ({ name: side.name, avatar: side.avatar, frame: side.frame, ai: aiLevelOf(side.trainerId) ?? null })),
       tournament: tournament ? { id: tournament.id, size: tournament.size } : null,
     };
   }
@@ -106,6 +106,7 @@ export class ArenaViews {
         return {
           name: seat.name,
           avatar: this.avatarOf(seat.id, { id: tournament.id, tournamentId: tournament.id }),
+          frame: this.frameOf(seat.id),
           ai: seat.ai ?? null,
           ready: seat.ready,
           online: seat.ai ? true : this.presence.inTournament(tournament.id, seat.id),
@@ -168,15 +169,25 @@ export class ArenaViews {
     return this.trainers.byId(id)?.look ?? trainerSpriteFor(id, STARTER_SPRITES);
   }
 
+  frameOf(id: string): string | null {
+    return aiLevelOf(id) ? null : this.trainers.byId(id)?.equipped?.frame ?? null;
+  }
+
+  ballOf(id: string): string {
+    return aiLevelOf(id) ? 'pb' : this.trainers.byId(id)?.ball ?? 'pb';
+  }
+
   countdownPlayer(id: string, fallbackName: string, challenge: Challenge): CountdownPlayer {
     const avatar = this.avatarOf(id, challenge);
+    const frame = this.frameOf(id);
     const level = aiLevelOf(id);
-    if (level) return { id, name: fallbackName, avatar, ai: level, wins: 0, losses: 0, rosterSize: 0, shinies: 0 };
+    if (level) return { id, name: fallbackName, avatar, frame, ai: level, wins: 0, losses: 0, rosterSize: 0, shinies: 0 };
     const trainer = this.trainers.byId(id);
     return {
       id,
       name: trainer?.name ?? fallbackName,
       avatar,
+      frame,
       ai: null,
       wins: trainer?.wins ?? 0,
       losses: trainer?.losses ?? 0,

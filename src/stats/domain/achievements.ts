@@ -1,6 +1,7 @@
 import { lineage, speciesData } from '../../catalog/domain/creatures.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { ELITE_FOUR, GYM_LEADERS, TRAINER_SPRITES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
+import { ELITE_FOUR, GYM_LEADERS, isShopTrainer, TRAINER_SPRITES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
+import { RARITIES, shopItemOf } from '../../catalog/domain/shop.js';
 import { TYPES } from '../../catalog/domain/type-chart.js';
 import type { ChallengeState } from '../../arena/domain/challenge.js';
 import { isHumanDuel } from '../../arena/domain/challenge.js';
@@ -35,10 +36,11 @@ export interface PlayerRecord {
   flawlessWins: number;
   lowLevelWins: number;
   diverseTeam: boolean;
+  owned: string[];
 }
 
 export interface RecordSource {
-  trainer: { id: string; roster: RosterEntry[]; wins: number; losses: number; totalTokens?: number };
+  trainer: { id: string; roster: RosterEntry[]; wins: number; losses: number; totalTokens?: number; owned?: string[] };
   team: RosterEntry[];
   challenges: readonly ChallengeState[];
   tournaments: readonly TournamentState[];
@@ -120,6 +122,7 @@ export function recordOf({ trainer, team, challenges, tournaments, rankedFirst }
     flawlessWins,
     lowLevelWins,
     diverseTeam: team.length >= 6 && new Set(teamTypes).size === teamTypes.length,
+    owned: trainer.owned ?? [],
   };
 }
 
@@ -197,7 +200,7 @@ export const UNLOCKS = buildUnlocks();
 
 export interface SpriteProgress {
   key: string;
-  group: Unlock['group'] | 'starter';
+  group: Unlock['group'] | 'starter' | 'shop';
   title: string | null;
   unlocked: boolean;
   goals: Goal[];
@@ -208,6 +211,11 @@ const share = (goals: Goal[]) => goals.reduce((sum, g) => sum + g.have / g.need,
 
 export function spriteProgress(record: PlayerRecord): SpriteProgress[] {
   return TRAINER_SPRITES.map((key) => {
+    if (isShopTrainer(key)) {
+      const item = shopItemOf('trainer', key)!;
+      const owned = record.owned.includes(item.id);
+      return { key, group: 'shop', title: `Tienda · ${RARITIES[item.rarity].label}`, unlocked: owned, goals: [{ text: `Comprarlo en la tienda por ${(item.price / 1_000_000).toLocaleString('es')} M de tokens`, have: owned ? 1 : 0, need: 1 }] };
+    }
     const unlock = UNLOCKS.get(key);
     if (!unlock) return { key, group: 'starter', title: null, unlocked: true, goals: [] };
     const ways = unlock.ways.map((way) => way.map((rule) => rule(record)));
@@ -217,6 +225,7 @@ export function spriteProgress(record: PlayerRecord): SpriteProgress[] {
 }
 
 export const isUnlocked = (record: PlayerRecord, key: string): boolean => {
+  if (isShopTrainer(key)) return record.owned.includes(`trainer:${key}`);
   const unlock = UNLOCKS.get(key);
   return !unlock || unlock.ways.some((way) => done(way.map((rule) => rule(record))));
 };

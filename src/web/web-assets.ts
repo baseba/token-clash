@@ -9,7 +9,8 @@ import { PUBLIC_DIR } from '../shared/paths.js';
 
 const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.gif': 'image/gif', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.json': 'application/json; charset=utf-8', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain; charset=utf-8' };
 // Code revalidates on every load so a deploy shows up at once (Cloudflare would stretch a short
-// max-age to hours). Sprites and sounds never change under the same name, so they can be cached.
+// max-age to hours). Sprites and sounds can be cached, except the Poké Balls generated at install
+// (anims/ui/): they change under the same name whenever their colors do, and weigh under 1 KB.
 const CACHEABLE = new Set(['.png', '.gif', '.ogg', '.mp3', '.wav', '.m4a', '.ico']);
 
 export interface Asset {
@@ -35,7 +36,7 @@ export class WebAssets {
     try {
       let body: Buffer | string = await readFile(file);
       if (['.html', '.js'].includes(extname(file))) body = body.toString('utf8').replaceAll('?v=dev', `?v=${this.version}`);
-      return { body, type: MIME[extname(file)] || 'application/octet-stream', cache: CACHEABLE.has(extname(file)) ? 'public, max-age=86400' : 'no-cache' };
+      return { body, type: MIME[extname(file)] || 'application/octet-stream', cache: CACHEABLE.has(extname(file)) && !rel.startsWith(join('anims', 'ui')) ? 'public, max-age=86400' : 'no-cache' };
     } catch {
       return null;
     }

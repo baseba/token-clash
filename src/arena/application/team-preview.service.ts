@@ -56,8 +56,8 @@ export class TeamPreviewService {
       preview: createPreview({
         mode: challenge.mode,
         sides: [
-          { trainerId: challenge.hostId, name: this.views.nameOf(challenge.hostId, challenge.hostName)!, avatar: this.views.avatarOf(challenge.hostId, challenge), entries: challenge.hostTeam },
-          { trainerId: challenge.guestId!, name: this.views.nameOf(challenge.guestId, challenge.guestName)!, avatar: this.views.avatarOf(challenge.guestId!, challenge), entries: challenge.guestTeam! },
+          { trainerId: challenge.hostId, name: this.views.nameOf(challenge.hostId, challenge.hostName)!, avatar: this.views.avatarOf(challenge.hostId, challenge), frame: this.views.frameOf(challenge.hostId), entries: challenge.hostTeam },
+          { trainerId: challenge.guestId!, name: this.views.nameOf(challenge.guestId, challenge.guestName)!, avatar: this.views.avatarOf(challenge.guestId!, challenge), frame: this.views.frameOf(challenge.guestId!), entries: challenge.guestTeam! },
         ],
       }),
       deadline: null,

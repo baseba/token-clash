@@ -73,6 +73,8 @@ export function createBattle({ id, sides, random = Math.random }: { id: string; 
       trainerId: s.trainerId,
       name: s.name,
       avatar: s.avatar ?? null,
+      frame: s.frame ?? null,
+      ball: s.ball ?? 'pb',
       team: s.entries.slice(0, BATTLE_SIZE).map((e) => prepare(e)),
       active: 0,
       action: null,

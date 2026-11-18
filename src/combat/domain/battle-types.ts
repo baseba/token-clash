@@ -226,6 +226,8 @@ export interface BattleSide {
   trainerId: string;
   name: string;
   avatar: string | null;
+  frame: string | null;
+  ball: string;
   team: BattleFighter[];
   active: number;
   action: SideAction | null;
@@ -387,5 +389,7 @@ export interface BattleSideInput {
   trainerId: string;
   name: string;
   avatar?: string;
+  frame?: string | null;
+  ball?: string;
   entries: RosterEntry[];
 }

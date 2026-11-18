@@ -196,6 +196,8 @@ export function publicState(battle: BattleState, viewer: number | null = null) {
       trainerId: side.trainerId,
       name: side.name,
       avatar: side.avatar,
+      frame: side.frame,
+      ball: side.ball,
       active: side.active,
       ready: !needsAction(battle, s),
       mustSwitch: side.mustSwitch,

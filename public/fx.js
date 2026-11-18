@@ -766,7 +766,8 @@ export function createFx(arena, field = arena) {
     return Promise.all(jobs);
   }
 
-  async function throwBall(spot, mine, onOpen) {
+  async function throwBall(spot, mine, onOpen, ballKey = 'pb') {
+    const kind = /^[a-z]{2}$/.test(ballKey) ? ballKey : 'pb';
     const k = fieldScale();
     const a = arena.getBoundingClientRect();
     const anchor = spot.getBoundingClientRect();
@@ -776,7 +777,7 @@ export function createFx(arena, field = arena) {
     const peakY = land.y + offset.peak * k;
     const track = node({ transform: `translateX(${start.x}px)` });
     const ball = document.createElement('div');
-    Object.assign(ball.style, { position: 'absolute', left: `${-6 * k}px`, top: `${-10 * k}px`, width: `${12 * k}px`, height: `${16 * k}px`, transformOrigin: '50% 62.5%', background: 'url("/anims/ui/pb.png") 0 0 / 100% 100% no-repeat', imageRendering: 'pixelated' });
+    Object.assign(ball.style, { position: 'absolute', left: `${-6 * k}px`, top: `${-10 * k}px`, width: `${12 * k}px`, height: `${16 * k}px`, transformOrigin: '50% 62.5%', background: `url("/anims/ui/${kind}.png?v=dev") 0 0 / 100% 100% no-repeat`, imageRendering: 'pixelated' });
     track.append(ball);
     const riseShare = 150 / 650;
     await Promise.all([
@@ -789,7 +790,7 @@ export function createFx(arena, field = arena) {
     ]).catch(() => {});
     track.remove();
     onOpen();
-    const open = uiSprite('pb_open.png', { w: 12 * k, h: 16 * k });
+    const open = uiSprite(`${kind}_open.png?v=dev`, { w: 12 * k, h: 16 * k });
     const img = spot.querySelector('.creature img');
     const grow = img?.animate([
       { transform: 'scale(0.5)', transformOrigin: '50% 100%', filter: 'brightness(0) invert(1)' },
@@ -912,12 +913,12 @@ export function createFx(arena, field = arena) {
     stat(up, spot) {
       return statChange(up, spot);
     },
-    async sendOut(spot, mine, onOpen = () => {}) {
+    async sendOut(spot, mine, onOpen = () => {}, ball = 'pb') {
       if (reduced()) {
         onOpen();
         return;
       }
-      await throwBall(spot, mine, onOpen);
+      await throwBall(spot, mine, onOpen, ball);
     },
     async recall(spot) {
       const img = spot.querySelector('.creature img');

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ArenaQueries } from '../../arena/application/arena-queries.js';
 import { forbidden } from '../../shared/domain/errors.js';
+import { isShopTrainer } from '../../catalog/domain/trainer-sprites.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { isUnlocked, recordOf, spriteProgress, type PlayerRecord } from '../domain/achievements.js';
@@ -30,7 +31,7 @@ export class AchievementsService {
 
   /** @throws {DomainError} the look is still locked, or is not a trainer sprite */
   chooseLook(trainer: Trainer, key: string): Trainer {
-    if (key !== trainer.avatar && !isUnlocked(this.recordFor(trainer), key)) throw forbidden('Todavía no desbloqueas a ese entrenador.');
+    if (key !== trainer.avatar && !isUnlocked(this.recordFor(trainer), key)) throw forbidden(isShopTrainer(key) ? 'Ese entrenador se compra en la tienda.' : 'Todavía no desbloqueas a ese entrenador.');
     return this.trainers.updateProfile(trainer, { avatar: key });
   }
 }

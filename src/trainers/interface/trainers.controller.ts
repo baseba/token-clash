@@ -11,8 +11,9 @@ import type { Trainer } from '../domain/trainer.js';
 import { ImportSaveDto } from './dto/import-save.dto.js';
 import { UpdateMonDto } from './dto/update-mon.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
+import { BuyDto, EquipDto } from './dto/shop.dto.js';
 import { Authenticated, CurrentTrainer, MaybeAuthenticated } from './session.guard.js';
-import { monDetail, myView, trainerSummary } from './trainer.presenter.js';
+import { monDetail, myView, shopView, trainerSummary } from './trainer.presenter.js';
 
 @Controller('api')
 export class TrainersController {
@@ -41,6 +42,25 @@ export class TrainersController {
   @Authenticated()
   updateMe(@CurrentTrainer() trainer: Trainer, @Body({ schema: UpdateProfileDto }) body: UpdateProfileDto) {
     return { me: myView(this.trainers.updateProfile(trainer, body), this.skynet.aiLevels) };
+  }
+
+  @Get('shop')
+  @Authenticated()
+  shop(@CurrentTrainer() trainer: Trainer) {
+    return { shop: shopView(trainer) };
+  }
+
+  @Post('shop/buy')
+  @HttpCode(200)
+  @Authenticated()
+  buy(@CurrentTrainer() trainer: Trainer, @Body({ schema: BuyDto }) body: BuyDto) {
+    return { shop: shopView(this.trainers.buy(trainer, body.item)) };
+  }
+
+  @Put('me/equip')
+  @Authenticated()
+  equip(@CurrentTrainer() trainer: Trainer, @Body({ schema: EquipDto }) body: EquipDto) {
+    return { shop: shopView(this.trainers.equip(trainer, body.kind, body.key)) };
   }
 
   @Get('me/mons/:id')

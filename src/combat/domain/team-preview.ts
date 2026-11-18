@@ -10,6 +10,7 @@ export interface PreviewSide {
   trainerId: string;
   name: string;
   avatar?: string;
+  frame?: string | null;
   entries: RosterEntry[];
   /** Indexes into entries, once confirmed. */
   picks: number[] | null;
@@ -24,10 +25,10 @@ export interface PreviewState {
   revealed?: boolean;
 }
 
-export function createPreview({ sides, mode = 'team' }: { sides: { trainerId: string; name: string; avatar?: string; entries: RosterEntry[] }[]; mode?: string }): PreviewState {
+export function createPreview({ sides, mode = 'team' }: { sides: { trainerId: string; name: string; avatar?: string; frame?: string | null; entries: RosterEntry[] }[]; mode?: string }): PreviewState {
   return {
     mode,
-    sides: sides.map((s) => ({ trainerId: s.trainerId, name: s.name, ...(s.avatar ? { avatar: s.avatar } : {}), entries: s.entries.slice(0, PARTY_SIZE), picks: null })),
+    sides: sides.map((s) => ({ trainerId: s.trainerId, name: s.name, ...(s.avatar ? { avatar: s.avatar } : {}), ...(s.frame ? { frame: s.frame } : {}), entries: s.entries.slice(0, PARTY_SIZE), picks: null })),
   };
 }
 
@@ -86,6 +87,7 @@ export interface PreviewSideView {
   trainerId: string;
   name: string;
   avatar: string | null;
+  frame: string | null;
   ready: boolean;
   needed: number;
   party: (Fighter | SeenCard)[];
@@ -112,6 +114,7 @@ export function previewView(preview: PreviewState, viewer: number | null = null)
         trainerId: side.trainerId,
         name: side.name,
         avatar: side.avatar ?? null,
+        frame: side.frame ?? null,
         ready: !!side.picks,
         needed: picksNeeded(preview, sideIndex),
         party: own || watching ? fighters : fighters.map(seenCard),

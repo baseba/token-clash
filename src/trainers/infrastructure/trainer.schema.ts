@@ -20,6 +20,10 @@ export const trainers = sqliteTable(
     updatedAt: integer('updated_at'),
     lastSeen: integer('last_seen'),
     avatar: text(),
+    shopBaseline: integer('shop_baseline'),
+    shopSpent: integer('shop_spent').notNull().default(0),
+    owned: text({ mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+    equipped: text({ mode: 'json' }).$type<Record<string, string>>(),
   },
 );
 

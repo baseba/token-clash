@@ -55,6 +55,7 @@ const SCREEN_TRACKS = {
   'tab:pokedex': 'laboratory',
   'tab:stats': 'plains',
   'tab:profile': 'title',
+  'tab:shop': 'mystery_encounter_gen_5_gts',
   prep: 'menu',
   'victory:win': 'bw/victory_trainer',
   'victory:champion': 'bw/victory_champion',
@@ -82,6 +83,7 @@ const UI_SOUNDS = {
   add: { file: 'pb_tray_enter' },
   remove: { file: 'pb_tray_empty' },
   save: { file: 'save' },
+  buy: { file: 'buy' },
 };
 export const UI_SOUND_KINDS = Object.keys(UI_SOUNDS);
 const UI_QUIET_AFTER_SFX_S = 0.6;

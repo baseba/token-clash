@@ -6,8 +6,9 @@ import { abilityOptions, usableAbility } from '../../catalog/domain/creatures.js
 import { validMoveset, MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import { uniqueSpecies, uniqueVariants, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
-import { invalid, notFound } from '../../shared/domain/errors.js';
-import { isTrainerSprite, STARTER_SPRITES, trainerSpriteFor } from '../../catalog/domain/trainer-sprites.js';
+import { conflict, forbidden, invalid, notFound } from '../../shared/domain/errors.js';
+import { isShopTrainer, isTrainerSprite, STARTER_SPRITES, trainerSpriteFor } from '../../catalog/domain/trainer-sprites.js';
+import { DEFAULT_BALL, shopItem, shopItemOf, type ShopItem } from '../../catalog/domain/shop.js';
 import { carryTeam, type ParsedSave } from './save-file.js';
 
 export interface TrainerState {
@@ -25,7 +26,14 @@ export interface TrainerState {
   updatedAt?: number;
   lastSeen?: number;
   avatar?: string;
+  shopBaseline?: number;
+  shopSpent?: number;
+  owned?: string[];
+  equipped?: Equipped;
 }
+
+export type EquipKind = 'ball' | 'window' | 'frame';
+export type Equipped = Partial<Record<EquipKind, string>>;
 
 const RARITY_RANK = { legendary: 3, rare: 2, uncommon: 1, common: 0 } as const;
 
@@ -58,6 +66,10 @@ export class Trainer implements TrainerState {
   updatedAt?: number;
   lastSeen?: number;
   avatar?: string;
+  shopBaseline?: number;
+  shopSpent?: number;
+  owned?: string[];
+  equipped?: Equipped;
 
   private constructor(state: TrainerState) {
     Object.assign(this, state);
@@ -77,10 +89,55 @@ export class Trainer implements TrainerState {
     return this.avatar ?? trainerSpriteFor(this.id, STARTER_SPRITES);
   }
 
-  /** @throws {DomainError} the sprite is not one of the trainer sprites */
+  /** @throws {DomainError} the sprite is not one of the trainer sprites, or is sold in the shop and not bought */
   chooseAvatar(key: string): void {
     if (!isTrainerSprite(key)) throw invalid('Ese entrenador no existe.');
+    if (isShopTrainer(key) && !this.owns(`trainer:${key}`) && key !== this.avatar) throw forbidden('Ese entrenador se compra en la tienda.');
     this.avatar = key;
+  }
+
+  releaseShopLook(): boolean {
+    if (!this.avatar || !isShopTrainer(this.avatar) || this.owns(`trainer:${this.avatar}`)) return false;
+    this.avatar = trainerSpriteFor(`${this.id}:shop`, STARTER_SPRITES);
+    return true;
+  }
+
+  get earned(): number {
+    return Math.max(0, this.totalTokens - (this.shopBaseline ?? 0));
+  }
+
+  get balance(): number {
+    return Math.max(0, this.earned - (this.shopSpent ?? 0));
+  }
+
+  owns(itemId: string): boolean {
+    return (this.owned ?? []).includes(itemId);
+  }
+
+  get ball(): string {
+    return this.equipped?.ball ?? DEFAULT_BALL;
+  }
+
+  /** @throws {DomainError} the item doesn't exist, is already owned, or the balance is short */
+  buy(itemId: string): ShopItem {
+    const item = shopItem(itemId);
+    if (!item) throw notFound('Ese artículo no existe.');
+    if (this.owns(itemId)) throw conflict('Ya lo tienes.');
+    if (this.balance < item.price) throw conflict('No te alcanzan los tokens.');
+    this.owned = [...(this.owned ?? []), itemId];
+    this.shopSpent = (this.shopSpent ?? 0) + item.price;
+    return item;
+  }
+
+  /** @throws {DomainError} the item doesn't exist or wasn't bought */
+  equip(kind: EquipKind, key: string | null): void {
+    if (key !== null) {
+      const item = shopItemOf(kind, key);
+      if (!item) throw notFound('Ese artículo no existe.');
+      if (!this.owns(item.id)) throw forbidden('Primero cómpralo en la tienda.');
+    }
+    const { [kind]: _, ...rest } = this.equipped ?? {};
+    this.equipped = key === null ? rest : { ...rest, [kind]: key };
   }
 
   get shinies(): number {
@@ -124,6 +181,7 @@ export class Trainer implements TrainerState {
     });
     this.team = carryTeam(this.team, previous, this.roster);
     if (!this.team.length) this.team = defaultTeam(this.roster);
+    if (parsed.totalTokens < this.totalTokens) this.shopBaseline = (this.shopBaseline ?? 0) - (this.totalTokens - parsed.totalTokens);
     this.totalTokens = parsed.totalTokens;
     this.updatedAt = at;
   }

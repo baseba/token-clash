@@ -31,7 +31,8 @@
   "include": [
     "src/**/*.ts",
     "public/types.js",
-    "public/trainer-sprites.js"
+    "public/trainer-sprites.js",
+    "public/shop.js"
   ],
   "exclude": [
     "node_modules",

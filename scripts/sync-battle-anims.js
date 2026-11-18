@@ -4,6 +4,8 @@ import { Buffer } from 'node:buffer';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MUSIC_TRACKS, musicFile } from '../public/music.js';
+import { BALL_GROUPS, BALL_VARIANTS, CUSTOM_BALLS } from '../public/shop.js';
+import { crc32 } from 'node:zlib';
 
 const RAW = 'https://raw.githubusercontent.com/pagefaultgames/pokerogue-assets/beta';
 const MOVEDEX = new URL('../src/catalog/data/movedex.json', import.meta.url);
@@ -32,8 +34,9 @@ const CHARGE_ANIMS = [
   'solar-beam', 'solar-blade',
 ].map((move) => `${move}-charging`);
 
-const UI_IMAGES = ['pokeball/pb.png', 'pokeball/pb_open.png', 'effects/pb_particles.png', 'effects/battle_stats.png'];
-const SE_SOUNDS = ['pb_throw', 'pb_rel', 'hit', 'hit_strong', 'hit_weak', 'faint', 'stat_up', 'stat_down', 'restore', 'pb_tray_ball', 'pb_lock', 'flee', 'pb_tray_enter', 'pb_tray_empty', 'save'];
+const BALLS = ['pb', 'gb', 'ub', 'lb', 'rb', 'mb'];
+const UI_IMAGES = [...BALLS.flatMap((ball) => [`pokeball/${ball}.png`, `pokeball/${ball}_open.png`]), 'effects/pb_particles.png', 'effects/battle_stats.png'];
+const SE_SOUNDS = ['pb_throw', 'pb_rel', 'hit', 'hit_strong', 'hit_weak', 'faint', 'stat_up', 'stat_down', 'restore', 'pb_tray_ball', 'pb_lock', 'flee', 'pb_tray_enter', 'pb_tray_empty', 'save', 'buy'];
 const UI_SOUNDS = ['select', 'menu_open'];
 
 async function fetchRetry(url, tries = 4) {
@@ -59,6 +62,87 @@ async function mapLimit(items, fn) {
 }
 
 export const assetName = (resourceName) => resourceName.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+(?=\.)|-+$/g, '');
+
+const BALL_PALETTE_SLOTS = {
+  closed: { top: [2, 4, 5, 6], bottom: [7, 3] },
+  open: { top: [5, 5, 6, 6], bottom: [7, 4] },
+};
+
+const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+export function recolorPalette(png, colors) {
+  const out = Buffer.from(png);
+  for (let at = 8; at < out.length; ) {
+    const length = out.readUInt32BE(at);
+    if (out.toString('latin1', at + 4, at + 8) === 'PLTE') {
+      for (const [index, hex] of colors) rgb(hex).forEach((value, c) => (out[at + 8 + index * 3 + c] = value));
+      out.writeUInt32BE(crc32(out.subarray(at + 4, at + 8 + length)), at + 8 + length);
+    }
+    at += 12 + length;
+  }
+  return out;
+}
+
+export function customBallColors(ball, frame) {
+  const slots = BALL_PALETTE_SLOTS[frame];
+  const pairs = slots.top.map((index, i) => [index, ball.top[i]]);
+  if (ball.bottom) slots.bottom.forEach((index, i) => pairs.push([index, ball.bottom[i]]));
+  return pairs;
+}
+
+export function paletteOf(png) {
+  for (let at = 8; at < png.length; ) {
+    const length = png.readUInt32BE(at);
+    if (png.toString('latin1', at + 4, at + 8) === 'PLTE') return Array.from({ length: length / 3 }, (_, i) => [png[at + 8 + i * 3], png[at + 9 + i * 3], png[at + 10 + i * 3]]);
+    at += 12 + length;
+  }
+  return [];
+}
+
+function toHsl([r, g, b]) {
+  const [rn, gn, bn] = [r / 255, g / 255, b / 255];
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = max === rn ? (gn - bn) / d + (gn < bn ? 6 : 0) : max === gn ? (bn - rn) / d + 2 : (rn - gn) / d + 4;
+  return [h * 60, s, l];
+}
+
+function toHex([h, s, l]) {
+  const k = (n) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return `#${[0, 8, 4].map((n) => Math.round(f(n) * 255).toString(16).padStart(2, '0')).join('')}`;
+}
+
+export function tintColor(color, { hue, sat = 1, light = 1 }) {
+  const [h, s, l] = toHsl(color);
+  return toHex([hue ?? h, Math.min(1, s * sat), Math.min(1, l * light)]);
+}
+
+export function variantColors(variant, frame, palette) {
+  return Object.entries(variant.tint).flatMap(([group, tint]) => (BALL_GROUPS[variant.base][group]?.[frame] ?? []).map((index, i) => [index, tint.colors ? tint.colors[frame][i] : tintColor(palette[index], tint)]));
+}
+
+export function generateBalls() {
+  const failed = [];
+  const recolor = (key, base, colorsFor) => {
+    try {
+      for (const [frame, suffix] of [['closed', ''], ['open', '_open']]) {
+        const png = readFileSync(new URL(`${base}${suffix}.png`, UI));
+        writeFileSync(new URL(`${key}${suffix}.png`, UI), recolorPalette(png, colorsFor(frame, png)));
+      }
+    } catch (err) {
+      failed.push(`${key}.png (${err.message})`);
+    }
+  };
+  for (const ball of CUSTOM_BALLS) recolor(ball.key, 'pb', (frame) => customBallColors(ball, frame));
+  for (const variant of BALL_VARIANTS) recolor(variant.key, variant.base, (frame, png) => variantColors(variant, frame, paletteOf(png)));
+  return failed;
+}
 
 export function pngSize(data) {
   if (data.length < 24 || data.toString('ascii', 12, 16) !== 'IHDR') return null;
@@ -158,6 +242,7 @@ export async function syncBattleAnims({ refresh = false, log = (msg) => process.
       failed.push(`${path} (${err.message})`);
     }
   });
+  failed.push(...generateBalls());
   await mapLimit(MUSIC_TRACKS, async (track) => {
     try {
       await download(`${RAW}/audio/bgm/${track}.mp3`, new URL(musicFile(track).slice('/music/'.length), MUSIC));
@@ -204,7 +289,11 @@ export async function syncBattleAnims({ refresh = false, log = (msg) => process.
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes('--balls')) {
+  const failed = generateBalls();
+  console.log(failed.length ? `No pude generar: ${failed.join(', ')}` : `Poké Balls generadas: ${CUSTOM_BALLS.length + BALL_VARIANTS.length}.`);
+  if (failed.length) process.exitCode = 1;
+} else if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   syncBattleAnims({ refresh: process.argv.includes('--refresh') }).catch((err) => {
     console.error(err.message);
     process.exitCode = 1;

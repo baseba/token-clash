@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isUnlocked, recordOf, spriteProgress, UNLOCKS } from './achievements.js';
-import { STARTER_SPRITES, TRAINER_SPRITES } from '../../catalog/domain/trainer-sprites.js';
+import { isShopTrainer, STARTER_SPRITES, TRAINER_SPRITES } from '../../catalog/domain/trainer-sprites.js';
 
 const IV = { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 };
 const entry = (finalID: number, extra: any = {}): any => ({ id: `e${finalID}-${extra.shiny ? 's' : 'n'}`, finalID, baseID: finalID, rarity: 'common', shiny: false, level: 50, ivs: IV, ...extra });
@@ -10,8 +10,9 @@ const record = ({ roster = [], wins = 0, losses = 0, challenges = [], tournament
   recordOf({ trainer: { id: 'me', roster, wins, losses, totalTokens }, team, challenges, tournaments, rankedFirst });
 const duel = (n: number, winnerId: string, extra: any = {}): any => ({ id: `c${n}`, hostId: 'me', guestId: 'rival', hostTeam: [], status: 'finished', mode: 'team', createdAt: n, finishedAt: n, winnerId, ...extra });
 
-test('every trainer sprite is either a starter or has a way to unlock it', () => {
-  for (const key of TRAINER_SPRITES) assert.ok(STARTER_SPRITES.includes(key) !== UNLOCKS.has(key), key);
+test('every trainer sprite is either a starter, sold in the shop, or has an achievement to unlock it', () => {
+  for (const key of TRAINER_SPRITES) assert.equal([STARTER_SPRITES.includes(key), UNLOCKS.has(key), isShopTrainer(key)].filter(Boolean).length, 1, key);
+  assert.ok(STARTER_SPRITES.length >= 90, 'a decent free selection');
   assert.ok(STARTER_SPRITES.includes('player_m') && STARTER_SPRITES.includes('hiker'));
 });
 
@@ -84,6 +85,13 @@ test('specials: shinies, tokens, a team without repeated types, flawless and low
   assert.ok(!isUnlocked(record({ challenges: [duel(1, 'me', { final: final([10, 0, 30]) })] }), 'emmet'));
   const lowTeam = [0, 1, 2].map((i) => ({ ...entry(25), id: `u${i}`, level: 20 }));
   assert.ok(isUnlocked(record({ challenges: [duel(1, 'me', { hostTeam: lowTeam, final: final([1, 1, 1]) })] }), 'marnie'));
+});
+
+test('a shop trainer unlocks when it is bought', () => {
+  assert.ok(!isUnlocked(record(), 'jacinthe_holo'));
+  const bought = recordOf({ trainer: { id: 'me', roster: [], wins: 0, losses: 0, owned: ['trainer:jacinthe_holo'] }, team: [], challenges: [], tournaments: [], rankedFirst: false });
+  assert.ok(isUnlocked(bought, 'jacinthe_holo'));
+  assert.equal(spriteProgress(bought).find((p) => p.key === 'jacinthe_holo')!.group, 'shop');
 });
 
 test('a locked sprite shows the way closest to done', () => {

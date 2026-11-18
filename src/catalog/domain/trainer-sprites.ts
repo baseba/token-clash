@@ -7,5 +7,7 @@ export const ELITE_FOUR: Readonly<Record<string, string>> = sprites.ELITE_FOUR;
 export const CHAMPIONS: readonly string[] = sprites.CHAMPIONS;
 export const VILLAINS: Readonly<Record<'admin' | 'boss' | 'legend' | 'star' | 'partner', readonly string[]>> = sprites.VILLAINS;
 export const SPECIALS: readonly string[] = sprites.SPECIALS;
+export const SHOP_TRAINERS: Readonly<Record<string, string>> = sprites.SHOP_TRAINERS;
+export const isShopTrainer = (key: string): boolean => key in sprites.SHOP_TRAINERS;
 export const isTrainerSprite = (key: string): boolean => sprites.isTrainerSprite(key);
 export const trainerSpriteFor = (seed: string, pool: readonly string[] = TRAINER_SPRITES): string => sprites.trainerSpriteFor(seed, [...pool]);

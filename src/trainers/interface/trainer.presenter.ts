@@ -4,12 +4,14 @@ import { abilityOptions, lineageLearnset, moveOrigins, speciesData } from '../..
 import { buildFighter, movepool, movesetFor, validMoveset, MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import type { Trainer } from '../domain/trainer.js';
+import { SHOP_ITEMS } from '../../catalog/domain/shop.js';
 
 export function trainerSummary(trainer: Trainer) {
   return {
     id: trainer.id,
     name: trainer.name,
     avatar: trainer.look,
+    frame: trainer.equipped?.frame ?? null,
     wins: trainer.wins,
     losses: trainer.losses,
     rosterSize: trainer.roster.length,
@@ -34,12 +36,21 @@ export function saveEdit(entry: RosterEntry) {
   return out.currentMoves || out.ability ? out : null;
 }
 
+export function shopSummary(trainer: Trainer) {
+  return { balance: trainer.balance, earned: trainer.earned, spent: trainer.shopSpent ?? 0, total: trainer.totalTokens, updatedAt: trainer.updatedAt ?? null, owned: trainer.owned ?? [], equipped: { ball: trainer.ball, window: trainer.equipped?.window ?? null, frame: trainer.equipped?.frame ?? null } };
+}
+
+export function shopView(trainer: Trainer) {
+  return { ...shopSummary(trainer), avatar: trainer.look, items: SHOP_ITEMS.map((item) => ({ ...item, owned: trainer.owns(item.id) })) };
+}
+
 /** The logged-in trainer, with their whole collection. */
 export function myView(trainer: Trainer, aiLevels: string[]) {
   return {
     ...trainerSummary(trainer),
     team: trainer.team,
     aiLevels,
+    shop: shopSummary(trainer),
     roster: trainer.roster
       .map((e) => ({ ...buildFighter(e), active: !!e.active, nickname: e.nickname || null, saveEdit: saveEdit(e) }))
       .sort((a, b) => a.speciesId - b.speciesId),

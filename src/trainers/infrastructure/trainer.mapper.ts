@@ -19,6 +19,10 @@ export function toDomain(row: TrainerRow, roster: RosterEntryRow[]): Trainer {
       updatedAt: row.updatedAt ?? undefined,
       lastSeen: row.lastSeen ?? undefined,
       avatar: row.avatar ?? undefined,
+      shopBaseline: row.shopBaseline ?? undefined,
+      shopSpent: row.shopSpent || undefined,
+      owned: row.owned?.length ? row.owned : undefined,
+      equipped: row.equipped && Object.keys(row.equipped).length ? row.equipped : undefined,
       roster: roster.sort((a, b) => a.position - b.position).map(entryToDomain),
     }),
   );
@@ -60,6 +64,10 @@ export function toRow(trainer: Trainer): typeof trainers.$inferInsert {
     updatedAt: trainer.updatedAt ?? null,
     lastSeen: trainer.lastSeen ?? null,
     avatar: trainer.avatar ?? null,
+    shopBaseline: trainer.shopBaseline ?? null,
+    shopSpent: trainer.shopSpent ?? 0,
+    owned: trainer.owned ?? [],
+    equipped: trainer.equipped ?? null,
   };
 }
 

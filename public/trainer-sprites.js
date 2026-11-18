@@ -79,9 +79,18 @@ export const VILLAINS = {
   partner: ['cheryl', 'riley', 'buck', 'marley', 'mira'],
 };
 
+export const SHOP_TRAINERS = {
+  halloween_rival_m: 'legendary', halloween_rival_f: 'legendary', jacinthe_holo: 'legendary',
+  player_m_alternate: 'epic', player_f_alternate: 'epic', mysterious_sisters: 'epic', bug_type_superfan: 'epic', hooligans: 'epic',
+  player_m_2: 'rare', player_f_2: 'rare', nate: 'rare', rosa: 'rare', victor: 'rare', victoria: 'rare', vicky: 'rare', vito: 'rare',
+  vivi: 'rare', interviewers: 'rare', backers_m: 'rare', backers_f: 'rare', young_couple: 'rare', twins: 'rare', expert_pokemon_breeder: 'rare', harlequin: 'rare',
+  rich_kid_m: 'common', rich_kid_f: 'common', maid: 'common', fairy_tale_girl: 'common', dancer: 'common', musician: 'common', smasher: 'common',
+  striker: 'common', infielder: 'common', hoopster: 'common', linebacker: 'common',
+};
+
 export const SPECIALS = ['collector', 'colress', 'mustard', 'rich_m', 'rich_f', 'cheren', 'hugh', 'emmet', 'ingo', 'bede', 'marnie'];
 
-const LOCKED = new Set([...Object.values(GYM_LEADERS).flat(), ...Object.keys(ELITE_FOUR), ...CHAMPIONS, ...Object.values(VILLAINS).flat(), ...SPECIALS]);
+const LOCKED = new Set([...Object.values(GYM_LEADERS).flat(), ...Object.keys(ELITE_FOUR), ...CHAMPIONS, ...Object.values(VILLAINS).flat(), ...SPECIALS, ...Object.keys(SHOP_TRAINERS)]);
 
 export const STARTER_SPRITES = TRAINER_SPRITES.filter((key) => !LOCKED.has(key));
 

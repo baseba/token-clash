@@ -110,6 +110,7 @@ const seat = (who: { me: any }, { ready, online }: { ready: boolean; online: boo
   id: who.me.id,
   name: who.me.name,
   avatar: who.me.avatar,
+  frame: null,
   ai: null,
   wins: 0,
   losses: 0,
