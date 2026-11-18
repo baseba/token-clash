@@ -85,7 +85,12 @@ test('import → challenge → accept → live battle → leaderboard', async ()
 
   const page = await fetch(`${base}/b/abcdef`);
   assert.equal(page.status, 200);
-  assert.match(page.headers.get('content-security-policy'), /default-src 'self'/);
+  const csp = new Map(page.headers.get('content-security-policy').split(';').map((directive) => directive.trim().split(/\s+/)).map(([name, ...sources]) => [name, sources]));
+  assert.deepEqual(csp.get('default-src'), ["'self'"]);
+  const upstream = ['https://cdn.jsdelivr.net', 'https://raw.githubusercontent.com'];
+  assert.deepEqual(csp.get('img-src'), ["'self'", 'data:', ...upstream], 'sprites and battle animations load from the CDNs');
+  assert.deepEqual(csp.get('connect-src'), ["'self'", ...upstream], 'cries, sounds and music are fetched from the CDNs');
+  for (const [name, sources] of csp) if (!['img-src', 'connect-src'].includes(name)) assert.ok(!sources.some((source) => source.startsWith('https:')), `${name} stays closed`);
 
   const team = [a.data.me.roster[3].uid];
   assert.deepEqual((await call('/api/me', { method: 'PUT', token: a.data.token, body: { team } })).data.me.team, team);

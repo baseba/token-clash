@@ -33,7 +33,8 @@
     "public/types.js",
     "public/trainer-sprites.js",
     "public/shop.js",
-    "public/trainer-variants.js"
+    "public/trainer-variants.js",
+    "public/upstream.js"
   ],
   "exclude": [
     "node_modules",

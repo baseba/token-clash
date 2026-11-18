@@ -11,6 +11,7 @@ import { TRAINER_SPRITES, TRAINER_VARIANTS, trainerSpriteFor, VARIANT_COLOR_NAME
 import { RADIO_KINDS, RADIO_REGIONS, RADIO_TRACKS, radioTrack } from './radio.js?v=dev';
 import { createNotifier } from './notify.js?v=dev';
 import { RARITIES, SHOP_KINDS } from './shop.js?v=dev';
+import { fallBackToRaw } from './upstream.js?v=dev';
 
 const $app = document.getElementById('app');
 const $who = document.getElementById('who');
@@ -5048,5 +5049,6 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
   };
 }
 
+fallBackToRaw(document);
 document.querySelector('footer.credits')?.append(feedbackButton());
 loadAnimatedSprites().finally(route);
