@@ -125,12 +125,14 @@ export function moveSfxCues(manifest, key, byPlayer = true) {
 /**
  * Where a radio station's song is, in seconds into its mp3. The time since it started is counted
  * on the server's clock: `serverNow` when the frame was sent, plus `sinceFrameMs` measured here
- * since it arrived, so a client clock that runs fast or slow doesn't matter. Past the end the song
- * is looping (nothing else was queued), so the position falls inside [loopStart, duration).
+ * since it arrived, so a client clock that runs fast or slow doesn't matter. Past the end a song
+ * that `loops` (nothing else was queued) falls inside [loopStart, duration). One that doesn't
+ * loop has ended there, and the frame with the next song is on its way: null, nothing to play.
  */
-export function stationPosition({ startedAt, serverNow, sinceFrameMs }, { duration, loopStart }) {
+export function stationPosition({ startedAt, serverNow, sinceFrameMs }, { duration, loopStart, loops }) {
   const elapsed = Math.max(0, (serverNow - startedAt + sinceFrameMs) / 1000);
   if (elapsed < duration) return elapsed;
+  if (!loops) return null;
   const loopFrom = loopStart < duration ? loopStart : 0;
   return loopFrom + ((elapsed - loopFrom) % (duration - loopFrom));
 }
@@ -435,14 +437,16 @@ export function createPlayer({ storage = null } = {}) {
     return trackGain;
   }
 
-  // `place` says, once the mp3 is loaded, whether it loops and where it starts.
+  // `place` says, once the mp3 is loaded, whether it loops and where it starts, or null to not start it.
   async function stream(id, track, gain, place) {
     const [buffer, loops] = await Promise.all([pokerogueBuffer('music', track), loadManifest('/music/loops.json')]);
     if (current?.id !== id || trackGain !== gain || !buffer) return;
+    const loopStart = Math.min(loops?.[track] ?? 0, buffer.duration);
+    const placement = place(buffer.duration, loopStart);
+    if (!placement) return;
+    const { loop, offset } = placement;
     const source = ctx.createBufferSource();
     const level = ctx.createGain();
-    const loopStart = Math.min(loops?.[track] ?? 0, buffer.duration);
-    const { loop, offset } = place(buffer.duration, loopStart);
     source.buffer = buffer;
     source.loop = loop;
     source.loopStart = loopStart;
@@ -455,11 +459,15 @@ export function createPlayer({ storage = null } = {}) {
   }
 
   // A station's song plays once through while more are queued (the server sends the next one when
-  // it ends) and loops when it is the last one.
-  const placeOnStation = (duration, loopStart) => ({
-    loop: !station.queue.length,
-    offset: stationPosition({ startedAt: station.nowPlaying.startedAt, serverNow: station.serverNow, sinceFrameMs: performance.now() - station.receivedAt }, { duration, loopStart }),
-  });
+  // it ends) and loops when it is the last one. The mp3 can take a while to load: by then the
+  // listener may have tuned out or on to another song (a tuneStation while the audio is suspended
+  // leaves `current` as it was), or the song may have ended.
+  const placeOnStation = (id) => (duration, loopStart) => {
+    if (id !== shown()) return null;
+    const loop = !station.queue.length;
+    const offset = stationPosition({ startedAt: station.nowPlaying.startedAt, serverNow: station.serverNow, sinceFrameMs: performance.now() - station.receivedAt }, { duration, loopStart, loops: loop });
+    return offset === null ? null : { loop, offset };
+  };
 
   function start(id) {
     if (station) id = stationKey();
@@ -468,7 +476,7 @@ export function createPlayer({ storage = null } = {}) {
     const track = station ? station.nowPlaying?.track ?? null : trackFor(id);
     const gain = fadeOutCurrent();
     current = track ? { id } : null;
-    if (track) stream(id, track, gain, station ? placeOnStation : () => ({ loop: !id.startsWith('victory:'), offset: 0 }));
+    if (track) stream(id, track, gain, station ? placeOnStation(id) : () => ({ loop: !id.startsWith('victory:'), offset: 0 }));
   }
 
   // Back to the screen's own music once neither a station nor the personal radio covers it.

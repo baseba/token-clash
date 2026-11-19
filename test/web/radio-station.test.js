@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { stationPosition } from '../../public/music.js';
 import { createStationFeed } from '../../public/radio-station.js';
 
-const SONG = { duration: 100, loopStart: 20 };
+const SONG = { duration: 100, loopStart: 20, loops: true };
 
 test('a station song starts where the server clock says it is, whatever the local clock reads', () => {
   assert.equal(stationPosition({ startedAt: 1_000_000, serverNow: 1_000_000, sinceFrameMs: 0 }, SONG), 0);
@@ -16,7 +16,14 @@ test('past its end the last song is looping, so the position falls inside the lo
   assert.equal(stationPosition({ startedAt: 0, serverNow: 100_000, sinceFrameMs: 0 }, SONG), 20, 'the loop starts again at its loop point');
   assert.equal(stationPosition({ startedAt: 0, serverNow: 130_000, sinceFrameMs: 0 }, SONG), 50);
   assert.equal(stationPosition({ startedAt: 0, serverNow: 100_000 + 80_000 * 3 + 5_000, sinceFrameMs: 0 }, SONG), 25, 'three loops later');
-  assert.equal(stationPosition({ startedAt: 0, serverNow: 130_000, sinceFrameMs: 0 }, { duration: 100, loopStart: 0 }), 30, 'a song without loop point loops whole');
+  assert.equal(stationPosition({ startedAt: 0, serverNow: 130_000, sinceFrameMs: 0 }, { duration: 100, loopStart: 0, loops: true }), 30, 'a song without loop point loops whole');
+});
+
+test('past its end a song with more queued after it has ended: there is nothing to start until the next frame', () => {
+  const playsOnce = { ...SONG, loops: false };
+  assert.equal(stationPosition({ startedAt: 0, serverNow: 30_000, sinceFrameMs: 0 }, playsOnce), 30);
+  assert.equal(stationPosition({ startedAt: 0, serverNow: 100_000, sinceFrameMs: 0 }, playsOnce), null);
+  assert.equal(stationPosition({ startedAt: 0, serverNow: 99_000, sinceFrameMs: 1_500 }, playsOnce), null, 'loading the mp3 can carry it past the end');
 });
 
 // A WebSocket stand-in the test opens, answers and drops by hand.
