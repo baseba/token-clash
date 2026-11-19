@@ -771,9 +771,17 @@ function radioButton() {
     count,
   );
   const tabs = h('div', { class: 'segmented radio-tabs', role: 'group', 'aria-label': 'Radio' }, Object.entries(RADIO_TABS).map(([value, label]) => h('button', { type: 'button', class: 'seg-item', 'data-tab': value, onclick: () => show(value) }, label)));
-  const body = h('div', { class: 'radio-tab' });
+  // Every tab is mounted once and shown or hidden, never re-inserted: moving a node takes the focus
+  // off the search box and scrolls the list back to the top. The filtered track list is shared by
+  // "Pistas" and "Mi estación", so it moves only when the tab does.
+  const tracksPane = h('div', { class: 'radio-tab' }, now, filters, list);
+  const minePicker = h('div', { class: 'radio-tab' }, h('b', { class: 'small' }, 'Agregar canciones'));
+  const minePane = h('div', { class: 'radio-tab' }, mine.root, minePicker);
+  const panes = { tracks: tracksPane, stations: stations.root, mine: minePane };
   function show(next) {
     tab = next;
+    const picker = tab === 'mine' ? minePicker : tracksPane;
+    if (filters.parentNode !== picker) picker.append(filters, list);
     if (tab === 'stations') stations.load();
     if (tab === 'mine') mine.load();
     paint();
@@ -812,20 +820,17 @@ function radioButton() {
     const tracks = shown();
     count.textContent = `${tracks.length} canciones`;
     list.replaceChildren(...(tracks.length ? tracks.map(trackItem) : [h('p', { class: 'muted' }, 'Ninguna canción coincide con el filtro.')]));
-    if (tab === 'tracks') {
-      paintTracksNow();
-      body.replaceChildren(now, filters, list);
-    } else if (tab === 'stations') {
-      stations.paint();
-      body.replaceChildren(stations.root);
-    } else {
-      body.replaceChildren(mine.root, ...(mine.open ? [h('b', { class: 'small' }, 'Agregar canciones'), filters, list] : []));
-    }
+    for (const [name, pane] of Object.entries(panes)) pane.hidden = name !== tab;
+    if (tab === 'tracks') paintTracksNow();
+    else if (tab === 'stations') stations.paint();
+    else minePicker.hidden = !mine.open;
   }
   dlg.append(h('div', { class: 'radio-body' },
     h('div', { class: 'row between' }, h('h2', null, '📻 Radio'), h('button', { class: 'btn sm ghost', type: 'button', 'aria-label': 'Cerrar', onclick: () => dlg.close() }, '✕')),
     tabs,
-    body,
+    tracksPane,
+    stations.root,
+    minePane,
   ));
   btn.addEventListener('click', () => {
     if (!dlg.open) dlg.showModal();

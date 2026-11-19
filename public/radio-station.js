@@ -158,8 +158,20 @@ export function stationsPanel({ h, api, toast, feed }) {
  * whole queue), skip and close. Songs are added from the same filtered list as the "Pistas" tab.
  */
 export function myStationPanel({ h, api, toast, feed, session, onChange }) {
-  const root = h('div', { class: 'station-panel' });
   let station;
+  // Built once and kept mounted: a frame arriving while the DJ types a name must not wipe it.
+  const message = h('p', { class: 'muted' });
+  const nameInput = h('input', { type: 'text', maxlength: STATION_NAME_MAX, required: true, placeholder: 'Radio Kanto', 'aria-label': 'Nombre de la estación' });
+  const submit = h('button', { class: 'btn sm primary', type: 'submit' });
+  const form = h('form', { class: 'station-form', onsubmit: (event) => {
+    event.preventDefault();
+    const opening = !station;
+    act(() => api('/api/radio/station', { method: 'PUT', body: { name: nameInput.value } })).then(() => {
+      if (opening && station) feed.tune(station.ownerId);
+    });
+  } }, nameInput, submit);
+  const details = h('div', { class: 'station-panel' });
+  const root = h('div', { class: 'station-panel' }, message, form, details);
 
   async function load() {
     const me = session();
@@ -201,17 +213,6 @@ export function myStationPanel({ h, api, toast, feed, session, onChange }) {
     if (station) setQueue([...station.queue, trackId]);
   }
 
-  function openForm() {
-    const input = h('input', { type: 'text', maxlength: STATION_NAME_MAX, required: true, placeholder: 'Radio Kanto', 'aria-label': 'Nombre de la estación', value: station?.name ?? `Radio de ${session().name}`.slice(0, STATION_NAME_MAX) });
-    return h('form', { class: 'station-form', onsubmit: (event) => {
-      event.preventDefault();
-      const opening = !station;
-      act(() => api('/api/radio/station', { method: 'PUT', body: { name: input.value } })).then(() => {
-        if (opening && station) feed.tune(station.ownerId);
-      });
-    } }, input, h('button', { class: 'btn sm primary', type: 'submit' }, station ? 'Cambiar nombre' : '📻 Abrir estación'));
-  }
-
   function queueRow(trackId, index) {
     const last = index === station.queue.length - 1;
     return h('div', { class: 'station-queue-item' },
@@ -230,18 +231,22 @@ export function myStationPanel({ h, api, toast, feed, session, onChange }) {
   }
 
   function paintPanel() {
-    if (station === undefined && !session()) return root.replaceChildren(h('p', { class: 'muted' }, 'Importa tu equipo para abrir tu propia estación.'));
-    if (station === undefined) return root.replaceChildren(h('p', { class: 'muted' }, 'Cargando tu estación…'));
+    form.hidden = station === undefined;
+    message.hidden = !!station;
+    details.hidden = !station;
+    if (station === undefined) {
+      message.textContent = session() ? 'Cargando tu estación…' : 'Importa tu equipo para abrir tu propia estación.';
+      return;
+    }
+    if (nameInput.ownerDocument.activeElement !== nameInput) nameInput.value = station?.name ?? `Radio de ${session().name}`.slice(0, STATION_NAME_MAX);
+    submit.textContent = station ? 'Cambiar nombre' : '📻 Abrir estación';
     if (!station) {
-      return root.replaceChildren(
-        h('p', { class: 'muted' }, 'Abre tu estación, arma la cola y deja que otros entren a escuchar lo que pones.'),
-        openForm(),
-      );
+      message.textContent = 'Abre tu estación, arma la cola y deja que otros entren a escuchar lo que pones.';
+      return;
     }
     const tunedHere = feed.tuned === station.ownerId;
     const playing = station.nowPlaying;
-    root.replaceChildren(
-      openForm(),
+    details.replaceChildren(
       h('div', { class: 'radio-now' },
         playing
           ? h('p', null, h('span', { class: 'live-dot on' }), ' Al aire ', h('b', null, trackTitle(playing.track)), h('span', { class: 'muted' }, ` · ${listenersLabel(station.listeners)}`))
