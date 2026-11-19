@@ -1682,7 +1682,12 @@ function feedbackButton() {
       'p',
       { class: 'feedback-guide' },
       'El código es público. ',
-      h('a', { href: CONTRIBUTING_GUIDE_URL, target: '_blank', rel: 'noopener' }, 'Aprende a hacer un fork y subir tu PR', h('span', { 'aria-hidden': 'true' }, ' →')),
+      h(
+        'a',
+        { href: CONTRIBUTING_GUIDE_URL, target: '_blank', rel: 'noopener' },
+        'Aprende a hacer un fork y subir tu PR',
+        h('span', { 'aria-hidden': 'true' }, ' →'),
+      ),
     ),
     h('button', { class: 'btn sm', autofocus: true, onclick: () => dialog.close() }, 'Ok 😔'),
   );

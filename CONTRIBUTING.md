@@ -67,9 +67,12 @@ git rebase upstream/main
 ```
 
 Si Git se detiene por un conflicto, arregla los archivos que nombra, haz `git add` de cada uno y sigue con
-`git rebase --continue`. `git rebase --abort` deshace todo y te deja como estabas. Después corre `npm test` de
-nuevo. Si ya habías subido la rama, súbela con `git push --force-with-lease`. Si no, usa el `git push -u` del
-paso 5.
+`git rebase --continue`. Si te enredas, `git rebase --abort` deshace todo y te deja como estabas. Cuando el rebase
+termine, corre `npm test` de nuevo.
+
+El rebase reescribe tus commits, así que GitHub rechaza un `git push` normal si ya habías subido la rama. En ese caso
+súbela con `git push --force-with-lease`, que solo pisa tu rama si nadie más la cambió. Si no la habías subido, usa
+el `git push -u` del paso 5.
 
 ¿Solo quieres reportar un bug o proponer una idea sin programar? Abre un
 [issue](https://github.com/baseba/token-clash/issues/new).
