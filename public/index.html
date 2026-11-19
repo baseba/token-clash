@@ -8,6 +8,28 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css?v=dev">
   <script type="module" src="/app.js?v=dev"></script>
+  <!-- Every request to our domain crosses Cloudflare and the tunnel, a long round trip. Without these
+       hints the browser finds each module only after the one that imports it arrives, and the
+       manifests the first paint waits for only after every module ran. test/web/index.test.js keeps
+       the list equal to the import graph. -->
+  <link rel="modulepreload" href="/ball-burst.js?v=dev">
+  <link rel="modulepreload" href="/ball-fx.js?v=dev">
+  <link rel="modulepreload" href="/backgrounds.js?v=dev">
+  <link rel="modulepreload" href="/battle-anims.js?v=dev">
+  <link rel="modulepreload" href="/creature.js?v=dev">
+  <link rel="modulepreload" href="/fx.js?v=dev">
+  <link rel="modulepreload" href="/music.js?v=dev">
+  <link rel="modulepreload" href="/notify.js?v=dev">
+  <link rel="modulepreload" href="/radio.js?v=dev">
+  <link rel="modulepreload" href="/savepatch.js?v=dev">
+  <link rel="modulepreload" href="/savestore.js?v=dev">
+  <link rel="modulepreload" href="/shop.js?v=dev">
+  <link rel="modulepreload" href="/trainer-sprites.js?v=dev">
+  <link rel="modulepreload" href="/trainer-variants.js?v=dev">
+  <link rel="modulepreload" href="/types.js?v=dev">
+  <link rel="modulepreload" href="/upstream.js?v=dev">
+  <link rel="preload" as="fetch" crossorigin href="/upstream/sprites.json?v=dev">
+  <link rel="preload" as="fetch" crossorigin href="/trainers/faces.json?v=dev">
 </head>
 <body>
   <header class="top">
