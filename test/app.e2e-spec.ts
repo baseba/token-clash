@@ -486,11 +486,70 @@ test('malformed socket frames are dropped or answered like a wrong value, and th
   assert.equal((await fetch(`${base}/healthz`)).status, 200);
 });
 
-test('everything survives a restart: sessions, collections, results and tournaments live in SQLite', async () => {
+test('a trainer runs a radio station: only they edit its queue, and every listener hears each change', async () => {
+  const dj = (await call('/api/import', { method: 'POST', body: { name: 'DJ Ana', save }, ip: '10.9.0.5' })).data;
+  const other = (await call('/api/import', { method: 'POST', body: { name: 'Otro', save }, ip: '10.9.0.6' })).data;
+  const ownerId = dj.me.id;
+  assert.equal((await call('/api/radio/station', { method: 'PUT', body: { name: 'Radio Kanto' } })).status, 401);
+  assert.equal((await call('/api/radio/station', { method: 'PUT', token: dj.token, body: { name: '   ' } })).status, 400);
+  const opened = await call('/api/radio/station', { method: 'PUT', token: dj.token, body: { name: '  Radio Kanto ' } });
+  assert.equal(opened.status, 200);
+  assert.deepEqual(opened.data.station, { ownerId, ownerName: 'DJ Ana', name: 'Radio Kanto', nowPlaying: null, queue: [], listeners: 0 });
+  const skipEmpty = await call('/api/radio/station/skip', { method: 'POST', token: dj.token });
+  assert.equal(skipEmpty.status, 409);
+  assert.match(skipEmpty.data.error, /cola/);
+
+  const listener = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
+  const frames: any[] = [];
+  listener.on('message', (raw) => frames.push(JSON.parse(String(raw))));
+  await new Promise((r) => listener.once('open', r));
+  const nextFrame = async () => {
+    for (let i = 0; i < 100 && !frames.length; i++) await new Promise((r) => setTimeout(r, 20));
+    return frames.shift();
+  };
+  listener.send(JSON.stringify({ t: 'radio', station: 'nobody' }));
+  assert.deepEqual({ ...(await nextFrame()), now: 0 }, { t: 'radio', station: null, now: 0 });
+  listener.send(JSON.stringify({ t: 'radio', station: ownerId }));
+  const tuned = await nextFrame();
+  assert.equal(tuned.station.name, 'Radio Kanto');
+  assert.equal(tuned.station.listeners, 1);
+  assert.ok(Math.abs(tuned.now - Date.now()) < 5000, 'the frame carries the server clock');
+
+  const queued = await call('/api/radio/station/queue', { method: 'PUT', token: dj.token, body: { queue: ['battle_kanto_gym', 'title'] } });
+  assert.equal(queued.status, 200);
+  const playing = (await nextFrame()).station;
+  assert.deepEqual(playing, queued.data.station);
+  assert.equal(playing.nowPlaying.track, 'battle_kanto_gym');
+  assert.equal(playing.nowPlaying.endsAt - playing.nowPlaying.startedAt, 58253, 'it plays once through, as long as the mp3 lasts');
+  assert.deepEqual(playing.queue, ['title']);
+  assert.equal((await call('/api/radio/station/queue', { method: 'PUT', token: dj.token, body: { queue: ['not_a_song'] } })).status, 400);
+  const notTheirs = await call('/api/radio/station/queue', { method: 'PUT', token: other.token, body: { queue: ['title'] } });
+  assert.deepEqual([notTheirs.status, notTheirs.data.error], [404, 'No tienes una estación abierta.']);
+
+  const skipped = await call('/api/radio/station/skip', { method: 'POST', token: dj.token });
+  assert.equal(skipped.data.station.nowPlaying.track, 'title');
+  assert.deepEqual((await nextFrame()).station.queue, []);
+  const listed = (await call('/api/radio/stations')).data.stations.find((station) => station.ownerId === ownerId);
+  assert.deepEqual(listed, skipped.data.station);
+  assert.deepEqual((await call(`/api/radio/stations/${ownerId}`)).data.station, listed);
+  assert.equal((await call('/api/radio/stations/nobody')).status, 404);
+
+  assert.equal((await call('/api/radio/station', { method: 'PUT', token: dj.token, body: { name: 'Radio Johto' } })).data.station.name, 'Radio Johto');
+  assert.equal((await nextFrame()).station.name, 'Radio Johto');
+  assert.equal((await call('/api/radio/station', { method: 'DELETE', token: other.token })).status, 200, 'closing a station you never opened changes nothing');
+  assert.equal((await call('/api/radio/station', { method: 'DELETE', token: dj.token })).status, 200);
+  assert.equal((await nextFrame()).station, null);
+  assert.equal((await call(`/api/radio/stations/${ownerId}`)).status, 404);
+  listener.close();
+});
+
+test('everything survives a restart: sessions, collections, results, tournaments and radio stations live in SQLite', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Memoria', save } });
   const token = a.data.token;
   const uid = a.data.me.roster[0].uid;
   await call('/api/me', { method: 'PUT', token, body: { nickname: { id: uid, name: 'Chispa' } } });
+  await call('/api/radio/station', { method: 'PUT', token, body: { name: 'Radio Memoria' } });
+  await call('/api/radio/station/queue', { method: 'PUT', token, body: { queue: ['battle_rocket_boss', 'title', 'town'] } });
   // A battle in progress lives in memory only: after a restart it must show up as cut.
   const live = (await call('/api/challenges', { method: 'POST', token, body: { ai: 'easy' } })).data.challenge;
   assert.equal(live.status, 'active');
@@ -499,7 +558,8 @@ test('everything survives a restart: sessions, collections, results and tourname
     const stats = (await call('/api/stats')).data;
     delete stats.live;
     stats.totals.activeNow = stats.totals.activeToday = 0;
-    return { me: (await call('/api/me', { token })).data, leaderboard: (await call('/api/leaderboard')).data, stats };
+    const station = (await call(`/api/radio/stations/${a.data.me.id}`)).data;
+    return { me: (await call('/api/me', { token })).data, leaderboard: (await call('/api/leaderboard')).data, stats, station };
   };
   const before = await snapshot();
   await app.stop();
@@ -508,6 +568,7 @@ test('everything survives a restart: sessions, collections, results and tourname
 
   assert.deepEqual(afterRestart, before);
   assert.equal(afterRestart.me.me.roster.find((m) => m.uid === uid).nickname, 'Chispa');
+  assert.deepEqual(afterRestart.station.station.queue, ['title', 'town'], 'a radio station and its queue live in SQLite');
   assert.equal((await call(`/api/challenges/${live.id}`)).data.challenge.status, 'abandoned');
   assert.ok(before.stats.tournaments.totals.tournaments >= 0);
 });

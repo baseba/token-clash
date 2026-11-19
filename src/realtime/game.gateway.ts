@@ -1,6 +1,7 @@
 // The socket protocol at /ws. One gateway, thin: it keeps per-connection state, checks which
-// messages are allowed in which state, and hands each one to the arena use case that owns it
-// (rooms, tournaments, the lobby and their chat). The frames sent back are built there too.
+// messages are allowed in which state, and hands each one to the use case that owns it: the arena
+// (rooms, tournaments, the lobby and their chat) or the radio (tuning in to a station, which any
+// connection can do on the side). The frames sent back are built there too.
 // What each message carries is in client-messages.ts; they arrive here already parsed.
 import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import type { IncomingMessage } from 'node:http';
@@ -12,11 +13,13 @@ import { LiveBattleService } from '../arena/application/live-battle.service.js';
 import { LobbyService } from '../arena/application/lobby.service.js';
 import { TeamPreviewService } from '../arena/application/team-preview.service.js';
 import { TournamentsService } from '../arena/application/tournaments.service.js';
+import type { RadioListener } from '../radio/application/radio-listeners.js';
+import { RadioService } from '../radio/application/radio.service.js';
 import type { ClientMessageOf } from './client-messages.js';
 import { ConnectionLimits } from './connection-limits.js';
 
-/** Adapts a WebSocket to the arena's ClientConnection port. */
-class WsConnection implements ClientConnection {
+/** Adapts a WebSocket to the arena's ClientConnection port and the radio's RadioListener port. */
+class WsConnection implements ClientConnection, RadioListener {
   trainerId: string | null = null;
   roomId: string | null = null;
   tourId: string | null = null;
@@ -57,6 +60,7 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
     private readonly battles: LiveBattleService,
     private readonly tournaments: TournamentsService,
     private readonly chat: ArenaChatService,
+    private readonly radio: RadioService,
   ) {}
 
   afterInit(server: WebSocketServer): void {
@@ -90,6 +94,7 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
     if (conn.inLobby) this.lobby.unsubscribe(conn);
     if (conn.tourId) this.tournaments.unfollow(conn);
     if (conn.roomId) this.duels.left(conn);
+    this.radio.disconnected(conn);
   }
 
   private conn(socket: WebSocket): WsConnection | undefined {
@@ -174,5 +179,12 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
   onChat(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'chat'>): void {
     const connection = this.conn(socket);
     if (connection) this.chat.say(connection, msg.text);
+  }
+
+  /** Listening doesn't touch `idle`: a player can keep a station on while battling. */
+  @SubscribeMessage('radio')
+  onRadio(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'radio'>): void {
+    const connection = this.conn(socket);
+    if (connection) this.radio.tune(connection, msg.station);
   }
 }

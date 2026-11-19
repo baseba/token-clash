@@ -23,6 +23,13 @@ test('a malformed field reads as the value its use case already turns down', () 
   assert.deepEqual(parse({ t: 'act', action: { type: 'move', move: 0, target: 'ally' } })?.data, { t: 'act', action: { type: 'move', move: 0, target: undefined } });
   assert.deepEqual(parse({ t: 'chat', text: { html: 1 } })?.data, { t: 'chat', text: '' });
   assert.equal((parse({ t: 'lobby', token: null })?.data as { token?: string }).token, undefined);
+  assert.deepEqual(parse({ t: 'radio', station: { id: 'x' } })?.data, { t: 'radio', station: null });
+  assert.deepEqual(parse({ t: 'radio' })?.data, { t: 'radio', station: null });
+});
+
+test('the radio tunes in to a station by its owner, or out with null', () => {
+  assert.deepEqual(parse({ t: 'radio', station: 'abc123' })?.data, { t: 'radio', station: 'abc123' });
+  assert.deepEqual(parse({ t: 'radio', station: null })?.data, { t: 'radio', station: null });
 });
 
 test('the ready check reads anything but false as ready', () => {
