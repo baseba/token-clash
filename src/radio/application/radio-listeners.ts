@@ -12,23 +12,21 @@ export class RadioListeners {
   private readonly byStation = new Map<string, Set<RadioListener>>();
   private readonly stationOf = new Map<RadioListener, string>();
 
-  /** Tunes in to a station, leaving the one it heard before. Returns that one, if any. */
-  tuneIn(listener: RadioListener, stationId: string): string | undefined {
-    const previous = this.tuneOut(listener);
+  /** Tunes in to a station, leaving the one it heard before. */
+  tuneIn(listener: RadioListener, stationId: string): void {
+    this.tuneOut(listener);
     this.stationOf.set(listener, stationId);
     this.byStation.set(stationId, (this.byStation.get(stationId) ?? new Set()).add(listener));
-    return previous;
   }
 
-  /** Stops listening. Returns the station it heard, if any. */
-  tuneOut(listener: RadioListener): string | undefined {
+  /** Stops listening, if it was. */
+  tuneOut(listener: RadioListener): void {
     const stationId = this.stationOf.get(listener);
-    if (stationId === undefined) return undefined;
+    if (stationId === undefined) return;
     this.stationOf.delete(listener);
     const listeners = this.byStation.get(stationId);
     listeners?.delete(listener);
     if (!listeners?.size) this.byStation.delete(stationId);
-    return stationId;
   }
 
   of(stationId: string): RadioListener[] {

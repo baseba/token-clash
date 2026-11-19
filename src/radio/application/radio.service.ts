@@ -81,21 +81,23 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Tunes a client in to a station (leaving the one it heard), or out with null. It gets the
-   * station's frame back, with `station: null` if that station doesn't exist.
+   * Tunes a client in to a station (leaving the one it heard), or out with null. Only that client
+   * gets the station's frame back, with `station: null` if that station doesn't exist: the other
+   * listeners see the new count with the next change, so a client that tunes over and over can't
+   * flood them.
    */
   tune(listener: RadioListener, stationId: string | null): void {
     const station = stationId ? this.stations.findByOwner(stationId) : undefined;
-    const left = station ? this.listeners.tuneIn(listener, station.ownerId) : this.listeners.tuneOut(listener);
-    if (left && left !== station?.ownerId) this.broadcastListeners(left);
-    if (!station) listener.send(this.frame(null));
-    else if (!this.settle(station)) this.broadcast(station);
+    if (station) this.listeners.tuneIn(listener, station.ownerId);
+    else this.listeners.tuneOut(listener);
+    // A station that caught up has just sent its frame to every listener, this one included.
+    if (station && this.settle(station)) return;
+    listener.send(this.frame(station ? this.view(station) : null));
   }
 
   /** A client went away. */
   disconnected(listener: RadioListener): void {
-    const left = this.listeners.tuneOut(listener);
-    if (left) this.broadcastListeners(left);
+    this.listeners.tuneOut(listener);
   }
 
   private owned(ownerId: string): Station {
@@ -131,11 +133,6 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     }, Math.max(0, at - now()));
     timer.unref();
     this.timers.set(station.ownerId, timer);
-  }
-
-  private broadcastListeners(stationId: string): void {
-    const station = this.stations.findByOwner(stationId);
-    if (station) this.broadcast(station);
   }
 
   private broadcast(station: Station): StationView {
