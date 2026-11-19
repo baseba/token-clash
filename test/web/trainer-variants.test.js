@@ -52,7 +52,7 @@ test('a recolor on sale costs a tier above its original and always needs the ori
 test('skin of every tone is protected, while vivid orange clothes are not', async () => {
   const { isSkin, hsl } = await import('../../scripts/plan-trainer-variants.mjs');
   const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  for (const skin of ['#ffd6bd', '#dea57b', '#c78e6a', '#845a3a', '#55371d', '#764a40', '#a36947', '#efbdad']) assert.ok(isSkin(hsl(rgb(skin))), skin);
+  for (const skin of ['#ffd6bd', '#dea57b', '#c78e6a', '#845a3a', '#55371d', '#764a40', '#a36947', '#efbdad', '#efb57b']) assert.ok(isSkin(hsl(rgb(skin))), skin);
   for (const cloth of ['#f7a53a', '#bd7b19', '#cf2b1a', '#3faee6', '#843131']) assert.ok(!isSkin(hsl(rgb(cloth))), cloth);
 });
 
@@ -121,4 +121,62 @@ test('every legendary and mythical Pokémon of the game unlocks a recolor of a r
   const LEGENDS = [144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649];
   const withPokemon = new Set(TRAINER_VARIANTS.filter((variant) => variant.pokemon).map((variant) => variant.pokemon));
   for (const id of LEGENDS) assert.ok(withPokemon.has(id), `#${id}`);
+});
+
+test('every recolor themed on a Pokémon has a shiny version painted with that Pokémon\'s shiny colors', async () => {
+  const { POKEMON_VARIANT_MAPS } = await import('../../public/trainer-variants.js');
+  const themed = TRAINER_VARIANTS.filter((variant) => variant.pokemon && !variant.shiny);
+  for (const variant of themed) {
+    const shiny = TRAINER_VARIANTS.find((other) => other.key === `${variant.key}_shiny`);
+    assert.ok(shiny, variant.key);
+    assert.equal(shiny.base, variant.base);
+    assert.equal(shiny.pokemon, variant.pokemon);
+    assert.ok(POKEMON_VARIANT_MAPS[shiny.key]?.length, `${shiny.key} has a map`);
+    assert.notDeepEqual(POKEMON_VARIANT_MAPS[shiny.key], POKEMON_VARIANT_MAPS[variant.key], shiny.key);
+  }
+});
+
+test('the ♂ and ♀ versions of a trainer share the same recolors, earned or sold the same way', async () => {
+  const { MALE_OF } = await import('../../public/trainer-sprites.js');
+  assert.equal(MALE_OF.ace_trainer_f, 'ace_trainer_m');
+  assert.equal(MALE_OF.player_f_alternate, 'player_m_alternate');
+  assert.ok(!('clerk_m_2' in MALE_OF) && !Object.values(MALE_OF).includes('clerk_m_2'), 'a trainer without a partner stays alone');
+  const colorsOf = (base) => TRAINER_VARIANTS.filter((variant) => variant.base === base && variant.color).map((variant) => [variant.color, !!variant.earn, variant.key in SHOP_TRAINERS]).sort();
+  for (const [female, male] of Object.entries(MALE_OF)) assert.deepEqual(colorsOf(female), colorsOf(male), `${male} / ${female}`);
+});
+
+test('only tiny light spots by the face count as eye whites, never a light collar or shoulders', async () => {
+  const { eyeWhites } = await import('../../scripts/sync-trainers.js');
+  const width = 20;
+  const height = 20;
+  const rgba = Buffer.alloc(width * height * 4);
+  const paint = (x0, y0, x1, y1, color) => {
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) rgba.set([...color, 255], (y * width + x) * 4);
+  };
+  paint(0, 0, width, height, [222, 165, 123]);
+  paint(8, 8, 10, 9, [250, 250, 250]);
+  paint(2, 11, 18, 14, [240, 240, 240]);
+  const kept = eyeWhites({ width, height, rgba }, { x: 0.45, y: 0.45, h: 0.5 });
+  assert.deepEqual([...kept].sort((a, b) => a - b), [8 * width + 8, 8 * width + 9]);
+});
+
+test('a head piece is recolored whole: the hair or cap colors that touch recolored ones join the map, skin and whites do not', async () => {
+  const { completeHeadPieces } = await import('../../scripts/plan-trainer-variants.mjs');
+  const width = 12;
+  const height = 24;
+  const rgba = Buffer.alloc(width * height * 4);
+  const paint = (x0, y0, x1, y1, color) => {
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) rgba.set([...color, 255], (y * width + x) * 4);
+  };
+  paint(0, 0, width, 5, [173, 82, 107]);
+  for (let x = 0; x < width; x += 2) paint(x, 1, x + 1, 4, [107, 33, 58]);
+  paint(4, 0, 6, 1, [255, 255, 255]);
+  paint(2, 5, 10, 9, [255, 214, 189]);
+  paint(0, 9, width, height, [107, 33, 58]);
+  const map = completeHeadPieces({ width, height, rgba }, [['#6b213a', '#1a6a50']]);
+  const added = new Map(map.slice(1));
+  assert.ok(added.has('#ad526b'), 'the hair shade beside the recolored strands joins');
+  assert.ok(!added.has('#ffd6bd') && !added.has('#ffffff'), 'skin and white stay');
+  const brightness = (hexText) => [1, 3, 5].reduce((sum, i) => sum + parseInt(hexText.slice(i, i + 2), 16), 0);
+  assert.ok(brightness(added.get('#ad526b')) > brightness('#1a6a50'), 'the lighter hair shade stays lighter than the recolored dark one');
 });

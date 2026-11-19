@@ -42,13 +42,16 @@ En vivo: **https://clash.mirrordev.xyz**
      `src/stats/domain/trainer-goals.ts`), más difíciles según su rareza: las clases comunes piden 3 Pokémon de su
      tipo o un Pokémon temático (los reclutas, a los de su equipo; el ❔ de la meta dice cuáles cuentan), las raras 5,
      las épicas 8; los protagonistas piden iniciales; los líderes de gimnasio 3, 6, 10 y 15 de su tipo, el Alto Mando
-     12 y victorias, los campeones la Pokédex regional, torneos o el ranking, los villanos ganarle a la IA. Líderes,
+     12 y victorias, los campeones la Pokédex regional (cerca de un 30 % de la región), torneos o el ranking (Red: primer
+     lugar y 15 victorias, o 250 especies en la Pokédex), los villanos ganarle a la IA. Líderes,
      Alto Mando, campeones y villanos tienen además una vía con su Pokémon emblemático. Solo cuentan especies de la 1.ª
      a la 5.ª generación. Los principiantes (Youngster, School Kid, Preschooler) llegan con el primer Pokémon.
      Cada personaje tiene recolores (al menos uno simple; campeones y jefes villanos 4, protagonistas 3): siempre piden
-     desbloquear primero al original. Al menos uno se vende en la tienda, un nivel de rareza más caro que el original;
+     desbloquear primero al original. Las versiones ♂ y ♀ de un mismo entrenador comparten recuadro y colores de
+     recolor. Al menos uno se vende en la tienda, un nivel de rareza más caro que el original;
      el resto se gana con Pokémon del tipo de su color (Carmesí → Fuego, Zafiro → Agua…). Los recolores con nombre de
-     Pokémon piden tenerlo y usan su paleta (Red Charizard, Lance Rayquaza, Maxie Kyogre…). `npm run variants` los
+     Pokémon piden tenerlo y usan su paleta (Red Charizard, Lance Rayquaza, Maxie Kyogre…); cada uno tiene además
+     una versión Shiny con la paleta shiny del Pokémon, que pide lo mismo y tenerlo en shiny. `npm run variants` los
      replanifica (`scripts/plan-trainer-variants.mjs` escribe `public/trainer-variants.js`) y los genera; al
      instalar también se calcula dónde está la cara de cada sprite (`public/trainers/faces.json`) para centrar el
      ícono de perfil. Al arrancar, el servidor devuelve los tokens de entrenadores que dejaron de venderse y cambia el

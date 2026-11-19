@@ -43,6 +43,12 @@ export const DOWNLOADED_SPRITES = [
   'worker_f', 'worker_m', 'wulfric', 'xerosic', 'young_couple', 'youngster_f', 'youngster_m', 'zinzolin',
 ];
 
+const MALE_MARK = /_m(?=_|$)/;
+
+export const MALE_OF = Object.fromEntries(DOWNLOADED_SPRITES.filter((key) => MALE_MARK.test(key)).map((male) => [male.replace(MALE_MARK, '_f'), male]).filter(([female]) => DOWNLOADED_SPRITES.includes(female)));
+
+export const FEMALE_OF = Object.fromEntries(Object.entries(MALE_OF).map(([female, male]) => [male, female]));
+
 export const HANDMADE_VARIANTS = [
   { key: 'red_blue', base: 'red', pokemon: 9, name: 'Red Blastoise', swaps: [{ from: [330, 10], hue: 215 }] },
   { key: 'maxie_aqua', base: 'maxie', pokemon: 382, name: 'Maxie Kyogre', swaps: [{ from: [340, 10], hue: 215 }] },
@@ -180,7 +186,11 @@ export function originalTier(key) {
   return retired === 'legendary' ? 'epic' : retired ?? 'common';
 }
 
-export const TRAINER_VARIANTS = [...HANDMADE_VARIANTS.map((variant) => (POKEMON_VARIANT_MAPS[variant.key] ? { ...variant, map: POKEMON_VARIANT_MAPS[variant.key] } : variant)), ...GENERATED_VARIANTS];
+export const SHINY_VARIANTS = HANDMADE_VARIANTS.filter((variant) => variant.pokemon).map((variant) => ({ key: `${variant.key}_shiny`, base: variant.base, pokemon: variant.pokemon, shiny: true, original: variant.key, name: `${variant.name} Shiny`, swaps: [] }));
+
+const withPokemonMap = (variant) => (POKEMON_VARIANT_MAPS[variant.key] ? { ...variant, map: POKEMON_VARIANT_MAPS[variant.key] } : variant);
+
+export const TRAINER_VARIANTS = [...[...HANDMADE_VARIANTS, ...SHINY_VARIANTS].map(withPokemonMap), ...GENERATED_VARIANTS];
 
 export const EARNED_VARIANTS = GENERATED_VARIANTS.filter((variant) => variant.earn);
 

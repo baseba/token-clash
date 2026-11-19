@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buyBlocker, isUnlocked, lookBlocker, recordOf, spriteProgress, UNLOCKS } from './achievements.js';
-import { DOWNLOADED_SPRITES, isShopTrainer, STARTER_SPRITES, TRAINER_SPRITES } from '../../catalog/domain/trainer-sprites.js';
+import { DOWNLOADED_SPRITES, isShopTrainer, STARTER_SPRITES, TRAINER_SPRITES, VARIANT_KEYS } from '../../catalog/domain/trainer-sprites.js';
 
 const IV = { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 };
 const entry = (finalID: number, extra: any = {}): any => ({ id: `e${finalID}-${extra.shiny ? 's' : 'n'}`, finalID, baseID: finalID, rarity: 'common', shiny: false, level: 50, ivs: IV, ...extra });
@@ -67,15 +67,20 @@ test('the Elite Four need their type and wins against people', () => {
 });
 
 test('champions come from the Pokédex, tournaments and the ranking; Red has two ways', () => {
-  const kanto = record({ roster: Array.from({ length: 75 }, (_, i) => entry(i + 1)) });
-  assert.ok(kanto.dexByRegion.kanto >= 75);
-  assert.ok(isUnlocked(kanto, 'blue'));
+  const regional = (from: number, count: number) => record({ roster: Array.from({ length: count }, (_, i) => entry(from + i)) });
+  for (const [key, from, need] of [['blue', 1, 45], ['lance', 152, 30], ['steven', 252, 40], ['cynthia', 387, 30], ['alder', 494, 45]] as const) {
+    assert.ok(!isUnlocked(regional(from, need - 1), key), `${key} needs ${need}`);
+    assert.ok(isUnlocked(regional(from, need), key), `${key} with ${need}`);
+  }
   const crown = (size: number): any => ({ id: `t${size}`, status: 'finished', size, champion: 0, seats: [{ id: 'me' }] });
   assert.ok(isUnlocked(record({ tournaments: [crown(4)] }), 'iris'));
   assert.ok(!isUnlocked(record({ tournaments: [crown(4)] }), 'kieran'));
   assert.ok(isUnlocked(record({ tournaments: [crown(16)] }), 'kieran'));
-  assert.ok(!isUnlocked(record({ rankedFirst: true, wins: 29 }), 'red'));
-  assert.ok(isUnlocked(record({ rankedFirst: true, wins: 30 }), 'red'));
+  assert.ok(!isUnlocked(record({ rankedFirst: true, wins: 14 }), 'red'));
+  assert.ok(isUnlocked(record({ rankedFirst: true, wins: 15 }), 'red'));
+  const red = spriteProgress(record()).find((p) => p.key === 'red')!;
+  assert.deepEqual(red.ways[1].map((g) => [g.text, g.need]), [['Especies registradas en la Pokédex', 250]]);
+  assert.ok(isUnlocked(regional(1, 250), 'red'));
 });
 
 test('Leon needs 10 wins in a row against people; AI and tournament battles do not break or count', () => {
@@ -149,6 +154,20 @@ test('a recolored trainer needs its original first, plus what its colors are abo
   assert.deepEqual(lance.goals.map((g) => [g.text, g.need]), [['Desbloquear a Lance', 1], ['Tener a Rayquaza en tu colección', 1]]);
 });
 
+test('a shiny recolor asks for its original trainer and that Pokémon in shiny', () => {
+  const champion = { rankedFirst: true, wins: 30 };
+  assert.ok(!isUnlocked(record({ roster: [entry(6, { shiny: true })] }), 'red_charizard_shiny'), 'Red is not unlocked yet');
+  assert.ok(!isUnlocked(record({ roster: [entry(6)], ...champion }), 'red_charizard_shiny'), 'a plain Charizard is not enough');
+  assert.ok(isUnlocked(record({ roster: [entry(6, { shiny: true })], ...champion }), 'red_charizard_shiny'));
+  const shiny = spriteProgress(record({ roster: [entry(6)], ...champion })).find((p) => p.key === 'red_charizard_shiny')!;
+  assert.equal(shiny.group, 'champion');
+  assert.equal(shiny.title, 'Campeón · variante shiny');
+  assert.deepEqual(shiny.goals.map((g) => [g.text, g.have >= g.need]), [
+    ['Desbloquear a Red', true],
+    ['Tener a Charizard shiny en tu colección', false],
+  ]);
+});
+
 test('each partner variant asks for its trainer\'s signature Pokémon on top of the trainer', () => {
   const kanto = Array.from({ length: 75 }, (_, i) => entry(i + 1));
   assert.ok(isUnlocked(record({ roster: kanto }), 'blue'));
@@ -205,7 +224,7 @@ test('the look a player already wears is never blocked, even if it is locked for
 
 test('an original never asks for the same Pokémon one of its recolors is named after', () => {
   for (const [key, unlock] of UNLOCKS) {
-    if (unlock.group === 'variant') continue;
+    if (unlock.group === 'variant' || VARIANT_KEYS.has(key)) continue;
     const asked = new Set(unlock.ways.flat().map((rule) => rule(record()).text).filter((text) => text.startsWith('Tener a ')));
     for (const [other, recolor] of UNLOCKS) {
       if (other === key || !other.startsWith(`${key}_`)) continue;

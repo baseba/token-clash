@@ -191,6 +191,7 @@ export function recolorTrainer(image, swaps) {
 }
 
 const EYE_REACH = 0.4;
+const EYE_SPOT_MAX = 8;
 
 const isEyeWhite = ([r, g, b]) => Math.min(r, g, b) >= 190 && Math.max(r, g, b) - Math.min(r, g, b) <= 40;
 
@@ -199,12 +200,35 @@ const inEyes = (image, face, i) => {
   return Math.abs((i % image.width) - face.x * image.width) <= reach && Math.abs(Math.floor(i / image.width) - face.y * image.height) <= reach;
 };
 
+export function eyeWhites(image, face) {
+  const light = (i) => image.rgba[i * 4 + 3] > 0 && isEyeWhite([image.rgba[i * 4], image.rgba[i * 4 + 1], image.rgba[i * 4 + 2]]);
+  const kept = new Set();
+  const seen = new Set();
+  for (let start = 0; start < image.width * image.height; start++) {
+    if (seen.has(start) || !light(start) || !inEyes(image, face, start)) continue;
+    const spot = [start];
+    seen.add(start);
+    for (let k = 0; k < spot.length; k++) {
+      const x = spot[k] % image.width;
+      const neighbors = [x > 0 ? spot[k] - 1 : -1, x + 1 < image.width ? spot[k] + 1 : -1, spot[k] - image.width, spot[k] + image.width];
+      for (const next of neighbors)
+        if (next >= 0 && next < image.width * image.height && !seen.has(next) && light(next)) {
+          seen.add(next);
+          spot.push(next);
+        }
+    }
+    if (spot.length <= EYE_SPOT_MAX) spot.forEach((i) => kept.add(i));
+  }
+  return kept;
+}
+
 export function recolorByMap(image, map, face) {
   const rgba = Buffer.from(image.rgba);
   const table = new Map(map.map(([from, to]) => [parseInt(from.slice(1), 16), [1, 3, 5].map((i) => parseInt(to.slice(i, i + 2), 16))]));
+  const eyes = face ? eyeWhites(image, face) : new Set();
   for (let i = 0; i < image.width * image.height; i++) {
     if (!rgba[i * 4 + 3]) continue;
-    if (face && isEyeWhite([rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2]]) && inEyes(image, face, i)) continue;
+    if (eyes.has(i)) continue;
     const to = table.get(rgba.readUIntBE(i * 4, 3));
     if (to) to.forEach((value, c) => (rgba[i * 4 + c] = value));
   }
@@ -216,7 +240,7 @@ const AXIS_SHARE = 0.45;
 const FACE_DROP = 0.58;
 const MIN_SKIN = 10;
 
-function skinPixel(image, x, y) {
+export function skinPixel(image, x, y) {
   const i = (y * image.width + x) * 4;
   const [r, g, b] = [image.rgba[i] / 255, image.rgba[i + 1] / 255, image.rgba[i + 2] / 255];
   const max = Math.max(r, g, b);
