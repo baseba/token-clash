@@ -508,9 +508,10 @@ test('a trainer runs a radio station: only they edit its queue, and every listen
     return frames.shift();
   };
   listener.send(JSON.stringify({ t: 'radio', station: 'nobody' }));
-  assert.deepEqual({ ...(await nextFrame()), now: 0 }, { t: 'radio', station: null, now: 0 });
+  assert.deepEqual({ ...(await nextFrame()), now: 0 }, { t: 'radio', stationId: 'nobody', station: null, now: 0 });
   listener.send(JSON.stringify({ t: 'radio', station: ownerId }));
   const tuned = await nextFrame();
+  assert.equal(tuned.stationId, ownerId);
   assert.equal(tuned.station.name, 'Radio Kanto');
   assert.equal(tuned.station.listeners, 1);
   assert.ok(Math.abs(tuned.now - Date.now()) < 5000, 'the frame carries the server clock');
@@ -541,7 +542,7 @@ test('a trainer runs a radio station: only they edit its queue, and every listen
   assert.equal((await nextFrame()).station.name, 'Radio Johto');
   assert.equal((await call('/api/radio/station', { method: 'DELETE', token: other.token })).status, 200, 'closing a station you never opened changes nothing');
   assert.equal((await call('/api/radio/station', { method: 'DELETE', token: dj.token })).status, 200);
-  assert.equal((await nextFrame()).station, null);
+  assert.deepEqual({ ...(await nextFrame()), now: 0 }, { t: 'radio', stationId: ownerId, station: null, now: 0 }, 'listeners hear which station closed');
   assert.equal((await call(`/api/radio/stations/${ownerId}`)).status, 404);
   listener.close();
 });

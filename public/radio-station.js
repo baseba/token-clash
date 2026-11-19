@@ -8,8 +8,8 @@ const STATION_KEY = 'tc_station';
 /**
  * The station this browser listens to, remembered in `storage`, over one socket of its own (apart
  * from the room and lobby sockets, which come and go with each page). It reconnects with backoff
- * and tunes in again. Every `radio` frame goes to `onFrame`, and `onFrame(null)` when listening
- * stops; a frame with `station: null` means it closed, and the browser forgets it.
+ * and tunes in again. Every `radio` frame of the tuned station goes to `onFrame`, and `onFrame(null)`
+ * when listening stops; a frame with `station: null` means it closed, and the browser forgets it.
  */
 export function createStationFeed({ open, storage = null, onFrame, retryIn = (ms, retry) => setTimeout(retry, ms) }) {
   const read = () => {
@@ -41,8 +41,7 @@ export function createStationFeed({ open, storage = null, onFrame, retryIn = (ms
     };
     current.onmessage = (event) => {
       const frame = JSON.parse(event.data);
-      if (frame.t !== 'radio' || socket !== current) return;
-      if (frame.station && frame.station.ownerId !== tuned) return;
+      if (frame.t !== 'radio' || socket !== current || frame.stationId !== tuned) return;
       last = frame.station;
       if (!frame.station) forget();
       onFrame(frame);

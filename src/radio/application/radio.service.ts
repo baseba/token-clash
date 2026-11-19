@@ -66,7 +66,7 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     this.stations.delete(ownerId);
     clearTimeout(this.timers.get(ownerId));
     this.timers.delete(ownerId);
-    for (const listener of this.listeners.drop(ownerId)) if (listener.open) listener.send(this.frame(null));
+    for (const listener of this.listeners.drop(ownerId)) if (listener.open) listener.send(this.frame(ownerId, null));
   }
 
   /** `playing` is when the song the DJ saw on air started: see Station.setQueue. */
@@ -94,7 +94,7 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     else this.listeners.tuneOut(listener);
     // A station that caught up has just sent its frame to every listener, this one included.
     if (station && this.settle(station)) return;
-    listener.send(this.frame(station ? this.view(station) : null));
+    listener.send(this.frame(stationId, station ? this.view(station) : null));
   }
 
   /** A client went away. */
@@ -139,7 +139,7 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
 
   private broadcast(station: Station): StationView {
     const view = this.view(station);
-    const frame = this.frame(view);
+    const frame = this.frame(station.ownerId, view);
     for (const listener of this.listeners.of(station.ownerId)) if (listener.open) listener.send(frame);
     return view;
   }
@@ -148,7 +148,9 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     return stationView(station, this.trainers.byId(station.ownerId)?.name ?? 'Entrenador', this.listeners.count(station.ownerId));
   }
 
-  private frame(station: StationView | null) {
-    return { t: 'radio', station, now: now() };
+  // `stationId` says which station a `station: null` frame is about, so a late answer for a station
+  // the client already left doesn't make it forget the one it tuned to since.
+  private frame(stationId: string | null, station: StationView | null) {
+    return { t: 'radio', stationId, station, now: now() };
   }
 }

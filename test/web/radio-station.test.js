@@ -52,7 +52,7 @@ function memoryStorage(initial = {}) {
   return { items, getItem: (key) => items.get(key) ?? null, setItem: (key, value) => (value == null ? items.delete(key) : items.set(key, value)) };
 }
 
-const frameOf = (ownerId, name = 'Radio') => ({ t: 'radio', station: { ownerId, name, ownerName: 'Ana', nowPlaying: null, queue: [], listeners: 1 }, now: 0 });
+const frameOf = (ownerId, name = 'Radio') => ({ t: 'radio', stationId: ownerId, station: { ownerId, name, ownerName: 'Ana', nowPlaying: null, queue: [], listeners: 1 }, now: 0 });
 
 test('a tuned station is remembered, tuned in again after a reload, and after the socket drops', () => {
   const { opened, open } = fakeSockets();
@@ -103,11 +103,11 @@ test('tuning out, or the station closing, forgets it and closes the socket for g
   const retries = [];
   const feed = createStationFeed({ open, storage, onFrame: (frame) => frames.push(frame), retryIn: (ms, retry) => retries.push(retry) });
   opened[0].connect();
-  opened[0].receive({ t: 'radio', station: null, now: 0 });
+  opened[0].receive({ t: 'radio', stationId: 'ana', station: null, now: 0 });
   assert.equal(feed.tuned, null);
   assert.equal(storage.items.has('tc_station'), false);
   assert.equal(opened[0].readyState, 3);
-  assert.deepEqual(frames.at(-1), { t: 'radio', station: null, now: 0 });
+  assert.deepEqual(frames.at(-1), { t: 'radio', stationId: 'ana', station: null, now: 0 });
 
   feed.tune('beto');
   opened[1].connect();
@@ -115,4 +115,20 @@ test('tuning out, or the station closing, forgets it and closes the socket for g
   assert.equal(frames.at(-1), null);
   assert.equal(opened[1].readyState, 3);
   assert.equal(retries.length, 0, 'a socket closed on purpose is not reopened');
+});
+
+test('a late answer that the station left behind is gone does not forget the station tuned to since', () => {
+  const { opened, open } = fakeSockets();
+  const storage = memoryStorage({ tc_station: 'ana' });
+  const frames = [];
+  const feed = createStationFeed({ open, storage, onFrame: (frame) => frames.push(frame) });
+  opened[0].connect();
+  feed.tune('beto');
+  opened[0].receive({ t: 'radio', stationId: 'ana', station: null, now: 0 });
+  assert.equal(feed.tuned, 'beto');
+  assert.equal(storage.items.get('tc_station'), 'beto');
+  assert.equal(opened[0].readyState, 1);
+  assert.equal(frames.length, 0);
+  opened[0].receive({ t: 'radio', stationId: 'beto', station: null, now: 0 });
+  assert.equal(feed.tuned, null, 'the station tuned to closing is still forgotten');
 });
