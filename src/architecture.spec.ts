@@ -8,7 +8,7 @@ import { dirname, join, normalize, relative } from 'node:path';
 import { PROJECT_ROOT } from './shared/paths.js';
 
 const SRC = join(PROJECT_ROOT, 'src');
-const CONTEXTS = ['arena', 'catalog', 'chat', 'combat', 'stats', 'trainers'];
+const CONTEXTS = ['arena', 'catalog', 'chat', 'combat', 'radio', 'stats', 'trainers'];
 
 interface Import {
   /** The importing file, relative to src/ ("arena/domain/lobby.ts"). */
@@ -78,5 +78,14 @@ test('catalog depends on no other context: it serves data, and combat decides wh
 
 test('shared/ depends on no context: the arrows point into it, never out', () => {
   const bad = imports.filter(({ file, target }) => file.startsWith('shared/') && contextOf(target));
+  assert.deepEqual(show(bad), []);
+});
+
+test('radio uses catalog and trainers only, and no context knows radio exists', () => {
+  const bad = imports.filter(({ file, target }) => {
+    const [from, to] = [contextOf(file), contextOf(target)];
+    if (!from || !to || from === to) return false;
+    return to === 'radio' || (from === 'radio' && !['catalog', 'trainers'].includes(to));
+  });
   assert.deepEqual(show(bad), []);
 });
