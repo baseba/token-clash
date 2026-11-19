@@ -71,3 +71,20 @@ test('at boot a station catches up with the time it spent off, and saves where i
   assert.deepEqual(stations.saved, ['ana']);
   radio.onModuleDestroy();
 });
+
+test('renaming a station that fell behind sends its listeners one frame, caught up and renamed', () => {
+  const radio = new RadioService(new MemoryStations(), trainers);
+  radio.open('ana', 'Radio');
+  const endsAt = radio.setQueue('ana', [GYM, 'title']).nowPlaying!.endsAt;
+  const ear = listener();
+  radio.tune(ear, 'ana');
+  radio.onModuleDestroy();
+  ear.frames.length = 0;
+
+  mock.timers.tick(endsAt - T0 + 1_000);
+  radio.open('ana', 'Radio Johto');
+  assert.equal(ear.frames.length, 1);
+  assert.equal(ear.frames[0].station?.name, 'Radio Johto');
+  assert.equal(ear.frames[0].station?.nowPlaying?.track, 'title');
+  radio.onModuleDestroy();
+});

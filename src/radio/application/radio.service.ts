@@ -54,8 +54,9 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
   open(ownerId: string, name: string): StationView {
     const existing = this.stations.findByOwner(ownerId);
     if (!existing) return this.changed(Station.open(ownerId, name, now()));
-    this.settle(existing);
+    // Renamed before it advances: a refused name leaves the station as it was, not advanced and unsaved.
     existing.rename(name);
+    existing.advance(now(), radioTrackDuration);
     return this.changed(existing);
   }
 
