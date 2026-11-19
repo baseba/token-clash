@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { RADIO_TRACK_IDS } from '../../../catalog/domain/radio-tracks.js';
-import { QUEUE_MAX, STATION_NAME_MAX } from '../../domain/station.js';
+import { RADIO_TRACK_IDS, STATION_NAME_MAX, STATION_QUEUE_MAX } from '../../../catalog/domain/radio-tracks.js';
 
 /** PUT /api/radio/station: open your station, or rename it. */
 export const OpenStationDto = z.object({
@@ -10,6 +9,6 @@ export type OpenStationDto = z.infer<typeof OpenStationDto>;
 
 /** PUT /api/radio/station/queue: the whole queue, in order (adding, removing and reordering all send it). */
 export const StationQueueDto = z.object({
-  queue: z.array(z.enum(RADIO_TRACK_IDS)).max(QUEUE_MAX, { error: `La cola admite hasta ${QUEUE_MAX} canciones.` }),
+  queue: z.array(z.enum(RADIO_TRACK_IDS)).max(STATION_QUEUE_MAX, { error: `La cola admite hasta ${STATION_QUEUE_MAX} canciones.` }),
 });
 export type StationQueueDto = z.infer<typeof StationQueueDto>;

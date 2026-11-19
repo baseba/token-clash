@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DomainError } from '../../shared/domain/errors.js';
-import { QUEUE_MAX, Station } from './station.js';
+import { STATION_QUEUE_MAX } from '../../catalog/domain/radio-tracks.js';
+import { Station } from './station.js';
 
 // Songs of round lengths, so every start and end below can be read at a glance.
 const LENGTHS: Record<string, number> = { intro: 60_000, gym: 100_000, champion: 150_000 };
@@ -97,10 +98,10 @@ test('the old queue plays up to the moment the new one arrives', () => {
 
 test('the queue holds at most 30 songs', () => {
   const station = Station.open('ana', 'Radio', T0);
-  rejects(() => station.setQueue(Array(QUEUE_MAX + 1).fill('gym'), T0, durationOf), 'invalid', /30/);
+  rejects(() => station.setQueue(Array(STATION_QUEUE_MAX + 1).fill('gym'), T0, durationOf), 'invalid', /30/);
   assert.equal(station.nowPlaying, null);
-  station.setQueue(Array(QUEUE_MAX).fill('gym'), T0, durationOf);
-  assert.equal(station.queue.length, QUEUE_MAX - 1);
+  station.setQueue(Array(STATION_QUEUE_MAX).fill('gym'), T0, durationOf);
+  assert.equal(station.queue.length, STATION_QUEUE_MAX - 1);
 });
 
 test('skipping starts the next queued song now', () => {

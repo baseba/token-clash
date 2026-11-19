@@ -8,11 +8,8 @@
 // exactly where it would be if someone had. Durations and the clock come from outside, so the
 // rules run without a catalog file or a real clock.
 
-import type { RadioTrackId } from '../../catalog/domain/radio-tracks.js';
+import { STATION_NAME_MAX, STATION_QUEUE_MAX, type RadioTrackId } from '../../catalog/domain/radio-tracks.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
-
-export const STATION_NAME_MAX = 40;
-export const QUEUE_MAX = 30;
 
 /** How long a song plays once through, in milliseconds. */
 export type TrackDuration = (track: RadioTrackId) => number;
@@ -84,7 +81,7 @@ export class Station implements StationState {
    * air, or the song on air already played through and is looping, the first one starts now.
    */
   setQueue(tracks: readonly RadioTrackId[], now: number, durationOf: TrackDuration): void {
-    if (tracks.length > QUEUE_MAX) throw invalid(`La cola admite hasta ${QUEUE_MAX} canciones.`);
+    if (tracks.length > STATION_QUEUE_MAX) throw invalid(`La cola admite hasta ${STATION_QUEUE_MAX} canciones.`);
     this.advance(now, durationOf);
     this.queue = [...tracks];
     if (this.queue.length && (!this.nowPlaying || now >= this.nowPlaying.endsAt)) this.playNext(now, durationOf);

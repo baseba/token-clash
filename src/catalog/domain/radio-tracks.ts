@@ -9,6 +9,9 @@ import { catalogFile } from '../../shared/paths.js';
 /** The id of a song of public/radio.js (`battle_kanto_gym`, `bw/victory_gym`…). */
 export type RadioTrackId = string;
 
+export const STATION_NAME_MAX: number = radio.STATION_NAME_MAX;
+export const STATION_QUEUE_MAX: number = radio.STATION_QUEUE_MAX;
+
 export const RADIO_TRACK_IDS = (radio.RADIO_TRACKS as readonly { id: RadioTrackId }[]).map((track) => track.id) as [RadioTrackId, ...RadioTrackId[]];
 
 const DURATIONS = new Map(Object.entries(JSON.parse(readFileSync(catalogFile('radio-durations.json'), 'utf8')) as Record<RadioTrackId, number>));
