@@ -1671,11 +1671,14 @@ function demoMon(i) {
   return { sprite: ['4', '7', '1'][i], rarity: 'rare' };
 }
 
+const CONTRIBUTING_GUIDE_URL = 'https://github.com/baseba/token-clash/blob/main/CONTRIBUTING.md#tu-primer-pr-paso-a-paso';
+
 function feedbackButton() {
   const dialog = h(
     'dialog',
     { class: 'feedback-dialog', 'aria-label': '¿Encontraste un bug o quieres proponer una mejora?' },
     h('img', { src: '/hazlo-tu.png', alt: 'Hazlo tú HDTPM, que aquí nadie es tu empleado', width: 498, height: 491 }),
+    h('p', { class: 'feedback-guide' }, 'El código es abierto. ', h('a', { href: CONTRIBUTING_GUIDE_URL, target: '_blank', rel: 'noopener' }, 'Aprende a hacer un fork y subir tu PR →')),
     h('button', { class: 'btn sm', onclick: () => dialog.close() }, 'Ok 😔'),
   );
   dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
