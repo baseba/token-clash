@@ -14,11 +14,20 @@ export const STATION_QUEUE_MAX: number = radio.STATION_QUEUE_MAX;
 
 export const RADIO_TRACK_IDS = (radio.RADIO_TRACKS as readonly { id: RadioTrackId }[]).map((track) => track.id) as [RadioTrackId, ...RadioTrackId[]];
 
-const DURATIONS = new Map(Object.entries(JSON.parse(readFileSync(catalogFile('radio-durations.json'), 'utf8')) as Record<RadioTrackId, number>));
+const MEASURED = JSON.parse(readFileSync(catalogFile('radio-durations.json'), 'utf8')) as Record<RadioTrackId, number>;
 
 // A song added to public/radio.js without its length would stall a station: stop at boot instead.
-const unmeasured = RADIO_TRACK_IDS.filter((id) => !((DURATIONS.get(id) ?? 0) > 0));
+const unmeasured = RADIO_TRACK_IDS.filter((id) => !(MEASURED[id] > 0));
 if (unmeasured.length) throw new Error(`Faltan las duraciones de ${unmeasured.join(', ')} en src/catalog/data/radio-durations.json: corre npm run radio.`);
 
+const DURATIONS = new Map(RADIO_TRACK_IDS.map((id) => [id, MEASURED[id]]));
+
+/** Whether a song is on the radio. A saved station can hold one that a later version removed. */
+export const isRadioTrack = (id: RadioTrackId): boolean => DURATIONS.has(id);
+
 /** How long a song plays once through (intro and one pass of its loop), in milliseconds. */
-export const radioTrackDuration = (id: RadioTrackId): number => DURATIONS.get(id)!;
+export function radioTrackDuration(id: RadioTrackId): number {
+  const duration = DURATIONS.get(id);
+  if (duration === undefined) throw new Error(`La canción ${id} no está en la radio.`);
+  return duration;
+}

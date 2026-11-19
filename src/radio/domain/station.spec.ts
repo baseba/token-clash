@@ -119,3 +119,10 @@ test('skipping with an empty queue is refused and leaves the song on air', () =>
   rejects(() => station.skip(T0 + 10_000, durationOf), 'conflict', /cola/);
   assert.deepEqual(station.nowPlaying, { track: 'intro', startedAt: T0, endsAt: T0 + 60_000 });
 });
+
+test('songs waiting with nothing on air start at the next advance', () => {
+  const station = Station.restore({ ownerId: 'ana', name: 'Radio', openedAt: T0, queue: ['gym', 'intro'], nowPlaying: null });
+  assert.equal(station.advance(T0 + 5_000, durationOf), true);
+  assert.deepEqual(station.nowPlaying, { track: 'gym', startedAt: T0 + 5_000, endsAt: T0 + 105_000 });
+  assert.deepEqual(station.queue, ['intro']);
+});

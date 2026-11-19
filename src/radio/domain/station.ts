@@ -28,7 +28,7 @@ export interface StationState {
   openedAt: number;
   /** The songs waiting their turn, in order. */
   queue: RadioTrackId[];
-  /** Null only while nothing was ever queued. */
+  /** Null while nothing was ever queued, or after the song on air left the radio (see advance). */
   nowPlaying: NowPlaying | null;
 }
 
@@ -65,10 +65,15 @@ export class Station implements StationState {
 
   /**
    * Plays the queue up to `now`: each song that ended hands over to the next queued one, which
-   * started when the previous one ended, not now. Says whether anything changed.
+   * started when the previous one ended, not now. With nothing on air and songs waiting, the first
+   * one starts now. Says whether anything changed.
    */
   advance(now: number, durationOf: TrackDuration): boolean {
     let changed = false;
+    if (!this.nowPlaying && this.queue.length) {
+      this.playNext(now, durationOf);
+      changed = true;
+    }
     while (this.nowPlaying && this.queue.length && now >= this.nowPlaying.endsAt) {
       this.playNext(this.nowPlaying.endsAt, durationOf);
       changed = true;
