@@ -35,6 +35,16 @@ test('a name is required, trimmed, cleaned of control characters and at most 40 
   assert.equal(station.name, 'ñ'.repeat(40));
 });
 
+test('a name counts each emoji once and keeps joined emoji whole, but drops bidi controls', () => {
+  const station = Station.open('ana', '😀'.repeat(40), T0);
+  assert.equal(station.name, '😀'.repeat(40));
+  rejects(() => station.rename('😀'.repeat(41)), 'invalid', /40/);
+  station.rename('Radio 👨\u200D👩\u200D👧');
+  assert.equal(station.name, 'Radio 👨\u200D👩\u200D👧');
+  station.rename('\u2067Radio\u200F \u202AKanto\u2069\u200E');
+  assert.equal(station.name, 'Radio Kanto');
+});
+
 test('the first queued song starts at once, and the rest wait their turn', () => {
   const station = Station.open('ana', 'Radio', T0);
   station.setQueue(['intro', 'gym'], null, T0 + 5_000, durationOf);

@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { RADIO_TRACK_IDS, STATION_NAME_MAX, STATION_QUEUE_MAX } from '../../../catalog/domain/radio-tracks.js';
+import { RADIO_TRACK_IDS, STATION_QUEUE_MAX } from '../../../catalog/domain/radio-tracks.js';
 
-/** PUT /api/radio/station: open your station, or rename it. */
+/** PUT /api/radio/station: open your station, or rename it. What a name may hold is the Station's rule. */
 export const OpenStationDto = z.object({
-  name: z.string({ error: 'Ponle un nombre a tu estación.' }).trim().min(1, { error: 'Ponle un nombre a tu estación.' }).max(STATION_NAME_MAX, { error: `El nombre de la estación admite hasta ${STATION_NAME_MAX} caracteres.` }),
+  name: z.string({ error: 'Ponle un nombre a tu estación.' }),
 });
 export type OpenStationDto = z.infer<typeof OpenStationDto>;
 

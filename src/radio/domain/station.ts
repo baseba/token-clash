@@ -32,9 +32,11 @@ export interface StationState {
   nowPlaying: NowPlaying | null;
 }
 
-// Control and bidi characters would let a name break the layout around it.
+// Control and bidi characters would let a name break the layout around it. Other format characters
+// stay: the zero-width joiner holds emoji like 👨‍👩‍👧 together. The length counts code points, not
+// UTF-16 units, so 😀 counts once.
 function cleanName(name: string): string {
-  const clean = name.replace(/[\p{Cc}\p{Cf}]/gu, '').trim();
+  const clean = name.replace(/[\p{Cc}\u200E\u200F\u202A-\u202E\u2066-\u2069]/gu, '').trim();
   if (!clean) throw invalid('Ponle un nombre a tu estación.');
   if ([...clean].length > STATION_NAME_MAX) throw invalid(`El nombre de la estación admite hasta ${STATION_NAME_MAX} caracteres.`);
   return clean;

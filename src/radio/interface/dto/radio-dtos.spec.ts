@@ -3,9 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OpenStationDto, StationQueueDto } from './station.dto.js';
 
-test('a station name is trimmed and must have 1 to 40 characters', () => {
-  assert.deepEqual(OpenStationDto.parse({ name: '  Radio Kanto ' }), { name: 'Radio Kanto' });
-  for (const body of [{}, { name: '   ' }, { name: 'x'.repeat(41) }, { name: 7 }]) assert.equal(OpenStationDto.safeParse(body).success, false, JSON.stringify(body));
+test('a station name is any text: the Station rules its length and characters, not the DTO', () => {
+  assert.deepEqual(OpenStationDto.parse({ name: '😀'.repeat(40) }), { name: '😀'.repeat(40) });
+  for (const body of [{}, { name: 7 }, { name: null }]) assert.equal(OpenStationDto.safeParse(body).success, false, JSON.stringify(body));
 });
 
 test('a queue lists radio songs only, at most 30', () => {
