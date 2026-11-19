@@ -9,11 +9,12 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 
 | Dominio | De qué se trata | Dueño de |
 | --- | --- | --- |
-| `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI y Pokémon Showdown), la Pokédex, los artículos de la tienda y los sprites de entrenador | archivos `src/catalog/data/*.json` y las listas compartidas de `public/` |
+| `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI y Pokémon Showdown), la Pokédex, los artículos de la tienda, los sprites de entrenador y las canciones de la radio con su duración | archivos `src/catalog/data/*.json` y las listas compartidas de `public/` |
 | `combat` | Cómo se pelea: motor de batalla, qué movimientos se pueden usar, elegir 3 de 6, sorteo aleatorio, IA, Skynet | nada (es puro) |
 | `trainers` | Quién juega: entrenador, colección, equipo, sesión, importar el save | tablas `trainers`, `roster_entries` |
 | `arena` | Dónde se pelea: salas, emparejamiento, peleas en vivo, torneos | tablas `challenges`, `tournaments`, `tournament_seats`, `tournament_matches` |
 | `chat` | Mensajes en salas y torneos | memoria (se borra al reiniciar, a propósito) |
+| `radio` | Las estaciones de los entrenadores: la cola que elige el dueño, qué suena y quién escucha | tabla `radio_stations` (los oyentes, en memoria) |
 | `stats` | La página de stats y los logros | nada: lee de los otros dominios y le pide los cambios a `trainers` |
 
 Más tres piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
@@ -28,15 +29,20 @@ Más tres piezas que no son dominios sino entradas y plomería: `realtime` (el p
      │         │ ▼             │
      │         │ chat          │
      └─────────┴───────────────┘
+
+   realtime (WS), HTTP ──▶ radio ──▶ trainers
+                             └─────▶ catalog
 ```
 
 Las flechas son "usa a". Nunca hay una flecha de vuelta: `trainers` no sabe que existen las salas, `combat` no
 sabe que existen los entrenadores, `catalog` no sabe que existe el motor, y `chat` guarda mensajes por canal sin
-saber qué es una sala.
+saber qué es una sala. `radio` usa `catalog` (qué canciones hay y cuánto dura cada una) y `trainers` (el nombre
+del DJ), y nadie sabe que existe: escuchar una estación no tiene nada que ver con las salas, y un jugador puede
+escucharla mientras pelea. `src/architecture.spec.ts` lo revisa.
 
 ## 2. Las capas dentro de un dominio
 
-Los dominios con estado (`trainers`, `arena`) tienen cuatro carpetas:
+Los dominios con estado (`trainers`, `arena`, `radio`) tienen cuatro carpetas:
 
 ```
 src/trainers/
@@ -223,7 +229,7 @@ El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection
 
 | Qué | Dónde | Cómo |
 | --- | --- | --- |
-| Reglas puras (save, torneo, lobby, chat, stats, motor, IA), DTOs y mensajes del socket | `*.spec.ts` al lado de cada archivo | funciones, sin Nest ni base de datos |
+| Reglas puras (save, torneo, lobby, chat, stats, motor, IA, estaciones de radio), DTOs y mensajes del socket | `*.spec.ts` al lado de cada archivo | funciones, sin Nest ni base de datos |
 | Reglas de dependencia | `src/architecture.spec.ts` | lee los imports de cada archivo |
 | Persistencia y migraciones | `src/legacy/legacy-json-import.spec.ts`, `src/arena/infrastructure/arena.migrations.spec.ts` | SQLite real en un directorio temporal |
 | Todo junto | `test/app.e2e-spec.ts` | levanta la app compilada y juega peleas y torneos por HTTP y WebSocket, y la reinicia |
@@ -265,6 +271,11 @@ build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de 
   variantes) se genera al instalar y lo servimos nosotros.
 - **El estado en vivo no se guarda.** Peleas, presencia y chat viven en memoria por diseño: es un juego entre
   amigos y retomar una pelea a medias tras un reinicio no vale la complejidad.
+- **Una estación de radio sí se guarda, y no depende de sus timers.** `Station` guarda cuándo empezó y cuándo
+  termina la canción al aire, y `advance(now)` la pone al día desde ahí: cada lectura y escritura lo llama primero,
+  y al arrancar el servidor cada estación cae en la canción que estaría sonando. El timer de cada estación solo
+  avisa a los oyentes en el momento en que empieza la siguiente. Los oyentes sí viven en memoria: tras un reinicio
+  cada navegador vuelve a sintonizar solo.
 
 ## 9. Cómo agregar algo
 
