@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts && rm -rf /root/.npm
 COPY tsconfig.json ./
-COPY public/types.js public/trainer-sprites.js public/trainer-variants.js public/shop.js public/upstream.js ./public/
+COPY public/types.js public/trainer-sprites.js public/trainer-variants.js public/shop.js public/radio.js public/upstream.js ./public/
 COPY src ./src
 RUN npm run build
 
