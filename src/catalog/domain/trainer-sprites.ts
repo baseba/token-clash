@@ -1,7 +1,8 @@
 import * as sprites from '../../../public/trainer-sprites.js';
 
 export const TRAINER_SPRITES: readonly string[] = sprites.TRAINER_SPRITES;
-export const TRAINER_VARIANTS: readonly { key: string; base: string; pokemon?: number }[] = sprites.TRAINER_VARIANTS;
+export const TRAINER_VARIANTS: readonly { key: string; base: string; pokemon?: number; shiny?: boolean }[] = sprites.TRAINER_VARIANTS;
+export const SHINY_VARIANTS: readonly { key: string; base: string; pokemon: number; original: string }[] = sprites.SHINY_VARIANTS as { key: string; base: string; pokemon: number; original: string }[];
 export const EARNED_VARIANTS: readonly { key: string; base: string; color: string }[] = sprites.EARNED_VARIANTS;
 export const VARIANT_COLOR_TYPES: Readonly<Record<string, string>> = sprites.VARIANT_COLOR_TYPES;
 export const VARIANT_COLOR_NAMES: Readonly<Record<string, string>> = sprites.VARIANT_COLOR_NAMES;

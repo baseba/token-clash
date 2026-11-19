@@ -7,7 +7,7 @@ import { ballSounds } from './ball-fx.js?v=dev';
 import { chargeAnim, COMMON_PRELOAD, hpTweenMs, moveLands } from './battle-anims.js?v=dev';
 import { patchSave } from './savepatch.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
-import { TRAINER_SPRITES, TRAINER_VARIANTS, trainerSpriteFor, VARIANT_COLOR_NAMES } from './trainer-sprites.js?v=dev';
+import { FEMALE_OF, MALE_OF, TRAINER_SPRITES, TRAINER_VARIANTS, trainerSpriteFor, VARIANT_COLOR_NAMES } from './trainer-sprites.js?v=dev';
 import { RADIO_KINDS, RADIO_REGIONS, RADIO_TRACKS, radioTrack } from './radio.js?v=dev';
 import { createStationFeed, myStationPanel, stationsPanel } from './radio-station.js?v=dev';
 import { createNotifier } from './notify.js?v=dev';
@@ -533,7 +533,7 @@ function toolButton({ icon, label, note, tip, ...attrs }) {
   return h(attrs.href ? 'a' : 'button', { ...(attrs.href ? {} : { type: 'button' }), class: 'tool-btn', 'data-tip': tip ?? null, ...attrs }, h('span', { class: 'tool-icon', 'aria-hidden': 'true' }, icon), h('span', { class: 'tool-text' }, h('b', null, label), note ? h('small', null, note) : null));
 }
 
-const trainerURL = (key) => `/trainers/${key}.png`;
+const trainerURL = (key) => `/trainers/${key}.png?v=dev`;
 function trainerImg(key, cls = '') {
   return h('img', { class: `trainer-img${cls ? ` ${cls}` : ''}`, src: trainerURL(key), alt: '', draggable: 'false', loading: 'lazy' });
 }
@@ -547,7 +547,6 @@ function avatarPic(key, size = 'sm', frame = null) {
   return h('span', { class: `avatar avatar-${size}${face ? ' has-face' : ''}${frame ? ` ring-${frame}` : ''}`, style, 'aria-hidden': 'true' }, h('span', { class: 'avatar-clip' }, trainerImg(key)));
 }
 const VARIANTS_BY_KEY = new Map(TRAINER_VARIANTS.map((variant) => [variant.key, variant]));
-const byLabel = (a, b) => trainerLabel(a).localeCompare(trainerLabel(b), 'es', { numeric: true, sensitivity: 'base' });
 const trainerLabel = (key) => {
   const variant = VARIANTS_BY_KEY.get(key);
   if (variant) return variant.name ?? `${baseTrainerLabel(variant.base)} ${VARIANT_COLOR_NAMES[variant.color] ?? variant.color}`;
@@ -1143,13 +1142,24 @@ async function profilePage(seq) {
     return { tip: `🔒 ${trainerLabel(key)} · ${p.title}`, note: `Te falta: ${p.goals.filter((g) => g.have < g.need).map((g) => `${g.text} ${goalState(g)}`).join(' · ')}` };
   }
   const goalList = (goals) => h('ul', { class: 'unlock-goals' }, goals.map((g) => h('li', { class: g.have >= g.need ? 'is-done' : null }, h('span', null, g.text, g.hint ? h('span', { class: 'goal-hint', tabindex: 0, 'data-tip': g.hint, 'aria-label': g.hint }, '?') : null), h('span', { class: 'unlock-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': g.need, 'aria-valuenow': g.have }, h('i', { style: { width: `${(g.have / g.need) * 100}%` } })), h('small', { class: 'muted' }, g.need === 1 ? (g.have >= 1 ? 'Listo' : 'Pendiente') : `${g.have.toLocaleString('es')} / ${g.need.toLocaleString('es')}`))));
-  const baseOf = (key) => VARIANTS_BY_KEY.get(key)?.base ?? key;
-  const familyKeys = (base) => [base, ...TRAINER_VARIANTS.filter((variant) => variant.base === base).map((variant) => variant.key).sort(byLabel)];
-  const versionName = (key) => {
+  const baseOf = (key) => {
+    const base = VARIANTS_BY_KEY.get(key)?.base ?? key;
+    return MALE_OF[base] ?? base;
+  };
+  const familyBases = (family) => [family, FEMALE_OF[family]].filter(Boolean);
+  const genderMark = (base) => (base in FEMALE_OF ? '♂' : base in MALE_OF ? '♀' : '');
+  const familyLabel = (family) => (FEMALE_OF[family] ? trainerLabel(family).replace(' ♂', '') : trainerLabel(family));
+  const plainVersionName = (key) => {
     const variant = VARIANTS_BY_KEY.get(key);
     if (!variant) return 'Original';
     const base = trainerLabel(variant.base);
     return variant.name ? (variant.name.startsWith(`${base} `) ? variant.name.slice(base.length + 1) : variant.name) : VARIANT_COLOR_NAMES[variant.color] ?? variant.color;
+  };
+  const versionName = (key) => [plainVersionName(key), genderMark(VARIANTS_BY_KEY.get(key)?.base ?? key)].filter(Boolean).join(' ');
+  const byVersion = (a, b) => plainVersionName(a).localeCompare(plainVersionName(b), 'es', { numeric: true, sensitivity: 'base' }) || genderMark(VARIANTS_BY_KEY.get(a).base).localeCompare(genderMark(VARIANTS_BY_KEY.get(b).base));
+  const familyKeys = (family) => {
+    const bases = familyBases(family);
+    return [...bases, ...TRAINER_VARIANTS.filter((variant) => bases.includes(variant.base)).map((variant) => variant.key).sort(byVersion)];
   };
   let openBase = null;
   let focusKey = null;
@@ -1167,6 +1177,12 @@ async function profilePage(seq) {
     if (state === 'buy' && item.key === focusKey) return action(item);
     return action(item);
   }
+  function recolorCount(family, total) {
+    const originals = familyBases(family).length;
+    const recolors = total - originals;
+    if (!recolors) return null;
+    return `${recolors} ${recolors === 1 ? 'recolor' : 'recolores'}, ${originals > 1 ? 'después de los originales ♂ y ♀' : 'después del original'}`;
+  }
   function openFamily(base, focus = null) {
     const members = familyKeys(base).map(trainerItem);
     focus ??= members.find((item) => versionState(item) === 'locked')?.key ?? base;
@@ -1177,7 +1193,7 @@ async function profilePage(seq) {
     const p = progress.get(base);
     confirmDlg.replaceChildren(h('div', { class: 'confirm-body family' },
       h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => confirmDlg.close() }, '×'),
-      h('header', { class: 'family-head' }, h('h2', null, trainerLabel(base)), h('p', { class: 'muted small' }, [p?.rarity ? RARITIES[p.rarity].label : null, p?.title, members.length > 1 ? `${members.length - 1} ${members.length === 2 ? 'recolor' : 'recolores'}, después del original` : null].filter(Boolean).join(' · '))),
+      h('header', { class: 'family-head' }, h('h2', null, familyLabel(base)), h('p', { class: 'muted small' }, [p?.rarity ? RARITIES[p.rarity].label : null, p?.title, recolorCount(base, members.length)].filter(Boolean).join(' · '))),
       ways ? h('div', { class: `family-goals${focused.unlocked ? ' is-done' : ''}` }, h('b', null, focused.unlocked ? `✓ Cómo conseguiste a ${trainerLabel(focus)}` : `🔒 Cómo conseguir a ${trainerLabel(focus)}`), ways.length > 1 ? h('div', { class: 'unlock-ways' }, ways.flatMap((goals, i) => [i ? h('p', { class: 'unlock-or' }, 'o bien') : null, h('div', { class: 'unlock-way' }, h('small', { class: 'muted' }, `Opción ${i + 1}`), goalList(goals))])) : goalList(ways[0])) : null,
       h('div', { class: 'family-grid' }, members.map((item) => {
         const state = versionState(item);
@@ -1343,7 +1359,8 @@ async function profilePage(seq) {
   function itemsFor() {
     if (kind !== 'trainer') return [...FREE_ITEMS, ...shop.items].filter((item) => item.kind === kind).sort(byRarityThenName);
     return TRAINER_SPRITES.filter((key) => !VARIANTS_BY_KEY.has(key))
-      .filter((base) => (!group || familyKeys(base).some((key) => progress.get(key)?.group === group)) && (!gender || trainerLabel(base).includes(gender)))
+      .filter((base) => !(base in MALE_OF))
+      .filter((base) => (!group || familyKeys(base).some((key) => progress.get(key)?.group === group)) && (!gender || familyBases(base).some((member) => trainerLabel(member).includes(gender))))
       .map((base) => {
         const members = familyKeys(base).map(trainerItem);
         return { kind: 'trainer', key: base, members, owned: !!members[0].owned };
@@ -1352,16 +1369,17 @@ async function profilePage(seq) {
   }
   function trainerTile(family) {
     const [original] = family.members;
-    const shown = family.members.find(isEquipped) ?? original;
+    const genderPick = gender ? family.members.find((item) => item.key === familyBases(family.key).find((member) => trainerLabel(member).includes(gender))) : null;
+    const shown = family.members.find(isEquipped) ?? genderPick ?? original;
     const state = versionState(shown);
     const owned = family.members.filter((item) => item.owned).length;
     const p = progress.get(family.key);
     const sub = state === 'equipped' ? 'En uso' : p?.rarity ? RARITIES[p.rarity].label : 'Común';
     const { tip, note } = unlockTip(shown.key);
-    return h('button', { type: 'button', class: `trainer-tile state-${state}${p?.rarity ? ` rarity-${p.rarity}` : ''}`, 'data-tip': tip, 'data-tip-note': note, 'aria-label': `${trainerLabel(family.key)}: ${VERSION_STATUS[state]}`, onclick: () => openFamily(family.key) },
+    return h('button', { type: 'button', class: `trainer-tile state-${state}${p?.rarity ? ` rarity-${p.rarity}` : ''}`, 'data-tip': tip, 'data-tip-note': note, 'aria-label': `${familyLabel(family.key)}: ${VERSION_STATUS[state]}`, onclick: () => openFamily(family.key) },
       h('span', { class: `tile-corner state-${state}`, 'aria-hidden': 'true' }, CORNER[state]),
       h('span', { class: 'tile-stage' }, trainerImg(shown.key)),
-      h('b', { class: 'tile-name' }, trainerLabel(family.key)),
+      h('b', { class: 'tile-name' }, familyLabel(family.key)),
       h('small', { class: 'tile-sub' }, sub),
       family.members.length > 1 ? h('small', { class: `tile-colors${owned === family.members.length ? ' is-complete' : ''}` }, `🎨 ${owned}/${family.members.length}`) : h('small', { class: 'tile-colors is-empty' }, ' '),
     );

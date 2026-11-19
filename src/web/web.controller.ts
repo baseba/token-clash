@@ -37,7 +37,8 @@ export class WebController {
   async serve(@Req() req: Request, @Res() res: Response) {
     if (req.path.startsWith('/api/')) return void res.status(404).json({ error: 'No encontrado' });
     const page = APP_PAGES.has(req.path) || SHARE_LINK.test(req.path);
-    const asset = await this.assets.read(page ? 'index.html' : req.path);
+    const version = typeof req.query.v === 'string' ? req.query.v : undefined;
+    const asset = await this.assets.read(page ? 'index.html' : req.path, version);
     if (!asset) return void res.status(404).type('text/plain; charset=utf-8').send('not found');
     res.set({ 'Content-Type': asset.type, 'Cache-Control': asset.cache }).send(asset.body);
   }

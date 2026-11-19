@@ -1,6 +1,6 @@
 import { finalForms, lineage, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { EARNED_VARIANTS, ELITE_FOUR, GYM_LEADERS, isShopTrainer, originalTier, TRAINER_SPRITES, TRAINER_VARIANTS, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
+import { EARNED_VARIANTS, ELITE_FOUR, GYM_LEADERS, isShopTrainer, originalTier, SHINY_VARIANTS, TRAINER_SPRITES, TRAINER_VARIANTS, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
 import { CLASS_TRAINERS, SIGNATURE, SPECIES_NEED, STARTER_IDS, STARTER_NEED, TYPE_NEED, type ClassTrainer, type TrainerRarity } from './trainer-goals.js';
 import { RARITIES, shopItem, shopItemOf } from '../../catalog/domain/shop.js';
 import { TYPES } from '../../catalog/domain/type-chart.js';
@@ -13,6 +13,7 @@ import { SHOP_TRAINER_NOT_BOUGHT } from '../../trainers/domain/trainer.js';
 const REGIONS = { kanto: [1, 151], johto: [152, 251], hoenn: [252, 386], sinnoh: [387, 493], unova: [494, 649] } as const;
 type Region = keyof typeof REGIONS;
 const DEX_SIZE = 649;
+const RED_DEX = 250;
 const GYM_STEPS = [3, 6, 10, 15];
 const ELITE_SPECIES = 12;
 const ELITE_WINS = 10;
@@ -41,6 +42,7 @@ export interface PlayerRecord {
   diverseTeam: boolean;
   owned: string[];
   species: number[];
+  shinySpecies: number[];
 }
 
 export interface RecordSource {
@@ -88,6 +90,7 @@ export function recordOf({ trainer, team, challenges, tournaments, rankedFirst }
     }
   const registered = new Set(trainer.roster.flatMap((entry) => lineage(entry.finalID)).filter((id) => id <= DEX_SIZE));
   const dexByRegion = Object.fromEntries(Object.keys(REGIONS).map((region) => [region, [...registered].filter((id) => inRegion(id, region as Region)).length])) as Record<Region, number>;
+  const shinySpecies = [...species].filter(([, entries]) => entries.some((entry) => entry.shiny)).map(([id]) => id);
   const legendary = [...species.values()].filter((entries) => entries.some((entry) => entry.rarity === 'legendary')).map((entries) => entries[0].finalID);
 
   const finished = challenges.filter((challenge) => challenge.status === 'finished' && sideOf(challenge, trainer.id) !== null).sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt));
@@ -113,7 +116,7 @@ export function recordOf({ trainer, team, challenges, tournaments, rankedFirst }
     dexTotal: registered.size,
     hoennLegendaries: legendary.filter((id) => inRegion(id, 'hoenn')).length,
     legendaries: legendary.length,
-    shinies: [...species.values()].filter((entries) => entries.some((entry) => entry.shiny)).length,
+    shinies: shinySpecies.length,
     tokens: trainer.totalTokens ?? 0,
     rankedWins: trainer.wins,
     rankedGames: trainer.wins + trainer.losses,
@@ -128,6 +131,7 @@ export function recordOf({ trainer, team, challenges, tournaments, rankedFirst }
     diverseTeam: team.length >= 6 && new Set(teamTypes).size === teamTypes.length,
     owned: trainer.owned ?? [],
     species: [...species.keys()],
+    shinySpecies,
   };
 }
 
@@ -169,6 +173,10 @@ const listNames = (ids: readonly number[]) => ids.map(nameOf).join(ids.length > 
 const ownsAnyOf = (ids: readonly number[]): GoalRule => {
   const finals = finalsOf(ids);
   return (r) => ({ ...goal(`Tener a ${listNames(finals)} en tu colección`, finals.some((id) => r.species.includes(id)), 1), ...(finals.length > 1 ? { hint: `Cuenta cualquiera: ${finals.map(nameOf).join(', ')}` } : {}) });
+};
+const ownsShinyOf = (id: number): GoalRule => {
+  const finals = finalsOf([id]);
+  return (r) => ({ ...goal(`Tener a ${listNames(finals)} shiny en tu colección`, finals.some((final) => r.shinySpecies.includes(final)), 1), ...(finals.length > 1 ? { hint: `Cuenta cualquiera en shiny: ${finals.map(nameOf).join(', ')}` } : {}) });
 };
 const ownsNamed = (name: string): GoalRule => ownsAnyOf([speciesIdByName(name) ?? 0]);
 const REGION_NAMES: Readonly<Record<string, string>> = { kanto: 'Kanto', johto: 'Johto', hoenn: 'Hoenn', sinnoh: 'Sinnoh', unova: 'Teselia', kalos: 'Kalos', alola: 'Alola', galar: 'Galar', paldea: 'Paldea' };
@@ -217,12 +225,12 @@ function buildUnlocks(): Map<string, Unlock> {
     });
   for (const [key, type] of Object.entries(ELITE_FOUR)) add([key], { group: 'elite', title: `Alto Mando · ${typeName(type)}`, ways: [[ofType(type, ELITE_SPECIES), rankedWins(ELITE_WINS)]] });
   const champion = (key: string, ...ways: GoalRule[][]) => add([key], { group: 'champion', title: 'Campeón', ways });
-  champion('blue', [dex('kanto', 75)]);
-  champion('lance', [dex('johto', 75)]);
-  champion('steven', [dex('hoenn', 100)]);
+  champion('blue', [dex('kanto', 45)]);
+  champion('lance', [dex('johto', 30)]);
+  champion('steven', [dex('hoenn', 40)]);
   champion('wallace', [(r) => goal('Pokémon legendario de Hoenn', r.hoennLegendaries, 1)]);
-  champion('cynthia', [dex('sinnoh', 100)]);
-  champion('alder', [dex('unova', 120)]);
+  champion('cynthia', [dex('sinnoh', 30)]);
+  champion('alder', [dex('unova', 45)]);
   champion('iris', [crowns(1)]);
   champion('diantha', [crowns(2)]);
   champion('kukui', [rankedWins(25)]);
@@ -231,7 +239,7 @@ function buildUnlocks(): Map<string, Unlock> {
   champion('geeta', [crowns(3)]);
   champion('nemona', [(r) => goal('Peleas contra otros jugadores', r.rankedGames, 100)]);
   champion('kieran', [(r) => goal('Torneos de 16 jugadores ganados', r.bigTournamentsWon, 1)]);
-  champion('red', [(r) => goal('Primer lugar del ranking', r.rankedFirst, 1), rankedWins(30)], [(r) => goal('Pokédex completa', r.dexTotal, DEX_SIZE)]);
+  champion('red', [(r) => goal('Primer lugar del ranking', r.rankedFirst, 1), rankedWins(15)], [(r) => goal('Especies registradas en la Pokédex', r.dexTotal, RED_DEX)]);
   add(VILLAINS.admin, { group: 'villain', title: 'Comandante de equipo villano', ways: [[beatAi('hard', 'Difícil')]] });
   add(VILLAINS.boss, { group: 'villain', title: 'Jefe de equipo villano', ways: [[beatAi('veryhard', 'Muy difícil')]] });
   add(VILLAINS.legend, { group: 'villain', title: 'Jefe legendario', ways: [[beatAi('skynet', 'Skynet')]] });
@@ -276,7 +284,11 @@ function buildUnlocks(): Map<string, Unlock> {
   for (const key of ['cheren', 'hugh']) special(key, [[(r) => goal('Equipo de 6 sin tipos repetidos', r.diverseTeam, 1)]]);
   for (const key of ['emmet', 'ingo']) special(key, [[(r) => goal('Victoria sin que se debilite ninguno de tus Pokémon', r.flawlessWins, 1)]]);
   for (const key of ['bede', 'marnie']) special(key, [[(r) => goal(`Victoria con Pokémon de nivel menor a ${LOW_LEVEL} en tu save`, r.lowLevelWins, 1)]]);
-  for (const variant of TRAINER_VARIANTS) if (variant.pokemon) variantOf(variant.key, variant.base, ownsSpecies(variant.pokemon));
+  for (const variant of TRAINER_VARIANTS) if (variant.pokemon && !variant.shiny) variantOf(variant.key, variant.base, ownsSpecies(variant.pokemon));
+  for (const variant of SHINY_VARIANTS) {
+    const original = unlocks.get(variant.original)!;
+    add([variant.key], { group: original.group, title: `${unlocks.get(variant.base)!.title} · variante shiny`, ways: [[hasOriginal(variant.base), ownsShinyOf(variant.pokemon)]] });
+  }
   for (const variant of EARNED_VARIANTS) {
     const type = VARIANT_COLOR_TYPES[variant.color];
     const title = `Variante ${VARIANT_COLOR_NAMES[variant.color]}`;

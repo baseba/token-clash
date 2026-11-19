@@ -2,7 +2,7 @@
 // "?v=dev" in its .html and .js files is replaced by a hash of the code when served.
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { PUBLIC_DIR } from '../shared/paths.js';
@@ -15,12 +15,17 @@ const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js
 // do. Sprites, cries, sounds and music aren't served from here (public/upstream.js).
 const CACHEABLE = new Set(['.png', '.ico']);
 const recolored = (rel: string): boolean => /^anims[/\\]ui[/\\]/.test(rel) || (/^trainers[/\\]/.test(rel) && VARIANT_KEYS.has(rel.slice('trainers/'.length, -'.png'.length)));
+const IMMUTABLE = 'public, max-age=31536000, immutable';
 
-// The manifests of public/upstream/ are part of the version, and the page asks for them with it.
-const cacheFor = (rel: string): string => {
-  if (/^upstream[/\\]/.test(rel)) return 'public, max-age=31536000, immutable';
+// The manifests of public/upstream/ and the trainer sprites are part of the version, and the page
+// asks for them with it. A trainer sprite asked for with another version (or none) may be stale.
+export const cacheFor = (rel: string, current: boolean): string => {
+  if (/^upstream[/\\]/.test(rel)) return IMMUTABLE;
+  if (/^trainers[/\\].+\.png$/.test(rel) && current) return IMMUTABLE;
   return CACHEABLE.has(extname(rel)) && !recolored(rel) ? 'public, max-age=86400' : 'no-cache';
 };
+
+const TRAINERS = 'trainers';
 
 export interface Asset {
   body: Buffer | string;
@@ -34,19 +39,20 @@ export class WebAssets {
     const hash = createHash('sha256');
     const code = readdirSync(PUBLIC_DIR).filter((f) => /\.(js|css|html)$/.test(f));
     const manifests = readdirSync(join(PUBLIC_DIR, 'upstream')).map((f) => join('upstream', f));
-    for (const file of [...code, ...manifests].sort()) hash.update(file).update(readFileSync(join(PUBLIC_DIR, file)));
+    const trainers = existsSync(join(PUBLIC_DIR, TRAINERS)) ? readdirSync(join(PUBLIC_DIR, TRAINERS)).filter((f) => f.endsWith('.png')).map((f) => join(TRAINERS, f)) : [];
+    for (const file of [...code, ...manifests, ...trainers].sort()) hash.update(file).update(readFileSync(join(PUBLIC_DIR, file)));
     return hash.digest('hex').slice(0, 10);
   })();
 
-  /** A file of public/, or null if there is none (or the path tries to leave public/). */
-  async read(path: string): Promise<Asset | null> {
+  /** A file of public/, or null if there is none (or the path tries to leave public/). `version` is the one the request asked for. */
+  async read(path: string, version?: string): Promise<Asset | null> {
     const rel = normalize(path).replace(/^([/\\])+/, '');
     if (rel.includes('..')) return null;
     const file = join(PUBLIC_DIR, rel || 'index.html');
     try {
       let body: Buffer | string = await readFile(file);
       if (['.html', '.js'].includes(extname(file))) body = body.toString('utf8').replaceAll('?v=dev', `?v=${this.version}`);
-      return { body, type: MIME[extname(file)] || 'application/octet-stream', cache: cacheFor(rel) };
+      return { body, type: MIME[extname(file)] || 'application/octet-stream', cache: cacheFor(rel, version === this.version) };
     } catch {
       return null;
     }
