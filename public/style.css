@@ -662,6 +662,8 @@ a.party-cell, a.party-cell.empty { cursor: pointer; }
 }
 .feedback-dialog::backdrop { background: rgb(0 0 0 / 0.6); }
 .feedback-dialog img { display: block; width: 100%; height: auto; border-radius: 10px; margin-bottom: .75rem; }
+.feedback-dialog .feedback-guide { margin: 0 0 .75rem; font-size: .9rem; color: var(--muted); text-wrap: balance; }
+.feedback-dialog .feedback-guide a { color: var(--accent); font-weight: 700; }
 
 [hidden] { display: none !important; }
 .nb-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .25rem 1rem; margin-bottom: 1.1rem; }

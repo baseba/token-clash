@@ -1,6 +1,7 @@
 # Cómo contribuir
 
-1. Haz fork (o una rama, si tienes acceso de escritura) desde `main`.
+1. Haz fork (o una rama, si tienes acceso de escritura) desde `main`. Si nunca lo has hecho, sigue
+   [Tu primer PR, paso a paso](#tu-primer-pr-paso-a-paso).
 2. Instala y levanta el juego en local:
 
    ```sh
@@ -15,6 +16,66 @@
 4. Al mergear, se despliega solo a https://clash.mirrordev.xyz en unos minutos, cuando no haya peleas en curso
    (ver "Deploy automático" en el README). Si tu PR necesita un paso a mano (regenerar datos, cambiar algo del
    servidor), déjalo hecho en el PR: lo que no esté commiteado no llega a producción.
+
+## Tu primer PR, paso a paso
+
+Si nunca has hecho un fork ni un PR, sigue esto. Necesitas una cuenta de GitHub, [Git](https://git-scm.com/downloads)
+y Node 22.13 o más nuevo.
+
+1. **Haz fork.** Entra a https://github.com/baseba/token-clash y aprieta **Fork** arriba a la derecha y después
+   **Create fork**. GitHub crea una copia del repo en tu cuenta: `https://github.com/<tu-usuario>/token-clash`.
+2. **Clona tu fork** en tu computador:
+
+   ```sh
+   git clone https://github.com/<tu-usuario>/token-clash.git
+   cd token-clash
+   git remote add upstream https://github.com/baseba/token-clash.git
+   ```
+
+   `origin` apunta a tu fork, donde vas a subir tus cambios. `upstream` apunta al repo original, para traer lo
+   nuevo.
+3. **Crea una rama** para tu cambio. No trabajes directo en `main`:
+
+   ```sh
+   git switch -c arregla-bug-de-la-tienda
+   ```
+
+4. **Haz el cambio y pruébalo** con `npm install`, `npm run dev` y `npm test` (ver arriba). `npm test` tiene que
+   pasar.
+5. **Commitea y sube la rama a tu fork:**
+
+   ```sh
+   git status
+   git add -A
+   git commit -m "fix(shop): el botón de comprar se desactiva sin tokens"
+   git push -u origin arregla-bug-de-la-tienda
+   ```
+
+   `git status` te muestra qué archivos vas a subir. Revisa que estén solo los que cambiaste.
+6. **Abre el PR.** Entra a tu fork en GitHub. Aparece un aviso con el botón **Compare & pull request**.
+   Si no aparece, ve a la pestaña **Pull requests** y aprieta **New pull request**. Revisa que diga
+   `base repository: baseba/token-clash`, `base: main` a la izquierda y tu fork y tu rama a la derecha.
+   Ponle un título como `fix(shop): …` y cuenta en la descripción qué arregla y por qué.
+7. **Responde la revisión.** Si te piden cambios, haz otro commit en la misma rama y súbelo con `git push`. El PR
+   se actualiza solo.
+
+Si `main` avanzó mientras trabajabas, commitea lo tuyo y ponte al día:
+
+```sh
+git fetch upstream
+git rebase upstream/main
+```
+
+Si Git se detiene por un conflicto, arregla los archivos que nombra, haz `git add` de cada uno y sigue con
+`git rebase --continue`. Si te enredas, `git rebase --abort` deshace todo y te deja como estabas. Cuando el rebase
+termine, corre `npm test` de nuevo.
+
+El rebase reescribe tus commits, así que GitHub rechaza un `git push` normal si ya habías subido la rama. En ese caso
+súbela con `git push --force-with-lease`, que solo pisa tu rama si nadie más la cambió. Si no la habías subido, usa
+el `git push -u` del paso 5.
+
+¿Solo quieres reportar un bug o proponer una idea sin programar? Abre un
+[issue](https://github.com/baseba/token-clash/issues/new).
 
 ## Ojo con
 
