@@ -71,14 +71,16 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
 
   /** `playing` is when the song the DJ saw on air started: see Station.setQueue. */
   setQueue(ownerId: string, queue: readonly RadioTrackId[], playing: number | null): StationView {
-    const station = this.owned(ownerId);
-    station.setQueue(queue, playing, now(), radioTrackDuration);
+    const at = now();
+    const station = this.owned(ownerId, at);
+    station.setQueue(queue, playing, at, radioTrackDuration);
     return this.changed(station);
   }
 
   skip(ownerId: string): StationView {
-    const station = this.owned(ownerId);
-    station.skip(now(), radioTrackDuration);
+    const at = now();
+    const station = this.owned(ownerId, at);
+    station.skip(at, radioTrackDuration);
     return this.changed(station);
   }
 
@@ -102,16 +104,19 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     this.listeners.tuneOut(listener);
   }
 
-  private owned(ownerId: string): Station {
+  // The edit that follows must use the same `at`: if the clock ticked past a song's end in between,
+  // the edit would advance the station again and could then be refused, leaving that song unsaved
+  // and unannounced.
+  private owned(ownerId: string, at: number): Station {
     const station = this.stations.findByOwner(ownerId);
     if (!station) throw notFound(NO_STATION);
-    this.settle(station);
+    this.settle(station, at);
     return station;
   }
 
   /** Catches the station up with its clock. If a song changed, saves it and tells its listeners. */
-  private settle(station: Station): boolean {
-    const advanced = station.advance(now(), radioTrackDuration);
+  private settle(station: Station, at = now()): boolean {
+    const advanced = station.advance(at, radioTrackDuration);
     if (advanced) this.changed(station);
     return advanced;
   }
