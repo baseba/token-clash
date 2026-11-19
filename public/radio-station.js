@@ -142,15 +142,19 @@ export function stationsPanel({ h, api, toast, feed }) {
 
   function paint() {
     if (!stations) return root.replaceChildren(h('p', { class: 'muted' }, 'Buscando estaciones…'));
-    const live = feed.station;
-    const shown = stations.map((station) => (live?.ownerId === station.ownerId ? live : station));
     root.replaceChildren(
       h('p', { class: 'muted small' }, 'Cada estación es de un entrenador: el DJ elige la cola y todos escuchan lo mismo, al mismo tiempo.'),
-      shown.length ? h('div', { class: 'radio-list' }, shown.map(row)) : h('p', { class: 'muted' }, 'No hay estaciones al aire. Abre la tuya en "Mi estación".'),
+      stations.length ? h('div', { class: 'radio-list' }, stations.map(row)) : h('p', { class: 'muted' }, 'No hay estaciones al aire. Abre la tuya en "Mi estación".'),
     );
   }
 
-  return { root, load, paint };
+  /** A `radio` frame replaces its station's row. Whichever came last, the list or the frame, wins. */
+  function update(view) {
+    if (!view || !stations) return;
+    stations = stations.map((station) => (station.ownerId === view.ownerId ? view : station));
+  }
+
+  return { root, load, paint, update };
 }
 
 /**
@@ -193,8 +197,9 @@ export function myStationPanel({ h, api, toast, feed, session, onChange }) {
       station = (await request()).station;
     } catch (error) {
       toast(error.message);
-      // The tab only follows the station while tuned to it, so it can be stale: show where it is now.
-      if (error.status === 409) return load();
+      // The tab only follows the station while tuned to it, so it can be stale (a song changed, or
+      // another tab closed the station): show where it is now.
+      if (error.status === 409 || error.status === 404) return load();
     }
     paint();
   }
@@ -266,12 +271,11 @@ export function myStationPanel({ h, api, toast, feed, session, onChange }) {
     );
   }
 
-  /** A `radio` frame of the owner's own station keeps the tab current. */
+  /** A `radio` frame of the owner's own station keeps the tab current. The caller repaints the dialog. */
   function update(view) {
-    if (view && station && view.ownerId === station.ownerId) {
-      station = view;
-      paint();
-    }
+    if (!view || !station || view.ownerId !== station.ownerId) return;
+    station = view;
+    paintPanel();
   }
 
   return {

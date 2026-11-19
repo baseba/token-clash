@@ -747,6 +747,7 @@ function radioButton() {
     storage: { getItem: (k) => ls.get(k), setItem: (k, v) => ls.set(k, v) },
     onFrame: (frame) => {
       music.tuneStation(frame);
+      stations.update(frame?.station ?? null);
       mine.update(frame?.station ?? null);
       paint();
     },
@@ -813,13 +814,22 @@ function radioButton() {
       ),
     );
   }
+  // Rebuilt only when what it shows changes: a frame arriving must not take the keyboard focus off
+  // the song just added.
+  let listKey = null;
+  function paintList() {
+    const key = `${tab}|${query}|${kind}|${region}|${feed.tuned ? '' : music.radio}`;
+    if (key === listKey) return;
+    listKey = key;
+    const tracks = shown();
+    count.textContent = `${tracks.length} canciones`;
+    list.replaceChildren(...(tracks.length ? tracks.map(trackItem) : [h('p', { class: 'muted' }, 'Ninguna canción coincide con el filtro.')]));
+  }
   function paint() {
     paintButton();
     if (!dlg.open) return;
     for (const item of tabs.children) item.setAttribute('aria-pressed', String(item.dataset.tab === tab));
-    const tracks = shown();
-    count.textContent = `${tracks.length} canciones`;
-    list.replaceChildren(...(tracks.length ? tracks.map(trackItem) : [h('p', { class: 'muted' }, 'Ninguna canción coincide con el filtro.')]));
+    paintList();
     for (const [name, pane] of Object.entries(panes)) pane.hidden = name !== tab;
     if (tab === 'tracks') paintTracksNow();
     else if (tab === 'stations') stations.paint();
