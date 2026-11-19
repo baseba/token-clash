@@ -69,9 +69,10 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     for (const listener of this.listeners.drop(ownerId)) if (listener.open) listener.send(this.frame(null));
   }
 
-  setQueue(ownerId: string, queue: readonly RadioTrackId[]): StationView {
+  /** `playing` is when the song the DJ saw on air started: see Station.setQueue. */
+  setQueue(ownerId: string, queue: readonly RadioTrackId[], playing: number | null): StationView {
     const station = this.owned(ownerId);
-    station.setQueue(queue, now(), radioTrackDuration);
+    station.setQueue(queue, playing, now(), radioTrackDuration);
     return this.changed(station);
   }
 

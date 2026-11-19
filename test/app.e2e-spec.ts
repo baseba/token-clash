@@ -515,20 +515,23 @@ test('a trainer runs a radio station: only they edit its queue, and every listen
   assert.equal(tuned.station.listeners, 1);
   assert.ok(Math.abs(tuned.now - Date.now()) < 5000, 'the frame carries the server clock');
 
-  const queued = await call('/api/radio/station/queue', { method: 'PUT', token: dj.token, body: { queue: ['battle_kanto_gym', 'title'] } });
+  const queued = await call('/api/radio/station/queue', { method: 'PUT', token: dj.token, body: { queue: ['battle_kanto_gym', 'title'], playing: null } });
   assert.equal(queued.status, 200);
   const playing = (await nextFrame()).station;
   assert.deepEqual(playing, queued.data.station);
   assert.equal(playing.nowPlaying.track, 'battle_kanto_gym');
   assert.equal(playing.nowPlaying.endsAt - playing.nowPlaying.startedAt, 58253, 'it plays once through, as long as the mp3 lasts');
   assert.deepEqual(playing.queue, ['title']);
-  assert.equal((await call('/api/radio/station/queue', { method: 'PUT', token: dj.token, body: { queue: ['not_a_song'] } })).status, 400);
-  const notTheirs = await call('/api/radio/station/queue', { method: 'PUT', token: other.token, body: { queue: ['title'] } });
+  assert.equal((await call('/api/radio/station/queue', { method: 'PUT', token: dj.token, body: { queue: ['not_a_song'], playing: null } })).status, 400);
+  const notTheirs = await call('/api/radio/station/queue', { method: 'PUT', token: other.token, body: { queue: ['title'], playing: null } });
   assert.deepEqual([notTheirs.status, notTheirs.data.error], [404, 'No tienes una estación abierta.']);
 
   const skipped = await call('/api/radio/station/skip', { method: 'POST', token: dj.token });
   assert.equal(skipped.data.station.nowPlaying.track, 'title');
   assert.deepEqual((await nextFrame()).station.queue, []);
+  const stale = await call('/api/radio/station/queue', { method: 'PUT', token: dj.token, body: { queue: ['battle_kanto_gym', 'title'], playing: playing.nowPlaying.startedAt } });
+  assert.equal(stale.status, 409, 'a queue edited while an older song was on air is refused');
+  assert.match(stale.data.error, /cambió de canción/);
   const listed = (await call('/api/radio/stations')).data.stations.find((station) => station.ownerId === ownerId);
   assert.deepEqual(listed, skipped.data.station);
   assert.deepEqual((await call(`/api/radio/stations/${ownerId}`)).data.station, listed);
@@ -549,7 +552,7 @@ test('everything survives a restart: sessions, collections, results, tournaments
   const uid = a.data.me.roster[0].uid;
   await call('/api/me', { method: 'PUT', token, body: { nickname: { id: uid, name: 'Chispa' } } });
   await call('/api/radio/station', { method: 'PUT', token, body: { name: 'Radio Memoria' } });
-  await call('/api/radio/station/queue', { method: 'PUT', token, body: { queue: ['battle_rocket_boss', 'title', 'town'] } });
+  await call('/api/radio/station/queue', { method: 'PUT', token, body: { queue: ['battle_rocket_boss', 'title', 'town'], playing: null } });
   // A battle in progress lives in memory only: after a restart it must show up as cut.
   const live = (await call('/api/challenges', { method: 'POST', token, body: { ai: 'easy' } })).data.challenge;
   assert.equal(live.status, 'active');

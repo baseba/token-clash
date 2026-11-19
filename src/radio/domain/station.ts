@@ -84,10 +84,15 @@ export class Station implements StationState {
   /**
    * The DJ's new queue: adding, removing and reordering all send the whole list. If nothing is on
    * air, or the song on air already played through and is looping, the first one starts now.
+   *
+   * `playing` is when the song the DJ saw on air started (null if none). The whole list comes from
+   * the DJ's copy, which can be minutes old: if a song changed since, that list still holds songs
+   * that already played, and taking it would play them again.
    */
-  setQueue(tracks: readonly RadioTrackId[], now: number, durationOf: TrackDuration): void {
+  setQueue(tracks: readonly RadioTrackId[], playing: number | null, now: number, durationOf: TrackDuration): void {
     if (tracks.length > STATION_QUEUE_MAX) throw invalid(`La cola admite hasta ${STATION_QUEUE_MAX} canciones.`);
     this.advance(now, durationOf);
+    if (playing !== (this.nowPlaying?.startedAt ?? null)) throw conflict('La estación cambió de canción mientras editabas la cola: revisa la cola y vuelve a intentarlo.');
     this.queue = [...tracks];
     if (this.queue.length && (!this.nowPlaying || now >= this.nowPlaying.endsAt)) this.playNext(now, durationOf);
   }

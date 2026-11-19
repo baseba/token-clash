@@ -38,7 +38,7 @@ export class RadioController {
   @Put('station/queue')
   @Authenticated(NO_SESSION)
   setQueue(@CurrentTrainer() trainer: Trainer, @Body({ schema: StationQueueDto }) body: StationQueueDto) {
-    return { station: this.radio.setQueue(trainer.id, body.queue) };
+    return { station: this.radio.setQueue(trainer.id, body.queue, body.playing) };
   }
 
   @Post('station/skip')

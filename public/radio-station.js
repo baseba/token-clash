@@ -182,11 +182,14 @@ export function myStationPanel({ h, api, toast, feed, session, onChange }) {
       station = (await request()).station;
     } catch (error) {
       toast(error.message);
+      // The tab only follows the station while tuned to it, so it can be stale: show where it is now.
+      if (error.status === 409) return load();
     }
     paint();
   }
 
-  const setQueue = (queue) => act(() => api('/api/radio/station/queue', { method: 'PUT', body: { queue } }));
+  // `playing` lets the server refuse an edit made on a copy older than the song on air.
+  const setQueue = (queue) => act(() => api('/api/radio/station/queue', { method: 'PUT', body: { queue, playing: station.nowPlaying?.startedAt ?? null } }));
   const move = (from, to) => {
     const queue = [...station.queue];
     const [track] = queue.splice(from, 1);

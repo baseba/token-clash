@@ -42,7 +42,7 @@ afterEach(() => mock.timers.reset());
 test('a tuned listener hears the next song the moment the one on air ends, timed from its end', () => {
   const radio = new RadioService(new MemoryStations(), trainers);
   radio.open('ana', 'Radio');
-  const playing = radio.setQueue('ana', [GYM, 'title']);
+  const playing = radio.setQueue('ana', [GYM, 'title'], null);
   const endsAt = playing.nowPlaying!.endsAt;
   const ear = listener();
   radio.tune(ear, 'ana');
@@ -75,7 +75,7 @@ test('at boot a station catches up with the time it spent off, and saves where i
 test('renaming a station that fell behind sends its listeners one frame, caught up and renamed', () => {
   const radio = new RadioService(new MemoryStations(), trainers);
   radio.open('ana', 'Radio');
-  const endsAt = radio.setQueue('ana', [GYM, 'title']).nowPlaying!.endsAt;
+  const endsAt = radio.setQueue('ana', [GYM, 'title'], null).nowPlaying!.endsAt;
   const ear = listener();
   radio.tune(ear, 'ana');
   radio.onModuleDestroy();
