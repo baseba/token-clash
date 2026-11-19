@@ -22,3 +22,27 @@ test('the radio plays its song in place of any screen, and the profile has its o
   assert.equal(trackFor('radio:not-a-song'), null);
   assert.equal(trackFor('tab:profile'), 'title');
 });
+
+// A silent MPEG-1 Layer III frame at 128 kbps and 44.1 kHz: 417 bytes, 1152 samples.
+const FRAME_BYTES = 417;
+const frames = (count, { xingFrames = null, id3 = 0 } = {}) => {
+  const bytes = new Uint8Array(id3 + FRAME_BYTES * count);
+  if (id3) bytes.set([0x49, 0x44, 0x33, 4, 0, 0, 0, 0, (id3 - 10) >> 7, (id3 - 10) & 0x7f]);
+  for (let i = 0; i < count; i++) bytes.set([0xff, 0xfb, 0x90, 0x00], id3 + i * FRAME_BYTES);
+  if (xingFrames != null) {
+    bytes.set([...'Xing'].map((char) => char.charCodeAt(0)), id3 + 36);
+    bytes.set([0, 0, 0, 1, xingFrames >>> 24, (xingFrames >>> 16) & 0xff, (xingFrames >>> 8) & 0xff, xingFrames & 0xff], id3 + 40);
+  }
+  return bytes;
+};
+
+test('an mp3 lasts its frames times their samples, read from its Xing tag or counted one by one', async () => {
+  const { mp3Duration } = await import('../../scripts/sync-radio.js');
+  assert.deepEqual(mp3Duration(frames(100)), { ms: Math.round((100 * 1152 * 1000) / 44100), frames: 100, taggedFrames: null, walkedFrames: 100, sampleRate: 44100, samplesPerFrame: 1152 });
+  const tagged = mp3Duration(frames(101, { xingFrames: 100, id3: 300 }));
+  assert.equal(tagged.taggedFrames, 100);
+  assert.equal(tagged.walkedFrames, 100, 'the tag frame holds no audio');
+  assert.equal(tagged.ms, 2612);
+  assert.equal(mp3Duration(frames(5, { xingFrames: 9000 })).ms, Math.round((9000 * 1152 * 1000) / 44100), 'the tag wins over a walk cut short');
+  assert.throws(() => mp3Duration(new Uint8Array(2000)), /frames MPEG/);
+});

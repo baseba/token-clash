@@ -9,6 +9,6 @@
     "noImplicitAny": false,
     "tsBuildInfoFile": "./dist/.tsbuildinfo.test"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "public/types.js", "public/trainer-sprites.js", "public/shop.js", "public/trainer-variants.js", "public/upstream.js"],
+  "include": ["src/**/*.ts", "test/**/*.ts", "public/types.js", "public/trainer-sprites.js", "public/shop.js", "public/radio.js", "public/trainer-variants.js", "public/upstream.js"],
   "exclude": ["node_modules", "dist"]
 }
