@@ -852,12 +852,15 @@ renderSound();
 
 // Without the sprite manifest every Pokémon would stay blank for the session, so each navigation
 // asks for it again. One request at a time, and the repaint waits if it would drop unsaved edits.
+// A battle the player moved into meanwhile is not repainted: that would reconnect its socket mid-fight.
 let spritesRetry = null;
 function retrySprites() {
   if (spritesLoaded() || spritesRetry) return;
+  const startedOn = location.pathname;
+  const enteredBattle = () => location.pathname !== startedOn && location.pathname.startsWith('/b/');
   spritesRetry = loadSprites()
     .finally(() => (spritesRetry = null))
-    .then(() => spritesLoaded() && !unsaved?.() && route(), () => {});
+    .then(() => spritesLoaded() && !unsaved?.() && !enteredBattle() && route(), () => {});
 }
 
 function route() {
@@ -5225,4 +5228,11 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
 
 fallBackToRaw(document);
 document.querySelector('footer.credits')?.append(feedbackButton());
-Promise.all([loadSprites(), loadFaces()]).finally(route);
+// The first paint waits for the manifests only a moment: a request that stalls between Cloudflare
+// and the tunnel would keep the page on "Cargando…" for as long as it lasts. A late sprite manifest
+// repaints through retrySprites, which joins the request already in flight. Late faces only refresh
+// the header, since a repaint would drop what the player typed, and the next page crops every
+// avatar. A battle keeps waiting: repainting it would reconnect its socket mid-fight.
+const MANIFEST_WAIT_MS = 1000;
+const manifests = Promise.all([loadSprites(), loadFaces().then(renderWho)]);
+(location.pathname.startsWith('/b/') ? manifests : Promise.race([manifests, sleep(MANIFEST_WAIT_MS)])).finally(route);
