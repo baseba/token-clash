@@ -40,6 +40,8 @@ export const ClientMessage = z.discriminatedUnion('t', [
   z.object({ t: z.literal('watch') }),
   /** A message to the room's or the tournament's chat. */
   z.object({ t: z.literal('chat'), text: z.string().catch('') }),
+  /** Tune in to a radio station (its owner's id), or out with null. Independent of rooms and the lobby. */
+  z.object({ t: z.literal('radio'), station: z.string().nullable().catch(null) }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 export type ClientMessageOf<T extends ClientMessage['t']> = Extract<ClientMessage, { t: T }>;

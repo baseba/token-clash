@@ -122,6 +122,21 @@ export function moveSfxCues(manifest, key, byPlayer = true) {
 
 
 
+/**
+ * Where a radio station's song is, in seconds into its mp3. The time since it started is counted
+ * on the server's clock: `serverNow` when the frame was sent, plus `sinceFrameMs` measured here
+ * since it arrived, so a client clock that runs fast or slow doesn't matter. Past the end a song
+ * that `loops` (nothing else was queued) falls inside [loopStart, duration). One that doesn't
+ * loop has ended there, and the frame with the next song is on its way: null, nothing to play.
+ */
+export function stationPosition({ startedAt, serverNow, sinceFrameMs }, { duration, loopStart, loops }) {
+  const elapsed = Math.max(0, (serverNow - startedAt + sinceFrameMs) / 1000);
+  if (elapsed < duration) return elapsed;
+  if (!loops) return null;
+  const loopFrom = loopStart < duration ? loopStart : 0;
+  return loopFrom + ((elapsed - loopFrom) % (duration - loopFrom));
+}
+
 export function createPlayer({ storage = null } = {}) {
   let ctx = null;
   let sfxGain = null;
@@ -133,6 +148,9 @@ export function createPlayer({ storage = null } = {}) {
   let wanted = null;
   let lastSfxAt = -Infinity;
   let radio = null;
+  // The station tuned in, as its last frame said, with when that frame arrived here. It beats the
+  // personal radio and the screens' music while it lasts.
+  let station = null;
   const read = (k, d) => {
     try {
       const v = storage?.getItem(k);
@@ -150,7 +168,8 @@ export function createPlayer({ storage = null } = {}) {
   const volumes = { music: read(VOLUME_KEYS.music, 0.5), sfx: read(VOLUME_KEYS.sfx, 0.15) };
   let muted = read('tc_music_muted', false);
   radio = radioTrack(read('tc_radio', null)) ? read('tc_radio', null) : null;
-  const shown = () => (radio ? `radio:${radio}` : wanted);
+  const stationKey = () => `station:${station.ownerId}:${station.nowPlaying?.track ?? ''}:${station.nowPlaying?.startedAt ?? ''}`;
+  const shown = () => (station ? stationKey() : radio ? `radio:${radio}` : wanted);
   let musicGain = null;
   const LEVEL = { music: 1.6, sfx: 2.8 };
   const STREAM_LEVEL = 0.55;
@@ -418,29 +437,57 @@ export function createPlayer({ storage = null } = {}) {
     return trackGain;
   }
 
-  async function stream(id, track, gain, loop) {
+  // `place` says, once the mp3 is loaded, whether it loops and where it starts, or null to not start it.
+  async function stream(id, track, gain, place) {
     const [buffer, loops] = await Promise.all([pokerogueBuffer('music', track), loadManifest('/music/loops.json')]);
     if (current?.id !== id || trackGain !== gain || !buffer) return;
+    const loopStart = Math.min(loops?.[track] ?? 0, buffer.duration);
+    const placement = place(buffer.duration, loopStart);
+    if (!placement) return;
+    const { loop, offset } = placement;
     const source = ctx.createBufferSource();
     const level = ctx.createGain();
     source.buffer = buffer;
     source.loop = loop;
-    source.loopStart = Math.min(loops?.[track] ?? 0, buffer.duration);
+    source.loopStart = loopStart;
     source.loopEnd = buffer.duration;
     level.gain.value = STREAM_LEVEL;
     source.connect(level);
     level.connect(gain);
-    source.start();
+    source.start(0, offset);
     current.source = source;
   }
 
+  // A station's song plays once through while more are queued (the server sends the next one when
+  // it ends) and loops when it is the last one. The mp3 can take a while to load: by then the
+  // listener may have tuned out or on to another song (a tuneStation while the audio is suspended
+  // leaves `current` as it was), or the song may have ended.
+  const placeOnStation = (id) => (duration, loopStart) => {
+    if (id !== shown()) return null;
+    const loop = !station.queue.length;
+    const offset = stationPosition({ startedAt: station.nowPlaying.startedAt, serverNow: station.serverNow, sinceFrameMs: performance.now() - station.receivedAt }, { duration, loopStart, loops: loop });
+    return offset === null ? null : { loop, offset };
+  };
+
   function start(id) {
-    if (radio) id = `radio:${radio}`;
+    if (station) id = stationKey();
+    else if (radio) id = `radio:${radio}`;
     if (!ensure() || current?.id === id) return;
-    const track = trackFor(id);
+    const track = station ? station.nowPlaying?.track ?? null : trackFor(id);
     const gain = fadeOutCurrent();
     current = track ? { id } : null;
-    if (track) stream(id, track, gain, !id.startsWith('victory:'));
+    if (track) stream(id, track, gain, station ? placeOnStation(id) : () => ({ loop: !id.startsWith('victory:'), offset: 0 }));
+  }
+
+  // Back to the screen's own music once neither a station nor the personal radio covers it.
+  function playWanted() {
+    if (wanted) {
+      current = null;
+      start(wanted);
+    } else {
+      fadeOutCurrent();
+      current = null;
+    }
   }
 
   return {
@@ -456,7 +503,7 @@ export function createPlayer({ storage = null } = {}) {
     },
     stop() {
       wanted = null;
-      if (radio || !ctx || !trackGain) return;
+      if (station || radio || !ctx || !trackGain) return;
       trackGain.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
       const source = current?.source;
       if (source) setTimeout(() => source.stop(), 1000);
@@ -541,15 +588,21 @@ export function createPlayer({ storage = null } = {}) {
     setRadio(track) {
       radio = track && radioTrack(track) ? track : null;
       write('tc_radio', radio);
-      if (!ctx || ctx.state !== 'running') return;
+      if (!ctx || ctx.state !== 'running' || station) return;
       if (radio) start(`radio:${radio}`);
-      else if (wanted) {
-        current = null;
-        start(wanted);
-      } else {
-        fadeOutCurrent();
-        current = null;
+      else playWanted();
+    },
+    /** A `radio` frame of the station tuned in, or null to stop listening. */
+    tuneStation(frame) {
+      const view = frame?.station ?? null;
+      station = view && { ownerId: view.ownerId, nowPlaying: view.nowPlaying, queue: view.queue, serverNow: frame.now, receivedAt: performance.now() };
+      if (!ctx || ctx.state !== 'running') return;
+      if (station && current?.id === stationKey()) {
+        if (current.source) current.source.loop = !station.queue.length;
+        return;
       }
+      if (station || radio) start(shown());
+      else playWanted();
     },
     get muted() {
       return muted;

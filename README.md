@@ -159,7 +159,12 @@ tocan las pistas tranquilas de bioma (`town`, `tall_grass`, `laboratory`, `plain
 `menu`, el perfil `title` (el tema original de PokeRogue) y al ganar suena `bw/victory_trainer` (o
 `bw/victory_champion` en un torneo). No hay música sintética. La **📻 radio** de la cabecera trae las 175 pistas
 de PokeRogue (`public/radio.js`), filtrables por batalla u otras, por región o generación y por las originales de
-PokeRogue; mientras está encendida suena en vez de la música de cada pantalla, en todo el sitio y entre recargas. `public/battle-anims.js` las reproduce cuadro a cuadro sobre el campo; lo que no tenga animación usa los efectos
+PokeRogue; mientras está encendida suena en vez de la música de cada pantalla, en todo el sitio y entre recargas.
+Cada entrenador puede abrir además su **estación**: elige la cola y cualquiera, con o sin sesión, entra desde la
+pestaña "Estaciones" a escuchar lo mismo al mismo tiempo. Cada canción suena una vez entera y después empieza la
+siguiente; si la cola se vacía, la última sigue en loop. El servidor toca la cola con su reloj (por eso conoce la
+duración de cada pista, en `src/catalog/data/radio-durations.json`) y la estación queda guardada aunque se reinicie.
+`public/battle-anims.js` las reproduce cuadro a cuadro sobre el campo; lo que no tenga animación usa los efectos
 sintéticos de `public/fx.js` y `public/music.js`. El campo de batalla replica el de PokeRogue: un escenario lógico de
 320×180 escalado al ancho disponible, con nuestros fondos (`public/backgrounds/`) escalados al ancho del campo y
 sus plataformas, los Pokémon anclados en (106, 142) y (236, 84) a tamaño de sprite real, cajas y cuadro de texto con el
@@ -228,6 +233,7 @@ Por carpeta:
 | `src/trainers/` | Entrenadores: importar el save, la colección, el equipo, la sesión, el saldo, lo comprado y el reciclaje. Dueño de `trainers` y `roster_entries`. |
 | `src/arena/` | Salas 1 contra 1, emparejamiento, peleas en vivo y torneos. Dueño de `challenges` y `tournament*`. |
 | `src/chat/` | El chat de salas y torneos (en memoria). |
+| `src/radio/` | Las estaciones de radio de los entrenadores: la cola que elige el DJ, qué suena y quién escucha. Dueño de `radio_stations`. |
 | `src/stats/` | La página de stats y los logros. No guarda nada: los cambios del entrenador se los pide a `TrainersService`. |
 | `src/realtime/` | El protocolo WebSocket (`/ws`). |
 | `src/web/` | El frontend estático y los health checks. |
@@ -264,7 +270,8 @@ Por tema:
 | Archivos externos (jsDelivr y respaldo en GitHub) | | | `public/upstream.js` (commits fijados, URLs y respaldo), `public/upstream/*.json`; la CSP que los permite está en `src/shared/http/security-headers.middleware.ts` |
 | Reciclaje de repetidos | `src/trainers/domain/recycling.ts` (cuánto vale cada uno), `Trainer.recycle` en `trainer.ts`; los repetidos salen de `save-file.ts` | `GET` y `POST /api/me/recycling` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
 | Efectos al abrir la Poké Ball | | | `public/ball-fx.js` (efecto por Ball y rareza), `public/ball-burst.js` (los dibuja en un canvas) |
-| Música, radio y sonidos | | | `public/music.js`, `public/radio.js`, `public/fx.js` |
+| Música, radio y sonidos | duración de cada pista en `src/catalog/domain/radio-tracks.ts` (la mide `scripts/sync-radio.js`) | | `public/music.js`, `public/radio.js`, `public/fx.js` |
+| Estaciones de radio | `src/radio/domain/station.ts` (la cola y qué suena), `src/radio/application/radio.service.ts` (timers y oyentes) | `radio/interface/radio.controller.ts` (`/api/radio/...`), WebSocket `{ t: 'radio' }` en `src/realtime/game.gateway.ts` | `public/radio-station.js` (las pestañas y el socket de la estación), `public/music.js` |
 | Notificaciones | | | `public/notify.js` |
 | Configuración y variables de entorno | `src/shared/config/app-config.ts` | | |
 | Seguridad HTTP y límites | `src/shared/http/` | | |
@@ -281,6 +288,7 @@ Datos externos:
 - `scripts/sync-trainers.js`: descarga los entrenadores de la lista de `public/trainer-sprites.js` a `public/trainers/`,
   recortando el primer cuadro de cada hoja de sprites (corre solo en `npm install`, o `npm run trainers`). Los sirve el
   juego porque no son copias exactas: el recorte y las variantes de colores salen de acá.
+- `scripts/sync-radio.js` (`npm run radio`): baja cada canción de la radio del commit fijado de pokerogue-assets, mide su duración leyendo los frames del mp3 y escribe `src/catalog/data/radio-durations.json`. Córrelo si cambia el commit o la lista de `public/radio.js`: el servidor no arranca si a una canción le falta su duración.
 - `scripts/upstream-files.js`: lo que comparten esos scripts para leer los repos externos en el commit fijado (reintentos, HEAD, manifiestos con una entrada por línea).
 - `public/battle-anims.js`: intérprete propio del formato de animación de PokeRogue (cuadros de 50 ms, focos en atacante, objetivo o pantalla, fondos).
 - `public/types.js`: tipos y tabla de efectividad, compartidos por el navegador y el servidor.

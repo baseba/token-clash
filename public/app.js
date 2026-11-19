@@ -9,6 +9,7 @@ import { patchSave } from './savepatch.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
 import { TRAINER_SPRITES, TRAINER_VARIANTS, trainerSpriteFor, VARIANT_COLOR_NAMES } from './trainer-sprites.js?v=dev';
 import { RADIO_KINDS, RADIO_REGIONS, RADIO_TRACKS, radioTrack } from './radio.js?v=dev';
+import { createStationFeed, myStationPanel, stationsPanel } from './radio-station.js?v=dev';
 import { createNotifier } from './notify.js?v=dev';
 import { RARITIES, SHOP_KINDS } from './shop.js?v=dev';
 import { fallBackToRaw } from './upstream.js?v=dev';
@@ -80,6 +81,8 @@ function toast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => $toast.classList.remove('show'), 2600);
 }
+
+const wsURL = () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
 async function api(path, { method = 'GET', body } = {}) {
   const headers = {};
@@ -726,54 +729,122 @@ document.addEventListener('click', (e) => {
   if (kind) music.ui(kind);
 }, { capture: true });
 
+const RADIO_TABS = { tracks: 'Pistas', stations: 'Estaciones', mine: 'Mi estación' };
+
 function radioButton() {
   let kind = '';
   let region = '';
   let query = '';
+  let tab = 'tracks';
   const btn = h('button', { class: 'sound-btn radio-btn', type: 'button', 'aria-label': 'Radio', 'aria-haspopup': 'dialog', 'data-tip': 'Radio' }, '📻');
   const now = h('div', { class: 'radio-now' });
   const count = h('span', { class: 'muted small' });
   const list = h('div', { class: 'radio-list', role: 'listbox', 'aria-label': 'Canciones' });
   const dlg = h('dialog', { class: 'info-dlg radio-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() });
+  // The station tuned in keeps playing on every page and after a reload: one feed for the whole app.
+  const feed = createStationFeed({
+    open: () => new WebSocket(wsURL()),
+    storage: { getItem: (k) => ls.get(k), setItem: (k, v) => ls.set(k, v) },
+    onFrame: (frame) => {
+      music.tuneStation(frame);
+      stations.update(frame?.station ?? null);
+      mine.update(frame?.station ?? null);
+      paint();
+    },
+  });
+  const stations = stationsPanel({ h, api, toast, feed });
+  // Opening or closing my station shows or hides the track list under its panel.
+  const mine = myStationPanel({ h, api, toast, feed, session: () => me, onChange: () => paint() });
   const shown = () => {
     const words = query.toLowerCase();
     return RADIO_TRACKS.filter((t) => (!kind || t.kind === kind) && (!region || t.region === region) && (!words || `${t.title} ${RADIO_REGIONS[t.region]}`.toLowerCase().includes(words)));
   };
+  // Picking a song of your own stops listening to a station: otherwise the click would play nothing.
   const tune = (id) => {
+    if (id) feed.tune(null);
     music.setRadio(id);
     paint();
   };
-  function paint() {
+  const filters = h('div', { class: 'radio-filters' },
+    h('input', { type: 'search', placeholder: 'Buscar canción…', 'aria-label': 'Buscar canción', oninput: (event) => { query = event.target.value.trim(); paint(); } }),
+    h('select', { 'aria-label': 'Tipo de canción', onchange: (event) => { kind = event.target.value; paint(); } }, h('option', { value: '' }, 'Batalla y otras'), Object.entries(RADIO_KINDS).map(([value, label]) => h('option', { value }, label))),
+    h('select', { 'aria-label': 'Región o generación', onchange: (event) => { region = event.target.value; paint(); } }, h('option', { value: '' }, 'Todas las regiones'), Object.entries(RADIO_REGIONS).map(([value, label]) => h('option', { value }, label))),
+    count,
+  );
+  const tabs = h('div', { class: 'segmented radio-tabs', role: 'group', 'aria-label': 'Radio' }, Object.entries(RADIO_TABS).map(([value, label]) => h('button', { type: 'button', class: 'seg-item', 'data-tab': value, onclick: () => show(value) }, label)));
+  // Every tab is mounted once and shown or hidden, never re-inserted: moving a node takes the focus
+  // off the search box and scrolls the list back to the top. The filtered track list is shared by
+  // "Pistas" and "Mi estación", so it moves only when the tab does.
+  const tracksPane = h('div', { class: 'radio-tab' }, now, filters, list);
+  const minePicker = h('div', { class: 'radio-tab' }, h('b', { class: 'small' }, 'Agregar canciones'));
+  const minePane = h('div', { class: 'radio-tab' }, mine.root, minePicker);
+  const panes = { tracks: tracksPane, stations: stations.root, mine: minePane };
+  function show(next) {
+    tab = next;
+    const picker = tab === 'mine' ? minePicker : tracksPane;
+    if (filters.parentNode !== picker) picker.append(filters, list);
+    if (tab === 'stations') stations.load();
+    if (tab === 'mine') mine.load();
+    paint();
+  }
+  const trackTags = (track) => h('span', { class: 'radio-tags' }, h('span', { class: `chip radio-kind ${track.kind}` }, RADIO_KINDS[track.kind]), h('span', { class: 'chip' }, RADIO_REGIONS[track.region]));
+  const trackItem = (track) => {
+    if (tab === 'mine') return h('button', { type: 'button', class: 'radio-item', onclick: () => mine.add(track.id) }, h('span', { class: 'radio-title' }, '＋ ', track.title), trackTags(track));
+    const on = !feed.tuned && music.radio === track.id;
+    return h('button', { type: 'button', class: `radio-item${on ? ' is-on' : ''}`, role: 'option', 'aria-selected': String(on), onclick: () => tune(track.id) }, h('span', { class: 'radio-title' }, on ? '▶ ' : '', track.title), trackTags(track));
+  };
+  function paintButton() {
+    const station = feed.tuned ? feed.station : null;
     const on = radioTrack(music.radio);
-    btn.classList.toggle('on', !!on);
-    btn.dataset.tip = on ? `Radio: ${on.title}` : 'Radio';
+    btn.classList.toggle('on', !!feed.tuned || !!on);
+    btn.dataset.tip = feed.tuned ? `Escuchando: ${station?.name ?? 'una estación'}` : on ? `Radio: ${on.title}` : 'Radio';
+  }
+  function paintTracksNow() {
+    const on = radioTrack(music.radio);
+    const station = feed.tuned ? feed.station : null;
     now.replaceChildren(
-      on
-        ? h('p', null, h('span', { class: 'live-dot on' }), ' Sonando ', h('b', null, on.title), h('span', { class: 'muted' }, ` · ${RADIO_REGIONS[on.region]}`))
-        : h('p', { class: 'muted' }, 'Apagada: suena la música de cada pantalla. Elige una canción para que suene en todo el sitio.'),
+      feed.tuned
+        ? h('p', null, h('span', { class: 'live-dot on' }), ' Escuchas la estación ', h('b', null, station?.name ?? '…'), h('span', { class: 'muted' }, '. Elegir una canción deja de escucharla.'))
+        : on
+          ? h('p', null, h('span', { class: 'live-dot on' }), ' Sonando ', h('b', null, on.title), h('span', { class: 'muted' }, ` · ${RADIO_REGIONS[on.region]}`))
+          : h('p', { class: 'muted' }, 'Apagada: suena la música de cada pantalla. Elige una canción para que suene en todo el sitio.'),
       h('div', { class: 'row' },
         h('button', { class: 'btn sm', type: 'button', onclick: () => { const pool = shown(); if (pool.length) tune(pool[Math.floor(Math.random() * pool.length)].id); } }, '🔀 Al azar'),
-        on ? h('button', { class: 'btn sm danger', type: 'button', onclick: () => tune(null) }, '⏹ Apagar radio') : null,
+        on && !feed.tuned ? h('button', { class: 'btn sm danger', type: 'button', onclick: () => tune(null) }, '⏹ Apagar radio') : null,
       ),
     );
+  }
+  // Rebuilt only when what it shows changes: a frame arriving must not take the keyboard focus off
+  // the song just added.
+  let listKey = null;
+  function paintList() {
+    const key = `${tab}|${query}|${kind}|${region}|${feed.tuned ? '' : music.radio}`;
+    if (key === listKey) return;
+    listKey = key;
     const tracks = shown();
     count.textContent = `${tracks.length} canciones`;
-    list.replaceChildren(...(tracks.length ? tracks.map((t) => h('button', { type: 'button', class: `radio-item${music.radio === t.id ? ' is-on' : ''}`, role: 'option', 'aria-selected': String(music.radio === t.id), onclick: () => tune(t.id) }, h('span', { class: 'radio-title' }, music.radio === t.id ? '▶ ' : '', t.title), h('span', { class: 'radio-tags' }, h('span', { class: `chip radio-kind ${t.kind}` }, RADIO_KINDS[t.kind]), h('span', { class: 'chip' }, RADIO_REGIONS[t.region])))) : [h('p', { class: 'muted' }, 'Ninguna canción coincide con el filtro.')]));
+    list.replaceChildren(...(tracks.length ? tracks.map(trackItem) : [h('p', { class: 'muted' }, 'Ninguna canción coincide con el filtro.')]));
+  }
+  function paint() {
+    paintButton();
+    if (!dlg.open) return;
+    for (const item of tabs.children) item.setAttribute('aria-pressed', String(item.dataset.tab === tab));
+    paintList();
+    for (const [name, pane] of Object.entries(panes)) pane.hidden = name !== tab;
+    if (tab === 'tracks') paintTracksNow();
+    else if (tab === 'stations') stations.paint();
+    else minePicker.hidden = !mine.open;
   }
   dlg.append(h('div', { class: 'radio-body' },
     h('div', { class: 'row between' }, h('h2', null, '📻 Radio'), h('button', { class: 'btn sm ghost', type: 'button', 'aria-label': 'Cerrar', onclick: () => dlg.close() }, '✕')),
-    now,
-    h('div', { class: 'radio-filters' },
-      h('input', { type: 'search', placeholder: 'Buscar canción…', 'aria-label': 'Buscar canción', oninput: (e) => { query = e.target.value.trim(); paint(); } }),
-      h('select', { 'aria-label': 'Tipo de canción', onchange: (e) => { kind = e.target.value; paint(); } }, h('option', { value: '' }, 'Batalla y otras'), Object.entries(RADIO_KINDS).map(([value, label]) => h('option', { value }, label))),
-      h('select', { 'aria-label': 'Región o generación', onchange: (e) => { region = e.target.value; paint(); } }, h('option', { value: '' }, 'Todas las regiones'), Object.entries(RADIO_REGIONS).map(([value, label]) => h('option', { value }, label))),
-      count,
-    ),
-    list,
+    tabs,
+    tracksPane,
+    stations.root,
+    minePane,
   ));
   btn.addEventListener('click', () => {
-    paint();
     if (!dlg.open) dlg.showModal();
+    show(tab);
   });
   paint();
   return [btn, dlg];
@@ -1730,7 +1801,6 @@ function renderHome() {
   );
 }
 
-const wsURL = () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 let roomsFeed = null;
 function closeRoomsFeed() {
   roomsFeed?.();

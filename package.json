@@ -16,6 +16,7 @@
     "sprites": "node scripts/sprites.mjs",
     "cries": "node scripts/sync-cries.js",
     "anims": "node scripts/sync-battle-anims.js --manifest",
+    "radio": "node scripts/sync-radio.js",
     "trainers": "node scripts/sync-trainers.js",
     "balls": "node scripts/sync-battle-anims.js --balls",
     "variants": "node scripts/plan-trainer-variants.mjs && node scripts/sync-trainers.js",
