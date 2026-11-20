@@ -207,9 +207,6 @@ GAME FREAK inc.
 - Sprites de entrenadores: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (material de Nintendo,
   Creatures y GAME FREAK; `bug_type_superfan` es de Chani von Karpa y `aliana`, `celosia` y `mable` de Red, con
   CC BY-NC-SA 4.0). Se descargan al instalar y no se versionan.
-- Decoraciones de los marcos de perfil (`public/frames/`): recortes de los escenarios de
-  [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (`images/arenas`), de Pagefault Games y sus
-  colaboradores, con CC BY-NC-SA 4.0.
 - Animaciones de batalla, sus sonidos, la Poké Ball y los efectos de sonido: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets), de
   Pagefault Games y sus colaboradores. Las animaciones y los sonidos `PRSFX-` son de
   [Pokémon Reborn](https://www.rebornevo.com/); las animaciones `GEN8-` son del Gen 8 Animation Project
