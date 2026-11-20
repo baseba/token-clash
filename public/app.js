@@ -2107,6 +2107,7 @@ function feedbackButton() {
 function renderLanding() {
   document.body.classList.add('signed-out');
   $app.replaceChildren(
+    ...[installNudge()].filter(Boolean),
     h(
       'div',
       { class: 'hero' },
@@ -2120,6 +2121,50 @@ function renderLanding() {
       accessCard({ onDone: route }),
     ),
   );
+}
+
+let installPrompt = null;
+let installNudgeClosed = false;
+const installRepaints = new Set();
+const isInstalled = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isAppleMobile = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Chrome offers its own install dialog only through this event; held, it can open from our button.
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  installRepaints.forEach((paint) => paint());
+});
+addEventListener('appinstalled', () => {
+  installNudgeClosed = true;
+  document.querySelectorAll('.install-nudge').forEach((nudge) => nudge.remove());
+});
+
+function installNudge() {
+  if (!isPhone() || isInstalled() || installNudgeClosed) return null;
+  const card = h('section', { class: 'card install-nudge' });
+  const install = async () => {
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    installPrompt = null;
+    if (outcome === 'accepted') card.remove();
+    else paint();
+  };
+  const howTo = () => {
+    if (installPrompt) return h('button', { class: 'btn primary sm', type: 'button', onclick: install }, '📲 Instalar');
+    if (isAppleMobile()) return h('p', { class: 'install-how' }, 'En Safari toca ', h('b', null, 'Compartir'), ' y luego ', h('b', null, 'Agregar a inicio'), '.');
+    return h('p', { class: 'install-how' }, 'Abre el menú ', h('b', null, '⋮'), ' del navegador y elige ', h('b', null, 'Instalar app'), ' o ', h('b', null, 'Agregar a la pantalla principal'), '.');
+  };
+  function paint() {
+    if (!card.isConnected && card.childElementCount) return installRepaints.delete(paint);
+    card.replaceChildren(
+      h('img', { class: 'install-icon', src: '/icons/icon-192.png', alt: '' }),
+      h('div', { class: 'install-text' }, h('b', null, 'Instala Token Clash'), h('small', null, 'Ábrela desde tu pantalla de inicio, a pantalla completa y sin la barra del navegador.'), howTo()),
+      h('button', { class: 'install-close', type: 'button', 'aria-label': 'Ahora no', onclick: () => { installNudgeClosed = true; installRepaints.delete(paint); card.remove(); } }, '✕'),
+    );
+  }
+  paint();
+  installRepaints.add(paint);
+  return card;
 }
 
 function credentialsNudge() {
@@ -2217,7 +2262,7 @@ function renderHome() {
       null,
       h('div', { class: 'row between' }, h('h1', null, `Hola, ${me.name}`), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))),
     ),
-    ...[credentialsNudge()].filter(Boolean),
+    ...[credentialsNudge() ?? installNudge()].filter(Boolean),
     h(
       'section',
       null,

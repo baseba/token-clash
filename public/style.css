@@ -48,7 +48,7 @@ h2 { font-size: 1.25rem; font-weight: 800; }
   max-width: 1100px; margin: 0 auto; padding: 14px 16px;
 }
 .logo { font-weight: 900; font-size: 1.25rem; text-decoration: none; color: var(--text); display: flex; align-items: center; gap: .5rem; }
-.logo-mark { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-size: 1.1rem; }
+.logo-mark { display: block; width: 34px; height: 34px; }
 #who { display: flex; align-items: center; gap: .5rem; font-weight: 700; }
 .chip { display: inline-flex; align-items: center; gap: .35rem; padding: .25rem .65rem; border-radius: 999px; background: var(--card-2); border: 1px solid var(--line); font-size: .85rem; font-weight: 700; white-space: nowrap; }
 
@@ -417,6 +417,13 @@ input[type=text]:focus, input[type=password]:focus, .btn:focus-visible, .mon:foc
 .prep-info-action .btn { width: 100%; min-height: 48px; }
 .controls-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .3rem .6rem; margin-top: .6rem; }
 .controls-foot .btn { padding: .3rem .6rem; color: var(--muted); }
+.install-nudge { position: relative; margin-bottom: 1rem; display: flex; align-items: flex-start; gap: .8rem; padding: .9rem 2.6rem .9rem .9rem; border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.install-icon { flex: none; width: 48px; height: 48px; border-radius: 12px; }
+.install-text { display: grid; gap: .3rem; min-width: 0; }
+.install-text small { color: var(--muted); font-size: .82rem; line-height: 1.4; }
+.install-text .btn { justify-self: start; margin-top: .2rem; }
+.install-how { margin: .1rem 0 0; font-size: .85rem; line-height: 1.4; }
+.install-close { position: absolute; top: .5rem; right: .5rem; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--card-2); color: var(--muted); cursor: pointer; }
 .prep-grid { grid-auto-rows: 1fr; }
 .prep-side.mine .dice-slot { min-height: 15.7rem; }
 .prep-side:not(.mine) .dice-slot { min-height: 9.8rem; }
