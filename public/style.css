@@ -1801,9 +1801,9 @@ body[data-watching="true"] .match-count { color: #5ec8ff; }
 .say.win-midnight, .say-sample.win-midnight { background-color: rgb(28 26 62); }
 .say.win-stellar::before, .say-sample.win-stellar::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(2px 2px at 18% 58%, #fff6d6, transparent), radial-gradient(1.6px 1.6px at 40% 18%, #fff6d6, transparent), radial-gradient(2.2px 2.2px at 67% 70%, #fff6d6, transparent), radial-gradient(1.6px 1.6px at 88% 52%, #fff6d6, transparent); animation: win-twinkle 2.6s ease-in-out infinite; }
 .win-stellar.win-theme { --win-ornament: linear-gradient(115deg, transparent 44%, rgb(255 244 210 / .75) 50%, transparent 52%) no-repeat -80px -20px / 70px 24px, linear-gradient(var(--win-mark), var(--win-mark)) left top / 10px 2px no-repeat, linear-gradient(var(--win-mark), var(--win-mark)) left top / 2px 10px no-repeat, linear-gradient(var(--win-mark), var(--win-mark)) right bottom / 10px 2px no-repeat, linear-gradient(var(--win-mark), var(--win-mark)) right bottom / 2px 10px no-repeat; }
-.say.win-stellar::after, .say-sample.win-stellar::after { animation: win-shooting 7s ease-in infinite; }
+.say.win-stellar::after, .say-sample.win-stellar::after { animation: win-shooting 18s ease-in-out infinite; }
 @keyframes win-twinkle { 0%, 100% { opacity: .25; } 50% { opacity: .9; } }
-@keyframes win-shooting { 0%, 78% { background-position: -80px -20px, left top, left top, right bottom, right bottom; } 92%, 100% { background-position: calc(100% + 80px) calc(100% + 20px), left top, left top, right bottom, right bottom; } }
+@keyframes win-shooting { 0%, 82% { background-position: -80px -20px, left top, left top, right bottom, right bottom; } 100% { background-position: calc(100% + 80px) calc(100% + 20px), left top, left top, right bottom, right bottom; } }
 @media (prefers-reduced-motion: reduce) { .say.win-stellar::before, .say-sample.win-stellar::before, .say.win-stellar::after, .say-sample.win-stellar::after { animation: none; } }
 
 
