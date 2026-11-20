@@ -1,7 +1,8 @@
 // Radio stations in the browser: the feed that keeps the tuned station playing across pages and
-// reloads, and the "Estaciones" and "Mi estación" tabs of the 📻 dialog. A station is a trainer's:
+// reloads, and the "Estaciones" and "Mi estación" tabs of the radio dialog. A station is a trainer's:
 // its owner picks the queue and anyone can listen.
 import { RADIO_REGIONS, radioTrack, STATION_NAME_MAX, STATION_QUEUE_MAX } from './radio.js?v=dev';
+import { glyph } from './glyphs.js?v=dev';
 
 const STATION_KEY = 'tc_station';
 
@@ -130,8 +131,8 @@ export function stationsPanel({ h, api, toast, feed }) {
         h('span', { class: 'small' }, station.nowPlaying ? '♪ ' : '', playing),
       ),
       on
-        ? h('button', { class: 'btn sm danger', type: 'button', onclick: () => tune(null) }, '⏹ Dejar de escuchar')
-        : h('button', { class: 'btn sm primary', type: 'button', onclick: () => tune(station.ownerId) }, '🎧 Escuchar'),
+        ? h('button', { class: 'btn sm danger', type: 'button', onclick: () => tune(null) }, glyph('stop'), ' Dejar de escuchar')
+        : h('button', { class: 'btn sm primary', type: 'button', onclick: () => tune(station.ownerId) }, glyph('headphones'), ' Escuchar'),
     );
   }
 
@@ -244,7 +245,7 @@ export function myStationPanel({ h, api, toast, feed, session, onChange }) {
       return;
     }
     if (nameInput.ownerDocument.activeElement !== nameInput) nameInput.value = station?.name ?? `Radio de ${session().name}`.slice(0, STATION_NAME_MAX);
-    submit.textContent = station ? 'Cambiar nombre' : '📻 Abrir estación';
+    submit.replaceChildren(...(station ? ['Cambiar nombre'] : [glyph('radio'), ' Abrir estación']));
     if (!station) {
       message.textContent = 'Abre tu estación, arma la cola y deja que otros entren a escuchar lo que pones.';
       return;
@@ -258,8 +259,8 @@ export function myStationPanel({ h, api, toast, feed, session, onChange }) {
           : h('p', { class: 'muted' }, 'En silencio: agrega canciones a la cola.'),
         station.queue.length ? null : playing ? h('p', { class: 'muted small' }, 'La cola está vacía: la última canción sigue en loop.') : null,
         h('div', { class: 'row' },
-          h('button', { class: 'btn sm', type: 'button', disabled: !station.queue.length, onclick: () => act(() => api('/api/radio/station/skip', { method: 'POST' })) }, '⏭ Saltar'),
-          tunedHere ? null : h('button', { class: 'btn sm', type: 'button', onclick: () => { feed.tune(station.ownerId); paint(); } }, '🎧 Escucharla'),
+          h('button', { class: 'btn sm', type: 'button', disabled: !station.queue.length, onclick: () => act(() => api('/api/radio/station/skip', { method: 'POST' })) }, glyph('skip'), ' Saltar'),
+          tunedHere ? null : h('button', { class: 'btn sm', type: 'button', onclick: () => { feed.tune(station.ownerId); paint(); } }, glyph('headphones'), ' Escucharla'),
           h('button', { class: 'btn sm danger', type: 'button', onclick: () => {
             if (!confirm('¿Cerrar tu estación? Se borra la cola y los oyentes dejan de escucharla.')) return;
             act(() => api('/api/radio/station', { method: 'DELETE' }));
