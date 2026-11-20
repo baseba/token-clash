@@ -592,6 +592,7 @@ function renderWho() {
 
 // ---------- routing ----------
 let routeSeq = 0;
+let loadedPath = null;
 let shownPath = location.pathname + location.search;
 let unsaved = null;
 const UNSAVED_MSG = 'Tienes cambios sin guardar. ¿Descartarlos?';
@@ -622,9 +623,34 @@ function revealPage() {
   playClass($app, 'page-enter', 500);
 }
 
+let showingLoader = true;
 new MutationObserver(() => {
-  if ($app.classList.contains('page-leave') && !$app.querySelector('.pad')) revealPage();
+  const loading = Boolean($app.querySelector(':scope > .loading-screen'));
+  if ($app.classList.contains('page-leave')) revealPage();
+  else if (showingLoader && !loading) playClass($app, 'page-enter', 500);
+  showingLoader = loading;
 }).observe($app, { childList: true });
+
+function loadingScreen(text = 'Cargando…', { compact = false } = {}) {
+  return h('div', { class: `loading-screen${compact ? ' compact' : ''}`, role: 'status', 'aria-live': 'polite' },
+    h('span', { class: 'loading-ball' }, h('img', { src: '/icons/token-ball.svg?v=dev', alt: '', draggable: 'false' })),
+    h('p', { class: 'loading-text' }, text),
+  );
+}
+
+function loadingTextFor(path) {
+  if (path.startsWith('/b/')) return 'Preparando la batalla…';
+  if (path.startsWith('/t/')) return 'Cargando el torneo…';
+  return {
+    '/coleccion': 'Abriendo tu colección…',
+    '/equipo': 'Abriendo tu colección…',
+    '/pokedex': 'Abriendo la Pokédex…',
+    '/stats': 'Cargando las stats…',
+    '/perfil': 'Abriendo tu perfil…',
+    '/tienda': 'Abriendo tu perfil…',
+    '/reciclaje': 'Buscando repetidos en tu save…',
+  }[path] ?? 'Cargando…';
+}
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[data-link]');
   if (!a || a.origin !== location.origin || e.metaKey || e.ctrlKey || e.shiftKey) return;
@@ -976,6 +1002,8 @@ function route() {
   cleanup = null;
   unsaved = null;
   shownPath = location.pathname + location.search;
+  if (location.pathname !== loadedPath) $app.replaceChildren(loadingScreen(loadingTextFor(location.pathname)));
+  loadedPath = location.pathname;
   const seq = ++routeSeq;
   markNav();
   const m = /^\/b\/([A-Za-z0-9_-]{4,20})$/.exec(location.pathname);
@@ -1381,7 +1409,7 @@ async function profilePage(seq) {
   if (stale(seq)) return;
   renderWho();
   if (!me) return renderLanding();
-  $app.replaceChildren(h('p', { class: 'muted center pad' }, 'Abriendo tu perfil…'));
+  $app.replaceChildren(loadingScreen('Abriendo tu perfil…'));
   let shop;
   try {
     shop = (await api('/api/shop')).shop;
@@ -1828,7 +1856,7 @@ async function recyclingPage(seq) {
   if (stale(seq)) return;
   renderWho();
   if (!me) return renderLanding();
-  $app.replaceChildren(h('p', { class: 'muted center pad' }, 'Buscando repetidos en tu save…'));
+  $app.replaceChildren(loadingScreen('Buscando repetidos en tu save…'));
   let data;
   try {
     await rescanSave();
@@ -2412,7 +2440,7 @@ function openRoomsCard() {
 
 const HISTORY_PAGE = 6;
 function myChallengesCard() {
-  const list = h('div', { class: 'list history-list' }, h('p', { class: 'muted' }, 'Cargando…'));
+  const list = h('div', { class: 'list history-list' }, loadingScreen('Cargando…', { compact: true }));
   const sentinel = h('div', { class: 'history-more', 'aria-hidden': 'true' });
   let offset = 0;
   let loading = false;
@@ -2616,7 +2644,7 @@ async function statsPage(seq) {
   await loadMe();
   if (stale(seq)) return;
   renderWho();
-  $app.replaceChildren(h('p', { class: 'muted center pad' }, 'Cargando…'));
+  $app.replaceChildren(loadingScreen('Cargando…'));
   let data;
   try {
     data = await api('/api/stats');
@@ -2728,7 +2756,7 @@ async function pokedexPage(seq) {
     $app.replaceChildren(h('section', { class: 'card banner' }, h('h2', null, 'Tu Pokédex'), h('p', { class: 'muted' }, 'Importa tu save para ver qué Pokémon tienes registrados.')), importCard({ onDone: () => route() }));
     return;
   }
-  $app.replaceChildren(h('p', { class: 'muted center pad' }, 'Abriendo la Pokédex…'));
+  $app.replaceChildren(loadingScreen('Abriendo la Pokédex…'));
   let dex;
   try {
     dex = (await api('/api/pokedex')).pokedex;
@@ -3154,7 +3182,7 @@ async function teamPage(seq) {
 
   async function openEditor() {
     if (!selected) return panel.replaceChildren(h('p', { class: 'muted' }, 'Elige un Pokémon para ver sus movimientos.'));
-    panel.replaceChildren(h('div', { class: 'panel-loading pulse' }, 'Cargando…'));
+    panel.replaceChildren(loadingScreen('Cargando…', { compact: true }));
     const want = selected;
     editor = null;
     editor = await monPanel(selected, panel, {

@@ -580,7 +580,6 @@ tr.unsupported .mv-cell .check, .move-table.is-full tr:not(.on) .mv-cell .check 
 .party-cell:hover .cell-remove, .party-cell:focus-within .cell-remove { opacity: 1; transform: scale(1); }
 
 .mon-panel { margin-top: 1.2rem; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden; }
-.panel-loading { padding: 2rem; text-align: center; }
 .panel-grid { display: grid; grid-template-columns: 280px 1fr; }
 @media (max-width: 900px) { .panel-grid { grid-template-columns: 1fr; } }
 .panel-side { padding: 1.4rem 1.2rem; text-align: center; background: radial-gradient(400px 300px at 50% 0%, rgb(122 104 232 / .25), transparent 70%), var(--bg-2); border-right: 1px solid var(--line); }
@@ -1164,6 +1163,16 @@ body[data-watching="true"] .match-count { color: #5ec8ff; }
 #app { transition: opacity .32s ease, transform .32s ease; }
 #app.page-leave { opacity: 0; transform: translateY(10px); }
 #app.page-enter { animation: page-enter .5s ease-out; }
+.loading-screen { display: grid; place-items: center; align-content: center; gap: .9rem; min-height: min(60vh, 440px); padding: 2rem 0; text-align: center; animation: loading-in .3s ease-out .18s both; }
+.loading-screen.compact { min-height: 0; padding: 1.5rem 0; gap: .6rem; }
+.loading-ball { position: relative; display: block; width: 56px; height: 56px; }
+.loading-screen.compact .loading-ball { width: 36px; height: 36px; }
+.loading-ball img { display: block; width: 100%; height: 100%; transform-origin: 50% 90%; animation: loading-wobble 1.4s ease-in-out infinite; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .35)); }
+.loading-ball::after { content: ''; position: absolute; left: 18%; right: 18%; bottom: -8px; height: 6px; border-radius: 50%; background: rgba(0, 0, 0, .35); filter: blur(2px); }
+.loading-text { margin: 0; color: var(--muted); font-weight: 700; }
+.loading-screen.compact .loading-text { font-size: .9rem; }
+@keyframes loading-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes loading-wobble { 0%, 45%, 100% { transform: rotate(0); } 55% { transform: rotate(-18deg); } 65% { transform: rotate(14deg); } 75% { transform: rotate(-8deg); } 85% { transform: rotate(4deg); } }
 @keyframes page-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .room-bar { animation: page-enter .4s ease-out; }
 .bk-slot.is-drawing { background: var(--bg-2); }
