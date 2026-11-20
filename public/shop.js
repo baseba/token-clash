@@ -9,6 +9,14 @@ export const RARITIES = {
   mythic: { label: 'Mítico', price: 5_000_000_000 },
 };
 
+export const RECOLOR_PRICES = {
+  common: 20_000_000,
+  rare: 60_000_000,
+  epic: 150_000_000,
+  legendary: 400_000_000,
+  mythic: 1_000_000_000,
+};
+
 export const SHOP_KINDS = { ball: 'Poké Balls', window: 'Marcos de ventana', frame: 'Marcos de perfil', trainer: 'Entrenadores' };
 
 export const DEFAULT_BALL = 'pb';
@@ -114,7 +122,7 @@ export const SHOP_ITEMS = [
   item('frame', 'galaxy', 'Marco galaxia', 'mythic', 'Un aro de galaxia con estrellas que giran en dos sentidos alrededor de tu foto.'),
   ...Object.entries(SHOP_TRAINERS).map(([key, rarity]) => ({
     ...item('trainer', key, key, rarity, VARIANT_REQUIRES[key] ? 'Una variante de colores: primero necesitas tener al original.' : 'Un entrenador para tu perfil y tus peleas.'),
-    ...(VARIANT_REQUIRES[key] ? { requires: VARIANT_REQUIRES[key] } : {}),
+    ...(VARIANT_REQUIRES[key] ? { requires: VARIANT_REQUIRES[key], price: RECOLOR_PRICES[rarity] } : {}),
   })),
 ];
 

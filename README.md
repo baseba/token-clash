@@ -52,7 +52,8 @@ En vivo: **https://clash.mirrordev.xyz**
      a la 5.ª generación. Los principiantes (Youngster, School Kid, Preschooler) llegan con el primer Pokémon.
      Cada personaje tiene recolores (al menos uno simple; campeones y jefes villanos 4, protagonistas 3): siempre piden
      desbloquear primero al original. Las versiones ♂ y ♀ de un mismo entrenador comparten recuadro y colores de
-     recolor. Al menos uno se vende en la tienda, un nivel de rareza más caro que el original;
+     recolor. Al menos uno se vende en la tienda, un nivel de rareza sobre el original pero a precio de recolor
+     (`RECOLOR_PRICES`, bastante más barato que el resto de su rareza);
      el resto se gana con Pokémon del tipo de su color (Carmesí → Fuego, Zafiro → Agua…). Los recolores con nombre de
      Pokémon piden tenerlo y usan su paleta (Red Charizard, Lance Rayquaza, Maxie Kyogre…); cada uno tiene además
      una versión Shiny con la paleta shiny del Pokémon, que pide lo mismo y tenerlo en shiny. `npm run variants` los
