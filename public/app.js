@@ -3,7 +3,7 @@ import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor } from './backgrounds.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
 import { createFx, moveShape } from './fx.js?v=dev';
-import { ballSounds } from './ball-fx.js?v=dev';
+import { ballFxNote, ballSounds } from './ball-fx.js?v=dev';
 import { chargeAnim, COMMON_PRELOAD, hpTweenMs, moveLands } from './battle-anims.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
 import { FEMALE_OF, MALE_OF, TRAINER_SPRITES, TRAINER_VARIANTS, trainerSpriteFor, VARIANT_COLOR_NAMES } from './trainer-sprites.js?v=dev';
@@ -1389,11 +1389,11 @@ const FREE_ITEMS = [
 
 const BALL_FX_NOTE = {
   free: 'Los destellos clásicos de PokeRogue.',
-  common: 'Un destello y un anillo de partículas con su tema.',
-  rare: 'Más partículas, un segundo anillo y brillo en el suelo.',
-  epic: 'Ondas, espirales y detalles alrededor de tu Pokémon.',
-  legendary: 'Rayos, un pilar de luz y ondas expansivas.',
-  mythic: 'El efecto completo: rayos dobles, lluvia de destellos y una corona de estrellas.',
+  common: 'Por ser común, con un destello y un anillo de partículas.',
+  rare: 'Por ser rara, con más partículas, un segundo anillo y brillo en el suelo.',
+  epic: 'Por ser épica, más intenso, con ondas y espirales alrededor de tu Pokémon.',
+  legendary: 'Por ser legendaria, suma un segundo efecto, rayos, un pilar de luz y ondas expansivas.',
+  mythic: 'Por ser mítica, tres efectos juntos, rayos dobles, lluvia de destellos y una corona de estrellas.',
 };
 
 function shopPreview(item) {
@@ -1690,7 +1690,7 @@ const STATE_GLYPH = { equipped: 'star', owned: 'check', locked: 'lock', buy: 'co
         h('div', null, h('h2', null, label(item)), h('span', { class: `chip rarity-chip${item.rarity ? ` rarity-${item.rarity}` : ''}` }, item.rarity ? RARITIES[item.rarity].label : 'Gratis')),
       ),
       stage,
-      h('p', { class: 'ball-preview-note' }, glyph('sparkle'), ` ${BALL_FX_NOTE[item.rarity ?? 'free']}`),
+      h('p', { class: 'ball-preview-note' }, glyph('sparkle'), ` ${[ballFxNote(item.key), BALL_FX_NOTE[item.rarity ?? 'free']].filter(Boolean).join(' ')}`),
       h('div', { class: 'row confirm-actions' }, replay, action(item)),
     ));
     const stop = () => {

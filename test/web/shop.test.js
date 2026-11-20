@@ -61,6 +61,29 @@ test('every Ball on sale has an opening effect themed on it, as rich as its rari
   assert.equal(ballFx('pb'), null, 'the free Poké Ball keeps the PokeRogue sparkles');
 });
 
+test('every Ball has its own signature effect, and rarer Balls stack more of them', async () => {
+  const { ballFx, ballFxNote, SIGNATURE_LABELS } = await import('../../public/ball-fx.js');
+  const { SIGNATURE_KINDS } = await import('../../public/ball-burst.js');
+  assert.deepEqual(Object.keys(SIGNATURE_LABELS).sort(), [...SIGNATURE_KINDS].sort());
+  const balls = SHOP_ITEMS.filter((item) => item.kind === 'ball');
+  for (const ball of balls) {
+    const { signature } = ballFx(ball.key);
+    assert.ok(signature.length, ball.key);
+    for (const name of signature) assert.ok(SIGNATURE_KINDS.includes(name), `${ball.key}: ${name}`);
+  }
+  const fewest = (rarity) => Math.min(...balls.filter((ball) => ball.rarity === rarity).map((ball) => ballFx(ball.key).signature.length));
+  assert.ok(fewest('legendary') >= 2);
+  assert.ok(fewest('mythic') >= 3);
+  assert.equal(ballFxNote('el'), 'Rayos eléctricos.');
+  const combos = balls.map((ball) => ballFx(ball.key).signature.join('+'));
+  assert.equal(new Set(combos).size, combos.length, 'no two Balls share the same effects');
+  assert.equal(ballFxNote('au'), 'Una lluvia de monedas que rebotan y una lluvia de oro y destellos.');
+  const owners = {};
+  for (const ball of balls) for (const name of ballFx(ball.key).signature) (owners[name] ??= []).push(ball.rarity);
+  for (const [name, rarities] of Object.entries(owners)) assert.equal(new Set(rarities).size, rarities.length, `${name} only repeats as an upgrade to a rarer Ball`);
+  assert.equal(ballFxNote('pb'), '');
+});
+
 test('every Ball on sale sounds like its theme, with sounds PokeRogue has upstream', async () => {
   const { readFileSync } = await import('node:fs');
   const { ballSounds } = await import('../../public/ball-fx.js');
