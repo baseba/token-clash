@@ -60,8 +60,8 @@ export const BALL_VARIANTS = [
   { key: 'ro', name: 'Ninja Ball', rarity: 'epic', base: 'rb', tint: { primary: { sat: 0.12, light: 0.55 }, accent: { hue: 0, sat: 1.1 } } },
   { key: 'rv', name: 'Arcana Ball', rarity: 'epic', base: 'rb', tint: { primary: { hue: 280 }, accent: { hue: 50 } } },
   { key: 'ms', name: 'Edén Ball', rarity: 'legendary', base: 'mb', tint: { primary: { hue: 145 }, accent: { hue: 48 } } },
-  { key: 'mr', name: 'Ritual Ball', rarity: 'legendary', base: 'mb', tint: { primary: { colors: { closed: ['#08060a', '#1c1418', '#3a2a32', '#9a8a92'], open: ['#1c1418', '#3a2a32'] } }, accent: { colors: { closed: ['#8a5a14', '#d9a43a', '#ffe6a0'], open: [] } }, bottom: { colors: { closed: ['#f09a92', '#c8101e'], open: ['#f09a92', '#c8101e'] } } } },
-  { key: 'mp', name: 'Diamante Ball', rarity: 'mythic', base: 'mb', tint: { primary: { colors: { closed: ['#3d4566', '#6c79a3', '#b3c0e6', '#f7f9ff'], open: ['#6c79a3', '#b3c0e6'] } }, accent: { colors: { closed: ['#7d5cff', '#5fd0ff', '#f3e6ff'], open: [] } }, bottom: { colors: { closed: ['#f4f6ff', '#8f9abd'], open: ['#f4f6ff', '#8f9abd'] } } } },
+  { key: 'mr', name: 'Ritual Ball', rarity: 'mythic', base: 'mb', tint: { primary: { colors: { closed: ['#08060a', '#1c1418', '#3a2a32', '#9a8a92'], open: ['#1c1418', '#3a2a32'] } }, accent: { colors: { closed: ['#7a0a18', '#d1121f', '#ff7a7a'], open: [] } } } },
+  { key: 'mp', name: 'Celestial Ball', rarity: 'mythic', base: 'mb', tint: { primary: { colors: { closed: ['#3d4566', '#6c79a3', '#b3c0e6', '#f7f9ff'], open: ['#6c79a3', '#b3c0e6'] } }, accent: { colors: { closed: ['#7d5cff', '#5fd0ff', '#f3e6ff'], open: [] } }, bottom: { colors: { closed: ['#f4f6ff', '#8f9abd'], open: ['#f4f6ff', '#8f9abd'] } } } },
   { key: 'md', name: 'Tesoro Ball', rarity: 'mythic', base: 'mb', tint: { primary: { colors: { closed: ['#6b4a08', '#a8740f', '#e6b422', '#fff1a8'], open: ['#a8740f', '#e6b422'] } }, accent: { colors: { closed: ['#c98a1a', '#ffd75e', '#fff4c2'], open: [] } }, bottom: { colors: { closed: ['#fff8e1', '#c9b98a'], open: ['#fff8e1', '#c9b98a'] } } } },
 ];
 

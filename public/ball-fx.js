@@ -45,8 +45,8 @@ const THEMES = {
   rv: { sounds: [['trick', 0, 0.6], ['trump-card1', 150, 0.5]], rarity: 'epic', colors: ['#ecd8ff', '#8a3fd8', '#4a1a86'], accent: ['#fff4c8', '#ffd35e', '#a8740f'], shape: 'shard', accentShape: 'star', motion: 'swirl', signature: ['cards'] },
   rs: { sounds: [['sparkling-aria1', 0, 0.5], ['heal-bell', 200, 0.5], ['flash', 0, 0.4]], rarity: 'legendary', colors: ['#fff1ea', '#ebb8a3', '#b97563'], accent: ['#ffffff', '#fff3e8', '#e8a093'], shape: 'dot', accentShape: 'star', motion: 'twinkle', signature: ['shimmer', 'roseswirl', 'glitter'], soft: 0.65 },
   ms: { sounds: [['petal-blizzard1', 0, 0.6], ['aromatherapy', 150, 0.5], ['flash', 0, 0.5]], rarity: 'legendary', colors: ['#d8ffe6', '#2fcf7a', '#127a42'], accent: ['#fff4c8', '#ffd35e', '#a8740f'], shape: 'star', accentShape: 'leaf', motion: 'swirl', signature: ['bloom', 'mint'] },
-  mr: { sounds: [['dark-pulse1', 0, 0.6], ['inferno', 150, 0.6], ['flash', 0, 0.4]], rarity: 'legendary', colors: ['#ff8a6a', '#c8101e', '#3a040a'], accent: ['#fff0c0', '#d9a43a', '#6a4410'], shape: 'spark', accentShape: 'dot', motion: 'rise', shadow: true, signature: ['runes', 'hellfire'] },
-  mp: { sounds: [['prismatic-laser1', 0, 0.5], ['ice-shard', 0, 0.7, 1.1], ['flash', 0, 0.6], ['blizzard', 300, 0.5], ['sparkling-aria1', 1150, 0.4]], rarity: 'mythic', colors: ['#ffffff', '#aab8e0', '#5f6c93'], accent: ['#ffffff', '#c9b4ff', '#5fd0ff'], shape: 'dot', accentShape: 'star', motion: 'twinkle', signature: ['diamond', 'frost', 'snowfall'], soft: 0.35 },
+  mr: { sounds: [['dark-pulse1', 0, 0.6], ['inferno', 150, 0.6], ['flash', 0, 0.4], ['night-daze1', 400, 0.5]], rarity: 'mythic', colors: ['#ff8a6a', '#c8101e', '#3a040a'], accent: ['#fff0c0', '#d9a43a', '#6a4410'], shape: 'spark', accentShape: 'dot', motion: 'rise', shadow: true, signature: ['runes', 'hellfire', 'ashfall'] },
+  mp: { sounds: [['heal-bell', 0, 0.6], ['moonlight', 150, 0.5], ['flash', 0, 0.6], ['healing-wish', 350, 0.6], ['sparkling-aria1', 700, 0.4]], rarity: 'mythic', colors: ['#ffffff', '#aab8e0', '#5f6c93'], accent: ['#ffffff', '#c9b4ff', '#5fd0ff'], shape: 'dot', accentShape: 'star', motion: 'rise', signature: ['feathers', 'halo', 'blessing'], soft: 0.35 },
   md: { sounds: [['pay-day1', 0, 0.8], ['pay-day2', 220, 0.7], ['flash', 0, 0.6], ['healing-wish', 350, 0.6], ['sparkling-aria1', 700, 0.4]], rarity: 'mythic', colors: GOLD, accent: ['#ffffff', '#ffd75e', '#c98a1a'], shape: 'star', accentShape: 'coin', motion: 'fall', signature: ['fountain', 'goldrain', 'aura'] },
 };
 
@@ -80,8 +80,11 @@ export const SIGNATURE_LABELS = {
   shuriken: 'shurikens, cortes y una bomba de humo',
   storm: 'nubes negras y lluvia',
   bloom: 'flores que brotan y sueltan pétalos',
+  feathers: 'plumas blancas que caen del cielo',
+  halo: 'un halo de luz sobre el Pokémon',
+  blessing: 'luz que sube del suelo',
+  ashfall: 'ceniza y brasas que caen',
   hellfire: 'llamas infernales que brotan del círculo, humo negro y brasas',
-  diamond: 'diamantes que orbitan y estallan en esquirlas de arcoíris',
   citrus: 'rodajas de lima y jugo que salpica',
   glitter: 'un polvo fino que destella',
   ghosts: 'fantasmas que salen del suelo a asustar',

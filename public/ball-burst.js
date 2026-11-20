@@ -1399,84 +1399,6 @@ const SIGNATURES = {
     }, 1800, 250);
   },
 
-  diamond({ k, body, tier, layer, add }) {
-    const hues = ['#ff6b8a', '#ffd35e', '#7dffb0', '#5fd0ff', '#b48aff'];
-    const top = { x: body.x, y: body.y - 62 * k };
-    const facetsOf = (width, crown, point) => [
-      [[-width, 0], [-width * 0.55, -crown], [0, 0]],
-      [[-width * 0.55, -crown], [width * 0.55, -crown], [0, 0]],
-      [[width, 0], [width * 0.55, -crown], [0, 0]],
-      [[-width, 0], [0, point], [-width * 0.3, 0]],
-      [[-width * 0.3, 0], [0, point], [width * 0.3, 0]],
-      [[width * 0.3, 0], [0, point], [width, 0]],
-    ];
-    const drawGem = (g, width, crown, point, shift, lineWidth) => {
-      facetsOf(width, crown, point).forEach((facet, i) => {
-        g.fillStyle = alpha(hues[(i + shift) % hues.length], 0.55);
-        g.beginPath();
-        facet.forEach(([x, y]) => g.lineTo(x, y));
-        g.closePath();
-        g.fill();
-      });
-      g.strokeStyle = '#ffffff';
-      g.lineWidth = lineWidth;
-      g.beginPath();
-      g.moveTo(-width, 0);
-      g.lineTo(-width * 0.55, -crown);
-      g.lineTo(width * 0.55, -crown);
-      g.lineTo(width, 0);
-      g.lineTo(0, point);
-      g.closePath();
-      g.moveTo(-width, 0);
-      g.lineTo(width, 0);
-      g.stroke();
-    };
-    const gems = hues.map((hue, i) => paintedSprite(`gem|${i}`, (g, r) => {
-      g.fillStyle = radial(g, 0, 0, r * 1.5, [[0, alpha(hue, 0.55)], [1, alpha(hue, 0)]]);
-      g.fillRect(-r * 1.5, -r * 1.5, r * 3, r * 3);
-      g.translate(0, -r * 0.25);
-      drawGem(g, r * 0.95, r * 0.45, r * 1.05, i, r * 0.09);
-    }));
-    const count = 4 + tier;
-    for (let i = 0; i < count; i++) {
-      const slot = (i / count) * TAU;
-      add({ img: gems[i % gems.length], dur: 1200, delay: i * 35, curve: ease.linear, keys: steps(16).map((t) => {
-        const spread = ease.out(Math.min(1, t / 0.25));
-        const merge = ease.inOut(Math.max(0, (t - 0.72) / 0.28));
-        const ang = slot + t * 3;
-        const orbit = { x: body.x + Math.cos(ang) * 46 * k * spread, y: body.y - 10 * k + Math.sin(ang) * 18 * k * spread };
-        return { t, x: orbit.x + (top.x - orbit.x) * merge, y: orbit.y + (top.y - orbit.y) * merge, s: k * 13 * spread * (1 - merge * 0.6), r: Math.sin(ang) * 0.25, a: t < 0.97 ? 1 : 0 };
-      }) });
-    }
-    const merged = 1150;
-    const prisms = hues.map((hue) => spriteFor('shard', ['#ffffff', hue, hue], true));
-    for (let i = 0; i < 30 + tier * 4; i++) {
-      const ang = (i / (30 + tier * 4)) * TAU + rnd(-0.1, 0.1);
-      const far = rnd(40, 80) * k;
-      add({ img: prisms[i % prisms.length], dur: rnd(700, 950), delay: merged, curve: ease.out, keys: [
-        { t: 0, ...top, s: k * 3, r: ang, a: 1 },
-        { t: 1, x: top.x + Math.cos(ang) * far, y: top.y + Math.sin(ang) * far * 0.7 + 18 * k, s: k * rnd(4, 6), r: ang + rnd(4, 8), a: 0 },
-      ] });
-    }
-    const flare = spriteFor('star', ['#ffffff', '#ffffff', '#c9b4ff'], true);
-    for (const [delay, size] of [[merged, 34], [merged + 520, 16]]) {
-      add({ img: flare, dur: 520, delay, curve: ease.out, keys: [
-        { t: 0, ...top, s: 0, r: 0, a: 0 },
-        { t: 0.3, ...top, s: k * size, r: 0.4, a: 1 },
-        { t: 1, ...top, s: 0, r: 0.9, a: 0 },
-      ] });
-    }
-    for (let i = 0; i < 22; i++) {
-      const ang = rnd(0, TAU);
-      const far = rnd(25, 70) * k;
-      const color = hues[i % hues.length];
-      add({ img: spriteFor('star', ['#ffffff', color, color], true), dur: 800, delay: merged + 100 + rnd(0, 900), curve: ease.out, keys: [
-        { t: 0, ...top, s: 0, a: 0 },
-        { t: 0.3, x: top.x + Math.cos(ang) * far * 0.5, y: top.y + Math.sin(ang) * far * 0.5, s: k * 5, r: 1, a: 1 },
-        { t: 1, x: top.x + Math.cos(ang) * far, y: top.y + Math.sin(ang) * far + 12 * k, s: 0, r: 2, a: 0 },
-      ] });
-    }
-  },
 
   citrus({ p, k, tier, add, layer }) {
     const slice = limeSprite();
@@ -2061,6 +1983,70 @@ const SIGNATURES = {
       const x = p.x + Math.cos(ang) * 40 * k;
       const y = p.y + Math.sin(ang) * 14 * k;
       add({ img: spark, dur: 800, delay: 400 + rnd(0, 700), curve: ease.out, keys: [{ t: 0, x, y, s: 0, a: 0 }, { t: 0.3, x, y: y - 14 * k, s: k * 4, a: 1 }, { t: 1, x, y: y - 50 * k, s: k * 2, a: 0 }] });
+    }
+  },
+
+  feathers({ p, k, body, tier, theme, add }) {
+    const feather = paintedSprite(`feather|${theme.colors[1]}`, (g, r) => {
+      g.fillStyle = radial(g, 0, -r * 0.2, r * 1.1, [[0, '#ffffff'], [0.6, theme.colors[0]], [1, theme.colors[1]]]);
+      g.beginPath();
+      g.moveTo(0, -r);
+      g.bezierCurveTo(r * 0.42, -r * 0.5, r * 0.32, r * 0.45, 0, r * 0.8);
+      g.bezierCurveTo(-r * 0.32, r * 0.45, -r * 0.42, -r * 0.5, 0, -r);
+      g.fill();
+      g.strokeStyle = alpha(theme.colors[2], 0.6);
+      g.lineWidth = r * 0.05;
+      g.beginPath();
+      g.moveTo(0, -r * 0.85);
+      g.lineTo(0, r);
+      g.stroke();
+    });
+    for (let i = 0; i < 14 + tier * 3; i++) {
+      const x = body.x + rnd(-75, 75) * k;
+      const sway = rnd(8, 16) * k;
+      const phase = rnd(0, TAU);
+      add({ img: feather, dur: rnd(1700, 2200), delay: rnd(0, 700), curve: ease.linear, keys: steps(12).map((t) => ({
+        t, x: x + Math.sin(t * TAU + phase) * sway, y: p.y - (115 - t * 120) * k, s: k * rnd(7, 9), r: Math.sin(t * TAU + phase) * 0.7 + 0.3, a: swell(t, 0.1, 0.8),
+      })) });
+    }
+  },
+
+  halo({ k, body, tier, add }) {
+    const center = { x: body.x, y: body.y - 46 * k };
+    const glow = [spriteFor('dot', ['#ffffff', '#fff6d0', '#ffd98a'], true), spriteFor('dot', ['#ffffff', '#e8f0ff', '#a8c0ff'], true)];
+    const count = 28 + tier * 4;
+    for (let i = 0; i < count; i++) {
+      const start = (i / count) * TAU;
+      add({ img: glow[i % 2], dur: 2000, delay: 200, curve: ease.linear, keys: steps(12).map((t) => {
+        const open = ease.out(Math.min(1, t / 0.3));
+        const ang = start + t * TAU * 0.5;
+        return { t, x: center.x + Math.cos(ang) * 26 * k * open, y: center.y + Math.sin(ang) * 6 * k * open, s: k * (2.6 + Math.max(0, Math.sin(ang)) * 1.6), a: swell(t, 0.12, 0.8) };
+      }) });
+    }
+  },
+
+  blessing({ p, k, body, tier, add }) {
+    const mote = [spriteFor('dot', ['#ffffff', '#fff6d0', '#ffd98a'], true), spriteFor('star', ['#ffffff', '#ffffff', '#c8d8ff'], true)];
+    for (let i = 0; i < 22 + tier * 5; i++) {
+      const side = i % 2 ? 1 : -1;
+      const x = body.x + side * rnd(16, 70) * k;
+      add({ img: mote[i % 4 === 0 ? 1 : 0], dur: rnd(1200, 1700), delay: rnd(0, 1000), curve: ease.out, keys: [
+        { t: 0, x, y: p.y + 2 * k, s: k * 2, r: 0, a: 0 },
+        { t: 0.25, x, y: p.y - 20 * k, s: k * 3.5, r: 0.5, a: 1 },
+        { t: 1, x: x + rnd(-6, 6) * k, y: p.y - rnd(90, 125) * k, s: k * 1.5, r: 1.5, a: 0 },
+      ] });
+    }
+  },
+
+  ashfall({ p, k, body, tier, add }) {
+    const ash = [spriteFor('chunk', ['#9a9096', '#4a4248', '#1a1418'], false), spriteFor('dot', ['#ffffff', '#ff9a5a', '#c8101e'], true)];
+    for (let i = 0; i < 20 + tier * 5; i++) {
+      const x = body.x + rnd(-85, 85) * k;
+      const phase = rnd(0, TAU);
+      const ember = i % 4 === 0;
+      add({ img: ash[ember ? 1 : 0], blend: ember ? 'lighter' : 'source-over', dur: rnd(1600, 2100), delay: 500 + rnd(0, 900), curve: ease.linear, keys: steps(10).map((t) => ({
+        t, x: x + Math.sin(t * TAU + phase) * 8 * k, y: p.y - (120 - t * 125) * k, s: k * (ember ? 2.5 : rnd(2, 3.2)), r: t * 6 + phase, a: swell(t, 0.1, 0.8) * (ember ? 1 : 0.8),
+      })) });
     }
   },
 };
