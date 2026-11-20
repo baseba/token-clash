@@ -1425,7 +1425,7 @@ async function profilePage(seq) {
         } }, nameInput, saveName, h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { editingName = false; paintIdentity(); } }, 'Cancelar'))
       : h('div', { class: 'profile-name-line' }, h('h1', null, me.name), h('button', { class: 'btn sm ghost icon-btn', type: 'button', 'data-tip': 'Cambiar nombre', 'aria-label': 'Cambiar nombre', onclick: () => { editingName = true; paintIdentity(); nameInput.focus(); } }, '✏️'));
     identity.replaceChildren(
-      avatarPic(me.avatar, 'lg', me.frame),
+      ...[avatarPic(me.avatar, 'lg', me.frame)].filter(Boolean),
       h('div', { class: 'profile-who' }, nameLine, h('div', { class: 'row profile-meta' }, skinTitle(me.avatar, 'span'), h('span', { class: 'chip' }, h('span', { class: 'w' }, `${me.wins}V`), ' · ', h('span', { class: 'l' }, `${me.losses}D`)))),
     );
     if (editingName) requestAnimationFrame(() => nameInput.focus());
@@ -2127,7 +2127,7 @@ function renderHome() {
       null,
       h('div', { class: 'row between' }, h('h1', null, `Hola, ${me.name}`), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))),
     ),
-    credentialsNudge(),
+    ...[credentialsNudge()].filter(Boolean),
     h(
       'section',
       null,
@@ -3010,7 +3010,7 @@ async function teamPage(seq) {
     h('section', { class: 'party-board' }, partyEl, h('p', { class: 'hint' }, `Arrastra para ordenar · el líder abre la pelea · antes de cada combate eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}`)),
     panel,
     h('section', { class: 'collection-board' }, h('div', { class: 'coll-head' }, h('h2', null, 'Tus Pokémon')), collectionBar(filters, collCount), grid),
-    me.hasPassword ? null : h('section', null, h('p', { class: 'muted small' }, 'Tu cuenta solo vive en este navegador. ', h('a', { href: '/perfil#cuenta', 'data-link': true }, 'Agrega una contraseña'), ' para jugar con el mismo save desde otro dispositivo.')),
+    ...(me.hasPassword ? [] : [h('section', null, h('p', { class: 'muted small' }, 'Tu cuenta solo vive en este navegador. ', h('a', { href: '/perfil#cuenta', 'data-link': true }, 'Agrega una contraseña'), ' para jugar con el mismo save desde otro dispositivo.'))]),
   );
   unsaved = () => !!editor?.dirty();
   paintParty();
@@ -3571,7 +3571,7 @@ function roomBar(c, requestWatchers) {
       h('span', { class: 'room-bar-text' }, tour ? `🏆 ${tour.round} · Pelea ${tour.number} de ${tour.total}` : null, tour && vs ? ' · ' : null, vs),
       ...(status ? [status.field, status.timer, status.forfeit] : []),
       ...(tour ? [h('a', { class: 'btn sm', href: `/t/${tour.id}`, 'data-link': true }, 'Ver llaves')] : []),
-      watching ? null : watch.el,
+      ...(watching ? [] : [watch.el]),
     );
   }
   return {
