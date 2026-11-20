@@ -5,7 +5,6 @@ import { createPlayer } from './music.js?v=dev';
 import { createFx, moveShape } from './fx.js?v=dev';
 import { ballSounds } from './ball-fx.js?v=dev';
 import { chargeAnim, COMMON_PRELOAD, hpTweenMs, moveLands } from './battle-anims.js?v=dev';
-import { patchSave } from './savepatch.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
 import { TRAINER_SPRITES, TRAINER_VARIANTS, trainerSpriteFor, VARIANT_COLOR_NAMES } from './trainer-sprites.js?v=dev';
 import { RADIO_KINDS, RADIO_REGIONS, RADIO_TRACKS, radioTrack } from './radio.js?v=dev';
@@ -2479,29 +2478,6 @@ async function savePartyIds(ids) {
   me = (await api('/api/me', { method: 'PUT', body: { team: ids } })).me;
 }
 
-function downloadText(name, text) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const a = h('a', { href: url, download: name });
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
-
-async function downloadEditedSave() {
-  const stored = await storedSave();
-  if (!stored) return toast('Vuelve a subir tu save en este navegador para poder descargarlo editado.');
-  const edits = me.roster.map((f) => f.saveEdit).filter(Boolean);
-  if (!edits.length) return toast('Todavía no cambias movimientos ni habilidades.');
-  try {
-    const { text, missing } = patchSave(stored.text, edits);
-    downloadText(`PokeTokenBar-Save-${new Date().toISOString().slice(0, 10)}-token-clash.json`, text);
-    toast(missing.length ? `Save listo. ${missing.length} Pokémon no tienen perfil en ese save y quedaron sin cambios.` : 'Save listo: impórtalo en PokeTokenBar → Ajustes → Backup & Transfer.');
-  } catch (e) {
-    toast(`No pude editar ese save: ${e.message}`);
-  }
-}
-
 function partyRow(team) {
   return h(
     'div',
@@ -2693,7 +2669,7 @@ async function teamPage(seq) {
     reimportBtn.setAttribute('aria-expanded', String(!reimport.hidden));
   } });
   $app.replaceChildren(
-    h('div', { class: 'coll-page-head' }, h('div', null, h('h1', null, 'Colección'), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))), h('div', { class: 'tools' }, toolButton({ icon: '⬇', label: 'Descargar save editado', note: 'Para importarlo en PokeTokenBar', tip: 'Baja tu save con los movimientos y habilidades que cambiaste', 'data-sfx': 'save', onclick: downloadEditedSave }), reimportBtn)),
+    h('div', { class: 'coll-page-head' }, h('div', null, h('h1', null, 'Colección'), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))), h('div', { class: 'tools' }, reimportBtn)),
     reimport,
     h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', countEl)),
     h('section', { class: 'party-board' }, partyEl, h('p', { class: 'hint' }, `Arrastra para ordenar · el líder abre la pelea · antes de cada combate eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}`)),

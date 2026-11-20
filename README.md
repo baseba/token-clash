@@ -56,8 +56,7 @@ En vivo: **https://clash.mirrordev.xyz**
      rival entran al campo, lanzan sus Pokémon y se retiran, y vuelven al terminar (el tuyo, en espejo y más grande).
      Las IAs usan un entrenador al azar por pelea (el mismo durante todo un torneo), como sus nombres.
 3. En **Colección** armas tus 6, los ordenas arrastrando (el primero es el líder) y eliges los
-   movimientos y la habilidad de cada uno. "Descargar save editado" baja tu save con esos cambios para
-   importarlo de vuelta en PokeTokenBar, y "Actualizar save" sube uno más nuevo.
+   movimientos y la habilidad de cada uno. "Actualizar save" sube uno más nuevo.
 4. En **Nueva batalla** eliges el modo y el rival:
    - **🎒 Batalla con tu equipo:** los 6 que armaste.
    - **🎲 Batalla aleatoria:** los dados sortean hasta 6 de la colección de cada uno, sin repetir especie, con
@@ -252,7 +251,7 @@ Por tema:
 
 | Tema | Reglas (servidor) | Entrada | Navegador |
 | --- | --- | --- | --- |
-| Importar el save | `src/trainers/domain/save-file.ts` | `POST /api/import` en `trainers/interface/trainers.controller.ts` | `public/savestore.js`, `public/savepatch.js` (save editado) |
+| Importar el save | `src/trainers/domain/save-file.ts` | `POST /api/import` en `trainers/interface/trainers.controller.ts` | `public/savestore.js` |
 | Colección, equipo, movimientos | `src/trainers/domain/trainer.ts` | `PUT /api/me`, `PUT /api/me/mons/:id` | `public/app.js` |
 | Pokédex | `src/catalog/domain/pokedex.ts` | `GET /api/pokedex` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
 | Motor de batalla | `src/combat/domain/battle.ts` (mapa de archivos al principio), `move-rules.ts`, `ability-effects.ts` | WebSocket, por la arena | `public/battle-anims.js`, `public/fx.js` |
