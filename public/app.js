@@ -621,7 +621,7 @@ document.addEventListener('click', (e) => {
   const a = e.target.closest('a[data-link]');
   if (!a || a.origin !== location.origin || e.metaKey || e.ctrlKey || e.shiftKey) return;
   e.preventDefault();
-  nav(a.pathname + a.search);
+  nav(a.pathname + a.search + a.hash);
 });
 window.addEventListener('popstate', () => {
   if (!canLeave()) return history.pushState(null, '', shownPath);
@@ -934,6 +934,7 @@ function retrySprites() {
 }
 
 function route() {
+  document.body.classList.remove('signed-out');
   hideTip();
   retrySprites();
   if (TAB_MUSIC[location.pathname]) music.play(TAB_MUSIC[location.pathname]);
@@ -966,22 +967,161 @@ function route() {
   return homePage(seq);
 }
 
+function rememberSession(sessionToken) {
+  token = sessionToken;
+  ls.set('tc_token', token);
+}
+
+function forgetSession() {
+  token = null;
+  me = null;
+  ls.set('tc_token', null);
+}
+
 async function loadMe() {
   if (!token) return;
   try {
     me = (await api('/api/me')).me;
   } catch (e) {
-    if (e.status === 401) {
-      token = null;
-      ls.set('tc_token', null);
-    }
+    if (e.status === 401) forgetSession();
   }
+}
+
+const PASSWORD_MIN_LENGTH = 8;
+
+function passwordProblem(password, repeated = password) {
+  if (password.length < PASSWORD_MIN_LENGTH) return `La contraseña necesita al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
+  if (password !== repeated) return 'Las contraseñas no coinciden.';
+  return null;
+}
+
+function textField(id, label, attrs) {
+  const input = h('input', { id, type: 'text', autocapitalize: 'none', spellcheck: 'false', ...attrs });
+  return { input, field: h('div', { class: 'field' }, h('label', { for: id }, label), input) };
+}
+
+function loginCard({ onDone } = {}) {
+  const err = h('p', { class: 'error', hidden: true });
+  const user = textField('luser', 'Nombre de entrenador', { maxlength: 24, autocomplete: 'username', required: true });
+  const pass = textField('lpass', 'Contraseña', { type: 'password', autocomplete: 'current-password', required: true });
+  const submit = h('button', { class: 'btn primary', type: 'submit' }, 'Entrar');
+  return h(
+    'form',
+    { class: 'card', onsubmit: async (e) => {
+      e.preventDefault();
+      err.hidden = true;
+      submit.disabled = true;
+      try {
+        const data = await api('/api/login', { method: 'POST', body: { name: user.input.value, password: pass.input.value } });
+        rememberSession(data.token);
+        me = data.me;
+        renderWho();
+        toast(`Hola de nuevo, ${me.name}`);
+        onDone?.();
+      } catch (problem) {
+        err.textContent = problem.message;
+        err.hidden = false;
+        submit.disabled = false;
+        pass.input.select();
+      }
+    } },
+    h('h2', null, 'Entra a tu cuenta'),
+    user.field,
+    pass.field,
+    submit,
+    err,
+    h('p', { class: 'muted small' }, 'Tu nombre de entrenador y la contraseña que elegiste al crear tu cuenta o en tu perfil.'),
+  );
+}
+
+function accessCard({ onDone } = {}) {
+  let mode = 'create';
+  const slot = h('div');
+  const tabs = h('div', { class: 'segmented access-tabs', role: 'group', 'aria-label': 'Cómo entrar' });
+  function paint() {
+    tabs.replaceChildren(...[['create', 'Crear cuenta'], ['login', 'Iniciar sesión']].map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === mode), onclick: () => { mode = value; paint(); } }, text)));
+    slot.replaceChildren(mode === 'create' ? importCard({ onDone }) : loginCard({ onDone }));
+  }
+  paint();
+  return h('div', { class: 'access' }, tabs, slot);
+}
+
+function accountCard() {
+  const card = h('section', { class: 'card account-card', id: 'cuenta' });
+  let open = false;
+
+  function passwordForm({ withCurrent }) {
+    const err = h('p', { class: 'error', hidden: true });
+    const user = h('input', { type: 'text', autocomplete: 'username', value: me.name, hidden: true, readonly: true });
+    const current = withCurrent ? textField('acur', 'Contraseña actual', { type: 'password', autocomplete: 'current-password', required: true }) : null;
+    const pass = textField('apass', withCurrent ? 'Contraseña nueva' : 'Contraseña', { type: 'password', autocomplete: 'new-password', minlength: PASSWORD_MIN_LENGTH, placeholder: `Al menos ${PASSWORD_MIN_LENGTH} caracteres`, required: true });
+    const repeat = textField('apass2', 'Repítela', { type: 'password', autocomplete: 'new-password', required: true });
+    const submit = h('button', { class: 'btn primary', type: 'submit' }, 'Guardar');
+    const form = h(
+      'form',
+      { class: 'account-form', onsubmit: async (e) => {
+        e.preventDefault();
+        const problem = passwordProblem(pass.input.value, repeat.input.value);
+        err.hidden = !problem;
+        if (problem) return (err.textContent = problem);
+        submit.disabled = true;
+        try {
+          me = (await api('/api/me/password', { method: 'PUT', body: { password: pass.input.value, ...(withCurrent ? { currentPassword: current.input.value } : {}) } })).me;
+          open = false;
+          toast(withCurrent ? 'Listo, cambiaste tu contraseña' : 'Listo: ya puedes entrar desde cualquier dispositivo');
+          paint();
+        } catch (failure) {
+          err.textContent = failure.message;
+          err.hidden = false;
+          submit.disabled = false;
+        }
+      } },
+      user,
+      h('div', { class: 'account-fields' }, current?.field, pass.field, repeat.field, submit),
+      err,
+    );
+    setTimeout(() => (current ?? pass).input.focus());
+    return form;
+  }
+
+  async function logOut(button) {
+    button.disabled = true;
+    try {
+      await api('/api/logout', { method: 'POST' });
+    } catch (failure) {
+      button.disabled = false;
+      return toast(failure.message);
+    }
+    forgetSession();
+    renderWho();
+    toast('Cerraste sesión en este dispositivo');
+    nav('/');
+  }
+
+  function paint() {
+    const toggle = (label) => h('button', { class: `btn sm${me.hasPassword ? '' : ' primary'}`, type: 'button', 'aria-expanded': String(open), onclick: () => { open = !open; paint(); } }, open ? 'Cancelar' : label);
+    const head = me.hasPassword
+      ? [
+          h('span', { class: 'account-icon', 'aria-hidden': 'true' }, '🔐'),
+          h('div', { class: 'account-text' }, h('b', null, 'Entras como ', me.name, ' desde cualquier dispositivo'), h('small', null, 'Con tu nombre de entrenador y tu contraseña. Si te cambias el nombre, entras con el nuevo.')),
+          h('div', { class: 'account-actions' }, toggle('Cambiar contraseña'), h('button', { class: 'btn sm ghost', type: 'button', onclick: (e) => logOut(e.currentTarget) }, 'Cerrar sesión')),
+        ]
+      : [
+          h('span', { class: 'account-icon', 'aria-hidden': 'true' }, '📱'),
+          h('div', { class: 'account-text' }, h('b', null, 'Juega desde cualquier dispositivo'), h('small', null, `Tu cuenta solo vive en este navegador. Con una contraseña entras como ${me.name} desde cualquier lado, con el mismo save, y no la pierdes si borras los datos del navegador.`)),
+          h('div', { class: 'account-actions' }, toggle('Agregar contraseña')),
+        ];
+    card.replaceChildren(h('div', { class: 'account-head' }, ...head), ...(open ? [passwordForm({ withCurrent: me.hasPassword })] : []));
+  }
+  paint();
+  return card;
 }
 
 // ---------- import ----------
 function importCard({ onDone, compact: small = false } = {}) {
   const err = h('p', { class: 'error', hidden: true });
   const nameInput = h('input', { type: 'text', id: 'tname', maxlength: 24, placeholder: 'Ej: Seba', value: me?.name || '', autocomplete: 'nickname' });
+  const pass = me ? null : textField('tpass', 'Contraseña', { type: 'password', autocomplete: 'new-password', minlength: PASSWORD_MIN_LENGTH, placeholder: `Al menos ${PASSWORD_MIN_LENGTH} caracteres` });
   const fileInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true });
   const dropText = h('span', { class: 'muted small' }, 'o haz clic para elegirlo');
   const drop = h('div', { class: 'drop', tabindex: 0, role: 'button' }, h('strong', null, '📦 Arrastra aquí tu save de PokeTokenBar'), dropText);
@@ -996,6 +1136,13 @@ function importCard({ onDone, compact: small = false } = {}) {
       nameInput.focus();
       return;
     }
+    const passwordError = me ? null : passwordProblem(pass.input.value);
+    if (passwordError) {
+      err.textContent = passwordError;
+      err.hidden = false;
+      pass.input.focus();
+      return;
+    }
     if (file.size > 8 * 1024 * 1024) {
       err.textContent = 'Ese archivo pesa más de 8 MB; no parece un save.';
       err.hidden = false;
@@ -1004,12 +1151,9 @@ function importCard({ onDone, compact: small = false } = {}) {
     dropText.textContent = 'Leyendo…';
     try {
       const save = await file.text();
-      const data = await api('/api/import', { method: 'POST', body: { name, save } });
+      const data = await api('/api/import', { method: 'POST', body: { name, save, ...(me ? {} : { password: pass.input.value }) } });
       await rememberSave(save);
-      if (data.token) {
-        token = data.token;
-        ls.set('tc_token', token);
-      }
+      if (data.token) rememberSession(data.token);
       me = data.me;
       renderWho();
       toast(`¡Listo! ${me.rosterSize} Pokémon importados`);
@@ -1032,7 +1176,8 @@ function importCard({ onDone, compact: small = false } = {}) {
     'div',
     { class: 'card' },
     small ? null : h('h2', null, me ? 'Actualizar tu save' : 'Trae tu equipo'),
-    h('div', { class: 'field' }, h('label', { for: 'tname' }, 'Nombre de entrenador'), nameInput),
+    h('div', { class: 'field' }, h('label', { for: 'tname' }, 'Nombre de entrenador'), nameInput, me ? null : h('small', { class: 'muted' }, 'Es único: con él y tu contraseña entras desde otro dispositivo.')),
+    pass?.field,
     drop,
     fileInput,
     err,
@@ -1043,6 +1188,130 @@ function importCard({ onDone, compact: small = false } = {}) {
       h('li', null, 'O directo el archivo vivo: en Finder ⌘⇧G y pega ', h('code', null, '~/Library/Application Support/PokeTokenBar/companion-state.json')),
     ),
     h('p', { class: 'muted small' }, 'Solo guardamos números: especie, nivel, rareza, IVs y si es shiny. Nada de tu Mac ni de tus logs.'),
+  );
+}
+
+function updateSavePanel({ onDone } = {}) {
+  let mode = 'file';
+  const slot = h('div');
+  const tabs = h('div', { class: 'segmented update-save-tabs', role: 'group', 'aria-label': 'Cómo actualizar tu save' });
+  function paint() {
+    const fileTab = h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(mode === 'file'), onclick: () => { mode = 'file'; paint(); } }, '📦 Subir archivo');
+    const hackerTab = me.hasPassword
+      ? h('button', { type: 'button', class: 'seg-item hacker-tab', 'aria-pressed': String(mode === 'hacker'), onclick: () => { mode = 'hacker'; paint(); } }, '>_ Modo hacker')
+      : h('button', { type: 'button', class: 'seg-item hacker-tab is-locked', 'aria-pressed': 'false', 'aria-disabled': 'true', 'data-tip': 'Primero agrega una contraseña en tu perfil', 'data-tip-note': 'El save automático entra con tu nombre de entrenador y tu contraseña.', onclick: () => toast('Primero agrega una contraseña en tu perfil') }, '🔒 Modo hacker');
+    tabs.replaceChildren(fileTab, hackerTab);
+    slot.replaceChildren(mode === 'file' ? importCard({ onDone }) : hackerGuide());
+  }
+  paint();
+  return h('div', { class: 'update-save' }, tabs, slot);
+}
+
+const SYNC_LABEL = 'com.token-clash.sync';
+const SYNC_DIR = '~/Library/Application\\ Support/TokenClash';
+const shellQuote = (text) => `'${text.replace(/'/g, `'\\''`)}'`;
+
+function commandBlock(text) {
+  return h('div', { class: 'hk-code' }, h('pre', null, h('code', null, text)), h('button', { class: 'btn sm hk-copy', type: 'button', onclick: () => copy(text, 'Copiado') }, 'Copiar'));
+}
+
+function syncRenameCommand(oldName, newName) {
+  return `security delete-generic-password -s token-clash -a ${shellQuote(oldName)} >/dev/null 2>&1
+USUARIO=${shellQuote(newName)}
+printf '%s' "$USUARIO" > ${SYNC_DIR}/usuario
+security add-generic-password -U -s token-clash -a "$USUARIO" -w`;
+}
+
+function syncScript(server, httpsOnly) {
+  return `#!/bin/bash
+set -uo pipefail
+DIR="$HOME/Library/Application Support/TokenClash"
+SAVE="$HOME/Library/Application Support/PokeTokenBar/companion-state.json"
+LOG="$HOME/Library/Logs/TokenClash/sync.log"
+mkdir -p "$(dirname "$LOG")"
+log() { printf '%s %s\\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG"; }
+NAME=$(cat "$DIR/usuario")
+PASSWORD=$(security find-generic-password -s token-clash -a "$NAME" -w 2>/dev/null) || { log "Falta tu contraseña en el Llavero"; exit 1; }
+escape() { printf '%s' "$1" | sed 's/[\\\\"]/\\\\&/g'; }
+STATUS=$(printf 'user = "%s:%s"\\n' "$(escape "$NAME")" "$(escape "$PASSWORD")" \\
+  | curl --config - --silent${httpsOnly ? " --proto '=https' --tlsv1.2" : ''} --max-time 60 \\
+      --output /dev/null --write-out '%{http_code}' \\
+      --header 'Content-Type: application/json' --data-binary @"$SAVE" ${server}/api/sync)
+unset PASSWORD
+log "HTTP $STATUS"`;
+}
+
+function syncPlist() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>${SYNC_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>$HOME/Library/Application Support/TokenClash/sync.sh</string></array>
+  <key>WatchPaths</key>
+  <array><string>$HOME/Library/Application Support/PokeTokenBar/companion-state.json</string></array>
+  <key>ThrottleInterval</key><integer>300</integer>
+  <key>StartInterval</key><integer>3600</integer>
+</dict>
+</plist>`;
+}
+
+function hackerGuide() {
+  const server = location.origin;
+  const httpsOnly = location.protocol === 'https:';
+  const plistPath = `~/Library/LaunchAgents/${SYNC_LABEL}.plist`;
+  const code = commandBlock;
+  const heading = (text) => h('h3', null, h('span', { class: 'hk-hash', 'aria-hidden': 'true' }, '## '), text);
+  const step = (title, note, command) => h('li', null, h('b', null, title), note ? h('p', null, note) : null, code(command));
+
+  return h(
+    'section',
+    { class: 'hacker', 'aria-label': 'Modo hacker: subir el save automáticamente' },
+    h('div', { class: 'hk-bar' }, h('span', { class: 'hk-dots', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')), h('span', null, 'token-clash-sync — README.md')),
+    h(
+      'div',
+      { class: 'hk-body' },
+      h('h2', null, h('span', { class: 'hk-hash', 'aria-hidden': 'true' }, '# '), 'Save automático'),
+      h('p', null, 'Tu Mac sube el save de PokeTokenBar cada vez que cambia (como mucho cada 5 minutos). Solo necesitas la Terminal y tu nombre de entrenador y contraseña de Token Clash.'),
+
+      heading('Qué se envía'),
+      h('p', null, 'Tu archivo ', h('code', null, 'companion-state.json'), ' por HTTPS. El servidor guarda solo tus Pokémon y tus tokens; el resto del archivo se descarta.'),
+
+      heading('Seguridad'),
+      h('ul', null,
+        h('li', null, 'La contraseña queda en el Llavero de macOS, nunca en archivos ni en el historial.'),
+        h('li', null, 'Esta conexión solo puede actualizar tu save: no inicia sesión ni cambia nada más.'),
+        h('li', null, 'Para cortarla, cambia tu contraseña en el perfil.'),
+      ),
+
+      heading('Instalación'),
+      h('p', { class: 'hk-muted' }, 'Copia cada bloque en la Terminal. En el primero cambia ', h('code', null, '<usuario>'), ' por tu nombre de entrenador.'),
+      h(
+        'ol',
+        { class: 'hk-steps' },
+        step('Guarda tu usuario y contraseña', 'La Terminal te pide la contraseña dos veces; no se ve al escribirla.', `USUARIO='<usuario>'
+mkdir -p ${SYNC_DIR}
+printf '%s' "$USUARIO" > ${SYNC_DIR}/usuario
+security add-generic-password -U -s token-clash -a "$USUARIO" -w`),
+        step('Crea el script', null, `cat > ${SYNC_DIR}/sync.sh <<'EOF'
+${syncScript(server, httpsOnly)}
+EOF
+chmod 700 ${SYNC_DIR}/sync.sh`),
+        step('Actívalo', null, `cat > ${plistPath} <<EOF
+${syncPlist()}
+EOF
+launchctl bootstrap gui/$(id -u) ${plistPath}`),
+        step('Pruébalo', h('span', null, 'Debe decir ', h('code', null, 'HTTP 200'), '. Si dice 401, revisa el usuario o la contraseña.'), `bash ${SYNC_DIR}/sync.sh; tail -n 1 ~/Library/Logs/TokenClash/sync.log`),
+      ),
+
+      h('details', { class: 'hk-details' },
+        h('summary', null, 'Desinstalar'),
+        code(`launchctl bootout gui/$(id -u)/${SYNC_LABEL}
+security delete-generic-password -s token-clash -a "$(cat ${SYNC_DIR}/usuario)"
+rm -rf ${plistPath} ${SYNC_DIR} ~/Library/Logs/TokenClash`),
+      ),
+    ),
   );
 }
 
@@ -1102,6 +1371,44 @@ async function profilePage(seq) {
     h('select', { 'aria-label': 'Filtrar por género', onchange: (e) => { gender = e.target.value; paint(); } }, h('option', { value: '' }, 'Ambos géneros'), h('option', { value: '♂' }, '♂ Hombres'), h('option', { value: '♀' }, '♀ Mujeres')),
   );
   let editingName = false;
+  let account = accountCard();
+  async function rename(name) {
+    const oldName = me.name;
+    try {
+      me = { ...me, ...(await api('/api/me', { method: 'PUT', body: { name } })).me };
+    } catch (err) {
+      toast(err.message);
+      return false;
+    }
+    editingName = false;
+    renderWho();
+    paintIdentity();
+    const fresh = accountCard();
+    account.replaceWith(fresh);
+    account = fresh;
+    toast('Nombre guardado');
+    return oldName;
+  }
+  function askRename(name) {
+    const go = h('button', { class: 'btn primary', type: 'button', onclick: async () => {
+      go.disabled = true;
+      const oldName = await rename(name);
+      if (!oldName) return (go.disabled = false);
+      confirmDlg.replaceChildren(h('div', { class: 'confirm-body rename-confirm' },
+        h('h2', null, `Ahora eres ${me.name}`),
+        h('p', null, 'Si activaste el save automático, corre esto en la Terminal de tu Mac. Te pide tu contraseña.'),
+        commandBlock(syncRenameCommand(oldName, me.name)),
+        h('div', { class: 'row confirm-actions' }, h('button', { class: 'btn primary', type: 'button', autofocus: true, onclick: () => confirmDlg.close() }, 'Listo')),
+      ));
+    } }, 'Cambiar nombre');
+    confirmDlg.replaceChildren(h('div', { class: 'confirm-body rename-confirm' },
+      h('h2', null, `¿Cambiar tu nombre a ${name}?`),
+      h('p', null, 'Tu nombre también es tu usuario: desde ahora entras con el nuevo en todos tus dispositivos.'),
+      h('p', null, h('b', null, 'Si activaste el save automático (Modo hacker), deja de subir tu save'), ' hasta que actualices el usuario en tu Mac. Te mostramos el comando al confirmar.'),
+      h('div', { class: 'row confirm-actions' }, h('button', { class: 'btn', type: 'button', autofocus: true, onclick: () => confirmDlg.close() }, 'Cancelar'), go),
+    ));
+    if (!confirmDlg.open) confirmDlg.showModal();
+  }
   function paintIdentity() {
     const nameInput = h('input', { type: 'text', maxlength: 24, value: me.name, 'aria-label': 'Nombre de entrenador', autocomplete: 'nickname' });
     const saveName = h('button', { class: 'btn sm primary', type: 'submit' }, 'Guardar');
@@ -1113,17 +1420,9 @@ async function profilePage(seq) {
             editingName = false;
             return paintIdentity();
           }
+          if (me.hasPassword) return askRename(name);
           saveName.disabled = true;
-          try {
-            me = { ...me, ...(await api('/api/me', { method: 'PUT', body: { name } })).me };
-            editingName = false;
-            renderWho();
-            paintIdentity();
-            toast('Nombre guardado');
-          } catch (err) {
-            toast(err.message);
-            saveName.disabled = false;
-          }
+          if (!(await rename(name))) saveName.disabled = false;
         } }, nameInput, saveName, h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { editingName = false; paintIdentity(); } }, 'Cancelar'))
       : h('div', { class: 'profile-name-line' }, h('h1', null, me.name), h('button', { class: 'btn sm ghost icon-btn', type: 'button', 'data-tip': 'Cambiar nombre', 'aria-label': 'Cambiar nombre', onclick: () => { editingName = true; paintIdentity(); nameInput.focus(); } }, '✏️'));
     identity.replaceChildren(
@@ -1417,6 +1716,7 @@ async function profilePage(seq) {
   });
   $app.replaceChildren(
     h('section', { class: 'card shop-head' }, identity, balance),
+    account,
     h('section', { class: 'card' },
       h('div', { class: 'segmented shop-tabs', role: 'group', 'aria-label': 'Categoría' }, Object.entries(SHOP_KINDS).map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === kind), onclick: (e) => { kind = value; e.currentTarget.parentElement.querySelectorAll('.seg-item').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); paint(); } }, text))),
       h('div', { class: 'shop-toolbar' },
@@ -1430,6 +1730,7 @@ async function profilePage(seq) {
     ),
     confirmDlg,
   );
+  if (location.hash === '#cuenta') document.getElementById('cuenta')?.scrollIntoView({ block: 'start' });
 }
 
 // ---------- recycling ----------
@@ -1696,6 +1997,7 @@ function feedbackButton() {
 }
 
 function renderLanding() {
+  document.body.classList.add('signed-out');
   $app.replaceChildren(
     h(
       'div',
@@ -1707,9 +2009,23 @@ function renderLanding() {
         h('p', { class: 'lead' }, 'Sube el save de PokeTokenBar, arma tu equipo y desafía a otro jugador con un link, o pelea contra la IA. Cada especie pelea con su tipo real, sus golpes y stats según el nivel que le diste a punta de tokens.'),
         h('div', { class: 'hero-mons' }, [0, 1, 2].map((i) => h('div', { html: creatureHTML(demoMon(i)) }))),
       ),
-      importCard({ onDone: renderHome }),
+      accessCard({ onDone: route }),
     ),
   );
+}
+
+function credentialsNudge() {
+  if (me.hasPassword || ls.get('tc_credentials_later') === me.id) return null;
+  const nudge = h(
+    'section',
+    { class: 'card credentials-nudge' },
+    h('p', null, h('b', null, '🔐 Tu cuenta solo vive en este navegador. '), 'Agrega una contraseña para entrar con tu nombre de entrenador y el mismo save desde otro dispositivo, y no perder la cuenta si borras los datos del navegador.'),
+    h('div', { class: 'row' },
+      h('a', { class: 'btn sm primary', href: '/perfil#cuenta', 'data-link': true }, 'Agregar contraseña'),
+      h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { ls.set('tc_credentials_later', me.id); nudge.remove(); } }, 'Ahora no'),
+    ),
+  );
+  return nudge;
 }
 
 function renderHome() {
@@ -1793,6 +2109,7 @@ function renderHome() {
       null,
       h('div', { class: 'row between' }, h('h1', null, `Hola, ${me.name}`), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))),
     ),
+    credentialsNudge(),
     h(
       'section',
       null,
@@ -2663,7 +2980,7 @@ async function teamPage(seq) {
 
   const filters = rosterFilters(() => paintCollection());
   const collCount = h('span', { class: 'coll-count' });
-  const reimport = h('div', { class: 'reimport', hidden: true }, importCard({ onDone: () => route() }));
+  const reimport = h('div', { class: 'reimport', hidden: true }, updateSavePanel({ onDone: () => route() }));
   const reimportBtn = toolButton({ icon: '↻', label: 'Actualizar save', note: 'Sube uno más nuevo', 'aria-expanded': 'false', onclick: () => {
     reimport.hidden = !reimport.hidden;
     reimportBtn.setAttribute('aria-expanded', String(!reimport.hidden));
@@ -2675,7 +2992,7 @@ async function teamPage(seq) {
     h('section', { class: 'party-board' }, partyEl, h('p', { class: 'hint' }, `Arrastra para ordenar · el líder abre la pelea · antes de cada combate eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}`)),
     panel,
     h('section', { class: 'collection-board' }, h('div', { class: 'coll-head' }, h('h2', null, 'Tus Pokémon')), collectionBar(filters, collCount), grid),
-    h('section', null, h('p', { class: 'muted small' }, 'Tu sesión vive en este navegador. Para entrar desde otro: ', h('a', { href: '#', onclick: (e) => { e.preventDefault(); copy(`${location.origin}/#key=${token}`, 'Link de acceso copiado. No lo compartas: entra como tú.'); } }, 'copiar link de acceso'), '.')),
+    me.hasPassword ? null : h('section', null, h('p', { class: 'muted small' }, 'Tu cuenta solo vive en este navegador. ', h('a', { href: '/perfil#cuenta', 'data-link': true }, 'Agrega una contraseña'), ' para jugar con el mismo save desde otro dispositivo.')),
   );
   unsaved = () => !!editor?.dirty();
   paintParty();

@@ -12,6 +12,7 @@ export const trainers = sqliteTable(
     id: text().primaryKey(),
     name: text().notNull(),
     tokenHash: text('token_hash').notNull().unique(),
+    passwordHash: text('password_hash'),
     /** Roster entry ids, leader first. A small ordered list that is always read whole: JSON. */
     team: text({ mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
     wins: integer().notNull().default(0),
@@ -64,5 +65,18 @@ export const rosterEntries = sqliteTable(
   ],
 );
 
+export const trainerSessions = sqliteTable(
+  'trainer_sessions',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    trainerId: text('trainer_id')
+      .notNull()
+      .references(() => trainers.id, { onDelete: 'cascade' }),
+    openedAt: integer('opened_at').notNull(),
+  },
+  (t) => [index('trainer_sessions_trainer_id').on(t.trainerId)],
+);
+
 export type TrainerRow = typeof trainers.$inferSelect;
 export type RosterEntryRow = typeof rosterEntries.$inferSelect;
+export type TrainerSessionRow = typeof trainerSessions.$inferSelect;

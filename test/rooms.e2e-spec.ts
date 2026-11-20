@@ -19,6 +19,8 @@ after(() => app.kill());
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+const newAccount = () => ({ password: 'contraseña-segura' });
+
 async function call(path: string, { method = 'GET', body = undefined as unknown, token = undefined as string | undefined, ip = '10.0.0.1' } = {}): Promise<{ status: number; data: any }> {
   const res = await fetch(app.base + path, {
     method,
@@ -30,7 +32,7 @@ async function call(path: string, { method = 'GET', body = undefined as unknown,
 
 let trainers = 0;
 async function trainer(name: string) {
-  const { data } = await call('/api/import', { method: 'POST', body: { name, save }, ip: `10.0.1.${++trainers}` });
+  const { data } = await call('/api/import', { method: 'POST', body: { name, save, ...newAccount() }, ip: `10.0.1.${++trainers}` });
   return { token: data.token as string, me: data.me };
 }
 

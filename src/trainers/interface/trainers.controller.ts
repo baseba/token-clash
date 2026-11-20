@@ -1,6 +1,6 @@
 // HTTP entry points of the trainers context. Controllers are thin: read the request, call one use
 // case, present the result. Rules live in the domain; orchestration in TrainersService.
-import { All, Body, Controller, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
+import { All, Body, Controller, Get, Headers, HttpCode, Param, Post, Put } from '@nestjs/common';
 import { pokedexOf } from '../../catalog/domain/pokedex.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { HttpError } from '../../shared/http/http-error.js';
@@ -8,12 +8,14 @@ import { RateLimit } from '../../shared/http/rate-limit.guard.js';
 import { TrainersService } from '../application/trainers.service.js';
 import { byRanking } from '../domain/ranking.js';
 import type { Trainer } from '../domain/trainer.js';
+import { LogInDto, SetPasswordDto } from './dto/credentials.dto.js';
 import { ImportSaveDto } from './dto/import-save.dto.js';
 import { UpdateMonDto } from './dto/update-mon.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
-import { Authenticated, CurrentTrainer, MaybeAuthenticated } from './session.guard.js';
+import { Authenticated, CurrentSessionToken, CurrentTrainer, MaybeAuthenticated } from './session.guard.js';
 import { monDetail, myView, recyclingView, trainerSummary } from './trainer.presenter.js';
 import { RecycleDto } from './dto/recycle.dto.js';
+import { SyncSaveDto } from './dto/sync-save.dto.js';
 
 @Controller('api')
 export class TrainersController {
@@ -30,6 +32,38 @@ export class TrainersController {
   import(@CurrentTrainer() current: Trainer | undefined, @Body({ schema: ImportSaveDto }) body: ImportSaveDto) {
     const { token, trainer } = this.trainers.importSave(current, body);
     return { token, me: myView(trainer, this.skynet.aiLevels) };
+  }
+
+  @Post('login')
+  @HttpCode(200)
+  @RateLimit({ bucket: 'login', by: 'ip', max: 10, windowMs: 10 * 60_000, message: 'Demasiados intentos, espera unos minutos.' })
+  logIn(@Body({ schema: LogInDto }) body: LogInDto) {
+    const session = this.trainers.logIn(body);
+    if (!session) throw new HttpError(401, 'Nombre o contraseña incorrectos.');
+    return { token: session.token, me: myView(session.trainer, this.skynet.aiLevels) };
+  }
+
+  @Post('sync')
+  @HttpCode(200)
+  @RateLimit({ bucket: 'sync', by: 'ip', max: 20, windowMs: 10 * 60_000, message: 'Demasiadas subidas, espera unos minutos.' })
+  sync(@Headers('authorization') authorization: string | undefined, @Body({ schema: SyncSaveDto }) body: SyncSaveDto) {
+    const trainer = this.trainers.syncSave(authorization, JSON.stringify(body));
+    if (!trainer) throw new HttpError(401, 'Nombre o contraseña incorrectos.');
+    return { rosterSize: trainer.roster.length, shinies: trainer.shinies, totalTokens: trainer.totalTokens };
+  }
+
+  @Post('logout')
+  @HttpCode(204)
+  @Authenticated()
+  logOut(@CurrentTrainer() trainer: Trainer, @CurrentSessionToken() token: string) {
+    this.trainers.logOut(trainer, token);
+  }
+
+  @Put('me/password')
+  @RateLimit({ bucket: 'password', by: 'trainer', max: 10, windowMs: 10 * 60_000, message: 'Demasiados intentos, espera unos minutos.' })
+  @Authenticated()
+  setPassword(@CurrentTrainer() trainer: Trainer, @Body({ schema: SetPasswordDto }) body: SetPasswordDto) {
+    return { me: myView(this.trainers.setPassword(trainer, body), this.skynet.aiLevels) };
   }
 
   @Get('me/recycling')

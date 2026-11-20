@@ -1,7 +1,9 @@
 // The trainers' DTOs on their own.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { LogInDto, SetPasswordDto } from './credentials.dto.js';
 import { ImportSaveDto } from './import-save.dto.js';
+import { SyncSaveDto } from './sync-save.dto.js';
 import { RecycleDto } from './recycle.dto.js';
 import { BuyDto, EquipDto } from './shop.dto.js';
 import { UpdateMonDto } from './update-mon.dto.js';
@@ -39,4 +41,17 @@ test('recycling names one roster entry, bounded in length', () => {
   assert.deepEqual(RecycleDto.parse({ entry: 'abc' }), { entry: 'abc' });
   assert.equal(RecycleDto.safeParse({ entry: '' }).success, false);
   assert.equal(RecycleDto.safeParse({ entry: 'x'.repeat(101) }).success, false);
+});
+
+test('logging in takes the trainer name and a password, and changing it may carry the current one', () => {
+  assert.deepEqual(LogInDto.parse({ name: 'Ana', password: 'secreta-1' }), { name: 'Ana', password: 'secreta-1' });
+  assert.equal(LogInDto.safeParse({ name: 'Ana' }).error!.issues[0].message, 'Escribe tu contraseña.');
+  assert.equal(SetPasswordDto.safeParse({ password: 42 }).success, false);
+  assert.deepEqual(SetPasswordDto.parse({ password: 'nueva-123', currentPassword: 'vieja-123' }).currentPassword, 'vieja-123');
+  assert.deepEqual(ImportSaveDto.parse({ save: '{}', name: 'Ana', password: 'secreta-1' }), { save: '{}', name: 'Ana', password: 'secreta-1' });
+});
+
+test('the automatic upload takes the save file itself as the body', () => {
+  assert.deepEqual(SyncSaveDto.parse({ format: 'poketokenbar.save', state: {} }), { format: 'poketokenbar.save', state: {} });
+  assert.equal(SyncSaveDto.safeParse([1, 2]).error!.issues[0].message, 'El cuerpo tiene que ser el archivo de PokeTokenBar.');
 });

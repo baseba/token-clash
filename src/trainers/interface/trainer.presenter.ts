@@ -44,6 +44,7 @@ export function recyclingView(trainer: Trainer) {
 export function myView(trainer: Trainer, aiLevels: string[]) {
   return {
     ...trainerSummary(trainer),
+    hasPassword: trainer.hasPassword,
     team: trainer.team,
     aiLevels,
     shop: shopSummary(trainer),

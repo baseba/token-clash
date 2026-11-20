@@ -47,6 +47,8 @@ after(() => {
   fakeJev.close();
 });
 
+const newAccount = () => ({ password: 'contraseña-segura' });
+
 async function call(path: string, { method = 'GET', body = undefined as unknown, token = undefined as string | undefined, ip = undefined as string | undefined } = {}): Promise<{ status: number; data: any; headers: Headers }> {
   const res = await fetch(base + path, {
     method,
@@ -76,12 +78,12 @@ function player(room: string, token: string | null): { ws: WebSocket; frames: an
 }
 
 test('import → challenge → accept → live battle → leaderboard', async () => {
-  const a = await call('/api/import', { method: 'POST', body: { name: 'Ana', save } });
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Ana', save, ...newAccount() } });
   assert.equal(a.status, 200);
   assert.ok(a.data.token);
   assert.equal(a.data.me.roster.length, 4);
   assert.equal(a.data.me.team.length, 4);
-  const b = await call('/api/import', { method: 'POST', body: { name: 'Beto <b>', save } });
+  const b = await call('/api/import', { method: 'POST', body: { name: 'Beto <b>', save, ...newAccount() } });
 
   const page = await fetch(`${base}/b/abcdef`);
   assert.equal(page.status, 200);
@@ -157,8 +159,8 @@ test('import → challenge → accept → live battle → leaderboard', async ()
 });
 
 test('random battle rolls a party from each collection', async () => {
-  const a = await call('/api/import', { method: 'POST', body: { name: 'Dados', save } });
-  const b = await call('/api/import', { method: 'POST', body: { name: 'Suerte', save } });
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Dados', save, ...newAccount() } });
+  const b = await call('/api/import', { method: 'POST', body: { name: 'Suerte', save, ...newAccount() } });
   await call('/api/me', { method: 'PUT', token: a.data.token, body: { team: [a.data.me.roster[0].uid] } });
   const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode: 'random' } });
   const id = ch.data.challenge.id;
@@ -189,7 +191,7 @@ test('random battle rolls a party from each collection', async () => {
 });
 
 test('a battle against the AI starts at once and stays out of the ranking and the history', async () => {
-  const a = await call('/api/import', { method: 'POST', body: { name: 'Solo', save } });
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Solo', save, ...newAccount() } });
   for (const mode of ['team', 'random']) {
     const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode, ai: 'veryhard' } });
     assert.equal(ch.status, 200);
@@ -212,7 +214,7 @@ test('a battle against the AI starts at once and stays out of the ranking and th
 });
 
 test('against Skynet, Jev picks the AI\'s actions and the battle ends', async () => {
-  const a = await call('/api/import', { method: 'POST', body: { name: 'Sarah', save } });
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Sarah', save, ...newAccount() } });
   assert.ok(a.data.me.aiLevels.includes('skynet'));
   const ch = await call('/api/challenges', { method: 'POST', token: a.data.token, body: { mode: 'team', ai: 'skynet' } });
   assert.equal(ch.status, 200);
@@ -229,8 +231,8 @@ test('against Skynet, Jev picks the AI\'s actions and the battle ends', async ()
 });
 
 test('a player who surrenders loses at once, and it counts in the ranking', async () => {
-  const a = await call('/api/import', { method: 'POST', body: { name: 'Rendida', save }, ip: '10.9.0.1' });
-  const b = await call('/api/import', { method: 'POST', body: { name: 'Ganadora', save }, ip: '10.9.0.2' });
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Rendida', save, ...newAccount() }, ip: '10.9.0.1' });
+  const b = await call('/api/import', { method: 'POST', body: { name: 'Ganadora', save, ...newAccount() }, ip: '10.9.0.2' });
   const id = (await call('/api/challenges', { method: 'POST', token: a.data.token, body: { visibility: 'private' } })).data.challenge.id;
   await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token });
   const quitter = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
@@ -259,8 +261,8 @@ test('a player who surrenders loses at once, and it counts in the ranking', asyn
 });
 
 test('timeouts auto-play so a battle always ends', async () => {
-  const a = await call('/api/import', { method: 'POST', body: { name: 'Lento', save } });
-  const b = await call('/api/import', { method: 'POST', body: { name: 'Ausente', save } });
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Lento', save, ...newAccount() } });
+  const b = await call('/api/import', { method: 'POST', body: { name: 'Ausente', save, ...newAccount() } });
   const id = (await call('/api/challenges', { method: 'POST', token: a.data.token, body: {} })).data.challenge.id;
   await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token });
   const presses = [a, b].map((p) => {
@@ -279,8 +281,8 @@ test('timeouts auto-play so a battle always ends', async () => {
 });
 
 test('a 1v1 room waits until both press ready, and the guest can leave to reopen it', async () => {
-  const a = await call('/api/import', { method: 'POST', body: { name: 'Dueña', save } });
-  const b = await call('/api/import', { method: 'POST', body: { name: 'Visita', save } });
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Dueña', save, ...newAccount() } });
+  const b = await call('/api/import', { method: 'POST', body: { name: 'Visita', save, ...newAccount() } });
   const id = (await call('/api/challenges', { method: 'POST', token: a.data.token, body: { visibility: 'private' } })).data.challenge.id;
   await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token });
   const host = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
@@ -304,8 +306,8 @@ test('a 1v1 room waits until both press ready, and the guest can leave to reopen
 });
 
 test('a 4-player tournament filled with AIs plays every match in order until a champion', async () => {
-  const a = await call('/api/import', { method: 'POST', body: { name: 'Campeona', save } });
-  const b = await call('/api/import', { method: 'POST', body: { name: 'Intrusa', save } });
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Campeona', save, ...newAccount() } });
+  const b = await call('/api/import', { method: 'POST', body: { name: 'Intrusa', save, ...newAccount() } });
   const T = (await call('/api/tournaments', { method: 'POST', token: a.data.token, body: { size: 4, mode: 'random', visibility: 'private' } })).data.tournament;
   assert.equal(T.status, 'open');
   assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', body: { level: 'easy' } })).status, 401);
@@ -352,8 +354,8 @@ test('a 4-player tournament filled with AIs plays every match in order until a c
 });
 
 test('public rooms are listed and a matching search joins them; private ones stay hidden', async () => {
-  const a = await call('/api/import', { method: 'POST', body: { name: 'Anfitrión', save } });
-  const b = await call('/api/import', { method: 'POST', body: { name: 'Buscador', save } });
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Anfitrión', save, ...newAccount() } });
+  const b = await call('/api/import', { method: 'POST', body: { name: 'Buscador', save, ...newAccount() } });
   const body = { mode: 'random' };
   const priv = (await call('/api/challenges', { method: 'POST', token: a.data.token, body: { ...body, visibility: 'private' } })).data.challenge;
   assert.equal(priv.visibility, 'private');
@@ -379,7 +381,7 @@ test('public rooms are listed and a matching search joins them; private ones sta
   assert.ok(!(await call('/api/rooms')).data.rooms.some((r) => r.id === pub.id));
   assert.ok(!(await emptied).rooms.some((r) => r.id === pub.id));
   lobby.close();
-  const late = await call(`/api/challenges/${pub.id}/accept`, { method: 'POST', token: (await call('/api/import', { method: 'POST', body: { name: 'Tardío', save } })).data.token });
+  const late = await call(`/api/challenges/${pub.id}/accept`, { method: 'POST', token: (await call('/api/import', { method: 'POST', body: { name: 'Tardío', save, ...newAccount() } })).data.token });
   assert.equal(late.status, 409);
   assert.match(late.data.error, /Llegaste tarde/);
   await call(`/api/challenges/${priv.id}`, { method: 'DELETE', token: a.data.token });
@@ -392,7 +394,7 @@ test('public rooms are listed and a matching search joins them; private ones sta
 });
 
 test('the shop sells, equips and guards what is still locked', async () => {
-  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Clienta', save }, ip: '10.9.0.3' })).data;
+  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Clienta', save, ...newAccount() }, ip: '10.9.0.3' })).data;
   const shop = await call('/api/shop', { token });
   assert.equal(shop.status, 200);
   assert.equal(shop.data.shop.items.find((item: any) => item.id === 'window:sapphire').owned, false);
@@ -422,7 +424,7 @@ test('the shredder turns a repeated Pokémon into tokens once', async () => {
   const venusaur = withRepeat.state.dex.find((seen: { finalID: number }) => seen.finalID === 3);
   venusaur.caughtAt = '2024-01-01T00:00:00Z';
   withRepeat.state.dex.push({ ...venusaur, id: '22222222-2222-3333-4444-555555555555', caughtAt: '2099-01-01T00:00:00Z' });
-  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Recicla', save: JSON.stringify(withRepeat) }, ip: '10.9.0.4' })).data;
+  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Recicla', save: JSON.stringify(withRepeat), ...newAccount() }, ip: '10.9.0.4' })).data;
   const before = await call('/api/me/recycling', { token });
   assert.equal(before.status, 200);
   const [duplicate] = before.data.recycling.duplicates;
@@ -445,14 +447,64 @@ test('bad uploads get a clear error', async () => {
   assert.match(r.data.error, /colección/);
   const notJson = await fetch(`${base}/api/import`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{bad' });
   assert.deepEqual([notJson.status, await notJson.json()], [400, { error: 'JSON inválido' }]);
-  const huge = await call('/api/import', { method: 'POST', body: { name: 'X', save: 'x'.repeat(10 * 1024 * 1024) } });
+  const huge = await call('/api/import', { method: 'POST', body: { name: 'X', save: 'x'.repeat(10 * 1024 * 1024), ...newAccount() } });
   assert.deepEqual([huge.status, huge.data], [413, { error: 'El archivo es demasiado grande (máx. 9 MB).' }]);
   const traversal = await fetch(`${base}/..%2fserver%2findex.js`);
   assert.equal(traversal.status, 404);
 });
 
+test('the same account plays from two devices with its trainer name and password', async () => {
+  const ip = '10.9.0.7';
+  const created = await call('/api/import', { method: 'POST', body: { name: 'Viajera', save, password: 'dos-equipos' }, ip });
+  assert.equal(created.status, 200);
+  assert.equal(created.data.me.hasPassword, true);
+  const taken = await call('/api/import', { method: 'POST', body: { name: ' VIAJERA ', save, password: 'otra-clave' }, ip });
+  assert.deepEqual([taken.status, taken.data.error], [409, 'Ya hay un entrenador que se llama VIAJERA, elige otro nombre.']);
+  const noPassword = await call('/api/import', { method: 'POST', body: { name: 'Apurada', save }, ip });
+  assert.equal(noPassword.status, 400);
+
+  const wrong = await call('/api/login', { method: 'POST', body: { name: 'Viajera', password: 'no-es-esta' }, ip });
+  const nobody = await call('/api/login', { method: 'POST', body: { name: 'Nadie', password: 'no-es-esta' }, ip });
+  assert.deepEqual([wrong.status, wrong.data.error], [401, 'Nombre o contraseña incorrectos.']);
+  assert.deepEqual(nobody.data, wrong.data, 'a missing trainer and a wrong password look the same');
+  const laptop = await call('/api/login', { method: 'POST', body: { name: ' viajera ', password: 'dos-equipos' }, ip });
+  assert.equal(laptop.status, 200);
+  assert.notEqual(laptop.data.token, created.data.token);
+  assert.equal(laptop.data.me.id, created.data.me.id);
+  assert.equal((await call('/api/me', { token: created.data.token })).status, 200, 'the first device stays logged in');
+
+  const other = await call('/api/import', { method: 'POST', body: { name: 'Otra', save, password: 'otra-clave' }, ip });
+  const clash = await call('/api/me', { method: 'PUT', token: other.data.token, body: { name: 'viajera' } });
+  assert.equal(clash.status, 409, 'a name already in use cannot be taken by renaming');
+  assert.equal((await call('/api/me', { method: 'PUT', token: laptop.data.token, body: { name: 'Viajera Frecuente' } })).status, 200);
+
+  const badChange = await call('/api/me/password', { method: 'PUT', token: laptop.data.token, body: { password: 'tres-equipos', currentPassword: 'no-es-esta' } });
+  assert.equal(badChange.status, 403);
+  assert.equal((await call('/api/me/password', { method: 'PUT', token: laptop.data.token, body: { password: 'tres-equipos', currentPassword: 'dos-equipos' } })).status, 200);
+
+  assert.equal((await call('/api/logout', { method: 'POST', token: laptop.data.token })).status, 204);
+  assert.equal((await call('/api/me', { token: laptop.data.token })).status, 401);
+  assert.equal((await call('/api/me', { token: created.data.token })).status, 200, 'logging out closes only that device');
+  assert.equal((await call('/api/login', { method: 'POST', body: { name: 'viajera frecuente', password: 'tres-equipos' }, ip })).status, 200, 'the new name is the new login');
+});
+
+test('the Mac uploads the save on its own with the trainer name and password, without opening a session', async () => {
+  const ip = '10.9.0.8';
+  const created = await call('/api/import', { method: 'POST', body: { name: 'Ñandú Sync', save, password: 'clave:con:dos-puntos' }, ip });
+  const sync = (authorization?: string) => fetch(`${base}/api/sync`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip, ...(authorization ? { Authorization: authorization } : {}) }, body: save });
+  const basic = (text: string) => `Basic ${Buffer.from(text, 'utf8').toString('base64')}`;
+
+  const ok = await sync(basic('ñandú sync:clave:con:dos-puntos'));
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), { rosterSize: created.data.me.rosterSize, shinies: created.data.me.shinies, totalTokens: created.data.me.totalTokens });
+  assert.equal((await sync(basic('Ñandú Sync:otra-clave'))).status, 401);
+  assert.equal((await sync()).status, 401);
+  assert.equal((await sync(`Bearer ${created.data.token}`)).status, 401, 'a session token does not work here');
+  assert.equal((await call('/api/me', { token: created.data.token })).status, 200);
+});
+
 test('requests with the wrong shape get a 400 before reaching the domain', async () => {
-  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Dora', save } })).data;
+  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Dora', save, ...newAccount() } })).data;
   const bad = await call('/api/challenges', { method: 'POST', token, body: { mode: 'chaos' } });
   assert.equal(bad.status, 400);
   assert.match(bad.data.error, /^mode: /);
@@ -467,7 +519,7 @@ test('requests with the wrong shape get a 400 before reaching the domain', async
 });
 
 test('malformed socket frames are dropped or answered like a wrong value, and the socket stays usable', async () => {
-  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Ruido', save } })).data;
+  const { token } = (await call('/api/import', { method: 'POST', body: { name: 'Ruido', save, ...newAccount() } })).data;
   const room = (await call('/api/challenges', { method: 'POST', token, body: { ai: 'easy' } })).data.challenge.id;
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
   const frames: any[] = [];
@@ -487,8 +539,8 @@ test('malformed socket frames are dropped or answered like a wrong value, and th
 });
 
 test('a trainer runs a radio station: only they edit its queue, and every listener hears each change', async () => {
-  const dj = (await call('/api/import', { method: 'POST', body: { name: 'DJ Ana', save }, ip: '10.9.0.5' })).data;
-  const other = (await call('/api/import', { method: 'POST', body: { name: 'Otro', save }, ip: '10.9.0.6' })).data;
+  const dj = (await call('/api/import', { method: 'POST', body: { name: 'DJ Ana', save, ...newAccount() }, ip: '10.9.0.5' })).data;
+  const other = (await call('/api/import', { method: 'POST', body: { name: 'Otro', save, ...newAccount() }, ip: '10.9.0.6' })).data;
   const ownerId = dj.me.id;
   assert.equal((await call('/api/radio/station', { method: 'PUT', body: { name: 'Radio Kanto' } })).status, 401);
   assert.equal((await call('/api/radio/station', { method: 'PUT', token: dj.token, body: { name: '   ' } })).status, 400);
@@ -548,7 +600,7 @@ test('a trainer runs a radio station: only they edit its queue, and every listen
 });
 
 test('everything survives a restart: sessions, collections, results, tournaments and radio stations live in SQLite', async () => {
-  const a = await call('/api/import', { method: 'POST', body: { name: 'Memoria', save } });
+  const a = await call('/api/import', { method: 'POST', body: { name: 'Memoria', save, ...newAccount() } });
   const token = a.data.token;
   const uid = a.data.me.roster[0].uid;
   await call('/api/me', { method: 'PUT', token, body: { nickname: { id: uid, name: 'Chispa' } } });
