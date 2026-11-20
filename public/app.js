@@ -5278,7 +5278,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
             const info =
               m.kind === 'attack'
                 ? [h('span', { class: 'mv-power' }, glyph(CATEGORY_ICON[m.category] ?? 'diamond'), ' ', m.power ? [h('span', { class: 'mv-label' }, 'Poder '), String(m.power)] : 'Especial'), h('span', { class: 'mv-accuracy' }, glyph('target'), ` ${m.accuracy ? `${m.accuracy}%` : 'Siempre'}`), m.priority > 0 ? h('span', { class: 'mv-priority' }, glyph('bolt'), h('span', { class: 'mv-label' }, ' Va primero')) : null, effTag]
-                : [h('span', { class: 'mv-power' }, glyph(CATEGORY_ICON.status), ' Estado')];
+                : [h('span', { class: 'mv-power' }, glyph(CATEGORY_ICON.status), ' Estado'), h('span', { class: 'mv-accuracy' }, glyph('target'), ` ${m.accuracy ? `${m.accuracy}%` : 'Siempre'}`), m.priority > 0 ? h('span', { class: 'mv-priority' }, glyph('bolt'), h('span', { class: 'mv-label' }, ' Va primero')) : null];
             if (m.aimable) info.push(h('span', { class: 'mv-aim' }, glyph('target'), ' Eliges sobre quién'));
             return h(
               'button',
