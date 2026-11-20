@@ -12,6 +12,10 @@ import { createStationFeed, myStationPanel, stationsPanel } from './radio-statio
 import { createNotifier } from './notify.js?v=dev';
 import { RARITIES, SHOP_KINDS } from './shop.js?v=dev';
 import { fallBackToRaw } from './upstream.js?v=dev';
+import { glyph } from './glyphs.js?v=dev';
+
+const NAV_GLYPH = { home: 'home', collection: 'ball', pokedex: 'dex', profile: 'cap', stats: 'chart', recycling: 'recycle' };
+document.querySelectorAll('.nav a[data-nav]').forEach((link) => link.replaceChildren(glyph(NAV_GLYPH[link.dataset.nav])));
 
 const $app = document.getElementById('app');
 const $who = document.getElementById('who');
@@ -80,7 +84,7 @@ let toastTimer;
 function toast(msg) {
   const layer = document.querySelector('dialog[open]') ?? document.body;
   if ($toast.parentElement !== layer) layer.append($toast);
-  $toast.textContent = msg;
+  $toast.replaceChildren(...[msg].flat());
   $toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => $toast.classList.remove('show'), 2600);
@@ -138,45 +142,45 @@ const CHARGE_TEXT = {
 };
 
 const STATUS_INFO = {
-  brn: { icon: '🔥', name: 'Quemado', desc: 'Pierde 1/16 de sus PS al final de cada turno y sus ataques físicos hacen la mitad de daño.' },
-  par: { icon: '⚡', name: 'Paralizado', desc: 'Su velocidad baja a la mitad y cada turno tiene 25% de probabilidad de no poder moverse.' },
-  psn: { icon: '☠️', name: 'Envenenado', desc: 'Pierde 1/8 de sus PS al final de cada turno.' },
-  tox: { icon: '☠️', name: 'Gravemente envenenado', short: 'Tóxico', desc: 'Pierde cada vez más PS al final de cada turno: 1/16, luego 2/16, 3/16…' },
-  slp: { icon: '💤', name: 'Dormido', desc: 'No puede moverse durante 1 a 3 turnos.' },
-  frz: { icon: '🧊', name: 'Congelado', desc: 'No puede moverse. Cada turno tiene 20% de probabilidad de descongelarse, y un ataque de Fuego lo descongela.' },
+  brn: { icon: 'fire', name: 'Quemado', desc: 'Pierde 1/16 de sus PS al final de cada turno y sus ataques físicos hacen la mitad de daño.' },
+  par: { icon: 'bolt', name: 'Paralizado', desc: 'Su velocidad baja a la mitad y cada turno tiene 25% de probabilidad de no poder moverse.' },
+  psn: { icon: 'poison', name: 'Envenenado', desc: 'Pierde 1/8 de sus PS al final de cada turno.' },
+  tox: { icon: 'poison', name: 'Gravemente envenenado', short: 'Tóxico', desc: 'Pierde cada vez más PS al final de cada turno: 1/16, luego 2/16, 3/16…' },
+  slp: { icon: 'sleep', name: 'Dormido', desc: 'No puede moverse durante 1 a 3 turnos.' },
+  frz: { icon: 'snow', name: 'Congelado', desc: 'No puede moverse. Cada turno tiene 20% de probabilidad de descongelarse, y un ataque de Fuego lo descongela.' },
 };
 const VOLATILE_INFO = {
-  confusion: () => ({ icon: '😵', name: 'Confuso', desc: 'Durante unos turnos puede golpearse a sí mismo en vez de atacar (1 de cada 3 veces).' }),
-  attract: () => ({ icon: '💘', name: 'Enamorado', desc: 'Cada turno tiene 50% de probabilidad de no atacar.' }),
-  perish: (v) => ({ icon: '🎵', name: `Canto mortal: ${v - 1}`, desc: `Se debilitará en ${v - 1} ${v - 1 === 1 ? 'turno' : 'turnos'} si no sale del combate.` }),
-  charge: () => ({ icon: '🔋', name: 'Cargado', desc: 'Su próximo ataque Eléctrico tiene el doble de poder.' }),
-  flashFire: () => ({ icon: '🔥', name: 'Absorbe Fuego', desc: 'Sus ataques de Fuego son 50% más fuertes.' }),
-  disabled: (v) => ({ icon: '🚫', name: 'Anulación', desc: `No puede usar ${v} por unos turnos.` }),
-  slowStart: () => ({ icon: '🐢', name: 'Inicio lento', desc: 'Su Ataque y su Velocidad están a la mitad durante unos turnos.' }),
-  bound: (v) => ({ icon: '🪢', name: 'Apresado', desc: `${v} le quita 1/8 de sus PS cada turno y no lo deja cambiar, por 4 o 5 turnos.` }),
-  trapped: () => ({ icon: '⛓️', name: 'Atrapado', desc: 'No puede cambiar mientras quien lo atrapó siga en combate.' }),
-  saltcure: () => ({ icon: '🧂', name: 'Salazón', desc: 'Pierde 1/8 de sus PS cada turno (1/4 si es de tipo Agua o Acero).' }),
-  smackdown: () => ({ icon: '⬇️', name: 'En el suelo', desc: 'Lo derribaron: los ataques de Tierra le afectan.' }),
-  noRetreat: () => ({ icon: '🚩', name: 'Bastión Final', desc: 'No puede cambiar de Pokémon.' }),
-  substitute: () => ({ icon: '🧸', name: 'Sustituto', desc: 'Un muñeco recibe los ataques en su lugar y bloquea los movimientos de estado del rival.' }),
-  taunt: (v) => ({ icon: '😤', name: 'Provocado', desc: `Solo puede usar ataques (${v} turnos).` }),
-  encore: () => ({ icon: '🔁', name: 'Otra Vez', desc: 'Tiene que repetir su último movimiento.' }),
-  torment: () => ({ icon: '😣', name: 'Tormento', desc: 'No puede usar el mismo movimiento dos veces seguidas.' }),
-  healblock: (v) => ({ icon: '🚫', name: 'Anticura', desc: `No puede curarse (${v} turnos).` }),
-  yawn: () => ({ icon: '🥱', name: 'Bostezo', desc: 'Se dormirá al final del próximo turno.' }),
-  nightmare: () => ({ icon: '👻', name: 'Pesadilla', desc: 'Pierde 1/4 de sus PS cada turno mientras duerme.' }),
-  curse: () => ({ icon: '🕯️', name: 'Maldición', desc: 'Pierde 1/4 de sus PS cada turno.' }),
-  focusenergy: () => ({ icon: '🎯', name: 'Foco Energía', desc: 'Más probabilidad de golpe crítico.' }),
-  ingrain: () => ({ icon: '🌱', name: 'Arraigo', desc: 'Recupera 1/16 de sus PS cada turno, pero no puede cambiar.' }),
-  aquaring: () => ({ icon: '💧', name: 'Acua Aro', desc: 'Recupera 1/16 de sus PS cada turno.' }),
-  magnetrise: (v) => ({ icon: '🧲', name: 'Levitón', desc: `Inmune a los ataques de Tierra (${v} turnos).` }),
-  telekinesis: (v) => ({ icon: '🪄', name: 'Telequinesis', desc: `Flota: los ataques no le fallan (${v} turnos).` }),
-  foresight: () => ({ icon: '👁️', name: 'Identificado', desc: 'Pierde sus inmunidades de tipo Fantasma y su evasión no cuenta.' }),
-  miracleeye: () => ({ icon: '👁️', name: 'Gran Ojo', desc: 'Los ataques Psíquicos le afectan aunque sea Siniestro.' }),
-  stockpile: (v) => ({ icon: '📦', name: `Reserva ${v}`, desc: 'Energía acumulada para Escupir o Tragar.' }),
-  gastroacid: () => ({ icon: '🧪', name: 'Bilis', desc: 'Su habilidad no tiene efecto.' }),
-  uproar: () => ({ icon: '📢', name: 'Alboroto', desc: 'Nadie puede dormirse mientras dure.' }),
-  imprison: () => ({ icon: '🔐', name: 'Sellado', desc: 'El rival no puede usar los movimientos que comparten.' }),
+  confusion: () => ({ icon: 'spiral', name: 'Confuso', desc: 'Durante unos turnos puede golpearse a sí mismo en vez de atacar (1 de cada 3 veces).' }),
+  attract: () => ({ icon: 'heart', name: 'Enamorado', desc: 'Cada turno tiene 50% de probabilidad de no atacar.' }),
+  perish: (v) => ({ icon: 'note', name: `Canto mortal: ${v - 1}`, desc: `Se debilitará en ${v - 1} ${v - 1 === 1 ? 'turno' : 'turnos'} si no sale del combate.` }),
+  charge: () => ({ icon: 'battery', name: 'Cargado', desc: 'Su próximo ataque Eléctrico tiene el doble de poder.' }),
+  flashFire: () => ({ icon: 'fire', name: 'Absorbe Fuego', desc: 'Sus ataques de Fuego son 50% más fuertes.' }),
+  disabled: (v) => ({ icon: 'block', name: 'Anulación', desc: `No puede usar ${v} por unos turnos.` }),
+  slowStart: () => ({ icon: 'hourglass', name: 'Inicio lento', desc: 'Su Ataque y su Velocidad están a la mitad durante unos turnos.' }),
+  bound: (v) => ({ icon: 'chain', name: 'Apresado', desc: `${v} le quita 1/8 de sus PS cada turno y no lo deja cambiar, por 4 o 5 turnos.` }),
+  trapped: () => ({ icon: 'chain', name: 'Atrapado', desc: 'No puede cambiar mientras quien lo atrapó siga en combate.' }),
+  saltcure: () => ({ icon: 'crystal', name: 'Salazón', desc: 'Pierde 1/8 de sus PS cada turno (1/4 si es de tipo Agua o Acero).' }),
+  smackdown: () => ({ icon: 'down', name: 'En el suelo', desc: 'Lo derribaron: los ataques de Tierra le afectan.' }),
+  noRetreat: () => ({ icon: 'flag', name: 'Bastión Final', desc: 'No puede cambiar de Pokémon.' }),
+  substitute: () => ({ icon: 'doll', name: 'Sustituto', desc: 'Un muñeco recibe los ataques en su lugar y bloquea los movimientos de estado del rival.' }),
+  taunt: (v) => ({ icon: 'anger', name: 'Provocado', desc: `Solo puede usar ataques (${v} turnos).` }),
+  encore: () => ({ icon: 'repeat', name: 'Otra Vez', desc: 'Tiene que repetir su último movimiento.' }),
+  torment: () => ({ icon: 'anger', name: 'Tormento', desc: 'No puede usar el mismo movimiento dos veces seguidas.' }),
+  healblock: (v) => ({ icon: 'block', name: 'Anticura', desc: `No puede curarse (${v} turnos).` }),
+  yawn: () => ({ icon: 'sleep', name: 'Bostezo', desc: 'Se dormirá al final del próximo turno.' }),
+  nightmare: () => ({ icon: 'ghost', name: 'Pesadilla', desc: 'Pierde 1/4 de sus PS cada turno mientras duerme.' }),
+  curse: () => ({ icon: 'candle', name: 'Maldición', desc: 'Pierde 1/4 de sus PS cada turno.' }),
+  focusenergy: () => ({ icon: 'target', name: 'Foco Energía', desc: 'Más probabilidad de golpe crítico.' }),
+  ingrain: () => ({ icon: 'leaf', name: 'Arraigo', desc: 'Recupera 1/16 de sus PS cada turno, pero no puede cambiar.' }),
+  aquaring: () => ({ icon: 'drop', name: 'Acua Aro', desc: 'Recupera 1/16 de sus PS cada turno.' }),
+  magnetrise: (v) => ({ icon: 'magnet', name: 'Levitón', desc: `Inmune a los ataques de Tierra (${v} turnos).` }),
+  telekinesis: (v) => ({ icon: 'sparkle', name: 'Telequinesis', desc: `Flota: los ataques no le fallan (${v} turnos).` }),
+  foresight: () => ({ icon: 'eye', name: 'Identificado', desc: 'Pierde sus inmunidades de tipo Fantasma y su evasión no cuenta.' }),
+  miracleeye: () => ({ icon: 'eye', name: 'Gran Ojo', desc: 'Los ataques Psíquicos le afectan aunque sea Siniestro.' }),
+  stockpile: (v) => ({ icon: 'box', name: `Reserva ${v}`, desc: 'Energía acumulada para Escupir o Tragar.' }),
+  gastroacid: () => ({ icon: 'flask', name: 'Bilis', desc: 'Su habilidad no tiene efecto.' }),
+  uproar: () => ({ icon: 'megaphone', name: 'Alboroto', desc: 'Nadie puede dormirse mientras dure.' }),
+  imprison: () => ({ icon: 'lock', name: 'Sellado', desc: 'El rival no puede usar los movimientos que comparten.' }),
 };
 const NOTHING_WHY = {
   sameGender: 'los dos son del mismo género',
@@ -197,16 +201,17 @@ const NOTHING_WHY = {
   noFainted: 'no hay ningún Pokémon debilitado',
   noStockpile: 'no tiene energía reservada',
 };
+const shinyName = (f, name = f.name) => (f.shiny ? [glyph('sparkle', { label: 'Shiny' }), ' ', name] : [name]);
 const GENDER = { male: { sym: '♂', name: 'Macho' }, female: { sym: '♀', name: 'Hembra' } };
 const genderMark = (g) => (GENDER[g] ? h('span', { class: `gender ${g}`, 'data-tip': GENDER[g].name, 'aria-label': GENDER[g].name }, GENDER[g].sym) : null);
-const statusLabel = (status) => `${STATUS_INFO[status].icon} ${STATUS_INFO[status].short ?? STATUS_INFO[status].name}`;
+const statusLabel = (status) => [glyph(STATUS_INFO[status].icon), ` ${STATUS_INFO[status].short ?? STATUS_INFO[status].name}`];
 const conditionsOf = (f) => [
   ...(f.status ? [{ key: f.status, ...STATUS_INFO[f.status] }] : []),
   ...Object.entries(f.volatiles || {}).filter(([k, v]) => v && VOLATILE_INFO[k]).map(([k, v]) => ({ key: k, ...VOLATILE_INFO[k](v) })),
 ];
 const STATUS_TEXT = { brn: 'se quema', par: 'queda paralizado', psn: 'queda envenenado', tox: 'queda gravemente envenenado', slp: 'se duerme', frz: 'se congela' };
 const CURE_TEXT = { brn: 'ya no está quemado', par: 'ya no está paralizado', psn: 'ya no está envenenado', tox: 'ya no está envenenado', slp: 'se despierta', frz: 'se descongela' };
-const WEATHER = { sun: '☀️ Sol', rain: '🌧️ Lluvia', sand: '🌪️ Tormenta de arena', snow: '❄️ Nieve', hail: '🧊 Granizo', harshsun: '🔆 Sol abrasador', heavyrain: '⛈️ Diluvio', winds: '🌀 Turbulencias' };
+const WEATHER = { sun: { icon: 'sun', name: 'Sol' }, rain: { icon: 'rain', name: 'Lluvia' }, sand: { icon: 'sand', name: 'Tormenta de arena' }, snow: { icon: 'snow', name: 'Nieve' }, hail: { icon: 'hail', name: 'Granizo' }, harshsun: { icon: 'sun', name: 'Sol abrasador' }, heavyrain: { icon: 'storm', name: 'Diluvio' }, winds: { icon: 'wind', name: 'Turbulencias' } };
 const WEATHER_START = { sun: 'El sol pega fuerte.', rain: 'Empieza a llover.', sand: 'Se desata una tormenta de arena.', snow: 'Empieza a nevar.', hail: 'Empieza a granizar.', harshsun: 'El sol abrasa: los ataques de Agua se evaporan.', heavyrain: 'Cae un diluvio: los ataques de Fuego se apagan.', winds: 'Soplan turbulencias que protegen a los Volador.' };
 const SCREEN = { reflect: 'Reflejo', lightscreen: 'Pantalla de Luz', auroraveil: 'Velo Aurora' };
 const SCREEN_GUARDS = { reflect: 'los ataques físicos', lightscreen: 'los ataques especiales', auroraveil: 'los ataques físicos y especiales' };
@@ -216,7 +221,7 @@ const SCREEN_END = {
   defog: (name, team) => `El viento se lleva ${name} del equipo de ${team}.`,
   cleaner: (name, team) => `Antibarrera elimina ${name} del equipo de ${team}.`,
 };
-const TERRAIN = { electric: '⚡ Campo Eléctrico', grassy: '🌿 Campo de Hierba', misty: '🌫️ Campo de Niebla', psychic: '🔮 Campo Psíquico' };
+const TERRAIN = { electric: { icon: 'bolt', name: 'Campo Eléctrico' }, grassy: { icon: 'leaf', name: 'Campo de Hierba' }, misty: { icon: 'fog', name: 'Campo de Niebla' }, psychic: { icon: 'orb', name: 'Campo Psíquico' } };
 const STAT = { atk: ['ATQ', 'ataque'], def: ['DEF', 'defensa'], satk: ['AT.E', 'ataque especial'], sdef: ['DF.E', 'defensa especial'], spd: ['VEL', 'velocidad'], acc: ['PRE', 'precisión'], eva: ['EVA', 'evasión'] };
 const CANT = {
   recharge: 'necesita recargarse.', slp: 'está dormido.', frz: 'está congelado.', par: 'está paralizado: no puede moverse.', flinch: '¡retrocede y no puede moverse!', attract: 'está enamorado y no ataca.',
@@ -236,26 +241,26 @@ const cantText = (ev) => {
   return typeof c === 'function' ? c(ev) : c ?? 'no puede moverse.';
 };
 const SIDE_COND = {
-  spikes: { icon: '📌', name: 'Púas', start: (t) => `Hay púas esparcidas alrededor del equipo de ${t}.`, end: (t) => `Desaparecen las púas del lado de ${t}.`, desc: 'Dañan al que entra y toca el suelo (1/8, 1/6 o 1/4 de los PS según las capas).' },
-  stealthrock: { icon: '🪨', name: 'Trampa Rocas', start: (t) => `Rocas puntiagudas flotan alrededor del equipo de ${t}.`, end: (t) => `Desaparecen las rocas del lado de ${t}.`, desc: 'Dañan al que entra según su debilidad a Roca.' },
-  stickyweb: { icon: '🕸️', name: 'Red Viscosa', start: (t) => `Una red viscosa se extiende bajo el equipo de ${t}.`, end: (t) => `Desaparece la red viscosa del lado de ${t}.`, desc: 'Baja la Velocidad del que entra y toca el suelo.' },
-  tailwind: { icon: '🌬️', name: 'Viento Afín', start: (t) => `Sopla un viento afín a favor del equipo de ${t}.`, end: (t) => `Amaina el viento afín del equipo de ${t}.`, desc: 'Duplica la Velocidad del equipo.' },
-  safeguard: { icon: '💠', name: 'Velo Sagrado', start: (t) => `Un velo sagrado protege al equipo de ${t}.`, end: (t) => `Se desvanece el velo sagrado del equipo de ${t}.`, desc: 'Protege al equipo de problemas de estado.' },
-  mist: { icon: '🌫️', name: 'Neblina', start: (t) => `Una neblina cubre al equipo de ${t}.`, end: (t) => `Se disipa la neblina del equipo de ${t}.`, desc: 'Impide que el rival baje las características del equipo.' },
-  luckychant: { icon: '🍀', name: 'Conjuro', start: (t) => `Un conjuro protege al equipo de ${t} de los golpes críticos.`, end: (t) => `Termina el conjuro del equipo de ${t}.`, desc: 'El rival no puede asestar golpes críticos al equipo.' },
-  quickguard: { icon: '⚡', name: 'Anticipo', start: (t) => `El equipo de ${t} se protege de los ataques con prioridad.` },
-  wideguard: { icon: '🧱', name: 'Vasta Guardia', start: (t) => `El equipo de ${t} se protege de los ataques en área.` },
-  craftyshield: { icon: '🃏', name: 'Truco Defensa', start: (t) => `El equipo de ${t} se protege de los movimientos de estado.` },
-  matblock: { icon: '🥋', name: 'Escudo Tatami', start: (t) => `El equipo de ${t} levanta un tatami.` },
-  wish: { icon: '🌠', name: 'Deseo', start: (t, ev) => `${ev.name} pide un deseo.` },
+  spikes: { icon: 'spikes', name: 'Púas', start: (t) => `Hay púas esparcidas alrededor del equipo de ${t}.`, end: (t) => `Desaparecen las púas del lado de ${t}.`, desc: 'Dañan al que entra y toca el suelo (1/8, 1/6 o 1/4 de los PS según las capas).' },
+  stealthrock: { icon: 'rock', name: 'Trampa Rocas', start: (t) => `Rocas puntiagudas flotan alrededor del equipo de ${t}.`, end: (t) => `Desaparecen las rocas del lado de ${t}.`, desc: 'Dañan al que entra según su debilidad a Roca.' },
+  stickyweb: { icon: 'web', name: 'Red Viscosa', start: (t) => `Una red viscosa se extiende bajo el equipo de ${t}.`, end: (t) => `Desaparece la red viscosa del lado de ${t}.`, desc: 'Baja la Velocidad del que entra y toca el suelo.' },
+  tailwind: { icon: 'wind', name: 'Viento Afín', start: (t) => `Sopla un viento afín a favor del equipo de ${t}.`, end: (t) => `Amaina el viento afín del equipo de ${t}.`, desc: 'Duplica la Velocidad del equipo.' },
+  safeguard: { icon: 'shield', name: 'Velo Sagrado', start: (t) => `Un velo sagrado protege al equipo de ${t}.`, end: (t) => `Se desvanece el velo sagrado del equipo de ${t}.`, desc: 'Protege al equipo de problemas de estado.' },
+  mist: { icon: 'fog', name: 'Neblina', start: (t) => `Una neblina cubre al equipo de ${t}.`, end: (t) => `Se disipa la neblina del equipo de ${t}.`, desc: 'Impide que el rival baje las características del equipo.' },
+  luckychant: { icon: 'clover', name: 'Conjuro', start: (t) => `Un conjuro protege al equipo de ${t} de los golpes críticos.`, end: (t) => `Termina el conjuro del equipo de ${t}.`, desc: 'El rival no puede asestar golpes críticos al equipo.' },
+  quickguard: { icon: 'bolt', name: 'Anticipo', start: (t) => `El equipo de ${t} se protege de los ataques con prioridad.` },
+  wideguard: { icon: 'wall', name: 'Vasta Guardia', start: (t) => `El equipo de ${t} se protege de los ataques en área.` },
+  craftyshield: { icon: 'shield', name: 'Truco Defensa', start: (t) => `El equipo de ${t} se protege de los movimientos de estado.` },
+  matblock: { icon: 'wall', name: 'Escudo Tatami', start: (t) => `El equipo de ${t} levanta un tatami.` },
+  wish: { icon: 'star', name: 'Deseo', start: (t, ev) => `${ev.name} pide un deseo.` },
 };
 const ROOM = {
-  gravity: { label: '🌌 Gravedad', start: 'La gravedad se intensifica.', end: 'La gravedad vuelve a la normalidad.' },
-  trickroom: { label: '🔄 Espacio Raro', start: 'El espacio se retuerce: los más lentos atacan primero.', end: 'El espacio vuelve a la normalidad.' },
-  wonderroom: { label: '❓ Zona Extraña', start: 'Se intercambian la Defensa y la Defensa Especial de todos.', end: 'La Zona Extraña desaparece.' },
-  mudsport: { label: '🟤 Chapoteo Lodo', start: 'Los ataques Eléctricos se debilitan.', end: 'El efecto de Chapoteo Lodo termina.' },
-  watersport: { label: '💧 Hidrochorro', start: 'Los ataques de Fuego se debilitan.', end: 'El efecto de Hidrochorro termina.' },
-  fairylock: { label: '🔒 Cerrojo Feérico', start: 'Nadie podrá huir durante el próximo turno.', end: 'El cerrojo feérico se abre.' },
+  gravity: { icon: 'planet', name: 'Gravedad', start: 'La gravedad se intensifica.', end: 'La gravedad vuelve a la normalidad.' },
+  trickroom: { icon: 'repeat', name: 'Espacio Raro', start: 'El espacio se retuerce: los más lentos atacan primero.', end: 'El espacio vuelve a la normalidad.' },
+  wonderroom: { icon: 'question', name: 'Zona Extraña', start: 'Se intercambian la Defensa y la Defensa Especial de todos.', end: 'La Zona Extraña desaparece.' },
+  mudsport: { icon: 'mud', name: 'Chapoteo Lodo', start: 'Los ataques Eléctricos se debilitan.', end: 'El efecto de Chapoteo Lodo termina.' },
+  watersport: { icon: 'drop', name: 'Hidrochorro', start: 'Los ataques de Fuego se debilitan.', end: 'El efecto de Hidrochorro termina.' },
+  fairylock: { icon: 'lock', name: 'Cerrojo Feérico', start: 'Nadie podrá huir durante el próximo turno.', end: 'El cerrojo feérico se abre.' },
 };
 const HURT = { leechseed: ' por las drenadoras', brn: ' por la quemadura', psn: ' por el veneno', tox: ' por el veneno', sand: ' por la tormenta de arena', hail: ' por el granizo', recoil: ' por el retroceso', ooze: ' por el lodo líquido', bound: ' por estar apresado', saltcure: ' por la salazón', crash: ' al estrellarse', cost: ' para potenciarse', stealthrock: ' por las rocas puntiagudas', spikes: ' por las púas', curse: ' por la maldición', nightmare: ' por la pesadilla', future: ' por el ataque anticipado', painsplit: ' al compartir el dolor', spikyshield: ' al chocar con el escudo de púas', ability: '' };
 const VOLATILE = {
@@ -421,7 +426,7 @@ function infoCard(f, { own, owner, close }) {
       h(
         'div',
         null,
-        h('h2', null, f.shiny ? `✨ ${f.name}` : f.name, ' ', genderMark(f.gender) ?? h('span', { class: 'gender none', 'data-tip': 'Sin género: Atracción no le afecta ni la puede usar.' }, '∅')),
+        h('h2', null, ...shinyName(f), ' ', genderMark(f.gender) ?? h('span', { class: 'gender none', 'data-tip': 'Sin género: Atracción no le afecta ni la puede usar.' }, '∅')),
         h('p', { class: 'muted small' }, f.name !== f.speciesName ? `${f.speciesName} · ` : '', `Nv ${f.level} · de ${owner}`),
         typeChips(f.types),
       ),
@@ -432,7 +437,7 @@ function infoCard(f, { own, owner, close }) {
       null,
       h('h3', null, 'Estado'),
       conditions.length
-        ? h('div', { class: 'cond-list' }, conditions.map((c) => h('div', { class: `cond-row ${c.key}` }, h('span', { class: 'cond-icon', 'aria-hidden': 'true' }, c.icon), h('div', null, h('b', null, c.name), h('small', null, c.desc)))))
+        ? h('div', { class: 'cond-list' }, conditions.map((c) => h('div', { class: `cond-row ${c.key}` }, h('span', { class: 'cond-icon', 'aria-hidden': 'true' }, glyph(c.icon)), h('div', null, h('b', null, c.name), h('small', null, c.desc)))))
         : h('p', { class: 'muted' }, 'Sin problemas de estado.'),
     ),
     h(
@@ -497,7 +502,7 @@ function monCard(f, opts = {}) {
       onkeydown: clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opts.onclick(); } } : null,
     },
     opts.badge ? h('span', { class: 'badge' }, opts.badge) : null,
-    f.shiny ? h('span', { class: 'shiny', 'data-tip': 'Shiny' }, '✨') : null,
+    f.shiny ? h('span', { class: 'shiny', 'data-tip': 'Shiny' }, glyph('sparkle')) : null,
     h('div', { html: creatureHTML(f) }),
     h('div', { class: 'nm', title: f.name !== f.speciesName ? `${f.name} (${f.speciesName})` : f.name }, f.name, genderMark(f.gender)),
     h('div', { class: 'meta' }, typeChips(f.types), h('span', null, `Nv ${f.level}`), opts.rarity !== false ? h('span', null, RARITY[f.rarity] || '') : null),
@@ -506,7 +511,7 @@ function monCard(f, opts = {}) {
       ? h('div', { class: 'stats' }, ...[['PV', 'hp'], ['ATQ', 'atk'], ['DEF', 'def'], ['AT.E', 'satk'], ['DF.E', 'sdef'], ['VEL', 'spd']].map(([l, k]) => h('span', null, h('b', null, f.stats[k]), l)))
       : null,
     opts.extra ?? null,
-    opts.onEdit ? h('button', { class: 'edit', 'data-tip': 'Ponerle apodo', 'aria-label': `Apodo para ${f.name}`, onclick: (e) => { e.stopPropagation(); opts.onEdit(); } }, '✎') : null,
+    opts.onEdit ? h('button', { class: 'edit', 'data-tip': 'Ponerle apodo', 'aria-label': `Apodo para ${f.name}`, onclick: (e) => { e.stopPropagation(); opts.onEdit(); } }, glyph('pencil')) : null,
   );
 }
 
@@ -518,7 +523,7 @@ function rosterFilters(onChange) {
     { class: 'coll-filters' },
     h('input', { type: 'search', placeholder: 'Buscar por nombre…', 'aria-label': 'Buscar Pokémon', oninput: (e) => set('query', e.target.value.trim().toLowerCase()) }),
     h('select', { 'aria-label': 'Filtrar por tipo', onchange: (e) => set('type', e.target.value) }, h('option', { value: '' }, 'Todos los tipos'), Object.keys(TYPES).map((t) => h('option', { value: t }, typeLabel(t)))),
-    h('select', { 'aria-label': 'Filtrar shiny', onchange: (e) => set('shiny', e.target.value) }, h('option', { value: '' }, 'Shiny y normales'), h('option', { value: 'shiny' }, '✨ Solo shiny'), h('option', { value: 'plain' }, 'Solo normales')),
+    h('select', { 'aria-label': 'Filtrar shiny', onchange: (e) => set('shiny', e.target.value) }, h('option', { value: '' }, 'Shiny y normales'), h('option', { value: 'shiny' }, 'Solo shiny'), h('option', { value: 'plain' }, 'Solo normales')),
   );
   const match = (f) => (!by.query || f.name.toLowerCase().includes(by.query) || f.speciesName.toLowerCase().includes(by.query)) && (!by.type || f.types.includes(by.type)) && (!by.shiny || (by.shiny === 'shiny') === !!f.shiny);
   return { el, match };
@@ -573,7 +578,7 @@ async function loadAchievements() {
   if (known !== null) {
     const before = new Set(known.split(',').filter(Boolean));
     const fresh = unlocked.filter((key) => !before.has(key));
-    if (fresh.length) toast(`🔓 Desbloqueaste a ${fresh.slice(0, 3).map(trainerLabel).join(', ')}${fresh.length > 3 ? ` y ${fresh.length - 3} más` : ''}. Elígelo en tu perfil.`);
+    if (fresh.length) toast([glyph('unlock'), ` Desbloqueaste a ${fresh.slice(0, 3).map(trainerLabel).join(', ')}${fresh.length > 3 ? ` y ${fresh.length - 3} más` : ''}. Elígelo en tu perfil.`]);
   }
   ls.set(storeKey, unlocked.join(','));
   return sprites;
@@ -761,7 +766,7 @@ function radioButton() {
   let region = '';
   let query = '';
   let tab = 'tracks';
-  const btn = h('button', { class: 'sound-btn radio-btn', type: 'button', 'aria-label': 'Radio', 'aria-haspopup': 'dialog', 'data-tip': 'Radio' }, '📻');
+  const btn = h('button', { class: 'sound-btn radio-btn', type: 'button', 'aria-label': 'Radio', 'aria-haspopup': 'dialog', 'data-tip': 'Radio' }, glyph('radio'));
   const now = h('div', { class: 'radio-now' });
   const count = h('span', { class: 'muted small' });
   const list = h('div', { class: 'radio-list', role: 'listbox', 'aria-label': 'Canciones' });
@@ -834,8 +839,8 @@ function radioButton() {
           ? h('p', null, h('span', { class: 'live-dot on' }), ' Sonando ', h('b', null, on.title), h('span', { class: 'muted' }, ` · ${RADIO_REGIONS[on.region]}`))
           : h('p', { class: 'muted' }, 'Apagada: suena la música de cada pantalla. Elige una canción para que suene en todo el sitio.'),
       h('div', { class: 'row' },
-        h('button', { class: 'btn sm', type: 'button', onclick: () => { const pool = shown(); if (pool.length) tune(pool[Math.floor(Math.random() * pool.length)].id); } }, '🔀 Al azar'),
-        on && !feed.tuned ? h('button', { class: 'btn sm danger', type: 'button', onclick: () => tune(null) }, '⏹ Apagar radio') : null,
+        h('button', { class: 'btn sm', type: 'button', onclick: () => { const pool = shown(); if (pool.length) tune(pool[Math.floor(Math.random() * pool.length)].id); } }, glyph('shuffle'), ' Al azar'),
+        on && !feed.tuned ? h('button', { class: 'btn sm danger', type: 'button', onclick: () => tune(null) }, glyph('stop'), ' Apagar radio') : null,
       ),
     );
   }
@@ -861,7 +866,7 @@ function radioButton() {
     else minePicker.hidden = !mine.open;
   }
   dlg.append(h('div', { class: 'radio-body' },
-    h('div', { class: 'row between' }, h('h2', null, '📻 Radio'), h('button', { class: 'btn sm ghost', type: 'button', 'aria-label': 'Cerrar', onclick: () => dlg.close() }, '✕')),
+    h('div', { class: 'row between' }, h('h2', null, glyph('radio'), ' Radio'), h('button', { class: 'btn sm ghost', type: 'button', 'aria-label': 'Cerrar', onclick: () => dlg.close() }, '✕')),
     tabs,
     tracksPane,
     stations.root,
@@ -879,7 +884,7 @@ function renderSound() {
   const host = document.getElementById('sound');
   if (!host) return;
   const silent = () => music.muted || (music.volume('music') === 0 && music.volume('sfx') === 0);
-  const icon = () => (silent() ? '🔇' : '🔊');
+  const icon = () => glyph(silent() ? 'mute' : 'sound');
   const btn = h('button', { class: 'sound-btn', type: 'button', 'data-sfx': 'none', 'aria-label': 'Mezclador de sonido', 'aria-haspopup': 'true', 'aria-expanded': 'false' }, icon());
   const muteBox = h('input', { type: 'checkbox', checked: music.muted ? true : null });
   const notifyBox = h('input', { type: 'checkbox', checked: notifier.enabled ? true : null });
@@ -915,14 +920,14 @@ function renderSound() {
     'div',
     { class: 'mixer', hidden: true, role: 'group', 'aria-label': 'Mezclador de sonido' },
     h('b', { class: 'mix-title' }, 'Sonido'),
-    channel('music', 'Música de fondo', '🎵'),
-    channel('sfx', 'Combate', '💥'),
+    channel('music', 'Música de fondo', glyph('note')),
+    channel('sfx', 'Combate', glyph('burst')),
     h('label', { class: 'mix-mute' }, muteBox, ' Silenciar todo'),
-    h('label', { class: 'mix-mute', 'data-tip': 'Te avisa cuando se llena tu sala, cuando solo faltas tú por estar listo y cuando te toca en una pelea, si estás en otra pestaña.' }, notifyBox, ' 🔔 Avisos'),
+    h('label', { class: 'mix-mute', 'data-tip': 'Te avisa cuando se llena tu sala, cuando solo faltas tú por estar listo y cuando te toca en una pelea, si estás en otra pestaña.' }, notifyBox, ' ', glyph('bell'), ' Avisos'),
     notifyNote,
   );
   const paint = () => {
-    btn.textContent = icon();
+    btn.replaceChildren(icon());
     sliders.forEach((sl) => (sl.disabled = music.muted));
   };
   muteBox.addEventListener('change', () => {
@@ -1128,12 +1133,12 @@ function accountCard() {
     const toggle = (label) => h('button', { class: `btn sm${me.hasPassword ? '' : ' primary'}`, type: 'button', 'aria-expanded': String(open), onclick: () => { open = !open; paint(); } }, open ? 'Cancelar' : label);
     const head = me.hasPassword
       ? [
-          h('span', { class: 'account-icon', 'aria-hidden': 'true' }, '🔐'),
+          h('span', { class: 'account-icon', 'aria-hidden': 'true' }, glyph('key')),
           h('div', { class: 'account-text' }, h('b', null, 'Entras como ', me.name, ' desde cualquier dispositivo'), h('small', null, 'Con tu nombre de entrenador y tu contraseña. Si te cambias el nombre, entras con el nuevo.')),
           h('div', { class: 'account-actions' }, toggle('Cambiar contraseña'), h('button', { class: 'btn sm ghost', type: 'button', onclick: (e) => logOut(e.currentTarget) }, 'Cerrar sesión')),
         ]
       : [
-          h('span', { class: 'account-icon', 'aria-hidden': 'true' }, '📱'),
+          h('span', { class: 'account-icon', 'aria-hidden': 'true' }, glyph('phone')),
           h('div', { class: 'account-text' }, h('b', null, 'Juega desde cualquier dispositivo'), h('small', null, `Tu cuenta solo vive en este navegador. Con una contraseña entras como ${me.name} desde cualquier lado, con el mismo save, y no la pierdes si borras los datos del navegador.`)),
           h('div', { class: 'account-actions' }, toggle('Agregar contraseña')),
         ];
@@ -1150,7 +1155,7 @@ function importCard({ onDone, compact: small = false } = {}) {
   const pass = me ? null : textField('tpass', 'Contraseña', { type: 'password', autocomplete: 'new-password', minlength: PASSWORD_MIN_LENGTH, placeholder: `Al menos ${PASSWORD_MIN_LENGTH} caracteres` });
   const fileInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true });
   const dropText = h('span', { class: 'muted small' }, 'o haz clic para elegirlo');
-  const drop = h('div', { class: 'drop', tabindex: 0, role: 'button' }, h('strong', null, '📦 Arrastra aquí tu save de PokeTokenBar'), dropText);
+  const drop = h('div', { class: 'drop', tabindex: 0, role: 'button' }, h('strong', null, glyph('box'), ' Arrastra aquí tu save de PokeTokenBar'), dropText);
 
   async function handle(file) {
     err.hidden = true;
@@ -1218,7 +1223,7 @@ function importCard({ onDone, compact: small = false } = {}) {
 }
 
 const isPhone = () => matchMedia('(max-width: 640px)').matches;
-const phoneSaveNote = () => h('div', { class: 'phone-save-note' }, h('span', { 'aria-hidden': 'true' }, '💻'), h('p', null, h('b', null, 'El save se sube desde el computador. '), 'PokeTokenBar guarda tu save en el Mac: abre Token Clash ahí para subirlo o actualizarlo. Desde el celular puedes entrar con tu nombre y contraseña y jugar con el save que ya subiste.'));
+const phoneSaveNote = () => h('div', { class: 'phone-save-note' }, glyph('laptop'), h('p', null, h('b', null, 'El save se sube desde el computador. '), 'PokeTokenBar guarda tu save en el Mac: abre Token Clash ahí para subirlo o actualizarlo. Desde el celular puedes entrar con tu nombre y contraseña y jugar con el save que ya subiste.'));
 
 function updateSavePanel({ onDone } = {}) {
   if (isPhone()) return phoneSaveNote();
@@ -1226,10 +1231,10 @@ function updateSavePanel({ onDone } = {}) {
   const slot = h('div');
   const tabs = h('div', { class: 'segmented update-save-tabs', role: 'group', 'aria-label': 'Cómo actualizar tu save' });
   function paint() {
-    const fileTab = h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(mode === 'file'), onclick: () => { mode = 'file'; paint(); } }, '📦 Subir archivo');
+    const fileTab = h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(mode === 'file'), onclick: () => { mode = 'file'; paint(); } }, glyph('box'), ' Subir archivo');
     const hackerTab = me.hasPassword
       ? h('button', { type: 'button', class: 'seg-item hacker-tab', 'aria-pressed': String(mode === 'hacker'), onclick: () => { mode = 'hacker'; paint(); } }, '>_ Modo hacker')
-      : h('button', { type: 'button', class: 'seg-item hacker-tab is-locked', 'aria-pressed': 'false', 'aria-disabled': 'true', 'data-tip': 'Primero agrega una contraseña en tu perfil', 'data-tip-note': 'El save automático entra con tu nombre de entrenador y tu contraseña.', onclick: () => toast('Primero agrega una contraseña en tu perfil') }, '🔒 Modo hacker');
+      : h('button', { type: 'button', class: 'seg-item hacker-tab is-locked', 'aria-pressed': 'false', 'aria-disabled': 'true', 'data-tip': 'Primero agrega una contraseña en tu perfil', 'data-tip-note': 'El save automático entra con tu nombre de entrenador y tu contraseña.', onclick: () => toast('Primero agrega una contraseña en tu perfil') }, glyph('lock'), ' Modo hacker');
     tabs.replaceChildren(fileTab, hackerTab);
     slot.replaceChildren(mode === 'file' ? importCard({ onDone }) : hackerGuide());
   }
@@ -1400,11 +1405,26 @@ async function profilePage(seq) {
     h('select', { 'aria-label': 'Filtrar por categoría', onchange: (e) => { group = e.target.value; paint(); } }, Object.entries(TRAINER_GROUPS).filter(([value]) => !['unlocked', 'locked'].includes(value)).map(([value, text]) => h('option', { value }, text))),
     h('select', { 'aria-label': 'Filtrar por género', onchange: (e) => { gender = e.target.value; paint(); } }, h('option', { value: '' }, 'Ambos géneros'), h('option', { value: '♂' }, '♂ Hombres'), h('option', { value: '♀' }, '♀ Mujeres')),
   );
-  let editingName = false;
+  const nameInput = h('input', { id: 'account-name-input', type: 'text', maxlength: 24, value: me.name, autocomplete: 'nickname' });
+  const saveName = h('button', { class: 'btn sm primary', type: 'submit' }, 'Guardar');
+  const nameForm = h('form', { class: 'account-name', onsubmit: async (e) => {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      if (!name || name === me.name) {
+        nameInput.value = me.name;
+        return;
+      }
+      if (me.hasPassword) return askRename(name);
+      saveName.disabled = true;
+      await rename(name);
+      saveName.disabled = false;
+    } },
+    h('label', { class: 'account-name-label', for: 'account-name-input' }, h('b', null, 'Nombre de entrenador'), h('small', { class: 'muted' }, 'También es tu usuario para entrar.')),
+    h('div', { class: 'account-name-row' }, nameInput, saveName));
   let account = accountCard();
   const accountDlg = h('dialog', { class: 'info-dlg account-dlg', 'aria-label': 'Tu cuenta', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() },
-    h('div', { class: 'account-dlg-body' }, h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => accountDlg.close() }, '×'), h('h2', null, '⚙️ Tu cuenta'), account));
-  const accountBtn = h('button', { type: 'button', class: `btn sm ghost account-open${me.hasPassword ? '' : ' needs-password'}`, 'aria-label': 'Tu cuenta', 'data-tip': me.hasPassword ? 'Contraseña y sesión' : 'Agrega una contraseña para entrar desde otros dispositivos', onclick: () => accountDlg.showModal() }, '⚙️', h('span', { class: 'account-open-label' }, ' Cuenta y contraseña'));
+    h('div', { class: 'account-dlg-body' }, h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => accountDlg.close() }, '×'), h('h2', null, glyph('gear'), ' Tu cuenta'), nameForm, account));
+  const accountBtn = h('button', { type: 'button', class: `btn sm ghost account-open${me.hasPassword ? '' : ' needs-password'}`, 'aria-label': 'Tu cuenta', 'data-tip': me.hasPassword ? 'Nombre, contraseña y sesión' : 'Agrega una contraseña para entrar desde otros dispositivos', onclick: () => accountDlg.showModal() }, glyph('gear'), h('span', { class: 'account-open-label' }, ' Cuenta, nombre y contraseña'));
   accountDlg.addEventListener('close', () => accountBtn.classList.toggle('needs-password', !me.hasPassword));
   async function rename(name) {
     const oldName = me.name;
@@ -1414,7 +1434,7 @@ async function profilePage(seq) {
       toast(err.message);
       return false;
     }
-    editingName = false;
+    nameInput.value = me.name;
     renderWho();
     paintIdentity();
     const fresh = accountCard();
@@ -1444,26 +1464,11 @@ async function profilePage(seq) {
     if (!confirmDlg.open) confirmDlg.showModal();
   }
   function paintIdentity() {
-    const nameInput = h('input', { type: 'text', maxlength: 24, value: me.name, 'aria-label': 'Nombre de entrenador', autocomplete: 'nickname' });
-    const saveName = h('button', { class: 'btn sm primary', type: 'submit' }, 'Guardar');
-    const nameLine = editingName
-      ? h('form', { class: 'profile-name', onsubmit: async (e) => {
-          e.preventDefault();
-          const name = nameInput.value.trim();
-          if (!name || name === me.name) {
-            editingName = false;
-            return paintIdentity();
-          }
-          if (me.hasPassword) return askRename(name);
-          saveName.disabled = true;
-          if (!(await rename(name))) saveName.disabled = false;
-        } }, nameInput, saveName, h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { editingName = false; paintIdentity(); } }, 'Cancelar'))
-      : h('div', { class: 'profile-name-line' }, h('h1', null, me.name), h('button', { class: 'btn sm ghost icon-btn', type: 'button', 'data-tip': 'Cambiar nombre', 'aria-label': 'Cambiar nombre', onclick: () => { editingName = true; paintIdentity(); nameInput.focus(); } }, '✏️'));
+    const nameLine = h('div', { class: 'profile-name-line' }, h('h1', null, me.name));
     identity.replaceChildren(
       ...[avatarPic(me.avatar, 'lg', me.frame)].filter(Boolean),
       h('div', { class: 'profile-who' }, nameLine, h('div', { class: 'row profile-meta' }, skinTitle(me.avatar, 'span'), h('span', { class: 'chip' }, h('span', { class: 'w' }, `${me.wins}V`), ' · ', h('span', { class: 'l' }, `${me.losses}D`)))),
     );
-    if (editingName) requestAnimationFrame(() => nameInput.focus());
   }
   const usable = (key) => key === me.avatar || progress.get(key)?.unlocked !== false;
   const goalState = (g) => (g.need === 1 ? (g.have >= 1 ? 'listo' : 'pendiente') : `${g.have.toLocaleString('es')}/${g.need.toLocaleString('es')}`);
@@ -1471,8 +1476,8 @@ async function profilePage(seq) {
     const p = progress.get(key);
     if (!p) return { tip: trainerLabel(key), note: null };
     if (p.group === 'starter') return { tip: `${trainerLabel(key)} · disponible desde el inicio`, note: null };
-    if (p.unlocked) return { tip: `🔓 ${trainerLabel(key)} · ${p.title}`, note: `Lo desbloqueaste con: ${p.goals.map((g) => (g.need === 1 ? g.text : `${g.text} (${g.need.toLocaleString('es')})`)).join(' y ')}` };
-    return { tip: `🔒 ${trainerLabel(key)} · ${p.title}`, note: `Te falta: ${p.goals.filter((g) => g.have < g.need).map((g) => `${g.text} ${goalState(g)}`).join(' · ')}` };
+    if (p.unlocked) return { tip: `${trainerLabel(key)} · ${p.title}`, note: `Lo desbloqueaste con: ${p.goals.map((g) => (g.need === 1 ? g.text : `${g.text} (${g.need.toLocaleString('es')})`)).join(' y ')}` };
+    return { tip: `${trainerLabel(key)} · ${p.title}`, note: `Te falta: ${p.goals.filter((g) => g.have < g.need).map((g) => `${g.text} ${goalState(g)}`).join(' · ')}` };
   }
   const goalList = (goals) => h('ul', { class: 'unlock-goals' }, goals.map((g) => h('li', { class: g.have >= g.need ? 'is-done' : null }, h('span', null, g.text, g.hint ? h('span', { class: 'goal-hint', tabindex: 0, 'data-tip': g.hint, 'aria-label': g.hint }, '?') : null), h('span', { class: 'unlock-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': g.need, 'aria-valuenow': g.have }, h('i', { style: { width: `${(g.have / g.need) * 100}%` } })), h('small', { class: 'muted' }, g.need === 1 ? (g.have >= 1 ? 'Listo' : 'Pendiente') : `${g.have.toLocaleString('es')} / ${g.need.toLocaleString('es')}`))));
   const baseOf = (key) => {
@@ -1502,7 +1507,8 @@ async function profilePage(seq) {
     if (item.locked || item.available === false) return 'locked';
     return 'buy';
   }
-  const VERSION_STATUS = { equipped: '★ En uso', owned: '✓ Obtenido', locked: '🔒 Por desbloquear', buy: '🪙 En venta' };
+  const VERSION_STATUS = { equipped: 'En uso', owned: 'Obtenido', locked: 'Por desbloquear', buy: 'En venta' };
+const STATE_GLYPH = { equipped: 'star', owned: 'check', locked: 'lock', buy: 'coin' };
   function versionAction(item, state) {
     if (state === 'equipped') return h('span', { class: 'chip ready-chip' }, 'En uso');
     if (state === 'owned') return h('button', { class: 'btn sm primary', type: 'button', onclick: (e) => { e.stopPropagation(); equip(item); } }, 'Equipar');
@@ -1527,7 +1533,7 @@ async function profilePage(seq) {
     confirmDlg.replaceChildren(h('div', { class: 'confirm-body family' },
       h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => confirmDlg.close() }, '×'),
       h('header', { class: 'family-head' }, h('h2', null, familyLabel(base)), h('p', { class: 'muted small' }, [p?.rarity ? RARITIES[p.rarity].label : null, p?.title, recolorCount(base, members.length)].filter(Boolean).join(' · '))),
-      ways ? h('div', { class: `family-goals${focused.unlocked ? ' is-done' : ''}` }, h('b', null, focused.unlocked ? `✓ Cómo conseguiste a ${trainerLabel(focus)}` : `🔒 Cómo conseguir a ${trainerLabel(focus)}`), ways.length > 1 ? h('div', { class: 'unlock-ways' }, ways.flatMap((goals, i) => [i ? h('p', { class: 'unlock-or' }, 'o bien') : null, h('div', { class: 'unlock-way' }, h('small', { class: 'muted' }, `Opción ${i + 1}`), goalList(goals))])) : goalList(ways[0])) : null,
+      ways ? h('div', { class: `family-goals${focused.unlocked ? ' is-done' : ''}` }, h('b', null, ...(focused.unlocked ? [glyph('check'), ` Cómo conseguiste a ${trainerLabel(focus)}`] : [glyph('lock'), ` Cómo conseguir a ${trainerLabel(focus)}`])), ways.length > 1 ? h('div', { class: 'unlock-ways' }, ways.flatMap((goals, i) => [i ? h('p', { class: 'unlock-or' }, 'o bien') : null, h('div', { class: 'unlock-way' }, h('small', { class: 'muted' }, `Opción ${i + 1}`), goalList(goals))])) : goalList(ways[0])) : null,
       h('div', { class: 'family-grid' }, members.map((item) => {
         const state = versionState(item);
         const { tip, note } = unlockTip(item.key);
@@ -1535,7 +1541,7 @@ async function profilePage(seq) {
         return h('div', { class: `family-card state-${state}${item.key === focus ? ' is-focus' : ''}${pickable ? ' is-pickable' : ''}`, onclick: pickable ? () => openFamily(base, item.key) : null },
           h('div', { class: 'tile-stage', 'data-tip': tip, 'data-tip-note': note }, trainerImg(item.key)),
           h('b', null, versionName(item.key)),
-          h('small', { class: `family-status state-${state}` }, VERSION_STATUS[state]),
+          h('small', { class: `family-status state-${state}` }, glyph(STATE_GLYPH[state]), ' ', VERSION_STATUS[state]),
           versionAction(item, state),
         );
       })),
@@ -1582,7 +1588,7 @@ async function profilePage(seq) {
         refresh((await api('/api/shop/buy', { method: 'POST', body: { item: item.id } })).shop);
         music.ui('buy');
         confirmDlg.close();
-        toast(`🛒 Compraste ${label(item)}`);
+        toast([glyph('cart'), ` Compraste ${label(item)}`]);
       } catch (e) {
         toast(e.message);
         go.disabled = false;
@@ -1596,7 +1602,7 @@ async function profilePage(seq) {
         h('p', null, item.desc),
       ),
       h('dl', { class: 'buy-summary' },
-        h('div', null, h('dt', null, 'Precio'), h('dd', null, `🪙 ${tokensM(item.price)}`)),
+        h('div', null, h('dt', null, 'Precio'), h('dd', null, glyph('coin'), ` ${tokensM(item.price)}`)),
         h('div', null, h('dt', null, 'Saldo después'), h('dd', null, tokensM(shop.balance - item.price))),
       ),
       h('div', { class: 'confirm-actions buy-actions' }, h('button', { class: 'btn', type: 'button', autofocus: true, onclick: () => confirmDlg.close() }, 'Cancelar'), go),
@@ -1629,7 +1635,7 @@ async function profilePage(seq) {
     music.preloadCues(ballSounds(item.key));
     let running = false;
     let closed = false;
-    const replay = h('button', { class: 'btn', type: 'button', onclick: () => run() }, '↻ Repetir');
+    const replay = h('button', { class: 'btn', type: 'button', onclick: () => run() }, glyph('repeat'), ' Repetir');
     async function run() {
       if (running || closed) return;
       running = true;
@@ -1656,7 +1662,7 @@ async function profilePage(seq) {
         h('div', null, h('h2', null, label(item)), h('span', { class: `chip rarity-chip${item.rarity ? ` rarity-${item.rarity}` : ''}` }, item.rarity ? RARITIES[item.rarity].label : 'Gratis')),
       ),
       stage,
-      h('p', { class: 'ball-preview-note' }, `✨ ${BALL_FX_NOTE[item.rarity ?? 'free']}`),
+      h('p', { class: 'ball-preview-note' }, glyph('sparkle'), ` ${BALL_FX_NOTE[item.rarity ?? 'free']}`),
       h('div', { class: 'row confirm-actions' }, replay, action(item)),
     ));
     const stop = () => {
@@ -1672,14 +1678,14 @@ async function profilePage(seq) {
     requestAnimationFrame(() => requestAnimationFrame(() => run()));
   }
   function action(item) {
-    if (item.locked) return h('button', { class: 'btn sm ghost', type: 'button', onclick: () => openFamily(baseOf(item.key), item.key) }, '🔒 ¿Cómo?');
-    if (!item.owned && item.available === false) return h('span', { class: 'muted small shop-locked', 'data-tip': `Desbloquea a ${trainerLabel(item.requires)} para poder comprarla` }, `🔒 Primero ${trainerLabel(item.requires)} · 🪙 ${tokensM(item.price)}`);
+    if (item.locked) return h('button', { class: 'btn sm ghost', type: 'button', onclick: () => openFamily(baseOf(item.key), item.key) }, glyph('lock'), ' ¿Cómo?');
+    if (!item.owned && item.available === false) return h('span', { class: 'muted small shop-locked', 'data-tip': `Desbloquea a ${trainerLabel(item.requires)} para poder comprarla` }, glyph('lock'), ` Primero ${trainerLabel(item.requires)} · `, glyph('coin'), ` ${tokensM(item.price)}`);
     if (!item.owned) {
       const short = item.price - shop.balance;
-      return h('button', { class: 'btn sm primary', type: 'button', disabled: short > 0 || null, 'data-tip': short > 0 ? `Te faltan ${tokensM(short)}` : null, onclick: () => askBuy(item) }, `🪙 ${tokensM(item.price)}`);
+      return h('button', { class: 'btn sm primary', type: 'button', disabled: short > 0 || null, 'data-tip': short > 0 ? `Te faltan ${tokensM(short)}` : null, onclick: () => askBuy(item) }, glyph('coin'), ` ${tokensM(item.price)}`);
     }
     if (isEquipped(item)) {
-      return h('span', { class: 'chip ready-chip' }, '✓ Equipado');
+      return h('span', { class: 'chip ready-chip' }, glyph('check'), ' Equipado');
     }
     return h('button', { class: 'btn sm', type: 'button', onclick: () => equip(item) }, 'Equipar');
   }
@@ -1710,14 +1716,14 @@ async function profilePage(seq) {
     const sub = state === 'equipped' ? 'En uso' : p?.rarity ? RARITIES[p.rarity].label : 'Común';
     const { tip, note } = unlockTip(shown.key);
     return h('button', { type: 'button', class: `trainer-tile state-${state}${p?.rarity ? ` rarity-${p.rarity}` : ''}`, 'data-tip': tip, 'data-tip-note': note, 'aria-label': `${familyLabel(family.key)}: ${VERSION_STATUS[state]}`, onclick: () => openFamily(family.key) },
-      h('span', { class: `tile-corner state-${state}`, 'aria-hidden': 'true' }, CORNER[state]),
+      h('span', { class: `tile-corner state-${state}`, 'aria-hidden': 'true' }, glyph(CORNER[state])),
       h('span', { class: 'tile-stage' }, trainerImg(shown.key)),
       h('b', { class: 'tile-name' }, familyLabel(family.key)),
       h('small', { class: 'tile-sub' }, sub),
-      family.members.length > 1 ? h('small', { class: `tile-colors${owned === family.members.length ? ' is-complete' : ''}` }, `🎨 ${owned}/${family.members.length}`) : h('small', { class: 'tile-colors is-empty' }, ' '),
+      family.members.length > 1 ? h('small', { class: `tile-colors${owned === family.members.length ? ' is-complete' : ''}` }, glyph('palette'), ` ${owned}/${family.members.length}`) : h('small', { class: 'tile-colors is-empty' }, ' '),
     );
   }
-  const CORNER = { equipped: '★', owned: '✓', locked: '🔒', buy: '🪙' };
+  const CORNER = STATE_GLYPH;
   const rarityOf = (item) => (item.kind === 'trainer' && !item.price ? progress.get(item.key)?.rarity ?? 'common' : item.rarity ?? 'free');
   const raritySelect = h('select', { class: 'rarity-select', 'aria-label': 'Filtrar por rareza', onchange: (e) => { rarity = e.target.value; paint(); } }, h('option', { value: '' }, 'Todas las rarezas'), Object.entries(RARITIES).map(([value, { label: text }]) => h('option', { value }, text)));
   function card(item) {
@@ -1725,9 +1731,9 @@ async function profilePage(seq) {
     const tag = RARITIES[rarityOf(item)]?.label ?? 'Gratis';
     const cornerTip = { equipped: 'En uso', owned: 'Obtenido', locked: 'Bloqueado', buy: 'En venta' }[state];
     return h('div', { class: `shop-card state-${state}${isEquipped(item) ? ' is-equipped' : ''}${item.rarity ? ` rarity-${item.rarity}` : ''}` },
-      h('div', { class: 'shop-preview' }, shopPreview(item), h('span', { class: `tile-corner state-${state}`, 'data-tip': cornerTip, 'aria-label': cornerTip }, CORNER[state])),
+      h('div', { class: 'shop-preview' }, shopPreview(item), h('span', { class: `tile-corner state-${state}`, 'data-tip': cornerTip, 'aria-label': cornerTip }, glyph(CORNER[state]))),
       h('div', { class: 'shop-info' }, h('b', { 'data-tip': item.desc }, label(item)), h('span', { class: `rarity-tag rarity-${rarityOf(item)}` }, tag)),
-      h('div', { class: 'shop-action' }, item.kind === 'ball' ? h('button', { class: 'btn sm ghost shop-try', type: 'button', 'data-tip': 'Ver en combate', 'aria-label': `Ver ${label(item)} en combate`, onclick: () => previewBall(item) }, '▶ Probar') : null, action(item)),
+      h('div', { class: 'shop-action' }, item.kind === 'ball' ? h('button', { class: 'btn sm ghost shop-try', type: 'button', 'data-tip': 'Ver en combate', 'aria-label': `Ver ${label(item)} en combate`, onclick: () => previewBall(item) }, glyph('play'), h('span', { class: 'shop-try-label' }, ' Probar')) : null, action(item)),
     );
   }
   let shownCount = 0;
@@ -1743,8 +1749,8 @@ async function profilePage(seq) {
   function paint(limit = PAGE) {
     const ledger = `${tokensM(shop.total)} de tu save${shop.updatedAt ? ` (subido ${ago(shop.updatedAt)})` : ''} + ${tokensM(shop.recycled ?? 0)} reciclados − ${tokensM(shop.spent)} gastados`;
     balance.replaceChildren(
-      h('span', { class: 'shop-coins', tabindex: 0, 'data-tip': ledger, 'data-tip-note': 'Crece cuando subes tu save o reciclas repetidos.' }, `🪙 ${tokensM(shop.balance)}`),
-      h('a', { class: 'btn sm ghost', href: '/reciclaje', 'data-link': true, 'data-tip': 'Tritura tus Pokémon repetidos para ganar tokens' }, '♻️ Reciclar'),
+      h('span', { class: 'shop-coins', tabindex: 0, 'data-tip': ledger, 'data-tip-note': 'Crece cuando subes tu save o reciclas repetidos.' }, glyph('coin'), ` ${tokensM(shop.balance)}`),
+      h('a', { class: 'btn sm ghost', href: '/reciclaje', 'data-link': true, 'data-tip': 'Tritura tus Pokémon repetidos para ganar tokens' }, glyph('recycle'), h('span', { class: 'recycle-link-label' }, ' Reciclar')),
     );
     trainerFilters.hidden = kind !== 'trainer';
     const matchesText = (item) => !query || (item.members ?? [item]).some((member) => label(member).toLowerCase().includes(query));
@@ -1770,10 +1776,10 @@ async function profilePage(seq) {
   $app.replaceChildren(
     h('section', { class: 'card shop-head profile-head' }, identity, accountBtn),
     h('section', { class: 'card shop-section' },
-      h('div', { class: 'shop-title' }, h('h2', null, '🛍️ Tienda'), balance),
+      h('div', { class: 'shop-title' }, h('h2', null, glyph('shop'), ' Tienda'), balance),
       h('div', { class: 'segmented shop-tabs', role: 'group', 'aria-label': 'Categoría' }, Object.entries(SHOP_KINDS).map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === kind), onclick: (e) => { kind = value; e.currentTarget.parentElement.querySelectorAll('.seg-item').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); paint(); } }, text))),
       h('div', { class: 'shop-toolbar' },
-        h('label', { class: 'search-field' }, h('span', { 'aria-hidden': 'true' }, '🔍'), h('input', { type: 'search', placeholder: 'Buscar', 'aria-label': 'Buscar por nombre', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } })),
+        h('label', { class: 'search-field' }, glyph('search'), h('input', { type: 'search', placeholder: 'Buscar', 'aria-label': 'Buscar por nombre', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } })),
         ownPills,
         raritySelect,
         trainerFilters,
@@ -1837,7 +1843,7 @@ async function recyclingPage(seq) {
   music.preload({ sprites: data.duplicates.map((mon) => mon.sprite) });
   let busy = false;
   let shownBalance = data.balance;
-  const coins = h('span', { class: 'shop-coins', tabindex: 0, 'data-tip': 'Tu saldo para comprar en tu perfil' }, `🪙 ${tokensM(shownBalance)}`);
+  const coins = h('span', { class: 'shop-coins', tabindex: 0, 'data-tip': 'Tu saldo para comprar en tu perfil' }, glyph('coin'), ` ${tokensM(shownBalance)}`);
   const pile = h('div', { class: 'duplicate-grid' });
   const history = h('div', { class: 'recycle-log' });
   const mouth = h('div', { class: 'shred-mouth' }, h('span', { class: 'shred-hint' }, matchMedia('(pointer: coarse)').matches ? 'Mantén presionado y arrastra aquí · o toca uno' : 'Arrastra aquí'));
@@ -1859,7 +1865,7 @@ async function recyclingPage(seq) {
     const step = (now) => {
       const k = Math.min(1, (now - start) / 900);
       shownBalance = Math.round(from + (target - from) * (1 - (1 - k) ** 3));
-      coins.textContent = `🪙 ${tokensM(shownBalance)}`;
+      coins.replaceChildren(glyph('coin'), ` ${tokensM(shownBalance)}`);
       if (k < 1) requestAnimationFrame(step);
     };
     coins.classList.add('is-bumping');
@@ -1874,7 +1880,7 @@ async function recyclingPage(seq) {
           tabindex: 0,
           role: 'button',
           'aria-label': `${mon.name}${mon.shiny ? ' shiny' : ''}, ${RECYCLE_RARITY[mon.rarity]}, ${tokensM(mon.tokens)}. Arrástralo a la trituradora, mantén presionado para arrastrar o presiona Enter.`,
-          'data-tip': `${mon.name}${mon.shiny ? ' ✨' : ''} · Nv ${mon.level}`,
+          'data-tip': `${mon.name}${mon.shiny ? ' (shiny)' : ''} · Nv ${mon.level}`,
           'data-tip-note': 'Arrástralo a la trituradora',
           onpointerdown: (e) => startDrag(e, mon),
           onkeydown: (e) => e.key === 'Enter' && shred(mon, e.currentTarget),
@@ -1884,7 +1890,7 @@ async function recyclingPage(seq) {
 
   function paintHistory() {
     history.replaceChildren(...(data.history.length
-      ? data.history.slice(0, 50).map((row) => h('div', { class: 'recycle-row' }, h('div', { class: 'recycle-row-sprite', html: creatureHTML({ sprite: row.sprite, shiny: row.shiny }) }), h('span', null, h('b', null, row.name), row.shiny ? ' ✨' : '', h('small', { class: 'muted' }, ` · ${RECYCLE_RARITY[row.rarity]} · ${ago(row.at)}`)), h('b', { class: 'recycle-row-tokens' }, `+${tokensM(row.tokens)}`)))
+      ? data.history.slice(0, 50).map((row) => h('div', { class: 'recycle-row' }, h('div', { class: 'recycle-row-sprite', html: creatureHTML({ sprite: row.sprite, shiny: row.shiny }) }), h('span', null, h('b', null, row.name), row.shiny ? [' ', glyph('sparkle', { label: 'Shiny' })] : '', h('small', { class: 'muted' }, ` · ${RECYCLE_RARITY[row.rarity]} · ${ago(row.at)}`)), h('b', { class: 'recycle-row-tokens' }, `+${tokensM(row.tokens)}`)))
       : [h('p', { class: 'muted' }, 'Todavía no trituras nada.')]));
   }
 
@@ -1976,9 +1982,9 @@ async function recyclingPage(seq) {
       confirmDlg.close();
       machine.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       setTimeout(() => shred(mon, source), 350);
-    } }, `♻️ Triturar · +${tokensM(mon.tokens)}`);
+    } }, glyph('recycle'), ` Triturar · +${tokensM(mon.tokens)}`);
     confirmDlg.replaceChildren(h('div', { class: 'confirm-body' },
-      h('h2', null, `¿Triturar ${mon.name}${mon.shiny ? ' ✨' : ''}?`),
+      h('h2', null, '¿Triturar ', ...shinyName(mon), '?'),
       h('p', null, 'Es una copia repetida: sale de tu colección y ganas sus tokens. No se puede deshacer.'),
       h('div', { class: 'row confirm-actions' }, cancel, confirm)));
     confirmDlg.showModal();
@@ -2054,7 +2060,7 @@ async function recyclingPage(seq) {
   paintPile();
   paintHistory();
   $app.replaceChildren(
-    h('section', { class: 'card shop-head' }, h('div', { class: 'profile-who' }, h('h1', null, '♻️ Reciclaje'), h('p', { class: 'muted small recycle-lead' }, 'Tritura tus Pokémon repetidos para ganar tokens. Mientras más raro, más tokens; un shiny vale el triple.')), h('div', { class: 'shop-balance' }, coins, h('a', { class: 'btn sm ghost', href: '/perfil', 'data-link': true }, '🧢 Ir al perfil'))),
+    h('section', { class: 'card shop-head' }, h('div', { class: 'profile-who' }, h('h1', null, glyph('recycle'), ' Reciclaje'), h('p', { class: 'muted small recycle-lead' }, 'Tritura tus Pokémon repetidos para ganar tokens. Mientras más raro, más tokens; un shiny vale el triple.')), h('div', { class: 'shop-balance' }, coins, h('a', { class: 'btn sm ghost', href: '/perfil', 'data-link': true }, glyph('cap'), ' Ir al perfil'))),
     h('section', { class: 'card recycle-stage' },
       h('div', { class: 'recycle-pile' }, h('h2', null, `Tus repetidos`), pile),
       h('div', { class: 'recycle-machine' }, machine),
@@ -2097,7 +2103,7 @@ function feedbackButton() {
         h('span', { 'aria-hidden': 'true' }, ' →'),
       ),
     ),
-    h('button', { class: 'btn sm', autofocus: true, onclick: () => dialog.close() }, 'Ok 😔'),
+    h('button', { class: 'btn sm', autofocus: true, onclick: () => dialog.close() }, 'Ok'),
   );
   dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
   const btn = h('button', { class: 'feedback-btn', onclick: () => dialog.showModal() }, h('span', { class: 'feedback-icon', 'aria-hidden': 'true' }, '?'), '¿Encontraste un bug o quieres proponer una mejora?');
@@ -2150,14 +2156,14 @@ function installNudge() {
     else paint();
   };
   const howTo = () => {
-    if (installPrompt) return h('button', { class: 'btn primary sm', type: 'button', onclick: install }, '📲 Instalar');
+    if (installPrompt) return h('button', { class: 'btn primary sm', type: 'button', onclick: install }, glyph('download'), ' Instalar');
     if (isAppleMobile()) return h('p', { class: 'install-how' }, 'En Safari toca ', h('b', null, 'Compartir'), ' y luego ', h('b', null, 'Agregar a inicio'), '.');
     return h('p', { class: 'install-how' }, 'Abre el menú ', h('b', null, '⋮'), ' del navegador y elige ', h('b', null, 'Instalar app'), ' o ', h('b', null, 'Agregar a la pantalla principal'), '.');
   };
   function paint() {
     if (!card.isConnected && card.childElementCount) return installRepaints.delete(paint);
     card.replaceChildren(
-      h('img', { class: 'install-icon', src: '/icons/icon-192.png', alt: '' }),
+      h('img', { class: 'install-icon', src: '/icons/token-ball-192.png?v=dev', alt: '' }),
       h('div', { class: 'install-text' }, h('b', null, 'Instala Token Clash'), h('small', null, 'Ábrela desde tu pantalla de inicio, a pantalla completa y sin la barra del navegador.'), howTo()),
       h('button', { class: 'install-close', type: 'button', 'aria-label': 'Ahora no', onclick: () => { installNudgeClosed = true; installRepaints.delete(paint); card.remove(); } }, '✕'),
     );
@@ -2172,7 +2178,7 @@ function credentialsNudge() {
   const nudge = h(
     'section',
     { class: 'card credentials-nudge' },
-    h('p', null, h('b', null, '🔐 Tu cuenta solo vive en este navegador. '), 'Agrega una contraseña para entrar con tu nombre de entrenador y el mismo save desde otro dispositivo, y no perder la cuenta si borras los datos del navegador.'),
+    h('p', null, h('b', null, glyph('key'), ' Tu cuenta solo vive en este navegador. '), 'Agrega una contraseña para entrar con tu nombre de entrenador y el mismo save desde otro dispositivo, y no perder la cuenta si borras los datos del navegador.'),
     h('div', { class: 'row' },
       h('a', { class: 'btn sm primary', href: '/perfil#cuenta', 'data-link': true }, 'Agregar contraseña'),
       h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { ls.set('tc_credentials_later', me.id); nudge.remove(); } }, 'Ahora no'),
@@ -2212,7 +2218,7 @@ function renderHome() {
       h(
         'button',
         { type: 'button', class: `${kind}-item`, 'aria-pressed': String(o.value === current), onclick: () => { items.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i].value === o.value))); onPick(o.value); } },
-        o.icon ? h('span', { class: `${kind}-icon`, 'aria-hidden': 'true' }, o.icon) : null,
+        o.icon ? h('span', { class: `${kind}-icon`, 'aria-hidden': 'true' }, glyph(o.icon)) : null,
         o.desc ? h('span', { class: `${kind}-text` }, h('b', null, o.label), h('small', null, o.desc)) : o.label,
       ),
     );
@@ -2224,7 +2230,7 @@ function renderHome() {
   const startBtn = h('button', { class: 'btn primary nb-start', onclick: (e) => createChallenge(e.currentTarget) });
   const aiField = field('Dificultad', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Dificultad de la IA' }, choice('seg', AI_ORDER.filter((k) => (me.aiLevels ?? AI_ORDER).includes(k)).map((k) => ({ value: k, label: AI_LABEL[k] })), aiLevel, (v) => { aiLevel = v; paint(); })), aiNote);
   const roomNote = h('p', { class: 'nb-note' });
-  const roomField = field('Sala', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Tipo de sala' }, choice('seg', [{ value: 'public', label: '🌐 Pública' }, { value: 'private', label: '🔒 Privada' }], visibility, (v) => { visibility = v; paint(); })), roomNote);
+  const roomField = field('Sala', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Tipo de sala' }, choice('seg', [{ value: 'public', icon: 'globe', label: 'Pública' }, { value: 'private', icon: 'lock', label: 'Privada' }], visibility, (v) => { visibility = v; paint(); })), roomNote);
   const sizeField = field('Jugadores', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Jugadores del torneo' }, choice('seg', TOURNAMENT_SIZES.map((n) => ({ value: n, label: String(n) })), size, (v) => { size = v; paint(); })), h('p', { class: 'nb-note' }, 'Llaves de eliminación directa. El dueño puede rellenar los asientos libres con IAs.'));
   function paint() {
     const tour = rival === 'tournament';
@@ -2235,7 +2241,8 @@ function renderHome() {
     roomNote.textContent = visibility === 'public'
       ? tour ? 'Si ya hay un torneo abierto con este modo y tamaño, entras a ese. Si no, abrimos el tuyo y aparece en Salas abiertas.' : 'Si ya hay una sala abierta con este modo, entras a esa. Si no, abrimos la tuya y aparece en Salas abiertas.'
       : 'No aparece en Salas abiertas: solo entra quien tenga el link que te damos.';
-    startBtn.textContent = rival === 'ai' ? `🤖 Pelear contra la IA · ${AI_LABEL[aiLevel]}` : tour ? (visibility === 'public' ? `🏆 Buscar torneo de ${size}` : `🔒 Crear torneo privado de ${size}`) : visibility === 'public' ? '⚔︎ Buscar rival' : '🔒 Crear sala privada';
+    const [startIcon, startText] = rival === 'ai' ? ['robot', `Pelear contra la IA · ${AI_LABEL[aiLevel]}`] : tour ? (visibility === 'public' ? ['trophy', `Buscar torneo de ${size}`] : ['lock', `Crear torneo privado de ${size}`]) : visibility === 'public' ? ['swords', 'Buscar rival'] : ['lock', 'Crear sala privada'];
+    startBtn.replaceChildren(glyph(startIcon), ` ${startText}`);
   }
   const battleForm = h(
     'div',
@@ -2245,9 +2252,9 @@ function renderHome() {
       { value: 'random', icon: MODE_ICON.random, label: MODE_LABEL.random, desc: `Los dados sortean ${PARTY_SIZE} de tu colección, con movimientos y habilidad al azar.` },
     ], mode, (v) => { mode = v; paint(); }))),
     field('Rival', h('div', { class: 'cards3', role: 'group', 'aria-label': 'Rival' }, choice('pick', [
-      { value: 'friend', icon: '👥', label: 'Contra otro jugador', desc: 'Entras a una sala abierta o abres una nueva.' },
-      { value: 'ai', icon: '🤖', label: 'La IA', desc: 'Peleas ahora mismo, con Pokémon de la 1.ª a la 5.ª generación.' },
-      { value: 'tournament', icon: '🏆', label: 'Torneo', desc: 'De 4, 8 o 16 jugadores, con IAs para rellenar.' },
+      { value: 'friend', icon: 'users', label: 'Contra otro jugador', desc: 'Entras a una sala abierta o abres una nueva.' },
+      { value: 'ai', icon: 'robot', label: 'La IA', desc: 'Peleas ahora mismo, con Pokémon de la 1.ª a la 5.ª generación.' },
+      { value: 'tournament', icon: 'trophy', label: 'Torneo', desc: 'De 4, 8 o 16 jugadores, con IAs para rellenar.' },
     ], rival, (v) => { rival = v; paint(); }))),
     sizeField,
     roomField,
@@ -2260,13 +2267,13 @@ function renderHome() {
     h(
       'section',
       null,
-      h('div', { class: 'row between' }, h('h1', null, `Hola, ${me.name}`), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))),
+      h('div', { class: 'row between' }, h('h1', null, `Hola, ${me.name}`), h('div', { class: 'row' }, h('span', { class: 'chip' }, glyph('ball'), ` ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, glyph('sparkle'), ` ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, glyph('coin'), ` ${compact(me.totalTokens)} tokens`))),
     ),
     ...[credentialsNudge() ?? installNudge()].filter(Boolean),
     h(
       'section',
       null,
-      h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', h('span', { class: 'party-count' }, `${team.length}/${PARTY_SIZE}`)), h('a', { class: 'btn sm primary', href: '/coleccion', 'data-link': true }, '✎ Editar en Colección')),
+      h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', h('span', { class: 'party-count' }, `${team.length}/${PARTY_SIZE}`)), h('a', { class: 'btn sm primary', href: '/coleccion', 'data-link': true }, glyph('pencil'), ' Editar en Colección')),
       h('div', { class: 'party-board' }, partyRow(team), h('p', { class: 'hint' }, `En cada pelea eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}. Toca uno para editar sus movimientos y su habilidad en Colección.`)),
     ),
     h(
@@ -2321,7 +2328,7 @@ function openRoomsCard() {
       btn.textContent = 'No disponible';
     }
   }
-  const meta = (r) => `${r.kind === 'tournament' ? `🏆 Torneo de ${r.size} · ${r.filled}/${r.size} · ` : ''}${MODE_ICON[r.mode] ?? MODE_ICON.team} ${MODE_LABEL[r.mode] ?? MODE_LABEL.team} · ${ago(r.createdAt)}`;
+  const meta = (r) => [...(r.kind === 'tournament' ? [glyph('trophy'), ` Torneo de ${r.size} · ${r.filled}/${r.size} · `] : []), modeGlyph(r.mode), ` ${MODE_LABEL[r.mode] ?? MODE_LABEL.team} · ${ago(r.createdAt)}`];
   const key = (r) => `${r.kind}:${r.id}:${r.filled ?? ''}:${r.mine}`;
   function row(r) {
     const tour = r.kind === 'tournament';
@@ -2344,13 +2351,13 @@ function openRoomsCard() {
     list.replaceChildren(...(rooms.length ? rooms.map((r) => rows.get(key(r))) : [h('p', { class: 'muted' }, 'No hay salas abiertas. Busca rival y la tuya aparecerá aquí para los demás.')]));
     first = false;
   }
-  const liveMeta = (b) => `${b.tournament ? `🏆 Torneo de ${b.tournament.size} · ` : ''}${MODE_ICON[b.mode] ?? MODE_ICON.team} ${MODE_LABEL[b.mode] ?? MODE_LABEL.team} · ${b.sides.some((s) => s.ai) ? '🤖 Contra la IA · ' : ''}empezó ${ago(b.startedAt)}`;
+  const liveMeta = (b) => [...(b.tournament ? [glyph('trophy'), ` Torneo de ${b.tournament.size} · `] : []), modeGlyph(b.mode), ` ${MODE_LABEL[b.mode] ?? MODE_LABEL.team} · `, ...(b.sides.some((s) => s.ai) ? [glyph('robot'), ' Contra la IA · '] : []), `empezó ${ago(b.startedAt)}`];
   function liveRow(b) {
     return h(
       'div',
       { class: 'item room' },
       h('span', { class: 'room-who' }, h('b', null, avatarPic(b.sides[0].avatar, 'md', b.sides[0].frame), ` ${trainerShort(b.sides[0].name)} vs ${trainerShort(b.sides[1].name)} `, avatarPic(b.sides[1].avatar, 'md', b.sides[1].frame)), h('span', { class: 'muted small room-meta' }, liveMeta(b))),
-      h('a', { class: 'btn sm', href: `/b/${b.id}`, 'data-link': true }, '👁 Mirar'),
+      h('a', { class: 'btn sm', href: `/b/${b.id}`, 'data-link': true }, glyph('eye'), ' Mirar'),
     );
   }
   function paintLive(next) {
@@ -2360,7 +2367,7 @@ function openRoomsCard() {
     liveList.replaceChildren(...(battles.length ? battles.map(liveRow) : [h('p', { class: 'muted' }, 'No hay peleas en vivo ahora mismo.')]));
   }
   function refreshAges() {
-    for (const r of rooms) rows.get(key(r))?.querySelector('.room-meta')?.replaceChildren(meta(r));
+    for (const r of rooms) rows.get(key(r))?.querySelector('.room-meta')?.replaceChildren(...meta(r));
     paintLive(battles);
   }
   function connect() {
@@ -2440,8 +2447,8 @@ function myChallengesCard() {
   }
   loadMore();
   const tourList = h('div', { class: 'list' });
-  const tourBox = h('div', { class: 'my-tours', hidden: true }, h('h3', null, '🏆 Tus torneos'), tourList);
-  return h('div', { class: 'card' }, h('h2', null, 'Tus batallas'), list, tourBox);
+  const tourBox = h('div', { class: 'my-tours', hidden: true }, h('h3', null, glyph('trophy'), ' Tus torneos'), tourList);
+  return h('div', { class: 'card' }, h('h2', null, glyph('swords'), ' Tus batallas'), list, tourBox);
 }
 
 function challengeItem(c) {
@@ -2451,16 +2458,16 @@ function challengeItem(c) {
     : c.status === 'active' ? h('span', { class: 'pulse' }, 'En curso')
     : c.status === 'open' ? h('span', { class: 'muted' }, 'Abierta')
     : h('span', { class: 'muted' }, c.status === 'cancelled' ? 'Cancelado' : 'Cortado');
-  return h('a', { class: 'item', href: `/b/${c.id}`, 'data-link': true }, h('span', null, label, h('span', { class: 'muted small' }, ` · ${MODE_ICON[c.mode] ?? MODE_ICON.team}`)), st);
+  return h('a', { class: 'item', href: `/b/${c.id}`, 'data-link': true }, h('span', null, label, h('span', { class: 'muted small' }, ' · ', modeGlyph(c.mode))), st);
 }
 
 function tournamentItem(t) {
   const st =
     t.status === 'open' ? h('span', { class: 'muted' }, 'Esperando jugadores')
     : t.status === 'running' ? h('span', { class: 'pulse' }, 'En juego')
-    : t.champion ? h('span', { class: 'w' }, '🏆 Campeón')
+    : t.champion ? h('span', { class: 'w' }, glyph('trophy'), ' Campeón')
     : h('span', { class: 'muted' }, t.reached ? `Llegaste a ${t.reached === 'Final' ? 'la Final' : t.reached}` : 'Terminado');
-  return h('a', { class: 'item', href: `/t/${t.id}`, 'data-link': true }, h('span', null, `Torneo de ${t.size}`, h('span', { class: 'muted small' }, ` · ${MODE_ICON[t.mode] ?? MODE_ICON.team} · ${plural(t.humans, 'jugador', 'jugadores')}`)), st);
+  return h('a', { class: 'item', href: `/t/${t.id}`, 'data-link': true }, h('span', null, `Torneo de ${t.size}`, h('span', { class: 'muted small' }, ' · ', modeGlyph(t.mode), ` · ${plural(t.humans, 'jugador', 'jugadores')}`)), st);
 }
 
 const percent = (x) => (x == null ? '—' : `${Math.round(x * 100)}%`);
@@ -2482,7 +2489,7 @@ const rateBar = (t) => h('span', { class: 'rate', 'data-tip': t.games ? `${t.win
 const trainerMeta = (t) => `${t.rosterSize} Pokémon · ${t.shinies} shiny · ${compact(t.totalTokens)} tokens`;
 
 function podium(top) {
-  const medals = ['🥇', '🥈', '🥉'];
+  const medals = ['medal1', 'medal2', 'medal3'];
   return h(
     'div',
     { class: 'podium' },
@@ -2490,7 +2497,7 @@ function podium(top) {
       h(
         'div',
         { class: `podium-card place-${i + 1}${isMe(t) ? ' is-me' : ''}` },
-        h('span', { class: 'podium-medal', 'aria-label': `Puesto ${i + 1}` }, medals[i]),
+        h('span', { class: 'podium-medal', 'aria-label': `Puesto ${i + 1}` }, glyph(medals[i])),
         h('b', { class: 'podium-name' }, t.name, isMe(t) ? h('span', { class: 'muted small' }, ' (tú)') : null),
         record(t),
         rateBar(t),
@@ -2520,33 +2527,33 @@ function rankingCard(ranking) {
             )
           : null,
       ];
-  return h('div', { class: 'card' }, h('div', { class: 'row between' }, h('h2', null, '🏆 Ranking'), h('span', { class: 'muted small' }, 'Solo batallas entre jugadores')), ...body);
+  return h('div', { class: 'card' }, h('div', { class: 'row between' }, h('h2', null, glyph('trophy'), ' Ranking'), h('span', { class: 'muted small' }, 'Solo batallas entre jugadores')), ...body);
 }
 
 function tournamentStatsSection({ totals, ranking, recent }) {
-  const head = h('div', { class: 'row between' }, h('h2', null, '🏆 Torneos'), h('span', { class: 'muted small', tabindex: 0, 'data-tip': 'Solo cuentan los torneos terminados con al menos 2 personas. No suman al ranking de batallas 1 contra 1.' }, 'Aparte del ranking 1 contra 1'));
+  const head = h('div', { class: 'row between' }, h('h2', null, glyph('trophy'), ' Torneos'), h('span', { class: 'muted small', tabindex: 0, 'data-tip': 'Solo cuentan los torneos terminados con al menos 2 personas. No suman al ranking de batallas 1 contra 1.' }, 'Aparte del ranking 1 contra 1'));
   if (!totals.tournaments) return h('section', null, h('div', { class: 'card' }, head, h('p', { class: 'muted' }, 'Todavía no termina ningún torneo con al menos 2 personas. Arma uno desde el inicio.')));
   const champs = h(
     'div',
     { class: 'list rank-list' },
     ranking.slice(0, 10).map((t, i) =>
-      h('div', { class: `item${me && t.id === me.id ? ' is-me' : ''}` }, h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 1}`), h('span', { class: 'rank-who' }, h('strong', null, t.name), h('small', { class: 'muted' }, `${plural(t.played, 'torneo', 'torneos')} · ${plural(t.finals, 'final', 'finales')}`))), h('span', { class: 'row rank-right' }, h('span', { class: 'chip' }, `🏆 ${t.titles}`), record(t))),
+      h('div', { class: `item${me && t.id === me.id ? ' is-me' : ''}` }, h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 1}`), h('span', { class: 'rank-who' }, h('strong', null, t.name), h('small', { class: 'muted' }, `${plural(t.played, 'torneo', 'torneos')} · ${plural(t.finals, 'final', 'finales')}`))), h('span', { class: 'row rank-right' }, h('span', { class: 'chip' }, glyph('trophy'), ` ${t.titles}`), record(t))),
     ),
   );
   const last = h(
     'div',
     { class: 'list' },
-    recent.map((t) => h('a', { class: 'item recent', href: `/t/${t.id}`, 'data-link': true }, h('span', null, h('span', { class: 'winner' }, `🏆 ${t.champion}`), h('span', { class: 'muted small' }, ` · Torneo de ${t.size}`)), h('span', { class: 'muted small recent-meta' }, `${MODE_ICON[t.mode] ?? MODE_ICON.team} · ${plural(t.humans, 'jugador', 'jugadores')} · ${ago(t.finishedAt)}`))),
+    recent.map((t) => h('a', { class: 'item recent', href: `/t/${t.id}`, 'data-link': true }, h('span', null, h('span', { class: 'winner' }, glyph('trophy'), ` ${t.champion}`), h('span', { class: 'muted small' }, ` · Torneo de ${t.size}`)), h('span', { class: 'muted small recent-meta' }, modeGlyph(t.mode), ` · ${plural(t.humans, 'jugador', 'jugadores')} · ${ago(t.finishedAt)}`))),
   );
   return h(
     'section',
     null,
-    h('div', { class: 'card' }, head, h('div', { class: 'row tour-totals' }, h('span', { class: 'chip' }, plural(totals.tournaments, 'torneo', 'torneos')), h('span', { class: 'chip' }, `${plural(totals.matches, 'pelea', 'peleas')} de torneo`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Torneos que terminó ganando una IA' }, `🤖 ${plural(totals.aiTitles, 'título', 'títulos')} de la IA`)), h('div', { class: 'grid2 tour-stats' }, h('div', null, h('h3', null, 'Campeones'), champs), h('div', null, h('h3', null, 'Últimos torneos'), last))),
+    h('div', { class: 'card' }, head, h('div', { class: 'row tour-totals' }, h('span', { class: 'chip' }, plural(totals.tournaments, 'torneo', 'torneos')), h('span', { class: 'chip' }, `${plural(totals.matches, 'pelea', 'peleas')} de torneo`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Torneos que terminó ganando una IA' }, glyph('robot'), ` ${plural(totals.aiTitles, 'título', 'títulos')} de la IA`)), h('div', { class: 'grid2 tour-stats' }, h('div', null, h('h3', null, 'Campeones'), champs), h('div', null, h('h3', null, 'Últimos torneos'), last))),
   );
 }
 
 function recentCard(recent) {
-  const who = (name, won) => h('span', { class: won ? 'winner' : null }, won ? `🏆 ${name}` : name);
+  const who = (name, won) => h('span', { class: won ? 'winner' : null }, won ? [glyph('trophy'), ` ${name}`] : name);
   const list = recent.length
     ? h(
         'div',
@@ -2556,30 +2563,30 @@ function recentCard(recent) {
             'a',
             { class: 'item recent', href: `/b/${c.id}`, 'data-link': true },
             h('span', { class: 'recent-vs' }, who(c.host, c.winner === 'host'), h('span', { class: 'muted' }, ' vs '), who(c.guest, c.winner === 'guest'), c.winner ? null : h('span', { class: 'muted small' }, ' · empate')),
-            h('span', { class: 'muted small recent-meta' }, `${MODE_ICON[c.mode] ?? MODE_ICON.team}${c.turns ? ` · ${c.turns} turnos` : ''} · ${ago(c.finishedAt)}`),
+            h('span', { class: 'muted small recent-meta' }, modeGlyph(c.mode), `${c.turns ? ` · ${c.turns} turnos` : ''} · ${ago(c.finishedAt)}`),
           ),
         ),
       )
     : h('p', { class: 'muted' }, 'Todavía no hay batallas entre jugadores.');
-  return h('div', { class: 'card' }, h('h2', null, '🕑 Batallas recientes'), list);
+  return h('div', { class: 'card' }, h('h2', null, glyph('clock'), ' Batallas recientes'), list);
 }
 
 function numbersCard(totals) {
   const rows = [
-    ['⚔︎', 'Batallas entre jugadores', totals.battles],
+    ['swords', 'Batallas entre jugadores', totals.battles],
     [MODE_ICON.random, 'De ellas, aleatorias', totals.randomBattles],
-    ['🤝', 'De ellas, empates', totals.draws],
-    ['⏱', 'Turnos por batalla (promedio)', totals.avgTurns ?? '—'],
-    ['🤖', 'Peleas contra la IA', totals.aiBattles, totals.aiBattles ? `los jugadores ganaron ${percent(totals.aiWins / totals.aiBattles)}` : null],
-    ['📚', 'Especies distintas en el servidor', totals.species],
-    ['🟢', 'Jugadores activos', totals.activeNow, 'en los últimos 15 min'],
-    ['📅', 'Jugadores activos hoy', totals.activeToday, 'en las últimas 24 h'],
+    ['draw', 'De ellas, empates', totals.draws],
+    ['clock', 'Turnos por batalla (promedio)', totals.avgTurns ?? '—'],
+    ['robot', 'Peleas contra la IA', totals.aiBattles, totals.aiBattles ? `los jugadores ganaron ${percent(totals.aiWins / totals.aiBattles)}` : null],
+    ['ball', 'Especies distintas en el servidor', totals.species],
+    ['live', 'Jugadores activos', totals.activeNow, 'en los últimos 15 min'],
+    ['calendar', 'Jugadores activos hoy', totals.activeToday, 'en las últimas 24 h'],
   ];
   return h(
     'div',
     { class: 'card' },
-    h('h2', null, '📈 En números'),
-    h('div', { class: 'list' }, rows.map(([icon, label, value, note]) => h('div', { class: 'item' }, h('span', { class: 'num-label' }, `${icon} ${label}`, note ? h('small', { class: 'muted' }, note) : null), h('strong', { class: 'num-value' }, value)))),
+    h('h2', null, glyph('trend'), ' En números'),
+    h('div', { class: 'list' }, rows.map(([icon, label, value, note]) => h('div', { class: 'item' }, h('span', { class: 'num-label' }, glyph(icon), ` ${label}`, note ? h('small', { class: 'muted' }, note) : null), h('strong', { class: 'num-value' }, value)))),
   );
 }
 
@@ -2601,7 +2608,7 @@ function topMonsSection(mons) {
         ),
       )
     : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aparecen cuando haya batallas entre jugadores.'));
-  return h('section', null, h('div', { class: 'row between' }, h('h2', null, '🔥 Pokémon más usados'), h('span', { class: 'muted small' }, 'Los que salieron a pelear en batallas entre jugadores')), body);
+  return h('section', null, h('div', { class: 'row between' }, h('h2', null, glyph('fire'), ' Pokémon más usados'), h('span', { class: 'muted small' }, 'Los que salieron a pelear en batallas entre jugadores')), body);
 }
 
 async function statsPage(seq) {
@@ -2632,10 +2639,10 @@ async function statsPage(seq) {
           'div',
           { class: 'row' },
           h('span', { class: 'chip live-chip', tabindex: 0, 'data-tip': 'Preparaciones y batallas con alguien mirando, incluidas las peleas contra la IA' }, h('i', { class: 'live-dot', 'aria-hidden': 'true' }), `${plural(live.battles, 'batalla', 'batallas')} en vivo`),
-          h('span', { class: 'chip', tabindex: 0, 'data-tip': totals.accounts > totals.trainers ? `${totals.accounts} cuentas: quien importó el mismo save en varias cuenta una sola vez` : 'Cada save cuenta una vez' }, `🧢 ${plural(totals.trainers, 'entrenador', 'entrenadores')}`),
-          h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Pokémon distintos de todos los saves, sin contar dos veces los que se repiten entre cuentas' }, `📚 ${compact(totals.pokemon)} Pokémon`),
-          h('span', { class: 'chip' }, `✨ ${totals.shinies} shiny`),
-          h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens de todos los saves según PokeTokenBar, una vez por save' }, `🪙 ${compact(totals.tokens)} tokens`),
+          h('span', { class: 'chip', tabindex: 0, 'data-tip': totals.accounts > totals.trainers ? `${totals.accounts} cuentas: quien importó el mismo save en varias cuenta una sola vez` : 'Cada save cuenta una vez' }, glyph('cap'), ` ${plural(totals.trainers, 'entrenador', 'entrenadores')}`),
+          h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Pokémon distintos de todos los saves, sin contar dos veces los que se repiten entre cuentas' }, glyph('ball'), ` ${compact(totals.pokemon)} Pokémon`),
+          h('span', { class: 'chip' }, glyph('sparkle'), ` ${totals.shinies} shiny`),
+          h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens de todos los saves según PokeTokenBar, una vez por save' }, glyph('coin'), ` ${compact(totals.tokens)} tokens`),
         ),
       ),
     ),
@@ -2649,7 +2656,7 @@ async function statsPage(seq) {
   foldSections($app, STATS_OPEN);
 }
 
-const STATS_OPEN = new Set(['🏆 Ranking', 'Tus batallas']);
+const STATS_OPEN = new Set(['Ranking', 'Tus batallas']);
 function foldSections(root, openByDefault) {
   let saved = {};
   try {
@@ -2709,7 +2716,7 @@ const dexShiny = (() => {
 function shinySwitch(entry, onChange) {
   const can = entry.shiny;
   const input = h('input', { type: 'checkbox', role: 'switch', checked: can && dexShiny.has(entry.id) ? true : null, disabled: !can || null, 'aria-label': `Ver a ${entry.name} shiny`, onclick: (e) => e.stopPropagation(), onchange: (e) => { dexShiny.toggle(entry.id, e.target.checked); onChange(e.target.checked); } });
-  return h('label', { class: `dex-switch${can ? '' : ' is-off'}`, 'data-tip': can ? 'Ver shiny' : 'Aún no tienes este shiny', onclick: (e) => e.stopPropagation() }, input, h('span', { class: 'dex-track', 'aria-hidden': 'true' }, h('i')), h('span', { class: 'dex-switch-label' }, '✨'));
+  return h('label', { class: `dex-switch${can ? '' : ' is-off'}`, 'data-tip': can ? 'Ver shiny' : 'Aún no tienes este shiny', onclick: (e) => e.stopPropagation() }, input, h('span', { class: 'dex-track', 'aria-hidden': 'true' }, h('i')), h('span', { class: 'dex-switch-label' }, glyph('sparkle')));
 }
 
 async function pokedexPage(seq) {
@@ -2752,7 +2759,7 @@ async function pokedexPage(seq) {
       'button',
       { type: 'button', class: `dex-tile is-known${e.owned ? '' : ' by-evolution'}${e.shiny && dexShiny.has(id) ? ' is-shiny' : ''}`, onclick: () => openEntry(id), 'aria-label': `${dexNumber(id)} ${e.name}` },
       h('span', { class: 'dex-num' }, dexNumber(id)),
-      e.shiny ? h('span', { class: 'dex-shiny-badge', 'data-tip': 'Lo tienes shiny' }, '✨') : null,
+      e.shiny ? h('span', { class: 'dex-shiny-badge', 'data-tip': 'Lo tienes shiny' }, glyph('sparkle')) : null,
       h('div', { class: 'dex-pic' }, img),
       h('b', { class: 'dex-name' }, e.name),
       h('span', { class: 'dex-types' }, e.types.map((t) => h('i', { class: 'dex-type', style: { background: TYPES[t]?.color ?? '#9099a1' }, 'data-tip': typeLabel(t) }))),
@@ -2845,7 +2852,7 @@ async function pokedexPage(seq) {
       'section',
       { class: 'dex-shell' },
       h('div', { class: 'dex-lights', 'aria-hidden': 'true' }, h('i', { class: 'big' }), h('i', { class: 'r' }), h('i', { class: 'y' }), h('i', { class: 'g' })),
-      h('div', { class: 'dex-head' }, h('h1', null, 'Pokédex'), h('p', null, h('b', null, dex.registered), ` de ${dex.total} registrados · ${pct}%`, h('span', { class: 'dex-sep' }, '·'), `✨ ${plural(dex.shinies, 'shiny', 'shinies')}`)),
+      h('div', { class: 'dex-head' }, h('h1', null, 'Pokédex'), h('p', null, h('b', null, dex.registered), ` de ${dex.total} registrados · ${pct}%`, h('span', { class: 'dex-sep' }, '·'), h('span', { class: 'nowrap' }, glyph('sparkle'), ` ${plural(dex.shinies, 'shiny', 'shinies')}`))),
       h('div', { class: 'dex-progress', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': dex.total, 'aria-valuenow': dex.registered }, h('i', { style: { width: `${Math.max(pct, 0.5)}%` } })),
     ),
     h('section', null, genTabs),
@@ -2864,7 +2871,8 @@ async function pokedexPage(seq) {
 
 // ---------- team ----------
 const PARTY_SIZE = 6;
-const MODE_ICON = { team: '🎒', random: '🎲' };
+const MODE_ICON = { team: 'bag', random: 'dice' };
+const modeGlyph = (mode) => glyph(MODE_ICON[mode] ?? MODE_ICON.team, { label: MODE_LABEL[mode] ?? MODE_LABEL.team });
 const MODE_LABEL = { team: 'Batalla con tu equipo', random: 'Batalla aleatoria' };
 const AI_ORDER = ['easy', 'mid', 'hard', 'veryhard', 'skynet'];
 const TOURNAMENT_SIZES = [4, 8, 16];
@@ -2879,7 +2887,7 @@ const nameSize = (name) => {
 const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 const nameTitle = (name, avatar) => {
   const difficulty = trainerTitle(name);
-  if (difficulty) return h('small', { class: 'trainer-title is-ai' }, `🤖 ${capitalize(difficulty)}`);
+  if (difficulty) return h('small', { class: 'trainer-title is-ai' }, glyph('robot'), ` ${capitalize(difficulty)}`);
   return avatar ? skinTitle(avatar) : null;
 };
 const shortTrainer = (key) => {
@@ -2934,9 +2942,9 @@ function addToParty(ids, uid) {
   return { ids: next, swapped: byId.get(ids[twin]) };
 }
 
-const swapNote = (from, to) => `Solo puedes llevar un ${to.speciesName}: cambié ${from.shiny ? 'el shiny' : 'el normal'} por ${to.shiny ? 'el shiny ✨' : 'el normal'}.`;
+const swapNote = (from, to) => `Solo puedes llevar un ${to.speciesName}: cambié ${from.shiny ? 'el shiny' : 'el normal'} por ${to.shiny ? 'el shiny' : 'el normal'}.`;
 const BATTLE_SIZE = 3;
-const CATEGORY_ICON = { physical: '💥', special: '🌀', status: '✦' };
+const CATEGORY_ICON = { physical: 'burst', special: 'spiral', status: 'diamond' };
 const STAT_ROWS = [['PS', 'hp'], ['Ataque', 'atk'], ['Defensa', 'def'], ['At. Esp.', 'satk'], ['Def. Esp.', 'sdef'], ['Velocidad', 'spd']];
 
 function partyOf() {
@@ -2961,7 +2969,7 @@ function partyRow(team) {
         h('span', { class: 'slot-num' }, i + 1),
         i === 0 ? h('span', { class: 'lead-tag' }, 'Líder') : null,
         ballFrame(f),
-        h('div', { class: 'name-plate' }, h('b', null, f.shiny ? `✨ ${f.name}` : f.name, genderMark(f.gender)), h('small', null, `Nv ${f.level}`), typeChips(f.types)),
+        h('div', { class: 'name-plate' }, h('b', null, ...shinyName(f), genderMark(f.gender)), h('small', null, `Nv ${f.level}`), typeChips(f.types)),
       );
     }),
   );
@@ -3060,7 +3068,7 @@ async function teamPage(seq) {
             h('span', null, `${at + 1} de ${me.team.length}`),
             h('button', { type: 'button', class: 'btn sm ghost', 'aria-label': 'Siguiente del equipo', disabled: at === me.team.length - 1, onclick: () => goTo(at + 1) }, '›'))
         : h('span'),
-      ...(at > 0 ? [h('button', { type: 'button', class: 'btn sm sheet-lead', onclick: () => move(at, 0) }, '👑 Hacer líder · sale primero a pelear')] : []),
+      ...(at > 0 ? [h('button', { type: 'button', class: 'btn sm sheet-lead', onclick: () => move(at, 0) }, glyph('crown'), ' Hacer líder · sale primero a pelear')] : []),
     );
   }
 
@@ -3096,7 +3104,7 @@ async function teamPage(seq) {
           h('span', { class: 'slot-num' }, i + 1),
           i === 0 ? h('span', { class: 'lead-tag' }, 'Líder') : null,
           ballFrame(f),
-          h('div', { class: 'name-plate' }, h('b', null, f.shiny ? `✨ ${f.name}` : f.name, genderMark(f.gender)), h('small', null, `Nv ${f.level}`), typeChips(f.types)),
+          h('div', { class: 'name-plate' }, h('b', null, ...shinyName(f), genderMark(f.gender)), h('small', null, `Nv ${f.level}`), typeChips(f.types)),
           h('button', { class: 'cell-remove', type: 'button', 'data-sfx': 'remove', 'data-tip': 'Quitar del equipo', 'aria-label': `Quitar a ${f.name}`, onclick: (e) => { e.stopPropagation(); toggle(f.uid); } }, '✕'),
         );
         return cell;
@@ -3163,12 +3171,12 @@ async function teamPage(seq) {
   const filters = rosterFilters(() => paintCollection());
   const collCount = h('span', { class: 'coll-count' });
   const reimport = h('div', { class: 'reimport', hidden: true }, updateSavePanel({ onDone: () => route() }));
-  const reimportBtn = toolButton({ icon: '↻', label: 'Actualizar save', note: 'Sube uno más nuevo', 'aria-expanded': 'false', onclick: () => {
+  const reimportBtn = toolButton({ icon: glyph('download'), label: 'Actualizar save', note: 'Sube uno más nuevo', 'aria-expanded': 'false', onclick: () => {
     reimport.hidden = !reimport.hidden;
     reimportBtn.setAttribute('aria-expanded', String(!reimport.hidden));
   } });
   $app.replaceChildren(
-    h('div', { class: 'coll-page-head' }, h('div', null, h('h1', null, 'Colección'), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))), h('div', { class: 'tools' }, reimportBtn)),
+    h('div', { class: 'coll-page-head' }, h('div', null, h('h1', null, 'Colección'), h('div', { class: 'row' }, h('span', { class: 'chip' }, glyph('ball'), ` ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, glyph('sparkle'), ` ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, glyph('coin'), ` ${compact(me.totalTokens)} tokens`))), h('div', { class: 'tools' }, reimportBtn)),
     reimport,
     h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', countEl)),
     h('section', { class: 'party-board' }, partyEl, h('p', { class: 'hint' }, `Arrastra para ordenar · el líder abre la pelea · antes de cada combate eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}`)),
@@ -3303,7 +3311,7 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
         'aside',
         { class: 'panel-side' },
         ballFrame(mon, { size: 'lg' }),
-        h('h2', null, mon.shiny ? `✨ ${mon.name}` : mon.name, ' ', genderMark(mon.gender)),
+        h('h2', null, ...shinyName(mon), ' ', genderMark(mon.gender)),
         h('p', { class: 'muted small' }, mon.name !== mon.speciesName ? `${mon.speciesName} · ` : '', `#${mon.speciesId} · Nv ${mon.level}`, mon.nature ? ` · ${mon.nature}` : ''),
         typeChips(mon.types),
         h('div', { class: 'stat-bars' }, STAT_ROWS.map(([label, k]) => h('div', { class: 'stat-row' }, h('span', null, label), h('b', null, mon.stats[k]), h('i', { style: { width: `${Math.min(100, (mon.stats[k] / (k === 'hp' ? 400 : 300)) * 100)}%` } })))),
@@ -3487,7 +3495,7 @@ function renderLobby(c, { onAccepted }) {
   const link = `${location.origin}/b/${c.id}`;
   const random = c.mode === 'random';
   const modeNote = [
-    h('span', { class: 'chip' }, `${MODE_ICON[c.mode] ?? MODE_ICON.team} ${MODE_LABEL[c.mode] ?? MODE_LABEL.team}`),
+    h('span', { class: 'chip' }, modeGlyph(c.mode), ` ${MODE_LABEL[c.mode] ?? MODE_LABEL.team}`),
   ];
   const diceTeam = (n) => h('div', { class: 'mini-team' }, Array.from({ length: n }, (_, i) => h('div', { class: 'mon mon-hidden', 'aria-label': 'Pokémon por sortear' }, h('span', { class: 'badge' }, i + 1), h('div', { class: 'die idle' }, DIE_FACES[i % DIE_FACES.length]), h('div', { class: 'nm' }, '???'))));
   const randomHint = h('p', { class: 'muted small' }, `Cuando los dos estén listos, los dados sortean ${PARTY_SIZE} Pokémon de la colección de cada uno, sin repetir, con movimientos y habilidad al azar.`);
@@ -3498,10 +3506,10 @@ function renderLobby(c, { onAccepted }) {
       h(
         'section',
         { class: 'card' },
-        h('h1', { class: 'with-avatar' }, avatarPic(c.host.avatar, 'lg', c.host.frame), open ? '🌐 Tu sala está abierta' : '🔒 Tu sala privada está lista'),
+        h('h1', { class: 'with-avatar' }, avatarPic(c.host.avatar, 'lg', c.host.frame), glyph(open ? 'globe' : 'lock'), open ? ' Tu sala está abierta' : ' Tu sala privada está lista'),
         h('p', { class: 'muted' }, open ? 'Aparece en Salas abiertas del inicio y el primero que entre pelea contigo. También puedes mandar el link. Deja esta página abierta: si la cierras, la sala deja de aparecer.' : 'No aparece en Salas abiertas: mándale este link a quien quieras desafiar. La pelea parte apenas entre; deja esta página abierta para jugar en vivo.'),
         h('div', { class: 'share' }, input, h('button', { class: 'btn primary', onclick: () => copy(link, 'Link copiado, ¡a provocar!') }, 'Copiar')),
-        h('div', { class: 'row', style: null }, modeNote, h('span', { class: 'muted pulse' }, '⏳ Esperando rival…')),
+        h('div', { class: 'row', style: null }, modeNote, h('span', { class: 'muted pulse' }, glyph('hourglass'), ' Esperando rival…')),
       ),
       random
         ? h('section', { class: 'card' }, h('h2', null, 'Tu equipo saldrá de los dados'), diceTeam(c.hostTeamSize), randomHint)
@@ -3543,7 +3551,7 @@ function renderLobby(c, { onAccepted }) {
         h('h2', null, 'Tu equipo saldrá de los dados'),
         diceTeam(Math.min(PARTY_SIZE, me.rosterSize)),
         randomHint,
-        h('button', { class: 'btn primary', onclick: (e) => accept(e.currentTarget) }, '🎲 Aceptar y lanzar los dados'),
+        h('button', { class: 'btn primary', onclick: (e) => accept(e.currentTarget) }, glyph('dice'), ' Aceptar y lanzar los dados'),
       )
     : me
     ? h(
@@ -3552,7 +3560,7 @@ function renderLobby(c, { onAccepted }) {
         h('h2', null, 'Tu equipo'),
         h('div', { class: 'mini-team' }, myTeam().map((f, i) => monCard(f, { badge: i + 1, stats: true, rarity: false }))),
         h('p', { class: 'muted small' }, '¿Otro equipo? ', h('a', { href: '/', target: '_blank', rel: 'noopener' }, 'Cámbialo en otra pestaña'), ' y recarga esta.'),
-        h('button', { class: 'btn primary', onclick: (e) => accept(e.currentTarget) }, open ? '⚔︎ Entrar a la sala' : '⚔︎ Aceptar desafío'),
+        h('button', { class: 'btn primary', onclick: (e) => accept(e.currentTarget) }, glyph('swords'), open ? ' Entrar a la sala' : ' Aceptar desafío'),
       )
     : importCard({ onDone: () => renderLobby(c, { onAccepted }) });
 
@@ -3602,21 +3610,21 @@ function aiColor(name) {
 
 const avatar = (p) => (p.avatar
   ? avatarPic(p.avatar, 'seat', p.frame)
-  : h('div', { class: `match-avatar${p.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true', style: p.ai ? { background: aiColor(p.name) } : null }, p.ai ? '🤖' : (p.name.trim()[0] ?? '?').toUpperCase()));
+  : h('div', { class: `match-avatar${p.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true', style: p.ai ? { background: aiColor(p.name) } : null }, p.ai ? glyph('robot') : (p.name.trim()[0] ?? '?').toUpperCase()));
 
 function seatCard(p, { you = false, host = false, onRemove = null } = {}) {
-  const status = p.ready ? h('span', { class: 'seat-state ok' }, '✅ Listo') : h('span', { class: 'seat-state' }, '⏳ Esperando');
+  const status = p.ready ? h('span', { class: 'seat-state ok' }, glyph('check'), ' Listo') : h('span', { class: 'seat-state' }, glyph('hourglass'), ' Esperando');
   return h(
     'div',
     { class: `seat${you ? ' is-you' : ''}${p.ready ? ' is-ready' : ''}${p.online === false ? ' is-away' : ''}` },
     avatar(p),
-    h('div', { class: 'seat-body' }, h('span', { class: 'seat-name' }, trainerName(p.name, {}, p.avatar), host ? h('span', { 'data-tip': 'Dueño de la sala' }, '👑') : null, you ? h('span', { class: 'chip match-you' }, 'Tú') : null), h('span', { class: 'seat-meta' }, p.ai ? null : record(p), status), p.online === false ? h('span', { class: 'muted small' }, 'Desconectado') : null),
+    h('div', { class: 'seat-body' }, h('span', { class: 'seat-name' }, trainerName(p.name, {}, p.avatar), host ? h('span', { 'data-tip': 'Dueño de la sala' }, glyph('crown', { label: 'Dueño de la sala' })) : null, you ? h('span', { class: 'chip match-you' }, 'Tú') : null), h('span', { class: 'seat-meta' }, p.ai ? null : record(p), status), p.online === false ? h('span', { class: 'muted small' }, 'Desconectado') : null),
     onRemove ? h('button', { class: 'btn sm ghost seat-x', type: 'button', 'aria-label': `Quitar a ${trainerShort(p.name)}`, 'data-tip': 'Quitar', onclick: (e) => { e.currentTarget.disabled = true; onRemove(); } }, '✕') : null,
   );
 }
 
 function readyButton(ready, onToggle) {
-  return h('button', { class: `btn ${ready ? '' : 'primary'} ready-btn`, 'aria-pressed': String(ready), onclick: (e) => { e.currentTarget.disabled = true; onToggle(!ready); } }, ready ? 'Ya no estoy listo' : '✋ ¡Estoy listo!');
+  return h('button', { class: `btn ${ready ? '' : 'primary'} ready-btn`, 'aria-pressed': String(ready), onclick: (e) => { e.currentTarget.disabled = true; onToggle(!ready); } }, ...(ready ? ['Ya no estoy listo'] : [glyph('check'), ' ¡Estoy listo!']));
 }
 
 /** Watches a room's frames and alerts the player when the game is waiting on them. */
@@ -3685,8 +3693,8 @@ function watchControl(request) {
   let open = false;
   let asked = false;
   const paint = () => el.replaceChildren(open
-    ? h('span', { class: 'chip watch-on', 'data-tip': 'Tu pelea aparece en Juegos en vivo', 'aria-label': 'Espectadores habilitados' }, '👁', h('span', { class: 'watch-label' }, ' Espectadores habilitados'))
-    : h('button', { type: 'button', class: 'btn sm ghost watch-btn', disabled: asked || null, 'data-tip': 'Deja que tu pelea aparezca en Juegos en vivo para que otros entren a mirar', 'aria-label': 'Habilitar espectadores', onclick: () => { asked = true; paint(); request(); } }, '👁', h('span', { class: 'watch-label' }, ' Habilitar espectadores')));
+    ? h('span', { class: 'chip watch-on', 'data-tip': 'Tu pelea aparece en Juegos en vivo', 'aria-label': 'Espectadores habilitados' }, glyph('eye'), h('span', { class: 'watch-label' }, ' Espectadores habilitados'))
+    : h('button', { type: 'button', class: 'btn sm ghost watch-btn', disabled: asked || null, 'data-tip': 'Deja que tu pelea aparezca en Juegos en vivo para que otros entren a mirar', 'aria-label': 'Habilitar espectadores', onclick: () => { asked = true; paint(); request(); } }, glyph('eye'), h('span', { class: 'watch-label' }, ' Habilitar espectadores')));
   paint();
   return {
     el,
@@ -3702,7 +3710,7 @@ function roomBar(c, requestWatchers) {
   const watch = watchControl(requestWatchers);
   const el = h('div', { class: 'room-bar', hidden: true });
   const header = document.querySelector('header.top');
-  const menuBtn = h('button', { class: 'menu-btn', type: 'button', 'aria-label': 'Menú', 'aria-expanded': 'false', onclick: () => setMenu(!document.body.classList.contains('menu-open')) }, '☰');
+  const menuBtn = h('button', { class: 'menu-btn', type: 'button', 'aria-label': 'Menú', 'aria-expanded': 'false', onclick: () => setMenu(!document.body.classList.contains('menu-open')) }, glyph('menu'));
   let status = null;
   let last = null;
   const setMenu = (open) => {
@@ -3731,9 +3739,9 @@ function roomBar(c, requestWatchers) {
     el.className = `room-bar ${watching ? 'is-watching' : 'is-playing'}${status ? ' is-battle' : ''}${windowSkin ? ` win-bar win-${windowSkin}` : ''}`;
     el.replaceChildren(
       menuBtn,
-      h('span', { class: 'room-bar-tag' }, watching ? '👁 Estás mirando' : '⚔︎ Tu pelea'),
+      h('span', { class: 'room-bar-tag' }, glyph(watching ? 'eye' : 'swords'), watching ? ' Estás mirando' : ' Tu pelea'),
       ...(status ? [status.turn, status.vs] : []),
-      h('span', { class: 'room-bar-text' }, tour ? `🏆 ${tour.round} · Pelea ${tour.number} de ${tour.total}` : null, tour && vs ? ' · ' : null, vs),
+      h('span', { class: 'room-bar-text' }, tour ? [glyph('trophy'), ` ${tour.round} · Pelea ${tour.number} de ${tour.total}`] : null, tour && vs ? ' · ' : null, vs),
       ...(status ? [status.field, status.timer, status.forfeit] : []),
       ...(tour ? [h('a', { class: 'btn sm', href: `/t/${tour.id}`, 'data-link': true }, 'Ver llaves')] : []),
       ...(watching ? [] : [watch.el]),
@@ -3924,8 +3932,8 @@ function tournamentUI(id, justPlayed = null) {
     return h(
       'section',
       { class: 'tour-head' },
-      h('div', { class: 'row between' }, h('h1', null, `🏆 Torneo de ${T.size}`), T.you !== null && T.status !== 'finished' ? watch.el : null),
-      h('div', { class: 'row' }, h('span', { class: 'chip' }, `${MODE_ICON[T.mode]} ${MODE_LABEL[T.mode]}`), h('span', { class: 'chip' }, T.visibility === 'public' ? '🌐 Público' : '🔒 Privado'), h('span', { class: `chip${T.status === 'running' ? ' pulse' : ''}` }, status)),
+      h('div', { class: 'row between' }, h('h1', null, glyph('trophy'), ` Torneo de ${T.size}`), T.you !== null && T.status !== 'finished' ? watch.el : null),
+      h('div', { class: 'row' }, h('span', { class: 'chip' }, modeGlyph(T.mode), ` ${MODE_LABEL[T.mode]}`), h('span', { class: 'chip' }, glyph(T.visibility === 'public' ? 'globe' : 'lock'), T.visibility === 'public' ? ' Público' : ' Privado'), h('span', { class: `chip${T.status === 'running' ? ' pulse' : ''}` }, status)),
     );
   }
 
@@ -3956,7 +3964,7 @@ function tournamentUI(id, justPlayed = null) {
         h(
           'div',
           { class: 'row center tour-actions' },
-          seated ? readyButton(T.seats[T.you].ready, (ready) => act('/ready', { body: { ready } })) : me ? h('button', { class: 'btn primary', disabled: !free, onclick: () => act('/join') }, free ? '⚔︎ Entrar al torneo' : 'Torneo lleno') : null,
+          seated ? readyButton(T.seats[T.you].ready, (ready) => act('/ready', { body: { ready } })) : me ? h('button', { class: 'btn primary', disabled: !free, onclick: () => act('/join') }, ...(free ? [glyph('swords'), ' Entrar al torneo'] : ['Torneo lleno'])) : null,
           T.host ? h('button', { class: 'btn danger', onclick: () => act('', { method: 'DELETE' }, () => nav('/')) }, 'Cerrar torneo') : seated ? h('button', { class: 'btn', onclick: () => act('/leave', {}, () => nav('/')) }, 'Salir del torneo') : null,
         ),
       ),
@@ -3975,14 +3983,14 @@ function tournamentUI(id, justPlayed = null) {
     const done = m.winner !== null;
     const won = done && m.winner === i;
     const cls = ['bk-slot', seat ? '' : 'is-tbd', seat && i === T.you ? 'is-you' : '', won ? 'won' : '', done && !won ? 'lost' : ''].filter(Boolean).join(' ');
-    const sub = !seat ? 'Espera ganador' : seat.ai ? `🤖 ${capitalize(trainerTitle(seat.name) ?? AI_LABEL[seat.ai] ?? 'IA')}` : seat.avatar ? skinTitle(seat.avatar, 'span') : `${seat.wins}V ${seat.losses}D`;
+    const sub = !seat ? 'Espera ganador' : seat.ai ? [glyph('robot'), ` ${capitalize(trainerTitle(seat.name) ?? AI_LABEL[seat.ai] ?? 'IA')}`] : seat.avatar ? skinTitle(seat.avatar, 'span') : `${seat.wins}V ${seat.losses}D`;
     return h(
       'div',
       { class: cls, 'data-round': round, 'data-side': side },
       h('span', { class: 'bk-seed' }, seat ? seedOf(i) : ''),
-      seat?.avatar ? h('span', { class: 'bk-av has-sprite', 'aria-hidden': 'true' }, avatarPic(seat.avatar, 'sm', seat.frame)) : h('span', { class: `bk-av${seat?.ai ? ' is-ai' : ''}${!seat ? ' is-empty' : ''}`, 'aria-hidden': 'true', style: seat?.ai ? { background: aiColor(seat.name) } : null }, !seat ? '?' : seat.ai ? '🤖' : (seat.name.trim()[0] ?? '?').toUpperCase()),
+      seat?.avatar ? h('span', { class: 'bk-av has-sprite', 'aria-hidden': 'true' }, avatarPic(seat.avatar, 'sm', seat.frame)) : h('span', { class: `bk-av${seat?.ai ? ' is-ai' : ''}${!seat ? ' is-empty' : ''}`, 'aria-hidden': 'true', style: seat?.ai ? { background: aiColor(seat.name) } : null }, !seat ? '?' : seat.ai ? glyph('robot') : (seat.name.trim()[0] ?? '?').toUpperCase()),
       h('span', { class: 'bk-who', title: seat?.name ?? null }, h('span', { class: `bk-name${seat && nameSize(seat.name) ? ` ${nameSize(seat.name)}` : ''}` }, seat ? (trainerShort(seat.name)) : 'Por definir'), h('small', { class: 'bk-sub' }, sub)),
-      h('span', { class: 'bk-mark', 'aria-label': won ? 'Ganó' : done && seat ? 'Perdió' : null }, won ? (m.coinFlip ? h('span', { 'data-tip': 'Empate: avanzó por sorteo' }, '🪙') : '✔') : done && seat ? '✕' : ''),
+      h('span', { class: 'bk-mark', 'aria-label': won ? 'Ganó' : done && seat ? 'Perdió' : null }, won ? (m.coinFlip ? h('span', { 'data-tip': 'Empate: avanzó por sorteo' }, glyph('coin')) : '✓') : done && seat ? '✕' : ''),
     );
   }
 
@@ -4041,10 +4049,10 @@ function tournamentUI(id, justPlayed = null) {
             h(
               'div',
               { class: `bk-trophy${champion ? ' has-champ' : ''}${T.champion !== null && T.champion === T.you ? ' is-you' : ''}` },
-              h('span', { class: 'bk-cup', 'aria-hidden': 'true' }, '🏆'),
-              champion ? h('span', { class: `bk-av big${champion.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true', style: champion.ai ? { background: aiColor(champion.name) } : null }, champion.ai ? '🤖' : (champion.name.trim()[0] ?? '?').toUpperCase()) : null,
+              h('span', { class: 'bk-cup', 'aria-hidden': 'true' }, glyph('trophy')),
+              champion ? h('span', { class: `bk-av big${champion.ai ? ' is-ai' : ''}`, 'aria-hidden': 'true', style: champion.ai ? { background: aiColor(champion.name) } : null }, champion.ai ? glyph('robot') : (champion.name.trim()[0] ?? '?').toUpperCase()) : null,
               h('b', { class: 'bk-champ-name' }, champion?.name ?? '¿Quién será?'),
-              runnerUp ? h('small', { class: 'muted' }, `🥈 ${trainerShort(runnerUp.name)}`) : h('small', { class: 'muted' }, `${T.size} jugadores · ${T.total} peleas`),
+              runnerUp ? h('small', { class: 'muted' }, glyph('medal2'), ` ${trainerShort(runnerUp.name)}`) : h('small', { class: 'muted' }, `${T.size} jugadores · ${T.total} peleas`),
             ),
           ),
         ),
@@ -4055,7 +4063,7 @@ function tournamentUI(id, justPlayed = null) {
       { class: 'bk-top' },
       h('div', { class: 'bk-progress', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': T.total, 'aria-valuenow': T.played }, h('i', { style: { width: `${(T.played / T.total) * 100}%` } })),
       h('span', { class: 'muted small' }, `${T.played} de ${T.total} peleas`),
-      h('span', { class: 'bk-legend' }, h('span', null, h('i', { class: 'bk-dot' }), 'En vivo'), h('span', { class: 'lg-win' }, '✔ Avanza'), T.you !== null ? h('span', { class: 'lg-you' }, '★ Tu camino') : null, h('span', null, '🤖 IA')),
+      h('span', { class: 'bk-legend' }, h('span', null, h('i', { class: 'bk-dot' }), 'En vivo'), h('span', { class: 'lg-win' }, '✓ Avanza'), T.you !== null ? h('span', { class: 'lg-you' }, '★ Tu camino') : null, h('span', null, glyph('robot'), ' IA')),
     );
     return h('div', { class: 'bracket-box' }, progress, h('div', { class: 'bracket-wrap' }, h('div', { class: `bracket rounds-${T.rounds.length} size-${T.size}` }, cols)));
   }
@@ -4064,15 +4072,15 @@ function tournamentUI(id, justPlayed = null) {
     const left = T.nextAt ? Math.max(0, Math.ceil((T.nextAt - nowServer()) / 1000)) : null;
     if (T.status === 'finished') {
       const champ = T.seats[T.champion];
-      return h('section', { class: 'card tour-live is-champ' }, h('h2', null, T.champion === T.you ? '🏆 ¡Ganaste el torneo!' : `🏆 ¡${trainerShort(champ.name)} gana el torneo!`), h('p', { class: 'muted' }, `${T.total} peleas jugadas.`), h('a', { class: 'btn primary', href: '/', 'data-link': true }, 'Volver al inicio'));
+      return h('section', { class: 'card tour-live is-champ' }, h('h2', null, glyph('trophy'), T.champion === T.you ? ' ¡Ganaste el torneo!' : ` ¡${trainerShort(champ.name)} gana el torneo!`), h('p', { class: 'muted' }, `${T.total} peleas jugadas.`), h('a', { class: 'btn primary', href: '/', 'data-link': true }, 'Volver al inicio'));
     }
     if (T.current) {
       const m = T.rounds[T.current.round].matches[T.current.index];
       const mine = T.you !== null && (m.a === T.you || m.b === T.you);
-      return h('section', { class: `card tour-live${mine ? ' is-mine' : ''}` }, h('div', null, h('span', { class: 'chip pulse' }, '● EN VIVO'), ' ', h('b', null, `${seatName(m.a)} vs ${seatName(m.b)}`), h('span', { class: 'muted small' }, ` · ${T.rounds[T.current.round].name} · Pelea ${T.played + 1} de ${T.total}`)), h('a', { class: 'btn primary', href: `/b/${m.challengeId}`, 'data-link': true }, mine ? '⚔︎ ¡Ir a tu pelea!' : '👁 Mirar la pelea'));
+      return h('section', { class: `card tour-live${mine ? ' is-mine' : ''}` }, h('div', null, h('span', { class: 'chip pulse' }, '● EN VIVO'), ' ', h('b', null, `${seatName(m.a)} vs ${seatName(m.b)}`), h('span', { class: 'muted small' }, ` · ${T.rounds[T.current.round].name} · Pelea ${T.played + 1} de ${T.total}`)), h('a', { class: 'btn primary', href: `/b/${m.challengeId}`, 'data-link': true }, glyph(mine ? 'swords' : 'eye'), mine ? ' ¡Ir a tu pelea!' : ' Mirar la pelea'));
     }
     const drawing = T.drawAt && nowServer() - T.drawAt < 5000;
-    if (left !== null) return h('section', { class: 'card tour-live' }, h('b', { class: 'tour-next' }, drawing ? '🎲 Sorteando las llaves…' : `Siguiente pelea en ${left}s`), h('span', { class: 'muted small' }, `${T.played} de ${T.total} peleas jugadas`));
+    if (left !== null) return h('section', { class: 'card tour-live' }, h('b', { class: 'tour-next' }, ...(drawing ? [glyph('dice'), ' Sorteando las llaves…'] : [`Siguiente pelea en ${left}s`])), h('span', { class: 'muted small' }, `${T.played} de ${T.total} peleas jugadas`));
     return null;
   }
 
@@ -4155,7 +4163,7 @@ function tournamentUI(id, justPlayed = null) {
         const el = $app.querySelector('.tour-next');
         if (!el) return;
         const drawing = T.drawAt && nowServer() - T.drawAt < 5000;
-        el.textContent = drawing ? '🎲 Sorteando las llaves…' : `Siguiente pelea en ${Math.max(0, Math.ceil((T.nextAt - nowServer()) / 1000))}s`;
+        el.replaceChildren(...(drawing ? [glyph('dice'), ' Sorteando las llaves…'] : [`Siguiente pelea en ${Math.max(0, Math.ceil((T.nextAt - nowServer()) / 1000))}s`]));
       }, 250);
     },
     busyUntil: () => Math.max(drawingUntil, justPlayed ? celebrateUntil : 0),
@@ -4178,7 +4186,7 @@ function countdownUI(c) {
     { class: 'card match' },
     heading,
     late,
-    h('div', { class: 'row match-chips' }, h('span', { class: 'chip' }, `${MODE_ICON[c.mode] ?? MODE_ICON.team} ${MODE_LABEL[c.mode] ?? MODE_LABEL.team}`)),
+    h('div', { class: 'row match-chips' }, h('span', { class: 'chip' }, modeGlyph(c.mode), ` ${MODE_LABEL[c.mode] ?? MODE_LABEL.team}`)),
     cards,
     caption,
   );
@@ -4194,12 +4202,12 @@ function countdownUI(c) {
       avatar(p),
       trainerName(p.name, { class: 'match-name' }, p.avatar),
       you ? h('span', { class: 'chip match-you' }, 'Tú') : null,
-      p.ai ? h('span', { class: 'chip' }, '🤖 IA') : record(p),
-      p.ai ? null : h('span', { class: 'muted small' }, `📚 ${p.rosterSize} Pokémon · ✨ ${p.shinies} shiny`),
+      p.ai ? h('span', { class: 'chip' }, glyph('robot'), ' IA') : record(p),
+      p.ai ? null : h('span', { class: 'muted small' }, glyph('ball'), ` ${p.rosterSize} Pokémon · `, glyph('sparkle'), ` ${p.shinies} shiny`),
     );
   function tick() {
     if (waiting) {
-      number.textContent = '⏳';
+      number.replaceChildren(glyph('hourglass'));
       return;
     }
     const left = Math.max(0, endsAt - Date.now());
@@ -4207,7 +4215,7 @@ function countdownUI(c) {
     if (sec === shown) return;
     shown = sec;
     number.textContent = sec > 0 ? String(sec) : '¡Ya!';
-    document.title = sec > 0 ? `⚔︎ ${sec}… ¡Rival encontrado!` : '⚔︎ ¡A pelear!';
+    document.title = sec > 0 ? `${sec}… ¡Rival encontrado!` : '¡A pelear!';
     if (sec === 0) caption.textContent = '¡A pelear!';
     playClass(number, 'tick', 700);
   }
@@ -4216,7 +4224,7 @@ function countdownUI(c) {
       endsAt = Date.now() + msg.ms;
       const watching = msg.you === null;
       const tour = msg.tournament;
-      heading.textContent = tour ? (watching ? `👁 Próxima pelea · ${tour.round}` : `⚔︎ ¡Te toca! · ${tour.round}`) : watching ? 'Sala llena' : '¡Rival encontrado!';
+      heading.replaceChildren(...(tour ? [glyph(watching ? 'eye' : 'swords'), watching ? ` Próxima pelea · ${tour.round}` : ` ¡Te toca! · ${tour.round}`] : [watching ? 'Sala llena' : '¡Rival encontrado!']));
       waiting = msg.waiting?.length ? msg.waiting.map(trainerShort) : null;
       caption.textContent = waiting
         ? `Esperando a ${waiting.length > 2 ? `${waiting.slice(0, 2).join(', ')} y ${waiting.length - 2} más` : waiting.join(' y ')}…`
@@ -4248,7 +4256,12 @@ function preloadFor(you, parties) {
 function moveDetails(m) {
   const what = m.desc || moveEffects(m).join(' ') || 'Sin efectos adicionales.';
   return [
-    h('div', { class: 'mv-head' }, h('b', null, m.name), typeChip(m.type), h('span', { class: 'muted small' }, m.power ? `${CATEGORY[m.category] || ''} · ${m.power}` : CATEGORY[m.category] || '')),
+    h('div', { class: 'mv-head' }, h('b', null, m.name), typeChip(m.type)),
+    h('div', { class: 'mv-stats' },
+      h('span', null, glyph(CATEGORY_ICON[m.category] ?? 'diamond'), ` ${CATEGORY[m.category] || ''}${m.power ? ` · Poder ${m.power}` : ''}`),
+      m.accuracy !== undefined ? h('span', null, glyph('target'), m.accuracy ? ` Precisión ${m.accuracy}%` : ' Siempre acierta') : null,
+      m.pp ? h('span', null, `PP ${m.pp}`) : null,
+      m.priority > 0 ? h('span', null, glyph('bolt'), ' Va primero') : null),
     h('p', { class: 'mv-desc' }, what),
   ];
 }
@@ -4257,8 +4270,8 @@ function prepInfoCard(f, { own, foes, close, action }) {
   const { strong, weak } = matchupOf(f, foes);
   const names = (list) => list.map((o) => o.name).join(', ');
   const matchup = [
-    strong.length ? h('p', null, h('span', { class: 'tag-strong' }, '⚔️ Fuerte contra '), names(strong)) : null,
-    weak.length ? h('p', null, h('span', { class: 'tag-weak' }, '⚠️ Cuidado con '), names(weak)) : null,
+    strong.length ? h('p', null, h('span', { class: 'tag-strong' }, glyph('swords'), ' Fuerte contra '), names(strong)) : null,
+    weak.length ? h('p', null, h('span', { class: 'tag-weak' }, glyph('shield'), ' Cuidado con '), names(weak)) : null,
   ].filter(Boolean);
   return h(
     'div',
@@ -4290,8 +4303,8 @@ function matchupBadges(f, foes) {
   return h(
     'span',
     { class: 'matchup' },
-    h('span', { class: `mu up${strong.length ? '' : ' none'}`, tabindex: 0, 'data-tip': strong.length ? `${byMoves ? 'Sus movimientos' : 'Sus tipos'} pegan súper eficaz a: ${names(strong)}` : 'No tiene ventaja de tipo contra el rival' }, `⚔️ ${strong.length}`),
-    h('span', { class: `mu down${weak.length ? '' : ' none'}`, tabindex: 0, 'data-tip': weak.length ? `Lo amenazan por tipo: ${names(weak)}` : 'Ningún rival le pega súper eficaz por tipo' }, `⚠️ ${weak.length}`),
+    h('span', { class: `mu up${strong.length ? '' : ' none'}`, tabindex: 0, 'data-tip': strong.length ? `${byMoves ? 'Sus movimientos' : 'Sus tipos'} pegan súper eficaz a: ${names(strong)}` : 'No tiene ventaja de tipo contra el rival' }, glyph('swords'), ` ${strong.length}`),
+    h('span', { class: `mu down${weak.length ? '' : ' none'}`, tabindex: 0, 'data-tip': weak.length ? `Lo amenazan por tipo: ${names(weak)}` : 'Ningún rival le pega súper eficaz por tipo' }, glyph('shield'), ` ${weak.length}`),
   );
 }
 
@@ -4311,13 +4324,13 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
   const bar = h('i');
   const timerText = h('span', { class: 'timer' });
   const root = h('div', { class: 'prep' });
-  const title = h('b', null, '⚔︎ Preparación de batalla');
+  const title = h('b', null, glyph('swords'), ' Preparación de batalla');
   const infoDlg = h('dialog', { class: 'info-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() });
   $app.replaceChildren(h('div', { class: 'status-line' }, title, timerText), h('div', { class: 'prep-timer' }, bar), root, infoDlg);
   const tick = setInterval(() => {
     if (!last?.deadline) return;
     const left = Math.max(0, last.deadline - Date.now());
-    timerText.textContent = `⏱ ${Math.ceil(left / 1000)}s`;
+    timerText.replaceChildren(glyph('clock'), ` ${Math.ceil(left / 1000)}s`);
     timerText.classList.toggle('urgent', left <= 10_000);
     bar.style.width = `${total ? Math.min(100, (left / total) * 100) : 100}%`;
   }, 200);
@@ -4473,7 +4486,7 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
     const key = rollingOn(v.s) ? 'roll' : side.picks ? 'revealed' : side.ready ? 'ready' : side.draft ? `picking:${side.draft.length}` : 'picking';
     if (key === v.statusKey) return;
     v.statusKey = key;
-    v.status.replaceChildren(key === 'roll' ? h('span', { class: 'muted small pulse' }, '🎲 Sorteando…') : key === 'revealed' ? h('span', { class: 'chip ready-chip' }, '👁 Eligió estos 3') : key === 'ready' ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, side.draft ? `Eligiendo… ${side.draft.length}/${side.needed}` : 'Eligiendo…'));
+    v.status.replaceChildren(key === 'roll' ? h('span', { class: 'muted small pulse' }, glyph('dice'), ' Sorteando…') : key === 'revealed' ? h('span', { class: 'chip ready-chip' }, glyph('eye'), ' Eligió estos 3') : key === 'ready' ? h('span', { class: 'chip ready-chip' }, '✓ Listo') : h('span', { class: 'muted small pulse' }, side.draft ? `Eligiendo… ${side.draft.length}/${side.needed}` : 'Eligiendo…'));
   }
 
   function build(p, you) {
@@ -4484,6 +4497,7 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
     }
     const foeSide = 1 - you;
     const foe = sideView(foeSide, [playerPill(p.sides[foeSide], 'foe')]);
+    foe.el.classList.add('rival');
     const mine = { title: h('h2'), note: h('p', { class: 'muted small' }), grid: h('div', { class: 'prep-grid' }), foot: h('div', { class: 'prep-foot' }), footMode: null, footNote: h('p', { class: 'pulse' }), slots: [] };
     mine.pickBtn = h('button', { type: 'button', class: 'btn primary', onclick: () => { sent = true; sendPick(picks.slice()); render(); } });
     root.replaceChildren(h('div', { class: 'card prep-side mine' }, h('div', { class: 'with-avatar' }, playerPill(p.sides[you], 'me', true), mine.title), mine.note, mine.grid, mine.foot), h('div', { class: 'vs-mark' }, 'VS'), foe.el);
@@ -4495,7 +4509,7 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
     const rollingMe = rollingOn(you);
     const done = own.ready || sent;
     const chosen = own.picks ?? picks;
-    m.title.textContent = rollingMe ? '🎲 Lanzando los dados…' : done ? 'Tu equipo para esta pelea' : `Elige ${own.needed} de tus ${own.party.length}`;
+    m.title.replaceChildren(...(rollingMe ? [glyph('dice'), ' Lanzando los dados…'] : [done ? 'Tu equipo para esta pelea' : `Elige ${own.needed} de tus ${own.party.length}`]));
     m.note.textContent = rollingMe ? 'Sorteando Pokémon, movimientos y habilidades de tu colección.' : done ? 'El primero sale a pelear.' : 'Toca uno para ver qué hace y elegirlo. El primero que elijas sale a pelear.';
     syncGrid(m.grid, m.slots, own.party, you, (f, i) => ownCard(f, i, own, random));
     m.slots.forEach((slot, i) => {
@@ -4512,7 +4526,7 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
       m.footMode = mode;
       m.foot.replaceChildren(mode === 'pick' ? m.pickBtn : m.footNote);
     }
-    m.footNote.textContent = rollingMe ? '🎲 Los dados están rodando…' : last.preview.revealed || foe.ready ? '¡Los dos eligieron! La batalla parte en segundos.' : `Esperando a ${foe.name}…`;
+    m.footNote.textContent = rollingMe ? 'Los dados están rodando…' : last.preview.revealed || foe.ready ? '¡Los dos eligieron! La batalla parte en segundos.' : `Esperando a ${foe.name}…`;
     m.pickBtn.disabled = picks.length !== own.needed || rolling;
     m.pickBtn.textContent = picks.length < own.needed ? `Elige ${own.needed} · ${picks.length}/${own.needed}` : 'Continuar';
   }
@@ -4522,7 +4536,7 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
     const you = last.you;
     view ??= build(p, you);
     root.classList.toggle('is-revealed', !!p.revealed);
-    title.textContent = you == null ? (p.revealed ? '👁 Elecciones reveladas' : '👁 Preparación de batalla · eligiendo') : p.revealed ? '⚔︎ ¡Todo listo!' : '⚔︎ Preparación de batalla';
+    title.replaceChildren(glyph(you == null ? 'eye' : 'swords'), you == null ? (p.revealed ? ' Elecciones reveladas' : ' Preparación de batalla · eligiendo') : p.revealed ? ' ¡Todo listo!' : ' Preparación de batalla');
     for (const v of view.sides) paintSide(v, p.sides[v.s]);
     if (view.mine) paintMine(view.mine, p.sides[you], p.sides[1 - you], p.mode === 'random');
     if (infoDlg.open && openInfoFor) paintPrepInfo();
@@ -4590,13 +4604,13 @@ function chatPanel(send) {
     return h(
       'p',
       { class: `chat-msg${watcher ? ' watcher' : ''}${m.side != null ? ` side-${m.side}` : ''}${isMine(m) ? ' mine' : ''}` },
-      h('b', { class: 'chat-name', title: watcher ? 'Espectador' : 'Jugador' }, watcher ? `👁 ${m.name}:` : `${m.name}:`),
+      h('b', { class: 'chat-name', title: watcher ? 'Espectador' : 'Jugador' }, ...(watcher ? [glyph('eye'), ` ${m.name}:`] : [`${m.name}:`])),
       ' ',
       h('span', { class: 'chat-text' }, m.text),
     );
   };
   list.append(empty);
-  const el = h('section', { class: 'card chat', 'aria-label': 'Chat' }, h('h3', { class: 'chat-title' }, '💬 Chat'), list, form);
+  const el = h('section', { class: 'card chat', 'aria-label': 'Chat' }, h('h3', { class: 'chat-title' }, glyph('chat'), ' Chat'), list, form);
   const show = (messages) => {
     const fresh = messages.filter((m) => !seen.has(m.id));
     if (!fresh.length) return [];
@@ -4637,7 +4651,7 @@ function chatDock(chat) {
   let unread = 0;
   const badge = h('span', { class: 'chat-badge', hidden: true });
   const closeBtn = h('button', { class: 'chat-close', type: 'button', 'aria-label': 'Cerrar chat', onclick: () => setOpen(false) }, '✕');
-  const toggle = h('button', { class: 'chat-dock-toggle', type: 'button', 'aria-expanded': String(open), 'aria-label': 'Chat', onclick: () => setOpen(!open) }, '💬', h('span', { class: 'chat-dock-label' }, ' Chat'), badge);
+  const toggle = h('button', { class: 'chat-dock-toggle', type: 'button', 'aria-expanded': String(open), 'aria-label': 'Chat', onclick: () => setOpen(!open) }, glyph('chat'), h('span', { class: 'chat-dock-label' }, ' Chat'), badge);
   const dock = h('div', { class: 'chat-dock', onclick: (e) => e.target === e.currentTarget && setOpen(false) }, chat.el, toggle);
   chat.el.prepend(closeBtn);
   const paint = () => {
@@ -4717,7 +4731,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     say: h('div', { class: 'say', 'aria-live': 'polite' }),
     controls: h('div', { class: 'card battle-controls' }),
     log: h('div', { class: 'card log' }),
-    forfeit: h('button', { class: 'btn sm ghost danger forfeit-btn', type: 'button', hidden: true, 'data-tip': 'Abandonar esta pelea', onclick: () => askForfeit() }, '🏳 Rendirse'),
+    forfeit: h('button', { class: 'btn sm ghost danger forfeit-btn', type: 'button', hidden: true, 'data-tip': 'Abandonar esta pelea', onclick: () => askForfeit() }, glyph('flag'), ' Rendirse'),
     forfeitDlg: h('dialog', { class: 'info-dlg confirm-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() }),
   };
   function askForfeit() {
@@ -4727,9 +4741,9 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
       els.forfeitDlg.close();
       els.forfeit.disabled = true;
       sendSurrender?.();
-    } }, '🏳 Rendirme');
+    } }, glyph('flag'), ' Rendirme');
     els.forfeitDlg.replaceChildren(h('div', { class: 'confirm-body forfeit-confirm' },
-      h('div', { class: 'forfeit-flag', 'aria-hidden': 'true' }, '🏳️'),
+      h('div', { class: 'forfeit-flag', 'aria-hidden': 'true' }, glyph('flag')),
       h('h2', null, '¿Te rindes?'),
       h('p', null, `${trainerShort(view?.sides[1 - mine]?.name ?? 'Tu rival')} gana esta pelea.`),
       h('p', { class: 'forfeit-note' }, consequence),
@@ -4783,7 +4797,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
       return;
     }
     const s = Math.max(0, Math.ceil((frame.deadline - Date.now()) / 1000));
-    els.timer.textContent = `⏱ ${s}s`;
+    els.timer.replaceChildren(glyph('clock'), ` ${s}s`);
     els.timer.classList.toggle('urgent', s <= 10);
   }, 250);
 
@@ -4925,8 +4939,8 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
           watch: champ ? `${view.sides[winner]?.name} es campeón del torneo · ${loser} queda segundo.` : `${view.sides[winner]?.name} avanza a ${tour.next === 'Final' ? 'la Final' : tour.next} · ${loser} queda fuera.`,
         }[kind]
       : { win: `Venciste a ${trainerShort(view.sides[1 - mine].name)}.`, lose: `${trainerShort(view.sides[1 - mine].name)} ganó esta vez.`, draw: 'Nadie quedó en pie.', watch: `${trainerShort(view.sides[0].name)} vs ${trainerShort(view.sides[1].name)}` }[kind];
-    const icon = { win: '🏆', lose: '💀', draw: '🤝', watch: champ ? '🏆' : '🏁' }[kind];
-    const duel = winner === null ? null : h('div', { class: 'result-duel' }, [0, 1].map((side) => h('span', { class: `result-side ${side === winner ? 'won' : 'lost'}` }, side === winner ? '👑 ' : '', playerPill(view.sides[side], pos(side), isYou(side)))));
+    const icon = glyph({ win: 'trophy', lose: 'skull', draw: 'draw', watch: champ ? 'trophy' : 'flag' }[kind]);
+    const duel = winner === null ? null : h('div', { class: 'result-duel' }, [0, 1].map((side) => h('span', { class: `result-side ${side === winner ? 'won' : 'lost'}` }, side === winner ? [glyph('crown'), ' '] : '', playerPill(view.sides[side], pos(side), isYou(side)))));
     const el = h('div', { class: `result ${kind}`, onclick: () => el.remove() }, h('div', { class: 'result-card' }, h('span', { class: 'result-icon' }, icon), h('h2', null, title), duel, h('p', null, sub), h('small', null, tour ? 'Siguen las llaves del torneo' : 'Toca para cerrar')));
     arena.append(el);
     if (kind === 'win' || kind === 'watch') confetti(el);
@@ -4999,7 +5013,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     r.bar.style.width = `${pct}%`;
     countTo(r.num, from, f.hp, f.stats.hp, !!f.hpPercent, Math.max(1, ms));
 
-    r.name.replaceChildren(f.shiny ? `✨ ${f.name}` : f.name, genderMark(f.gender) ?? '');
+    r.name.replaceChildren(...shinyName(f), genderMark(f.gender) ?? '');
     r.lvl.textContent = `Nv ${f.level}`;
     const volatiles = conditionsOf({ volatiles: f.volatiles }).filter((c) => !['flashFire', 'disabled', 'slowStart', 'smackdown', 'noRetreat', 'foresight', 'miracleeye', 'focusenergy', 'gastroacid', 'imprison'].includes(c.key));
     r.sub.replaceChildren(
@@ -5011,8 +5025,8 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     );
     const condChips = [
       ...(f.hp > 0 ? boostChips(f.boosts) : []),
-      ...(f.hp > 0 ? volatiles : []).map((c) => h('span', { class: 'vol-chip', tabindex: 0, 'data-tip': c.name, 'data-tip-note': c.desc }, `${c.icon} ${c.name}`)),
-      ...Object.entries(sd.screens || {}).map(([kind, turns]) => h('span', { class: `screen-chip ${kind}`, tabindex: 0, 'data-tip': `Reduce a la mitad el daño de ${SCREEN_GUARDS[kind]} contra este equipo. Quedan ${turns} turnos.` }, `🛡️ ${SCREEN[kind]} ${turns}`)),
+      ...(f.hp > 0 ? volatiles : []).map((c) => h('span', { class: 'vol-chip', tabindex: 0, 'data-tip': c.name, 'data-tip-note': c.desc }, glyph(c.icon), ` ${c.name}`)),
+      ...Object.entries(sd.screens || {}).map(([kind, turns]) => h('span', { class: `screen-chip ${kind}`, tabindex: 0, 'data-tip': `Reduce a la mitad el daño de ${SCREEN_GUARDS[kind]} contra este equipo. Quedan ${turns} turnos.` }, glyph('shield'), ` ${SCREEN[kind]} ${turns}`)),
       ...sideChips(sd),
     ];
     r.conds.replaceChildren(...condChips);
@@ -5029,16 +5043,20 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     if (hz.stickyweb) out.push(['stickyweb', '']);
     for (const [k, turns] of Object.entries(sd.conds || {})) out.push([k, turns]);
     if (sd.wish) out.push(['wish', '']);
-    const chips = out.filter(([k]) => SIDE_COND[k]).map(([k, extra]) => h('span', { class: 'side-chip', tabindex: 0, 'data-tip': SIDE_COND[k].name, 'data-tip-note': SIDE_COND[k].desc ?? null }, `${SIDE_COND[k].icon} ${SIDE_COND[k].name}${extra ? ` ${extra}` : ''}`));
-    if (sd.toxicSpikes) chips.push(h('span', { class: 'side-chip', tabindex: 0, 'data-tip': 'Púas Tóxicas', 'data-tip-note': 'Envenenan al que entra y toca el suelo.' }, `☠️ Púas Tóxicas ×${sd.toxicSpikes}`));
-    if (sd.future) chips.push(h('span', { class: 'side-chip', tabindex: 0, 'data-tip': `${sd.future} viene en camino` }, `🔮 ${sd.future}`));
+    const chips = out.filter(([k]) => SIDE_COND[k]).map(([k, extra]) => h('span', { class: 'side-chip', tabindex: 0, 'data-tip': SIDE_COND[k].name, 'data-tip-note': SIDE_COND[k].desc ?? null }, glyph(SIDE_COND[k].icon), ` ${SIDE_COND[k].name}${extra ? ` ${extra}` : ''}`));
+    if (sd.toxicSpikes) chips.push(h('span', { class: 'side-chip', tabindex: 0, 'data-tip': 'Púas Tóxicas', 'data-tip-note': 'Envenenan al que entra y toca el suelo.' }, glyph('poison'), ` Púas Tóxicas ×${sd.toxicSpikes}`));
+    if (sd.future) chips.push(h('span', { class: 'side-chip', tabindex: 0, 'data-tip': `${sd.future} viene en camino` }, glyph('orb'), ` ${sd.future}`));
     return chips;
   }
 
   function paintField() {
     const fl = view.field || {};
-    const parts = [fl.weather ? `${WEATHER[fl.weather] ?? fl.weather}${fl.weatherSuppressed ? ' (sin efecto)' : ''}` : null, fl.terrain ? TERRAIN[fl.terrain] ?? fl.terrain : null, ...Object.keys(fl.rooms || {}).map((k) => ROOM[k]?.label)].filter(Boolean);
-    els.field.textContent = parts.join(' · ');
+    const parts = [
+      fl.weather ? [glyph(WEATHER[fl.weather]?.icon ?? 'sun'), ` ${WEATHER[fl.weather]?.name ?? fl.weather}${fl.weatherSuppressed ? ' (sin efecto)' : ''}`] : null,
+      fl.terrain ? [glyph(TERRAIN[fl.terrain]?.icon ?? 'leaf'), ` ${TERRAIN[fl.terrain]?.name ?? fl.terrain}`] : null,
+      ...Object.keys(fl.rooms || {}).filter((k) => ROOM[k]).map((k) => [glyph(ROOM[k].icon), ` ${ROOM[k].name}`]),
+    ].filter(Boolean);
+    els.field.replaceChildren(...parts.flatMap((part, i) => (i ? [' · ', ...part] : part)));
     els.sky.className = `sky${fl.weather ? ` ${fl.weather}` : ''}${fl.weatherSuppressed ? ' suppressed' : ''}`;
     els.ground.className = `terrain-glow${fl.terrain ? ` ${fl.terrain}` : ''}`;
   }
@@ -5171,7 +5189,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
         return;
       }
       const won = st.winner === you;
-      const title = st.winner === null ? 'Empate' : you === null ? `¡Gana ${trainerShort(st.sides[st.winner].name)}!` : won ? '¡Ganaste! 🏆' : 'Perdiste… 😵';
+      const title = st.winner === null ? 'Empate' : you === null ? `¡Gana ${trainerShort(st.sides[st.winner].name)}!` : won ? '¡Ganaste!' : 'Perdiste…';
       box.append(
         h('div', { class: 'banner' }, h('h2', null, title), h('p', { class: 'muted' }, `${trainerShort(st.sides[0].name)} vs ${trainerShort(st.sides[1].name)} · ${st.turn} turnos`)),
         c.tournament ? h('p', { class: 'muted pulse' }, 'Volviendo a las llaves del torneo…') : '',
@@ -5191,7 +5209,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
                     toast(err.message);
                   }
                 },
-              }, c.ai ? '⚔︎ Revancha' : c.visibility === 'public' ? '⚔︎ Buscar otra pelea' : '⚔︎ Revancha (sala privada)')
+              }, glyph('swords'), c.ai ? ' Revancha' : c.visibility === 'public' ? ' Buscar otra pelea' : ' Revancha (sala privada)')
             : null,
           c.tournament ? h('a', { class: 'btn primary', href: `/t/${c.tournament.id}`, 'data-link': true }, 'Ver llaves') : null,
           h('a', { class: 'btn', href: '/', 'data-link': true }, 'Inicio'),
@@ -5201,7 +5219,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     }
 
     if (you === null) {
-      if (c.tournament) box.append(h('h2', null, '👁 Estás mirando'), h('p', { class: 'muted' }, `${trainerShort(st.sides[0].name)} vs ${trainerShort(st.sides[1].name)} · ${c.tournament.round}. Cuando termine te llevamos a las llaves y a la siguiente pelea.`), h('a', { class: 'btn', href: `/t/${c.tournament.id}`, 'data-link': true }, 'Ver llaves'));
+      if (c.tournament) box.append(h('h2', null, glyph('eye'), ' Estás mirando'), h('p', { class: 'muted' }, `${trainerShort(st.sides[0].name)} vs ${trainerShort(st.sides[1].name)} · ${c.tournament.round}. Cuando termine te llevamos a las llaves y a la siguiente pelea.`), h('a', { class: 'btn', href: `/t/${c.tournament.id}`, 'data-link': true }, 'Ver llaves'));
       else box.append(h('h2', null, 'Estás mirando'), h('p', { class: 'muted' }, `${trainerShort(st.sides[0].name)} vs ${trainerShort(st.sides[1].name)}. Para pelear tú, busca rival desde el inicio.`), h('a', { class: 'btn', href: '/', 'data-link': true }, 'Ir al inicio'));
       return;
     }
@@ -5259,9 +5277,9 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
             const pp = f.pp?.[m.key] ?? m.pp;
             const info =
               m.kind === 'attack'
-                ? [h('span', { class: 'mv-power' }, `${CATEGORY_ICON[m.category] ?? ''} ${m.power ? `Poder ${m.power}` : 'Especial'}`), h('span', { class: 'mv-accuracy' }, m.accuracy ? `${m.accuracy}%` : '∞'), m.priority > 0 ? h('span', { class: 'mv-priority' }, 'Va primero') : null, effTag]
-                : [h('span', { class: 'mv-power' }, `${CATEGORY_ICON.status} Estado`)];
-            if (m.aimable) info.push(h('span', { class: 'mv-aim' }, '🎯 Eliges sobre quién'));
+                ? [h('span', { class: 'mv-power' }, glyph(CATEGORY_ICON[m.category] ?? 'diamond'), ' ', m.power ? [h('span', { class: 'mv-label' }, 'Poder '), String(m.power)] : 'Especial'), h('span', { class: 'mv-accuracy' }, glyph('target'), ` ${m.accuracy ? `${m.accuracy}%` : 'Siempre'}`), m.priority > 0 ? h('span', { class: 'mv-priority' }, glyph('bolt'), h('span', { class: 'mv-label' }, ' Va primero')) : null, effTag]
+                : [h('span', { class: 'mv-power' }, glyph(CATEGORY_ICON.status), ' Estado'), h('span', { class: 'mv-accuracy' }, glyph('target'), ` ${m.accuracy ? `${m.accuracy}%` : 'Siempre'}`), m.priority > 0 ? h('span', { class: 'mv-priority' }, glyph('bolt'), h('span', { class: 'mv-label' }, ' Va primero')) : null];
+            if (m.aimable) info.push(h('span', { class: 'mv-aim' }, glyph('target'), ' Eliges sobre quién'));
             return h(
               'button',
               { class: `move${pp === 0 ? ' no-pp' : ''}`, 'data-tip': m.desc, 'data-tip-note': pp === 0 ? 'Sin PP: no se puede usar.' : flinchNote(m), disabled: !moveSet.has(i), onclick: () => (m.aimable ? ((aiming = i), renderControls()) : act({ type: 'move', move: i }, m.name)) },
@@ -5275,10 +5293,10 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     }
     const canSwitch = acts.some((a) => a.type === 'switch');
     const forced = st.phase !== 'choose';
-    if (canSwitch && forced) box.append(h('p', { class: 'switch-hint forced' }, '👉 Elige en el panel de tu equipo quién entra.'));
+    if (canSwitch && forced) box.append(h('p', { class: 'switch-hint forced' }, glyph('arrow'), ' Elige en el panel de tu equipo quién entra.'));
     if (st.phase === 'choose') {
       box.append(h('div', { class: 'controls-foot' },
-        h('button', { type: 'button', class: 'btn sm ghost', onclick: () => openInfo(sideAt('me')) }, 'ⓘ Qué hace cada movimiento')));
+        h('button', { type: 'button', class: 'btn sm ghost', onclick: () => openInfo(sideAt('me')) }, glyph('info'), ' Qué hace cada movimiento')));
     }
   }
 
@@ -5515,7 +5533,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
       case 'terrain':
         view.field = { ...view.field, terrain: ev.terrain };
         paintField();
-        tell([`Aparece un ${TERRAIN[ev.terrain] ?? 'campo'}.`]);
+        tell([`Aparece un ${TERRAIN[ev.terrain]?.name ?? 'campo'}.`]);
         sound('terrain', { terrain: ev.terrain });
         return Promise.all([sleep(900), fx.terrain(ev.terrain)]);
       case 'terrainEnd':
@@ -5586,7 +5604,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
           f.hp = 0;
           paint(ev.side);
           await wait(500);
-          tell(['💀 ', ...mon(ev.side, f.name), ' cae rendido.'], { side: ev.side, cls: 'ko' });
+          tell([glyph('skull'), ' ', ...mon(ev.side, f.name), ' cae rendido.'], { side: ev.side, cls: 'ko' });
           await wait(700);
         })();
       }
@@ -5749,8 +5767,8 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
       case 'end':
         setActing(null);
         if (ev.reason === 'limit') log('Se llegó al límite de turnos: gana quien conserva más vida.', 'weak');
-        if (ev.reason === 'forfeit' && ev.winner !== null) tell([`🏳 ${isYou(1 - ev.winner) ? 'Te rendiste' : `${trainerShort(sd(1 - ev.winner).name)} se rindió`}.`], { cls: 'weak' });
-        tell([ev.winner === null ? 'Empate.' : isYou(ev.winner) ? '¡Ganaste la batalla! 🏆' : `¡${sd(ev.winner).name} gana la batalla!`], { cls: 'win' });
+        if (ev.reason === 'forfeit' && ev.winner !== null) tell([glyph('flag'), ` ${isYou(1 - ev.winner) ? 'Te rendiste' : `${trainerShort(sd(1 - ev.winner).name)} se rindió`}.`], { cls: 'weak' });
+        tell([ev.winner === null ? 'Empate.' : isYou(ev.winner) ? '¡Ganaste la batalla!' : `¡${sd(ev.winner).name} gana la batalla!`], { cls: 'win' });
         return (async () => {
           await trainersReturn(ev.winner);
           await wait(600);
@@ -5811,7 +5829,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
       }
       if (msg.state.status === 'finished') {
         const w = msg.state.winner;
-        tell([w === null ? 'Empate.' : isYou(w) ? '¡Ganaste esta batalla! 🏆' : `¡${trainerShort(view.sides[w].name)} ganó esta batalla!`], { cls: 'win' });
+        tell([w === null ? 'Empate.' : isYou(w) ? '¡Ganaste esta batalla!' : `¡${trainerShort(view.sides[w].name)} ganó esta batalla!`], { cls: 'win' });
         await trainersReturn(w);
         showResult(w);
       }
@@ -5820,7 +5838,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
       sent = null;
       aiming = null;
       renderControls();
-      if (msg.timedOut) log('⏱ Se acabó el tiempo: la máquina eligió por quien no alcanzó.', 'weak');
+      if (msg.timedOut) log([glyph('clock'), ' Se acabó el tiempo: la máquina eligió por quien no alcanzó.'], 'weak');
       let acted = false;
       for (const [i, ev] of msg.events.entries()) {
         if (dead) return;

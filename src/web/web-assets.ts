@@ -1,5 +1,6 @@
 // The frontend (public/) is plain JS modules with no build. To make each deploy bust caches,
-// "?v=dev" in its .html and .js files is replaced by a hash of the code when served.
+// "?v=dev" in its .html, .js and .webmanifest files is replaced by a hash of the code and the app's
+// icons when served.
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -18,14 +19,18 @@ const recolored = (rel: string): boolean => /^anims[/\\]ui[/\\]/.test(rel) || (/
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 
 // The manifests of public/upstream/ and the trainer sprites are part of the version, and the page
-// asks for them with it. A trainer sprite asked for with another version (or none) may be stale.
+// asks for them with it, like the app icons. A trainer sprite or icon asked for with another version
+// (or none) may be stale.
 export const cacheFor = (rel: string, current: boolean): string => {
   if (/^upstream[/\\]/.test(rel)) return IMMUTABLE;
   if (/^trainers[/\\].+\.png$/.test(rel) && current) return IMMUTABLE;
+  if (/^icons[/\\]/.test(rel) && current) return IMMUTABLE;
   return CACHEABLE.has(extname(rel)) && !recolored(rel) ? 'public, max-age=86400' : 'no-cache';
 };
 
 const TRAINERS = 'trainers';
+const ICONS = 'icons';
+const VERSIONED = new Set(['.html', '.js', '.webmanifest']);
 
 export interface Asset {
   body: Buffer | string;
@@ -37,10 +42,11 @@ export interface Asset {
 export class WebAssets {
   readonly version: string = (() => {
     const hash = createHash('sha256');
-    const code = readdirSync(PUBLIC_DIR).filter((f) => /\.(js|css|html)$/.test(f));
+    const code = readdirSync(PUBLIC_DIR).filter((f) => /\.(js|css|html|svg|webmanifest)$/.test(f));
+    const icons = readdirSync(join(PUBLIC_DIR, ICONS)).map((f) => join(ICONS, f));
     const manifests = readdirSync(join(PUBLIC_DIR, 'upstream')).map((f) => join('upstream', f));
     const trainers = existsSync(join(PUBLIC_DIR, TRAINERS)) ? readdirSync(join(PUBLIC_DIR, TRAINERS)).filter((f) => f.endsWith('.png')).map((f) => join(TRAINERS, f)) : [];
-    for (const file of [...code, ...manifests, ...trainers].sort()) hash.update(file).update(readFileSync(join(PUBLIC_DIR, file)));
+    for (const file of [...code, ...icons, ...manifests, ...trainers].sort()) hash.update(file).update(readFileSync(join(PUBLIC_DIR, file)));
     return hash.digest('hex').slice(0, 10);
   })();
 
@@ -51,7 +57,7 @@ export class WebAssets {
     const file = join(PUBLIC_DIR, rel || 'index.html');
     try {
       let body: Buffer | string = await readFile(file);
-      if (['.html', '.js'].includes(extname(file))) body = body.toString('utf8').replaceAll('?v=dev', `?v=${this.version}`);
+      if (VERSIONED.has(extname(file))) body = body.toString('utf8').replaceAll('?v=dev', `?v=${this.version}`);
       return { body, type: MIME[extname(file)] || 'application/octet-stream', cache: cacheFor(rel, version === this.version) };
     } catch {
       return null;

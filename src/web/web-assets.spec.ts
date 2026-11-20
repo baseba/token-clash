@@ -19,3 +19,8 @@ test('code always revalidates and the upstream manifests are cached for good', (
   assert.equal(cacheFor('app.js', true), 'no-cache');
   assert.equal(cacheFor('upstream/sprites.json', false), IMMUTABLE);
 });
+
+test('an app icon is cached for good only when asked for with the current version', () => {
+  assert.equal(cacheFor('icons/token-ball-192.png', true), IMMUTABLE);
+  assert.equal(cacheFor('icons/token-ball-192.png', false), 'public, max-age=86400');
+});

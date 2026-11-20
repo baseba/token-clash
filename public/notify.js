@@ -37,7 +37,7 @@ export function createNotifier() {
     let on = false;
     blink = setInterval(() => {
       on = !on;
-      document.title = on ? `🔔 ${text}` : baseTitle;
+      document.title = on ? `● ${text}` : baseTitle;
     }, BLINK_MS);
   }
 
@@ -82,7 +82,7 @@ export function createNotifier() {
       if (permission() !== 'granted') return;
       shown?.close();
       try {
-        shown = new Notification(title, { body, icon: '/favicon.svg', tag: 'token-clash', renotify: true });
+        shown = new Notification(title, { body, icon: '/icons/token-ball-192.png?v=dev', tag: 'token-clash', renotify: true });
         shown.onclick = () => {
           window.focus();
           clear();
