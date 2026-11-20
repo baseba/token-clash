@@ -11,6 +11,7 @@ export const STARTER_SPRITES: readonly string[] = sprites.STARTER_SPRITES;
 export const DOWNLOADED_SPRITES: readonly string[] = sprites.DOWNLOADED_SPRITES;
 export const originalTier = (key: string) => sprites.originalTier(key) as 'common' | 'rare' | 'epic' | 'legendary';
 export const RETIRED_RECOLORS = sprites.RETIRED_RECOLORS as Readonly<Record<string, 'common' | 'rare' | 'epic' | 'legendary' | 'mythic'>>;
+export const RENAMED_TRAINERS = sprites.RENAMED_TRAINERS as Readonly<Record<string, string>>;
 export const RETIRED_SHOP_TRAINERS = sprites.RETIRED_SHOP_TRAINERS as Readonly<Record<string, 'common' | 'rare' | 'epic' | 'legendary'>>;
 export const GYM_LEADERS: Readonly<Record<string, readonly string[]>> = sprites.GYM_LEADERS;
 export const ELITE_FOUR: Readonly<Record<string, string>> = sprites.ELITE_FOUR;

@@ -222,17 +222,57 @@ export function eyeWhites(image, face) {
   return kept;
 }
 
+const INK_MAX = 24;
+const LOCAL_LEAD = 2;
+
 export function recolorByMap(image, map, face) {
   const rgba = Buffer.from(image.rgba);
-  const table = new Map(map.map(([from, to]) => [parseInt(from.slice(1), 16), [1, 3, 5].map((i) => parseInt(to.slice(i, i + 2), 16))]));
+  const colorAt = (i) => image.rgba.readUIntBE(i * 4, 3);
+  const toRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const table = new Map(map.filter((entry) => entry.length === 2).map(([from, to]) => [parseInt(from.slice(1), 16), toRgb(to)]));
+  const local = new Map(map.filter((entry) => entry[2] === NEAR).map(([from, to]) => [parseInt(from.slice(1), 16), toRgb(to)]));
   const eyes = face ? eyeWhites(image, face) : new Set();
+  const paint = (i, to) => to.forEach((value, c) => (rgba[i * 4 + c] = value));
   for (let i = 0; i < image.width * image.height; i++) {
-    if (!rgba[i * 4 + 3]) continue;
-    if (eyes.has(i)) continue;
-    const to = table.get(rgba.readUIntBE(i * 4, 3));
-    if (to) to.forEach((value, c) => (rgba[i * 4 + c] = value));
+    if (!rgba[i * 4 + 3] || eyes.has(i)) continue;
+    const to = table.get(colorAt(i));
+    if (to) paint(i, to);
+  }
+  const seen = new Uint8Array(image.width * image.height);
+  for (let start = 0; start < image.width * image.height; start++) {
+    if (seen[start] || !image.rgba[start * 4 + 3] || !local.has(colorAt(start))) continue;
+    const color = colorAt(start);
+    const piece = [start];
+    seen[start] = 1;
+    let painted = 0;
+    let other = 0;
+    for (let k = 0; k < piece.length; k++) {
+      const i = piece[k];
+      const [x, y] = [i % image.width, Math.floor(i / image.width)];
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= image.width || ny >= image.height) continue;
+        const j = ny * image.width + nx;
+        if (!image.rgba[j * 4 + 3]) continue;
+        const neighbor = colorAt(j);
+        if (neighbor === color) {
+          if (!seen[j]) {
+            seen[j] = 1;
+            piece.push(j);
+          }
+        } else if (table.has(neighbor)) painted += 1;
+        else if (!isInk(image, j)) other += 1;
+      }
+    }
+    if (painted >= other * LOCAL_LEAD && painted > 0) for (const i of piece) if (!eyes.has(i)) paint(i, local.get(color));
   }
   return { width: image.width, height: image.height, rgba };
+}
+
+export const NEAR = 'near';
+
+function isInk(image, i) {
+  const [r, g, b] = image.rgba.subarray(i * 4, i * 4 + 3);
+  return Math.max(r, g, b) < INK_MAX;
 }
 
 const HEAD_SHARE = 0.26;

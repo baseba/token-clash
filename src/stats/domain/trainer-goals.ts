@@ -108,8 +108,6 @@ export const CLASS_TRAINERS: Readonly<Record<string, ClassTrainer>> = {
   scientist_m: type('Científico', 'steel'),
   scientist_f: type('Científica', 'steel'),
   snow_worker: type('Obrero de la nieve', 'ice'),
-  snow_worker_m: type('Obrero de la nieve', 'ice'),
-  snow_worker_f: type('Obrera de la nieve', 'ice'),
   bird_keeper_m: type('Ornitólogo', 'flying'),
   bird_keeper_f: type('Ornitóloga', 'flying'),
   pilot: type('Piloto', 'flying'),

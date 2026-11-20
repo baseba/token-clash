@@ -120,3 +120,11 @@ test('two names are the same name when they differ only in case or spacing', () 
   assert.notEqual(nameKey('Ángel'), nameKey('Angel'), 'an accent makes another name');
   assert.equal(nameKey('Ana\u200f'), nameKey('Ana'), 'invisible characters do not make another name');
 });
+
+test('a renamed or merged trainer keeps whoever had it: the owned key and the worn one move to the new name', () => {
+  const ana = Trainer.restore({ id: 'a1', name: 'Ana', tokenHash: 'h', roster: [], team: [], wins: 0, losses: 0, totalTokens: 0, createdAt: 0, avatar: 'snow_worker_f', owned: ['trainer:aether_grunt_f__lime', 'trainer:aether_grunt_f__peach', 'ball:gb'] });
+  assert.equal(ana.renameTrainers({ snow_worker_f: 'worker_f', aether_grunt_f__lime: 'aether_grunt_f__peach' }), true);
+  assert.equal(ana.look, 'worker_f');
+  assert.deepEqual(ana.owned, ['trainer:aether_grunt_f__peach', 'ball:gb']);
+  assert.equal(ana.renameTrainers({ snow_worker_f: 'worker_f' }), false);
+});

@@ -158,6 +158,18 @@ export class Trainer implements TrainerState {
     return refund;
   }
 
+  /** Moves owned trainers and the worn one to their new keys. Returns whether anything changed. */
+  renameTrainers(renames: Readonly<Record<string, string>>): boolean {
+    const moved = (key: string) => renames[key] ?? key;
+    const owned = [...new Set((this.owned ?? []).map((id) => (id.startsWith('trainer:') ? `trainer:${moved(id.slice('trainer:'.length))}` : id)))];
+    const avatar = this.avatar && moved(this.avatar);
+    const changed = owned.length !== (this.owned ?? []).length || owned.some((id, i) => id !== this.owned?.[i]) || avatar !== this.avatar;
+    if (!changed) return false;
+    if (this.owned) this.owned = owned;
+    this.avatar = avatar;
+    return true;
+  }
+
   /** Puts back a look the trainer no longer has: one they do have, or the default one. */
   replaceLook(key: string | null): void {
     this.avatar = key ?? undefined;
