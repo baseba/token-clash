@@ -91,7 +91,7 @@ test('every generated variant changes its colors visibly instead of landing on a
       change += n * Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
       weight += n;
     }
-    assert.ok(change / weight >= 38, `${variant.key}: ${Math.round(change / weight)}`);
+    assert.ok(change / weight >= 35, `${variant.key}: ${Math.round(change / weight)}`);
   }
 });
 

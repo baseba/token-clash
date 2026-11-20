@@ -94,7 +94,8 @@ const INK_SAT = 0.3;
 const INK_DARK = 0.16;
 const INK_LIGHT = 0.82;
 const CLASH_HUE = 40;
-const AWKWARD = [55, 100, 135, 150];
+const AWKWARD = [65, 95];
+const NEIGHBOR_SHIFTS = [-20, 20, -40, 40];
 const BYSTANDER_SAT = 0.35;
 const SIMILAR_HUE = 55;
 const SIMILAR_LIGHT = 0.25;
@@ -350,8 +351,7 @@ export function colorRegions(image) {
   const clothes = usable.filter((m) => m.hairShare < HAIR_LINE);
   const outfit = clothes.find((m) => m.kind === 'hue' && m.weight >= (clothes[0]?.weight ?? 0) * HUE_PREFERENCE) ?? clothes[0] ?? usable[0];
   const hair = materials.find((m) => m !== outfit && m.hairShare >= HAIR_LINE && m.weight >= opaque * HAIR_MIN_SHARE);
-  const second = hair ?? usable.find((m) => m !== outfit && m.weight >= outfit.weight * SECOND_SHARE);
-  return second ? [outfit, second] : [outfit];
+  return hair ? [outfit, hair] : [outfit];
 }
 
 
@@ -650,18 +650,20 @@ function contrastMaps(bystanders, used, originalHue, painted) {
       const ink = lumaAround(material, painted) > INK_FROM ? { hue: INK_HUE, sat: INK_SAT, light: INK_DARK, absolute: true, free: true } : { hue: used[0].hue, sat: INK_SAT, light: INK_LIGHT, absolute: true, free: true };
       return material.ramps.flatMap((ramp) => paintRamp(ramp, ink));
     }
-    const fits = (hue) => used.every((target) => harmonic(distance(target.hue, hue)));
-    const clash = used.some((target) => distance(target.hue, material.hue) < CLASH_HUE);
-    if (material.detail ? !clash : fits(material.hue) || (material.saturation < BYSTANDER_SAT && !clash)) return [];
+    const against = used.slice(0, 1);
+    const fits = (hue) => against.every((target) => harmonic(distance(target.hue, hue)));
+    const clash = against.some((target) => distance(target.hue, material.hue) < CLASH_HUE);
+    if (fits(material.hue) || (material.saturation < BYSTANDER_SAT && !clash)) return [];
     const first = used[0];
-    const candidates = [originalHue, first.hue + 180, first.hue + 120, first.hue - 120].filter((candidate) => candidate !== null && candidate !== undefined);
-    const farthest = (candidate) => Math.min(...used.map((target) => distance(target.hue, candidate)));
+    const nearby = NEIGHBOR_SHIFTS.map((shift) => material.hue + shift);
+    const candidates = [...(clash ? [originalHue, ...nearby] : [...nearby, originalHue]), first.hue + 180, first.hue + 120, first.hue - 120].filter((candidate) => candidate !== null && candidate !== undefined);
+    const farthest = (candidate) => Math.min(...against.map((target) => distance(target.hue, candidate)));
     const hue = candidates.find(fits) ?? candidates.reduce((a, b) => (farthest(b) > farthest(a) ? b : a));
     return colorMap(material, { hue: ((hue % 360) + 360) % 360, sat: 1, light: 1 }, true);
   });
 }
 
-const harmonic = (gap) => gap >= CLASH_HUE && !(gap > AWKWARD[0] && gap < AWKWARD[1]) && !(gap > AWKWARD[2] && gap < AWKWARD[3]);
+const harmonic = (gap) => gap >= CLASH_HUE && !(gap > AWKWARD[0] && gap < AWKWARD[1]);
 
 const looksAlike = (a, b) =>
   a.sat >= MUTED_TARGET && b.sat >= MUTED_TARGET ? distance(a.hue, b.hue) < SIMILAR_HUE : a.sat < MUTED_TARGET && b.sat < MUTED_TARGET && Math.abs(a.light - b.light) < SIMILAR_LIGHT;
