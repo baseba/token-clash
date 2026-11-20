@@ -2,10 +2,17 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#15122a">
   <title>Token Clash</title>
   <meta name="description" content="Batallas contra otros jugadores con los Pokémon que criaste con tus tokens.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Token Clash">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="/style.css?v=dev">
   <script type="module" src="/app.js?v=dev"></script>
   <!-- Every request to our domain crosses Cloudflare and the tunnel, a long round trip. Without these
@@ -33,7 +40,7 @@
 </head>
 <body>
   <header class="top">
-    <a class="logo" href="/" data-link><span class="logo-mark">⚔︎</span> <span class="logo-text">Token Clash</span></a>
+    <a class="logo" href="/" data-link><img class="logo-mark" src="/favicon.svg" alt="" width="34" height="34"> <span class="logo-text">Token Clash</span></a>
     <nav class="nav" aria-label="Principal">
       <a href="/" data-link data-nav="home" data-tip="Inicio" aria-label="Inicio">🏠</a>
       <a href="/coleccion" data-link data-nav="collection" data-tip="Colección" aria-label="Colección">🎒</a>

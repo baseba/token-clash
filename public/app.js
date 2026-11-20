@@ -50,7 +50,10 @@ function h(tag, attrs, ...kids) {
         else el.style[prop] = val;
       }
     } // CSSOM, so CSP-safe
-    else if (k === 'html') el.innerHTML = v; // only ever creatureHTML(), which validates the sprite slug
+    else if (k === 'html') {
+      el.innerHTML = v; // only ever creatureHTML(), which validates the sprite slug
+      if (!el.classList.contains('sub-doll')) el.querySelectorAll('.creature img').forEach(fitSprite);
+    }
     else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else el.setAttribute(k, v === true ? '' : String(v));
   }
@@ -75,6 +78,8 @@ const RARITY = { common: 'Común', uncommon: 'Poco común', rare: 'Rara', legend
 
 let toastTimer;
 function toast(msg) {
+  const layer = document.querySelector('dialog[open]') ?? document.body;
+  if ($toast.parentElement !== layer) layer.append($toast);
   $toast.textContent = msg;
   $toast.classList.add('show');
   clearTimeout(toastTimer);
@@ -463,8 +468,7 @@ function infoCard(f, { own, owner, close }) {
             ? h(
                 'li',
                 null,
-                h('div', { class: 'mv-head' }, h('b', null, m.name), typeChip(m.type), h('span', { class: 'muted small' }, CATEGORY[m.category] || ''), m.power ? h('span', { class: 'muted small' }, `Poder ${m.power} · ${m.accuracy}%`) : null),
-                h('p', { class: 'muted small' }, moveEffects(m).join(' ') || 'Sin efectos adicionales.'),
+                ...moveDetails(m),
               )
             : h('li', { class: 'muted' }, '???'),
         ),
@@ -664,28 +668,51 @@ function hideTip() {
   $tip.classList.remove('show');
   $tip.hidden = true;
 }
+let lastPointer = 'mouse';
+document.addEventListener('pointerdown', (e) => { lastPointer = e.pointerType; }, true);
+document.addEventListener('keydown', () => { lastPointer = 'keyboard'; }, true);
 document.addEventListener('mouseover', (e) => {
+  if (lastPointer === 'touch') return;
   if (tipTarget && !tipTarget.isConnected) hideTip();
   const el = e.target.closest?.('[data-tip]');
   if (el === tipTarget) return;
   el ? showTip(el) : hideTip();
 });
 document.addEventListener('focusin', (e) => {
+  if (lastPointer === 'touch') return;
   const el = e.target.closest?.('[data-tip]');
   el ? showTip(el) : hideTip();
 });
 document.addEventListener('focusout', hideTip);
-document.addEventListener('click', hideTip, true);
+// Touch has no hover: a tap on a tip that is not itself a control opens it, and the next tap closes it.
+document.addEventListener('click', (e) => {
+  const el = lastPointer === 'touch' ? e.target.closest?.('[data-tip]') : null;
+  if (el && el !== tipTarget && !el.closest('button, a[href], input, select, label, [role="button"]')) showTip(el);
+  else hideTip();
+}, true);
 addEventListener('scroll', hideTip, { passive: true, capture: true });
+// A sprite is sized only once it loads, so remember each size: a card rebuilt by a filter or a page
+// change lays out at its final size at once instead of jumping when the image arrives.
+const spriteSizes = new Map();
+function fitSprite(img) {
+  const size = spriteSizes.get(img.getAttribute('src'));
+  if (!size) return;
+  img.classList.toggle('native', size.native);
+  img.style.width = size.width;
+  img.style.height = size.height;
+}
 document.addEventListener(
   'load',
   (e) => {
     const img = e.target;
     if (!(img instanceof HTMLImageElement) || !img.closest('.creature') || img.closest('.spot')) return;
     const native = img.naturalWidth !== SPRITE_CANVAS || img.naturalHeight !== SPRITE_CANVAS;
-    img.classList.toggle('native', native);
-    img.style.width = native ? `${(img.naturalWidth / SPRITE_CANVAS) * 100}%` : '';
-    img.style.height = native ? `${(img.naturalHeight / SPRITE_CANVAS) * 100}%` : '';
+    spriteSizes.set(img.getAttribute('src'), {
+      native,
+      width: native ? `${(img.naturalWidth / SPRITE_CANVAS) * 100}%` : '',
+      height: native ? `${(img.naturalHeight / SPRITE_CANVAS) * 100}%` : '',
+    });
+    fitSprite(img);
   },
   true,
 );
@@ -1034,12 +1061,12 @@ function loginCard({ onDone } = {}) {
 }
 
 function accessCard({ onDone } = {}) {
-  let mode = 'create';
+  let mode = isPhone() ? 'login' : 'create';
   const slot = h('div');
   const tabs = h('div', { class: 'segmented access-tabs', role: 'group', 'aria-label': 'Cómo entrar' });
   function paint() {
     tabs.replaceChildren(...[['create', 'Crear cuenta'], ['login', 'Iniciar sesión']].map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === mode), onclick: () => { mode = value; paint(); } }, text)));
-    slot.replaceChildren(mode === 'create' ? importCard({ onDone }) : loginCard({ onDone }));
+    slot.replaceChildren(...(mode === 'create' ? [...(isPhone() ? [phoneSaveNote()] : []), importCard({ onDone })] : [loginCard({ onDone })]));
   }
   paint();
   return h('div', { class: 'access' }, tabs, slot);
@@ -1190,7 +1217,11 @@ function importCard({ onDone, compact: small = false } = {}) {
   );
 }
 
+const isPhone = () => matchMedia('(max-width: 640px)').matches;
+const phoneSaveNote = () => h('div', { class: 'phone-save-note' }, h('span', { 'aria-hidden': 'true' }, '💻'), h('p', null, h('b', null, 'El save se sube desde el computador. '), 'PokeTokenBar guarda tu save en el Mac: abre Token Clash ahí para subirlo o actualizarlo. Desde el celular puedes entrar con tu nombre y contraseña y jugar con el save que ya subiste.'));
+
 function updateSavePanel({ onDone } = {}) {
+  if (isPhone()) return phoneSaveNote();
   let mode = 'file';
   const slot = h('div');
   const tabs = h('div', { class: 'segmented update-save-tabs', role: 'group', 'aria-label': 'Cómo actualizar tu save' });
@@ -1371,6 +1402,10 @@ async function profilePage(seq) {
   );
   let editingName = false;
   let account = accountCard();
+  const accountDlg = h('dialog', { class: 'info-dlg account-dlg', 'aria-label': 'Tu cuenta', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() },
+    h('div', { class: 'account-dlg-body' }, h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => accountDlg.close() }, '×'), h('h2', null, '⚙️ Tu cuenta'), account));
+  const accountBtn = h('button', { type: 'button', class: `btn sm ghost account-open${me.hasPassword ? '' : ' needs-password'}`, 'aria-label': 'Tu cuenta', 'data-tip': me.hasPassword ? 'Contraseña y sesión' : 'Agrega una contraseña para entrar desde otros dispositivos', onclick: () => accountDlg.showModal() }, '⚙️', h('span', { class: 'account-open-label' }, ' Cuenta y contraseña'));
+  accountDlg.addEventListener('close', () => accountBtn.classList.toggle('needs-password', !me.hasPassword));
   async function rename(name) {
     const oldName = me.name;
     try {
@@ -1733,12 +1768,12 @@ async function profilePage(seq) {
     if (kind === 'trainer') paint(shownCount);
   });
   $app.replaceChildren(
-    h('section', { class: 'card shop-head' }, identity, balance),
-    account,
-    h('section', { class: 'card' },
+    h('section', { class: 'card shop-head profile-head' }, identity, accountBtn),
+    h('section', { class: 'card shop-section' },
+      h('div', { class: 'shop-title' }, h('h2', null, '🛍️ Tienda'), balance),
       h('div', { class: 'segmented shop-tabs', role: 'group', 'aria-label': 'Categoría' }, Object.entries(SHOP_KINDS).map(([value, text]) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(value === kind), onclick: (e) => { kind = value; e.currentTarget.parentElement.querySelectorAll('.seg-item').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); paint(); } }, text))),
       h('div', { class: 'shop-toolbar' },
-        h('label', { class: 'search-field' }, h('span', { 'aria-hidden': 'true' }, '🔍'), h('input', { type: 'search', placeholder: 'Buscar por nombre', 'aria-label': 'Buscar por nombre', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } })),
+        h('label', { class: 'search-field' }, h('span', { 'aria-hidden': 'true' }, '🔍'), h('input', { type: 'search', placeholder: 'Buscar', 'aria-label': 'Buscar por nombre', oninput: (e) => { query = e.target.value.trim().toLowerCase(); paint(); } })),
         ownPills,
         raritySelect,
         trainerFilters,
@@ -1747,8 +1782,9 @@ async function profilePage(seq) {
       more,
     ),
     confirmDlg,
+    accountDlg,
   );
-  if (location.hash === '#cuenta') document.getElementById('cuenta')?.scrollIntoView({ block: 'start' });
+  if (location.hash === '#cuenta') accountDlg.showModal();
 }
 
 // ---------- recycling ----------
@@ -1777,6 +1813,9 @@ async function rescanSave() {
   ls.set('tc_rescanned', mark);
 }
 
+const HOLD_TO_DRAG_MS = 220;
+const EDGE_SCROLL_ZONE = 90;
+
 async function recyclingPage(seq) {
   document.title = 'Reciclaje · Token Clash';
   await loadMe();
@@ -1801,10 +1840,11 @@ async function recyclingPage(seq) {
   const coins = h('span', { class: 'shop-coins', tabindex: 0, 'data-tip': 'Tu saldo para comprar en tu perfil' }, `🪙 ${tokensM(shownBalance)}`);
   const pile = h('div', { class: 'duplicate-grid' });
   const history = h('div', { class: 'recycle-log' });
-  const mouth = h('div', { class: 'shred-mouth' }, h('span', { class: 'shred-hint' }, 'Arrastra aquí'));
+  const mouth = h('div', { class: 'shred-mouth' }, h('span', { class: 'shred-hint' }, matchMedia('(pointer: coarse)').matches ? 'Mantén presionado y arrastra aquí · o toca uno' : 'Arrastra aquí'));
   const output = h('div', { class: 'shred-output' });
   const tray = h('div', { class: 'shred-tray' });
   const gain = h('div', { class: 'shred-gain', 'aria-live': 'polite' });
+  const confirmDlg = h('dialog', { class: 'info-dlg confirm-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() });
   const machine = h('div', { class: 'shredder', role: 'region', 'aria-label': 'Trituradora' },
     mouth,
     h('div', { class: 'shred-body' }, h('span', { class: 'shred-teeth' }), h('span', { class: 'shred-light' }), h('b', null, 'TRITURADORA'), h('small', null, 'Pokémon repetidos → tokens')),
@@ -1833,7 +1873,7 @@ async function recyclingPage(seq) {
           class: `duplicate-card rarity-${mon.rarity}${mon.shiny ? ' is-shiny' : ''}`,
           tabindex: 0,
           role: 'button',
-          'aria-label': `${mon.name}${mon.shiny ? ' shiny' : ''}, ${RECYCLE_RARITY[mon.rarity]}, ${tokensM(mon.tokens)}. Arrástralo a la trituradora o presiona Enter.`,
+          'aria-label': `${mon.name}${mon.shiny ? ' shiny' : ''}, ${RECYCLE_RARITY[mon.rarity]}, ${tokensM(mon.tokens)}. Arrástralo a la trituradora, mantén presionado para arrastrar o presiona Enter.`,
           'data-tip': `${mon.name}${mon.shiny ? ' ✨' : ''} · Nv ${mon.level}`,
           'data-tip-note': 'Arrástralo a la trituradora',
           onpointerdown: (e) => startDrag(e, mon),
@@ -1848,36 +1888,69 @@ async function recyclingPage(seq) {
       : [h('p', { class: 'muted' }, 'Todavía no trituras nada.')]));
   }
 
+  // On touch the list has to keep scrolling, so a card lifts only after a short hold; a plain tap asks instead.
   function startDrag(e, mon) {
     if (busy || e.button !== 0) return;
     const source = e.currentTarget;
+    const touch = e.pointerType === 'touch';
     const rect = source.getBoundingClientRect();
     const offset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    let ghost = null;
     const begin = { x: e.clientX, y: e.clientY };
+    let last = begin;
+    let ghost = null;
+    let held = !touch;
+    let scrollFrame = 0;
+    const holdTimer = touch
+      ? setTimeout(() => {
+          held = true;
+          source.classList.add('is-held');
+          navigator.vibrate?.(12);
+        }, HOLD_TO_DRAG_MS)
+      : 0;
+    const blockScroll = (ev) => held && ev.cancelable && ev.preventDefault();
     const over = (x, y) => {
       const r = mouth.getBoundingClientRect();
       return x >= r.left - 24 && x <= r.right + 24 && y >= r.top - 40 && y <= r.bottom + 30;
     };
+    const scrollNearEdges = () => {
+      const top = EDGE_SCROLL_ZONE - last.y;
+      const bottom = last.y - (innerHeight - EDGE_SCROLL_ZONE);
+      const speed = top > 0 ? -top / 4 : bottom > 0 ? bottom / 4 : 0;
+      if (speed) {
+        scrollBy(0, speed);
+        machine.classList.toggle('is-hot', over(last.x, last.y));
+      }
+      scrollFrame = requestAnimationFrame(scrollNearEdges);
+    };
     const move = (ev) => {
+      last = { x: ev.clientX, y: ev.clientY };
       if (!ghost) {
-        if (Math.hypot(ev.clientX - begin.x, ev.clientY - begin.y) < 6) return;
+        if (!held || Math.hypot(ev.clientX - begin.x, ev.clientY - begin.y) < 6) return;
         ghost = source.cloneNode(true);
         ghost.classList.add('drag-ghost');
         Object.assign(ghost.style, { width: `${rect.width}px`, height: `${rect.height}px` });
         document.body.append(ghost);
         source.classList.add('is-dragging');
         machine.classList.add('is-waiting');
+        scrollFrame = requestAnimationFrame(scrollNearEdges);
       }
       ghost.style.transform = `translate(${ev.clientX - offset.x}px, ${ev.clientY - offset.y}px) rotate(${Math.max(-8, Math.min(8, (ev.movementX ?? 0) * 0.6))}deg)`;
       machine.classList.toggle('is-hot', over(ev.clientX, ev.clientY));
     };
     const end = (ev) => {
+      clearTimeout(holdTimer);
+      cancelAnimationFrame(scrollFrame);
       removeEventListener('pointermove', move);
       removeEventListener('pointerup', end);
       removeEventListener('pointercancel', end);
+      source.removeEventListener('touchmove', blockScroll);
+      source.classList.remove('is-held');
       machine.classList.remove('is-waiting', 'is-hot');
-      if (!ghost) return;
+      if (!ghost) {
+        const tapped = touch && ev.type === 'pointerup' && Math.hypot(ev.clientX - begin.x, ev.clientY - begin.y) < 10;
+        if (tapped) source.addEventListener('click', () => askShred(mon, source), { once: true });
+        return;
+      }
       const drop = ev.type === 'pointerup' && over(ev.clientX, ev.clientY);
       if (drop) {
         ghost.remove();
@@ -1890,9 +1963,25 @@ async function recyclingPage(seq) {
         source.classList.remove('is-dragging');
       });
     };
+    if (touch) source.addEventListener('touchmove', blockScroll, { passive: false });
     addEventListener('pointermove', move);
     addEventListener('pointerup', end);
     addEventListener('pointercancel', end);
+  }
+
+  function askShred(mon, source) {
+    if (busy) return;
+    const cancel = h('button', { class: 'btn', type: 'button', onclick: () => confirmDlg.close() }, 'Cancelar');
+    const confirm = h('button', { class: 'btn primary', type: 'button', onclick: () => {
+      confirmDlg.close();
+      machine.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      setTimeout(() => shred(mon, source), 350);
+    } }, `♻️ Triturar · +${tokensM(mon.tokens)}`);
+    confirmDlg.replaceChildren(h('div', { class: 'confirm-body' },
+      h('h2', null, `¿Triturar ${mon.name}${mon.shiny ? ' ✨' : ''}?`),
+      h('p', null, 'Es una copia repetida: sale de tu colección y ganas sus tokens. No se puede deshacer.'),
+      h('div', { class: 'row confirm-actions' }, cancel, confirm)));
+    confirmDlg.showModal();
   }
 
   async function shred(mon, source) {
@@ -1971,6 +2060,7 @@ async function recyclingPage(seq) {
       h('div', { class: 'recycle-machine' }, machine),
     ),
     h('section', { class: 'card recycle-history' }, h('h2', null, 'Registro'), history),
+    confirmDlg,
   );
 }
 
@@ -2017,6 +2107,7 @@ function feedbackButton() {
 function renderLanding() {
   document.body.classList.add('signed-out');
   $app.replaceChildren(
+    ...[installNudge()].filter(Boolean),
     h(
       'div',
       { class: 'hero' },
@@ -2030,6 +2121,50 @@ function renderLanding() {
       accessCard({ onDone: route }),
     ),
   );
+}
+
+let installPrompt = null;
+let installNudgeClosed = false;
+const installRepaints = new Set();
+const isInstalled = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isAppleMobile = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Chrome offers its own install dialog only through this event; held, it can open from our button.
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  installRepaints.forEach((paint) => paint());
+});
+addEventListener('appinstalled', () => {
+  installNudgeClosed = true;
+  document.querySelectorAll('.install-nudge').forEach((nudge) => nudge.remove());
+});
+
+function installNudge() {
+  if (!isPhone() || isInstalled() || installNudgeClosed) return null;
+  const card = h('section', { class: 'card install-nudge' });
+  const install = async () => {
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    installPrompt = null;
+    if (outcome === 'accepted') card.remove();
+    else paint();
+  };
+  const howTo = () => {
+    if (installPrompt) return h('button', { class: 'btn primary sm', type: 'button', onclick: install }, '📲 Instalar');
+    if (isAppleMobile()) return h('p', { class: 'install-how' }, 'En Safari toca ', h('b', null, 'Compartir'), ' y luego ', h('b', null, 'Agregar a inicio'), '.');
+    return h('p', { class: 'install-how' }, 'Abre el menú ', h('b', null, '⋮'), ' del navegador y elige ', h('b', null, 'Instalar app'), ' o ', h('b', null, 'Agregar a la pantalla principal'), '.');
+  };
+  function paint() {
+    if (!card.isConnected && card.childElementCount) return installRepaints.delete(paint);
+    card.replaceChildren(
+      h('img', { class: 'install-icon', src: '/icons/icon-192.png', alt: '' }),
+      h('div', { class: 'install-text' }, h('b', null, 'Instala Token Clash'), h('small', null, 'Ábrela desde tu pantalla de inicio, a pantalla completa y sin la barra del navegador.'), howTo()),
+      h('button', { class: 'install-close', type: 'button', 'aria-label': 'Ahora no', onclick: () => { installNudgeClosed = true; installRepaints.delete(paint); card.remove(); } }, '✕'),
+    );
+  }
+  paint();
+  installRepaints.add(paint);
+  return card;
 }
 
 function credentialsNudge() {
@@ -2127,7 +2262,7 @@ function renderHome() {
       null,
       h('div', { class: 'row between' }, h('h1', null, `Hola, ${me.name}`), h('div', { class: 'row' }, h('span', { class: 'chip' }, `📚 ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, `✨ ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, `🪙 ${compact(me.totalTokens)} tokens`))),
     ),
-    ...[credentialsNudge()].filter(Boolean),
+    ...[credentialsNudge() ?? installNudge()].filter(Boolean),
     h(
       'section',
       null,
@@ -2854,6 +2989,8 @@ async function teamPage(seq) {
 
   const partyEl = h('div', { class: 'party-row' });
   const panel = h('section', { class: 'mon-panel' });
+  const sheetBar = h('div', { class: 'mon-sheet-bar' });
+  const sheet = h('div', { class: `mon-sheet${params.get('p') ? ' is-open' : ''}` }, sheetBar, panel);
   const grid = h('div', { class: 'collection' });
   const countEl = h('span', { class: 'party-count' });
 
@@ -2899,9 +3036,36 @@ async function teamPage(seq) {
     paintParty();
     paintCollection();
     openEditor();
+    sheet.classList.add('is-open');
+    if (!isPhone()) revealEditor();
+  }
+
+  function closeSheet() {
+    if (editor?.dirty() && !window.confirm(UNSAVED_MSG)) return;
+    sheet.classList.remove('is-open');
+    history.replaceState(null, '', '/coleccion');
+    shownPath = '/coleccion';
+  }
+
+  function paintSheetBar() {
+    const at = me.team.indexOf(selected);
+    const mon = me.roster.find((f) => f.uid === selected);
+    const goTo = (index) => select(me.team[index]);
+    sheetBar.replaceChildren(
+      h('button', { type: 'button', class: 'btn sm ghost sheet-back', onclick: closeSheet }, '← Volver'),
+      h('b', { class: 'sheet-title' }, mon?.name ?? ''),
+      at >= 0
+        ? h('div', { class: 'sheet-pager', role: 'group', 'aria-label': 'Tu equipo' },
+            h('button', { type: 'button', class: 'btn sm ghost', 'aria-label': 'Anterior del equipo', disabled: at === 0, onclick: () => goTo(at - 1) }, '‹'),
+            h('span', null, `${at + 1} de ${me.team.length}`),
+            h('button', { type: 'button', class: 'btn sm ghost', 'aria-label': 'Siguiente del equipo', disabled: at === me.team.length - 1, onclick: () => goTo(at + 1) }, '›'))
+        : h('span'),
+      ...(at > 0 ? [h('button', { type: 'button', class: 'btn sm sheet-lead', onclick: () => move(at, 0) }, '👑 Hacer líder · sale primero a pelear')] : []),
+    );
   }
 
   function paintParty(pop = null) {
+    paintSheetBar();
     const party = partyOf();
     countEl.textContent = `${party.length}/${PARTY_SIZE}`;
     partyEl.replaceChildren(
@@ -3008,7 +3172,7 @@ async function teamPage(seq) {
     reimport,
     h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', countEl)),
     h('section', { class: 'party-board' }, partyEl, h('p', { class: 'hint' }, `Arrastra para ordenar · el líder abre la pelea · antes de cada combate eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}`)),
-    panel,
+    sheet,
     h('section', { class: 'collection-board' }, h('div', { class: 'coll-head' }, h('h2', null, 'Tus Pokémon')), collectionBar(filters, collCount), grid),
     ...(me.hasPassword ? [] : [h('section', null, h('p', { class: 'muted small' }, 'Tu cuenta solo vive en este navegador. ', h('a', { href: '/perfil#cuenta', 'data-link': true }, 'Agrega una contraseña'), ' para jugar con el mismo save desde otro dispositivo.'))]),
   );
@@ -3081,10 +3245,10 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
     slotsEl.replaceChildren(
       ...Array.from({ length: mon.maxMoves }, (_, i) => {
         const m = byKey.get(moves[i]);
-        if (!m) return h('div', { class: 'move-slot empty' }, h('span', null, 'Elige un movimiento de la tabla'));
+        if (!m) return h('div', { class: 'move-slot empty' }, h('span', null, 'Libre: agrega uno de la lista'));
         return h(
           'button',
-          { type: 'button', class: 'move-slot', style: typeTint(m.type), 'data-tip': m.desc, 'data-tip-note': 'Clic para quitarlo', onclick: () => toggleMove(m.key) },
+          { type: 'button', class: 'move-slot', style: typeTint(m.type), 'data-tip': m.desc, 'data-tip-note': 'Clic para quitarlo', 'aria-label': `Quitar ${m.name}`, onclick: () => toggleMove(m.key) },
           h('span', { class: 'ms-top' }, h('b', null, m.name), h('span', { class: 'ms-x' }, '✕')),
           h('span', { class: 'ms-meta' }, h('span', { class: 'type-badge', style: typeTint(m.type) }, typeLabel(m.type)), h('span', null, `${CATEGORY[m.category]}${m.power ? ` · ${m.power}` : ''} · PP ${m.pp}`)),
         );
@@ -3104,6 +3268,7 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
     );
     const q = filter.toLowerCase();
     const rows = mon.movepool.filter((m) => (!onlyUsable || m.supported) && (origin === 'all' || m.origin === origin) && (!q || m.name.toLowerCase().includes(q) || typeLabel(m.type).toLowerCase().includes(q)));
+    tbody.parentElement?.classList.toggle('is-full', moves.length >= mon.maxMoves);
     tbody.replaceChildren(
       ...(rows.length
         ? rows.map((m) => {
@@ -3520,8 +3685,8 @@ function watchControl(request) {
   let open = false;
   let asked = false;
   const paint = () => el.replaceChildren(open
-    ? h('span', { class: 'chip watch-on', 'data-tip': 'Tu pelea aparece en Juegos en vivo' }, '👁 Espectadores habilitados')
-    : h('button', { type: 'button', class: 'btn sm ghost watch-btn', disabled: asked || null, 'data-tip': 'Deja que tu pelea aparezca en Juegos en vivo para que otros entren a mirar', onclick: () => { asked = true; paint(); request(); } }, '👁 Habilitar espectadores'));
+    ? h('span', { class: 'chip watch-on', 'data-tip': 'Tu pelea aparece en Juegos en vivo', 'aria-label': 'Espectadores habilitados' }, '👁', h('span', { class: 'watch-label' }, ' Espectadores habilitados'))
+    : h('button', { type: 'button', class: 'btn sm ghost watch-btn', disabled: asked || null, 'data-tip': 'Deja que tu pelea aparezca en Juegos en vivo para que otros entren a mirar', 'aria-label': 'Habilitar espectadores', onclick: () => { asked = true; paint(); request(); } }, '👁', h('span', { class: 'watch-label' }, ' Habilitar espectadores')));
   paint();
   return {
     el,
@@ -4080,6 +4245,37 @@ function preloadFor(you, parties) {
   parties.forEach((party, s) => preloadSprites([...(party ?? []), { sprite: 'substitute' }], { back: s === you }));
 }
 
+function moveDetails(m) {
+  const what = m.desc || moveEffects(m).join(' ') || 'Sin efectos adicionales.';
+  return [
+    h('div', { class: 'mv-head' }, h('b', null, m.name), typeChip(m.type), h('span', { class: 'muted small' }, m.power ? `${CATEGORY[m.category] || ''} · ${m.power}` : CATEGORY[m.category] || '')),
+    h('p', { class: 'mv-desc' }, what),
+  ];
+}
+
+function prepInfoCard(f, { own, foes, close, action }) {
+  const { strong, weak } = matchupOf(f, foes);
+  const names = (list) => list.map((o) => o.name).join(', ');
+  const matchup = [
+    strong.length ? h('p', null, h('span', { class: 'tag-strong' }, '⚔️ Fuerte contra '), names(strong)) : null,
+    weak.length ? h('p', null, h('span', { class: 'tag-weak' }, '⚠️ Cuidado con '), names(weak)) : null,
+  ].filter(Boolean);
+  return h(
+    'div',
+    { class: 'info-card prep-info-card' },
+    h('button', { class: 'info-close', type: 'button', 'aria-label': 'Cerrar', onclick: close }, '×'),
+    h('header', null,
+      h('div', { class: 'info-sprite', html: creatureHTML(f) }),
+      h('div', null, h('h2', null, f.name, ' ', genderMark(f.gender) ?? ''), typeChips(f.types ?? []), own && f.abilityInfo ? h('p', { class: 'prep-ability' }, abilityChip(f.abilityInfo), ' ', h('span', { class: 'muted small' }, f.abilityInfo.desc)) : null),
+    ),
+    h('section', { class: 'prep-matchup' }, ...(matchup.length ? matchup : [h('p', { class: 'muted' }, 'Sin ventajas ni amenazas de tipo contra el otro equipo.')])),
+    own
+      ? h('section', null, h('ul', { class: 'info-moves' }, f.moves.map((m) => h('li', null, ...moveDetails(m)))))
+      : h('section', null, h('p', { class: 'muted small' }, 'Sus movimientos y su habilidad se descubren durante la pelea.')),
+    action ? h('div', { class: 'prep-info-action' }, action) : null,
+  );
+}
+
 function matchupOf(f, foes) {
   const attacking = f.moves?.length ? [...new Set(f.moves.filter((m) => m.category !== 'status' && m.power).map((m) => m.type))] : f.types ?? [];
   const strong = foes.filter((o) => attacking.some((t) => effectiveness(t, o.types) >= 2));
@@ -4116,7 +4312,8 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
   const timerText = h('span', { class: 'timer' });
   const root = h('div', { class: 'prep' });
   const title = h('b', null, '⚔︎ Preparación de batalla');
-  $app.replaceChildren(h('div', { class: 'status-line' }, title, timerText), h('div', { class: 'prep-timer' }, bar), root);
+  const infoDlg = h('dialog', { class: 'info-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() });
+  $app.replaceChildren(h('div', { class: 'status-line' }, title, timerText), h('div', { class: 'prep-timer' }, bar), root, infoDlg);
   const tick = setInterval(() => {
     if (!last?.deadline) return;
     const left = Math.max(0, last.deadline - Date.now());
@@ -4166,7 +4363,7 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
   }
 
   function choose(i, needed) {
-    if (sent || rollingOn(last?.you)) return;
+    if (sent || rollingOn(last?.you) || last?.preview.sides[last.you]?.ready) return;
     const at = picks.indexOf(i);
     if (at >= 0) picks.splice(at, 1);
     else if (picks.length < needed) {
@@ -4189,12 +4386,37 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
     });
   }
 
+  let openInfoFor = null;
+
+  function prepAction(index) {
+    const own = last.preview.sides[last.you];
+    if (sent || own.ready) return h('button', { type: 'button', class: 'btn', disabled: true }, 'Ya confirmaste tu equipo');
+    if (rollingOn(last.you)) return h('button', { type: 'button', class: 'btn', disabled: true }, 'Espera a que terminen los dados');
+    const order = picks.indexOf(index);
+    if (order >= 0) return h('button', { type: 'button', class: 'btn', onclick: () => { choose(index, own.needed); infoDlg.close(); } }, `Quitar del equipo (sale ${order + 1}º)`);
+    if (picks.length >= own.needed) return h('button', { type: 'button', class: 'btn', disabled: true }, `Ya elegiste ${own.needed}: quita uno primero`);
+    return h('button', { type: 'button', class: 'btn primary', onclick: () => { choose(index, own.needed); infoDlg.close(); } }, `Elegir · sale ${picks.length + 1}º`);
+  }
+
+  function paintPrepInfo() {
+    const { f, side, index } = openInfoFor;
+    const close = () => infoDlg.close();
+    const action = index !== null && last.you != null ? prepAction(index) : null;
+    infoDlg.replaceChildren(prepInfoCard(f, { own: !!f.moves, foes: last.preview.sides[1 - side].party, close, action }));
+  }
+
+  function openPrepInfo(f, side, index = null) {
+    openInfoFor = { f, side, index };
+    paintPrepInfo();
+    if (!infoDlg.open) infoDlg.showModal();
+  }
+
   function seenCard(f, s, i) {
     const badge = h('span', { class: 'badge', hidden: true });
     const full = !!f.moves;
     const el = h(
       'div',
-      { class: `prep-card seen${full ? ' full' : ''}${cardAnim(s, i)}`, style: { animationDelay: `${i * 70}ms` } },
+      { class: `prep-card seen${full ? ' full' : ''}${cardAnim(s, i)}`, style: { animationDelay: `${i * 70}ms` }, role: 'button', tabindex: 0, 'aria-label': `Ver info de ${f.name}`, onclick: () => openPrepInfo(f, s), onkeydown: (e) => e.key === 'Enter' && openPrepInfo(f, s) },
       badge,
       h('div', { html: creatureHTML(f) }),
       h('b', null, f.name, genderMark(f.gender)),
@@ -4209,9 +4431,14 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
 
   function ownCard(f, i, own, random) {
     const badge = h('span', { class: 'badge', hidden: true });
+    const openWithKeys = (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      openPrepInfo(f, last.you, i);
+    };
     const el = h(
-      'button',
-      { type: 'button', class: `prep-card${cardAnim(last.you, i)}`, style: { animationDelay: entered ? '0ms' : `${i * 70}ms` }, onclick: () => choose(i, own.needed) },
+      'div',
+      { role: 'button', tabindex: 0, class: `prep-card own${cardAnim(last.you, i)}`, style: { animationDelay: entered ? '0ms' : `${i * 70}ms` }, 'aria-label': `${f.name}: ver info y elegir`, onclick: () => openPrepInfo(f, last.you, i), onkeydown: openWithKeys },
       badge,
       h('div', { html: creatureHTML(f) }),
       h('b', null, f.name, genderMark(f.gender)),
@@ -4269,14 +4496,14 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
     const done = own.ready || sent;
     const chosen = own.picks ?? picks;
     m.title.textContent = rollingMe ? '🎲 Lanzando los dados…' : done ? 'Tu equipo para esta pelea' : `Elige ${own.needed} de tus ${own.party.length}`;
-    m.note.textContent = rollingMe ? 'Sorteando Pokémon, movimientos y habilidades de tu colección.' : done ? 'El primero sale a pelear.' : 'Tócalos en el orden en que quieres usarlos: el primero sale a pelear. Si se acaba el tiempo, se eligen al azar.';
+    m.note.textContent = rollingMe ? 'Sorteando Pokémon, movimientos y habilidades de tu colección.' : done ? 'El primero sale a pelear.' : 'Toca uno para ver qué hace y elegirlo. El primero que elijas sale a pelear.';
     syncGrid(m.grid, m.slots, own.party, you, (f, i) => ownCard(f, i, own, random));
     m.slots.forEach((slot, i) => {
       if (slot.kind !== 'card') return;
       const order = chosen.indexOf(i);
       slot.el.classList.toggle('chosen', order >= 0);
       slot.el.classList.toggle('benched', done && order < 0);
-      slot.el.disabled = done || rollingMe;
+      slot.el.setAttribute('aria-disabled', String(done || rollingMe));
       slot.badge.hidden = order < 0;
       slot.badge.textContent = order >= 0 ? String(order + 1) : '';
     });
@@ -4287,7 +4514,7 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
     }
     m.footNote.textContent = rollingMe ? '🎲 Los dados están rodando…' : last.preview.revealed || foe.ready ? '¡Los dos eligieron! La batalla parte en segundos.' : `Esperando a ${foe.name}…`;
     m.pickBtn.disabled = picks.length !== own.needed || rolling;
-    m.pickBtn.textContent = `Continuar (${picks.length}/${own.needed})`;
+    m.pickBtn.textContent = picks.length < own.needed ? `Elige ${own.needed} · ${picks.length}/${own.needed}` : 'Continuar';
   }
 
   function render() {
@@ -4298,6 +4525,7 @@ function previewUI(c, sendPick, sendDraft = () => {}) {
     title.textContent = you == null ? (p.revealed ? '👁 Elecciones reveladas' : '👁 Preparación de batalla · eligiendo') : p.revealed ? '⚔︎ ¡Todo listo!' : '⚔︎ Preparación de batalla';
     for (const v of view.sides) paintSide(v, p.sides[v.s]);
     if (view.mine) paintMine(view.mine, p.sides[you], p.sides[1 - you], p.mode === 'random');
+    if (infoDlg.open && openInfoFor) paintPrepInfo();
     entered = true;
   }
 
@@ -4405,11 +4633,13 @@ function chatPanel(send) {
 function chatDock(chat) {
   const KEY = 'tc_chat_open';
   const saved = ls.get(KEY);
-  let open = saved === '1';
+  let open = saved === '1' && !isPhone();
   let unread = 0;
   const badge = h('span', { class: 'chat-badge', hidden: true });
-  const toggle = h('button', { class: 'chat-dock-toggle', type: 'button', 'aria-expanded': String(open), onclick: () => setOpen(!open) }, '💬 Chat', badge);
-  const dock = h('div', { class: 'chat-dock' }, chat.el, toggle);
+  const closeBtn = h('button', { class: 'chat-close', type: 'button', 'aria-label': 'Cerrar chat', onclick: () => setOpen(false) }, '✕');
+  const toggle = h('button', { class: 'chat-dock-toggle', type: 'button', 'aria-expanded': String(open), 'aria-label': 'Chat', onclick: () => setOpen(!open) }, '💬', h('span', { class: 'chat-dock-label' }, ' Chat'), badge);
+  const dock = h('div', { class: 'chat-dock', onclick: (e) => e.target === e.currentTarget && setOpen(false) }, chat.el, toggle);
+  chat.el.prepend(closeBtn);
   const paint = () => {
     dock.classList.toggle('collapsed', !open);
     toggle.setAttribute('aria-expanded', String(open));
@@ -4473,7 +4703,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     return r;
   };
   const els = {
-    turn: h('span', null, ''),
+    turn: h('span', { class: 'room-bar-turn' }, ''),
     vs: h('span', { class: 'vs-line' }),
     timer: h('span', { class: 'timer' }, ''),
     field: h('span', { class: 'field' }),
@@ -4485,20 +4715,25 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     team: { me: h('aside', { class: 'team-panel me', 'aria-label': 'Equipo de la izquierda' }), foe: h('aside', { class: 'team-panel foe', 'aria-label': 'Equipo de la derecha' }) },
     info: h('dialog', { class: 'info-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() }),
     say: h('div', { class: 'say', 'aria-live': 'polite' }),
-    controls: h('div', { class: 'card' }),
+    controls: h('div', { class: 'card battle-controls' }),
     log: h('div', { class: 'card log' }),
     forfeit: h('button', { class: 'btn sm ghost danger forfeit-btn', type: 'button', hidden: true, 'data-tip': 'Abandonar esta pelea', onclick: () => askForfeit() }, '🏳 Rendirse'),
     forfeitDlg: h('dialog', { class: 'info-dlg confirm-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() }),
   };
   function askForfeit() {
     const consequence = c.tournament ? 'Quedas fuera del torneo y tu rival avanza.' : c.ai ? 'Las peleas contra la IA no cuentan para el ranking.' : 'Cuenta como derrota en el ranking.';
-    const stay = h('button', { class: 'btn', type: 'button', autofocus: true, onclick: () => els.forfeitDlg.close() }, 'Seguir peleando');
-    const give = h('button', { class: 'btn primary danger-fill', type: 'button', onclick: () => {
+    const stay = h('button', { class: 'btn primary', type: 'button', autofocus: true, onclick: () => els.forfeitDlg.close() }, 'Seguir peleando');
+    const give = h('button', { class: 'btn forfeit-give', type: 'button', onclick: () => {
       els.forfeitDlg.close();
       els.forfeit.disabled = true;
       sendSurrender?.();
-    } }, '🏳 Me rindo');
-    els.forfeitDlg.replaceChildren(h('div', { class: 'confirm-body' }, h('h2', null, '¿Rendirte?'), h('p', null, `Pierdes esta pelea y ${trainerShort(view?.sides[1 - mine]?.name ?? 'tu rival')} gana. `, consequence), h('div', { class: 'row confirm-actions' }, stay, give)));
+    } }, '🏳 Rendirme');
+    els.forfeitDlg.replaceChildren(h('div', { class: 'confirm-body forfeit-confirm' },
+      h('div', { class: 'forfeit-flag', 'aria-hidden': 'true' }, '🏳️'),
+      h('h2', null, '¿Te rindes?'),
+      h('p', null, `${trainerShort(view?.sides[1 - mine]?.name ?? 'Tu rival')} gana esta pelea.`),
+      h('p', { class: 'forfeit-note' }, consequence),
+      h('div', { class: 'forfeit-actions' }, stay, give)));
     if (!els.forfeitDlg.open) els.forfeitDlg.showModal();
   }
   const windowSkin = me?.shop?.equipped?.window;
@@ -4530,8 +4765,12 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
   const fx = createFx(arena, field);
   $app.replaceChildren(
     ...(bar ? [] : [h('div', { class: 'status-line' }, els.turn, els.vs, els.field, els.timer, els.forfeit)]),
-    h('div', { class: 'stage battle-stage' }, els.team.me, arena, els.team.foe),
-    h('div', { class: 'battle-layout wide' }, els.controls, h('div', { class: 'fixed-slot' }, els.log)),
+    h(
+      'div',
+      { class: 'battle-screen' },
+      h('div', { class: 'stage battle-stage' }, els.team.me, arena, els.team.foe),
+      h('div', { class: 'battle-layout wide' }, els.controls, h('div', { class: 'fixed-slot' }, els.log)),
+    ),
     els.info,
     els.forfeitDlg,
   );
@@ -4924,6 +5163,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     const foeName = trainerShort(st.sides[1 - mine].name);
     const box = els.controls;
     box.replaceChildren();
+    els.team.foe.classList.toggle('foe-ready', you != null && !playing && st.status === 'active' && st.phase === 'choose' && !!st.sides[1 - you]?.ready);
 
     if (st.status === 'finished') {
       if (playing) {
@@ -5019,9 +5259,9 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
             const pp = f.pp?.[m.key] ?? m.pp;
             const info =
               m.kind === 'attack'
-                ? [h('span', null, `${CATEGORY_ICON[m.category] ?? ''} ${m.power ? `Poder ${m.power}` : 'Especial'}`), h('span', null, m.accuracy ? `${m.accuracy}%` : '∞'), m.priority > 0 ? h('span', null, 'Va primero') : null, effTag]
-                : [h('span', null, `${CATEGORY_ICON.status} Estado`)];
-            if (m.aimable) info.push(h('span', null, '🎯 Eliges sobre quién'));
+                ? [h('span', { class: 'mv-power' }, `${CATEGORY_ICON[m.category] ?? ''} ${m.power ? `Poder ${m.power}` : 'Especial'}`), h('span', { class: 'mv-accuracy' }, m.accuracy ? `${m.accuracy}%` : '∞'), m.priority > 0 ? h('span', { class: 'mv-priority' }, 'Va primero') : null, effTag]
+                : [h('span', { class: 'mv-power' }, `${CATEGORY_ICON.status} Estado`)];
+            if (m.aimable) info.push(h('span', { class: 'mv-aim' }, '🎯 Eliges sobre quién'));
             return h(
               'button',
               { class: `move${pp === 0 ? ' no-pp' : ''}`, 'data-tip': m.desc, 'data-tip-note': pp === 0 ? 'Sin PP: no se puede usar.' : flinchNote(m), disabled: !moveSet.has(i), onclick: () => (m.aimable ? ((aiming = i), renderControls()) : act({ type: 'move', move: i }, m.name)) },
@@ -5036,7 +5276,10 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     const canSwitch = acts.some((a) => a.type === 'switch');
     const forced = st.phase !== 'choose';
     if (canSwitch && forced) box.append(h('p', { class: 'switch-hint forced' }, '👉 Elige en el panel de tu equipo quién entra.'));
-    if (foeReady && st.phase === 'choose') box.append(h('p', { class: 'muted small' }, `${foeName} ya eligió.`));
+    if (st.phase === 'choose') {
+      box.append(h('div', { class: 'controls-foot' },
+        h('button', { type: 'button', class: 'btn sm ghost', onclick: () => openInfo(sideAt('me')) }, 'ⓘ Qué hace cada movimiento')));
+    }
   }
 
   const WHY = {
