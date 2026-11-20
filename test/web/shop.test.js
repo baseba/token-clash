@@ -107,3 +107,13 @@ test('the AI throws a random Ball: the free one or a common, never rarer', async
   assert.equal(aiBallFor(0.9999), AI_BALLS.at(-1));
   assert.equal(new Set(Array.from({ length: 200 }, (_, i) => aiBallFor(i / 200))).size, AI_BALLS.length);
 });
+
+test('a recolor costs much less than anything else of its rarity', async () => {
+  const { RARITIES, RECOLOR_PRICES } = await import('../../public/shop.js');
+  const recolors = SHOP_ITEMS.filter((item) => item.kind === 'trainer' && item.requires);
+  assert.ok(recolors.length);
+  for (const recolor of recolors) {
+    assert.equal(recolor.price, RECOLOR_PRICES[recolor.rarity], recolor.id);
+    assert.ok(recolor.price <= RARITIES[recolor.rarity].price / 4, recolor.id);
+  }
+});

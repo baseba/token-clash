@@ -6,7 +6,7 @@ import { createFx, moveShape } from './fx.js?v=dev';
 import { ballFxNote, ballSounds } from './ball-fx.js?v=dev';
 import { chargeAnim, COMMON_PRELOAD, hpTweenMs, moveLands } from './battle-anims.js?v=dev';
 import { rememberSave, storedSave } from './savestore.js?v=dev';
-import { FEMALE_OF, MALE_OF, TRAINER_SPRITES, TRAINER_VARIANTS, trainerSpriteFor, VARIANT_COLOR_NAMES } from './trainer-sprites.js?v=dev';
+import { FEMALE_OF, MALE_OF, TRAINER_SPRITES, TRAINER_VARIANTS, trainerSpriteFor, variantColorName } from './trainer-sprites.js?v=dev';
 import { RADIO_KINDS, RADIO_REGIONS, RADIO_TRACKS, radioTrack } from './radio.js?v=dev';
 import { createStationFeed, myStationPanel, stationsPanel } from './radio-station.js?v=dev';
 import { createNotifier } from './notify.js?v=dev';
@@ -557,7 +557,7 @@ function avatarPic(key, size = 'sm', frame = null) {
 const VARIANTS_BY_KEY = new Map(TRAINER_VARIANTS.map((variant) => [variant.key, variant]));
 const trainerLabel = (key) => {
   const variant = VARIANTS_BY_KEY.get(key);
-  if (variant) return variant.name ?? `${baseTrainerLabel(variant.base)} ${VARIANT_COLOR_NAMES[variant.color] ?? variant.color}`;
+  if (variant) return variant.name ?? `${baseTrainerLabel(variant.base)} ${variantColorName(variant)}`;
   return baseTrainerLabel(key);
 };
 const baseTrainerLabel = (key) => key.replace(/_([mf])(?=$|_)/, (_, g) => (g === 'm' ? ' ♂' : ' ♀')).replace(/_(\d)$/, ' $1').replace(/_/g, ' ').replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
@@ -1519,7 +1519,7 @@ async function profilePage(seq) {
     const variant = VARIANTS_BY_KEY.get(key);
     if (!variant) return 'Original';
     const base = trainerLabel(variant.base);
-    return variant.name ? (variant.name.startsWith(`${base} `) ? variant.name.slice(base.length + 1) : variant.name) : VARIANT_COLOR_NAMES[variant.color] ?? variant.color;
+    return variant.name ? (variant.name.startsWith(`${base} `) ? variant.name.slice(base.length + 1) : variant.name) : variantColorName(variant);
   };
   const versionName = (key) => [plainVersionName(key), genderMark(VARIANTS_BY_KEY.get(key)?.base ?? key)].filter(Boolean).join(' ');
   const byVersion = (a, b) => plainVersionName(a).localeCompare(plainVersionName(b), 'es', { numeric: true, sensitivity: 'base' }) || genderMark(VARIANTS_BY_KEY.get(a).base).localeCompare(genderMark(VARIANTS_BY_KEY.get(b).base));
@@ -2926,7 +2926,7 @@ const shortTrainer = (key) => {
 };
 function skinTitle(key, tag = 'small') {
   const variant = VARIANTS_BY_KEY.get(key);
-  const text = variant?.name ?? (variant ? `${shortTrainer(variant.base)} ${VARIANT_COLOR_NAMES[variant.color] ?? variant.color}` : shortTrainer(key));
+  const text = variant?.name ?? (variant ? `${shortTrainer(variant.base)} ${variantColorName(variant)}` : shortTrainer(key));
   return h(tag, { class: 'trainer-title skin-title', 'data-tip': trainerLabel(key) }, text);
 }
 function playerPill(side, by, you = false) {

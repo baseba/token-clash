@@ -6,7 +6,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { newId, newToken, now, sha256 } from '../../shared/domain/clock.js';
 import { conflict, forbidden, invalid } from '../../shared/domain/errors.js';
 import { RARITIES } from '../../catalog/domain/shop.js';
-import { RETIRED_RECOLORS, RETIRED_SHOP_TRAINERS } from '../../catalog/domain/trainer-sprites.js';
+import { RENAMED_TRAINERS, RETIRED_RECOLORS, RETIRED_SHOP_TRAINERS } from '../../catalog/domain/trainer-sprites.js';
 import { checkPassword, hashPassword, passwordMatches } from '../domain/credentials.js';
 import { basicCredentials, bearerToken } from './auth-headers.js';
 import type { RecycledRecord } from '../domain/recycling.js';
@@ -39,16 +39,20 @@ export class TrainersService implements OnModuleInit {
     let fixed = 0;
     let relooked = 0;
     let refunded = 0;
+    let moved = 0;
     const retiredPrices = Object.fromEntries(Object.entries({ ...RETIRED_SHOP_TRAINERS, ...RETIRED_RECOLORS }).map(([key, rarity]) => [key, RARITIES[rarity].price]));
     for (const trainer of this.trainers.all()) {
+      const renamed = trainer.renameTrainers(RENAMED_TRAINERS);
       const dropped = trainer.dropRepeatedSpecies();
       const released = trainer.releaseShopLook();
       const refund = trainer.refundRetired(retiredPrices);
-      if (dropped || released || refund) this.trainers.save(trainer);
+      if (renamed || dropped || released || refund) this.trainers.save(trainer);
+      if (renamed) moved += 1;
       if (dropped) fixed += 1;
       if (released) relooked += 1;
       if (refund) refunded += 1;
     }
+    if (moved) this.logger.log(`Pasé ${moved} entrenador(es) a los nombres nuevos de sus recolores.`);
     if (fixed) this.logger.log(`Quité especies repetidas de ${fixed} entrenador(es).`);
     if (refunded) this.logger.log(`Devolví los tokens de entrenadores que ya no se venden a ${refunded} entrenador(es).`);
     if (relooked) this.logger.log(`${relooked} entrenador(es) tenían un entrenador que ahora se vende en la tienda: les tocó otro.`);

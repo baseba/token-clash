@@ -222,23 +222,140 @@ export function eyeWhites(image, face) {
   return kept;
 }
 
+const INK_MAX = 24;
+const LOCAL_LEAD = 2;
+
 export function recolorByMap(image, map, face) {
   const rgba = Buffer.from(image.rgba);
-  const table = new Map(map.map(([from, to]) => [parseInt(from.slice(1), 16), [1, 3, 5].map((i) => parseInt(to.slice(i, i + 2), 16))]));
+  const colorAt = (i) => image.rgba.readUIntBE(i * 4, 3);
+  const toRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const table = new Map(map.filter((entry) => entry.length === 2).map(([from, to]) => [parseInt(from.slice(1), 16), toRgb(to)]));
+  const local = new Map(map.filter((entry) => entry[2] === NEAR).map(([from, to]) => [parseInt(from.slice(1), 16), toRgb(to)]));
   const eyes = face ? eyeWhites(image, face) : new Set();
+  const paint = (i, to) => to.forEach((value, c) => (rgba[i * 4 + c] = value));
   for (let i = 0; i < image.width * image.height; i++) {
-    if (!rgba[i * 4 + 3]) continue;
-    if (eyes.has(i)) continue;
-    const to = table.get(rgba.readUIntBE(i * 4, 3));
-    if (to) to.forEach((value, c) => (rgba[i * 4 + c] = value));
+    if (!rgba[i * 4 + 3] || eyes.has(i)) continue;
+    const to = table.get(colorAt(i));
+    if (to) paint(i, to);
+  }
+  const seen = new Uint8Array(image.width * image.height);
+  for (let start = 0; start < image.width * image.height; start++) {
+    if (seen[start] || !image.rgba[start * 4 + 3] || !local.has(colorAt(start))) continue;
+    const color = colorAt(start);
+    const piece = [start];
+    seen[start] = 1;
+    let painted = 0;
+    let other = 0;
+    for (let k = 0; k < piece.length; k++) {
+      const i = piece[k];
+      const [x, y] = [i % image.width, Math.floor(i / image.width)];
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= image.width || ny >= image.height) continue;
+        const j = ny * image.width + nx;
+        if (!image.rgba[j * 4 + 3]) continue;
+        const neighbor = colorAt(j);
+        if (neighbor === color) {
+          if (!seen[j]) {
+            seen[j] = 1;
+            piece.push(j);
+          }
+        } else if (table.has(neighbor)) painted += 1;
+        else if (!isInk(image, j)) other += 1;
+      }
+    }
+    if (painted >= other * LOCAL_LEAD && painted > 0) for (const i of piece) if (!eyes.has(i)) paint(i, local.get(color));
   }
   return { width: image.width, height: image.height, rgba };
+}
+
+export const NEAR = 'near';
+
+function isInk(image, i) {
+  const [r, g, b] = image.rgba.subarray(i * 4, i * 4 + 3);
+  return Math.max(r, g, b) < INK_MAX;
 }
 
 const HEAD_SHARE = 0.26;
 const AXIS_SHARE = 0.45;
 const FACE_DROP = 0.58;
 const MIN_SKIN = 10;
+const HEAD_FROM_FACE = 2;
+const FACE_SKIN_LIGHT = 0.45;
+
+function lightAt(image, x, y) {
+  const i = (y * image.width + x) * 4;
+  const [r, g, b] = [image.rgba[i], image.rgba[i + 1], image.rgba[i + 2]];
+  return (Math.max(r, g, b) + Math.min(r, g, b)) / 510;
+}
+const FACE_REACH = 0.55;
+const FACE_MIN_SHRINK = 0.7;
+const WIDE_RATIO = 1.25;
+const WIDE_MIN_FACE = 0.3;
+const FACE_MAX_GROW = 1.3;
+
+function wideFace(image, top, bottom) {
+  let minX = image.width;
+  let maxX = -1;
+  for (let y = top; y <= bottom; y++)
+    for (let x = 0; x < image.width; x++)
+      if (image.rgba[(y * image.width + x) * 4 + 3]) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+      }
+  const height = bottom - top + 1;
+  if (maxX - minX + 1 < height * WIDE_RATIO) return null;
+  const skin = [];
+  for (let y = top; y <= bottom; y++)
+    for (let x = minX; x <= maxX; x++)
+      if (image.rgba[(y * image.width + x) * 4 + 3] && skinPixel(image, x, y) && lightAt(image, x, y) >= FACE_SKIN_LIGHT) skin.push([x, y]);
+  const face = patchesOf(skin).map((patch) => {
+    const xs = patch.map(([x]) => x);
+    const ys = patch.map(([, y]) => y);
+    const w = Math.max(...xs) - Math.min(...xs) + 1;
+    const h = Math.max(...ys) - Math.min(...ys) + 1;
+    return { patch, score: patch.length * (Math.min(w, h) / Math.max(w, h)) * (patch.length / (w * h)) };
+  }).sort((a, b) => b.score - a.score)[0]?.patch;
+  if (!face || face.length < MIN_SKIN) return null;
+  const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
+  const size = Math.max(faceSpan(face, height) * HEAD_FROM_FACE, height * WIDE_MIN_FACE);
+  const round = (n) => Math.round(n * 1000) / 1000;
+  return { x: round((mean(face.map(([x]) => x)) + 0.5) / image.width), y: round((mean(face.map(([, y]) => y)) + 0.5) / image.height), h: round(size / image.height) };
+}
+
+function patchesOf(pixels) {
+  const left = new Set(pixels.map(([x, y]) => `${x},${y}`));
+  const patches = [];
+  for (const [x0, y0] of pixels) {
+    if (!left.has(`${x0},${y0}`)) continue;
+    left.delete(`${x0},${y0}`);
+    const patch = [[x0, y0]];
+    for (let k = 0; k < patch.length; k++) {
+      const [x, y] = patch[k];
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1], [x + 1, y + 1], [x - 1, y - 1], [x + 1, y - 1], [x - 1, y + 1]]) {
+        if (!left.has(`${nx},${ny}`)) continue;
+        left.delete(`${nx},${ny}`);
+        patch.push([nx, ny]);
+      }
+    }
+    patches.push(patch);
+  }
+  return patches;
+}
+
+function largestPatch(pixels) {
+  return patchesOf(pixels).reduce((best, patch) => (patch.length > best.length ? patch : best), []);
+}
+
+function faceSpan(skin, reach) {
+  const middle = (list) => [...list].sort((a, b) => a - b)[Math.floor(list.length / 2)];
+  const [cx, cy] = [middle(skin.map(([x]) => x)), middle(skin.map(([, y]) => y))];
+  const near = skin.filter(([x, y]) => Math.hypot(x - cx, y - cy) <= reach);
+  const kept = near.length >= MIN_SKIN ? near : skin;
+  const xs = kept.map(([x]) => x).sort((a, b) => a - b);
+  const ys = kept.map(([, y]) => y).sort((a, b) => a - b);
+  const spread = (list) => list[Math.floor(list.length * 0.9)] - list[Math.floor(list.length * 0.1)] + 1;
+  return Math.max(spread(xs), spread(ys));
+}
 
 export function skinPixel(image, x, y) {
   const i = (y * image.width + x) * 4;
@@ -265,6 +382,8 @@ export function faceOf(image) {
       }
   if (bottom < 0) return null;
   const height = bottom - top + 1;
+  const wide = wideFace(image, top, bottom);
+  if (wide) return wide;
   const headH = Math.max(4, Math.round(height * HEAD_SHARE));
   const axisBand = Math.min(image.height, top + Math.round(height * AXIS_SHARE));
   const column = Array.from({ length: image.width }, (_, x) => {
@@ -296,11 +415,11 @@ export function faceOf(image) {
   const skinIn = (from, to) => {
     const found = [];
     for (let y = Math.round(from); y < Math.min(image.height, Math.round(to)); y++)
-      for (let x = best; x < Math.min(image.width, best + span); x++) if (opaque(x, y) && skinPixel(image, x, y)) found.push([x, y]);
+      for (let x = best; x < Math.min(image.width, best + span); x++) if (opaque(x, y) && skinPixel(image, x, y) && lightAt(image, x, y) >= FACE_SKIN_LIGHT) found.push([x, y]);
     return found;
   };
-  let skin = skinIn(headTop, headTop + headH * 1.15);
-  if (skin.length < MIN_SKIN) skin = skinIn(headTop + headH * 0.6, headTop + headH * 1.7);
+  let skin = largestPatch(skinIn(headTop, headTop + headH * 1.15));
+  if (skin.length < MIN_SKIN) skin = largestPatch(skinIn(headTop + headH * 0.6, headTop + headH * 1.7));
   if (skin.length >= MIN_SKIN) {
     sumX = skin.reduce((a, [x]) => a + x, 0) * (count / skin.length);
     sumY = skin.reduce((a, [, y]) => a + y, 0) * (count / skin.length);
@@ -314,7 +433,8 @@ export function faceOf(image) {
         maxX = Math.max(maxX, x);
       }
   const headW = maxX >= minX ? maxX - minX + 1 : headH;
-  const size = Math.max(headH, headW * 0.85);
+  const outline = Math.max(headH, headW * 0.85);
+  const size = skin.length >= MIN_SKIN ? Math.min(outline * FACE_MAX_GROW, Math.max(outline * FACE_MIN_SHRINK, faceSpan(skin, headH * FACE_REACH) * HEAD_FROM_FACE)) : outline;
   const round = (n) => Math.round(n * 1000) / 1000;
   return { x: round((sumX / count + 0.5) / image.width), y: round((sumY / count + 0.5) / image.height), h: round(size / image.height) };
 }

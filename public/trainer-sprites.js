@@ -1,6 +1,8 @@
-import { GENERATED_VARIANTS, POKEMON_VARIANT_MAPS, RETIRED_GENERATED, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES } from './trainer-variants.js?v=dev';
+import { GENERATED_VARIANTS, POKEMON_VARIANT_MAPS, RENAMED_GENERATED, RETIRED_GENERATED, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES } from './trainer-variants.js?v=dev';
 
 export { VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES };
+
+export const variantColorName = (variant) => variant.title ?? VARIANT_COLOR_NAMES[variant.color] ?? variant.color;
 
 export const DOWNLOADED_SPRITES = [
   'aaron', 'ace_trainer_f', 'ace_trainer_m', 'acerola', 'aether_grunt_f', 'aether_grunt_m', 'agatha', 'alder',
@@ -36,7 +38,7 @@ export const DOWNLOADED_SPRITES = [
   'roxanne', 'roxie', 'ruin_maniac', 'ryme', 'sabrina', 'sailor', 'saturn', 'school_kid_f',
   'school_kid_m', 'scientist_f', 'scientist_m', 'scuba_diver_f', 'scuba_diver_m', 'shauntal', 'shelly', 'sidney',
   'siebold', 'skull_grunt_f', 'skull_grunt_m', 'skyla', 'smasher', 'snow_ace_trainer_f', 'snow_ace_trainer_m', 'snow_worker',
-  'snow_worker_f', 'snow_worker_m', 'star_grunt_f', 'star_grunt_m', 'steven', 'striker', 'swimmer_f', 'swimmer_m',
+  'star_grunt_f', 'star_grunt_m', 'steven', 'striker', 'swimmer_f', 'swimmer_m',
   'tabitha', 'tate', 'tulip', 'twins', 'unknown_f', 'unknown_m', 'valerie', 'veteran_f',
   'veteran_m', 'vicky', 'victor', 'victoria', 'viola', 'vito', 'vivi', 'volkner',
   'waiter_f', 'waiter_m', 'wallace', 'wattson', 'whitney', 'wikstrom', 'will', 'winona',
@@ -169,6 +171,10 @@ export const RETIRED_SHOP_TRAINERS = {
 };
 
 export const RETIRED_RECOLORS = { player_f__mint: 'rare', ...RETIRED_GENERATED };
+
+export const MERGED_TRAINERS = { snow_worker_m: 'snow_worker', snow_worker_f: 'worker_f' };
+
+export const RENAMED_TRAINERS = { ...MERGED_TRAINERS, ...RENAMED_GENERATED };
 
 const HANDMADE_SOLD = { leon_shadow: 'mythic', player_m_red: 'rare', player_f_mint: 'rare', player_m_green: 'rare', player_f_violet: 'rare', nate_red: 'epic', rosa_emerald: 'epic' };
 
