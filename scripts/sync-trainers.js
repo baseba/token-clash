@@ -279,6 +279,83 @@ const HEAD_SHARE = 0.26;
 const AXIS_SHARE = 0.45;
 const FACE_DROP = 0.58;
 const MIN_SKIN = 10;
+const HEAD_FROM_FACE = 2;
+const FACE_SKIN_LIGHT = 0.45;
+
+function lightAt(image, x, y) {
+  const i = (y * image.width + x) * 4;
+  const [r, g, b] = [image.rgba[i], image.rgba[i + 1], image.rgba[i + 2]];
+  return (Math.max(r, g, b) + Math.min(r, g, b)) / 510;
+}
+const FACE_REACH = 0.55;
+const FACE_MIN_SHRINK = 0.7;
+const WIDE_RATIO = 1.25;
+const WIDE_MIN_FACE = 0.3;
+const FACE_MAX_GROW = 1.3;
+
+function wideFace(image, top, bottom) {
+  let minX = image.width;
+  let maxX = -1;
+  for (let y = top; y <= bottom; y++)
+    for (let x = 0; x < image.width; x++)
+      if (image.rgba[(y * image.width + x) * 4 + 3]) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+      }
+  const height = bottom - top + 1;
+  if (maxX - minX + 1 < height * WIDE_RATIO) return null;
+  const skin = [];
+  for (let y = top; y <= bottom; y++)
+    for (let x = minX; x <= maxX; x++)
+      if (image.rgba[(y * image.width + x) * 4 + 3] && skinPixel(image, x, y) && lightAt(image, x, y) >= FACE_SKIN_LIGHT) skin.push([x, y]);
+  const face = patchesOf(skin).map((patch) => {
+    const xs = patch.map(([x]) => x);
+    const ys = patch.map(([, y]) => y);
+    const w = Math.max(...xs) - Math.min(...xs) + 1;
+    const h = Math.max(...ys) - Math.min(...ys) + 1;
+    return { patch, score: patch.length * (Math.min(w, h) / Math.max(w, h)) * (patch.length / (w * h)) };
+  }).sort((a, b) => b.score - a.score)[0]?.patch;
+  if (!face || face.length < MIN_SKIN) return null;
+  const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
+  const size = Math.max(faceSpan(face, height) * HEAD_FROM_FACE, height * WIDE_MIN_FACE);
+  const round = (n) => Math.round(n * 1000) / 1000;
+  return { x: round((mean(face.map(([x]) => x)) + 0.5) / image.width), y: round((mean(face.map(([, y]) => y)) + 0.5) / image.height), h: round(size / image.height) };
+}
+
+function patchesOf(pixels) {
+  const left = new Set(pixels.map(([x, y]) => `${x},${y}`));
+  const patches = [];
+  for (const [x0, y0] of pixels) {
+    if (!left.has(`${x0},${y0}`)) continue;
+    left.delete(`${x0},${y0}`);
+    const patch = [[x0, y0]];
+    for (let k = 0; k < patch.length; k++) {
+      const [x, y] = patch[k];
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1], [x + 1, y + 1], [x - 1, y - 1], [x + 1, y - 1], [x - 1, y + 1]]) {
+        if (!left.has(`${nx},${ny}`)) continue;
+        left.delete(`${nx},${ny}`);
+        patch.push([nx, ny]);
+      }
+    }
+    patches.push(patch);
+  }
+  return patches;
+}
+
+function largestPatch(pixels) {
+  return patchesOf(pixels).reduce((best, patch) => (patch.length > best.length ? patch : best), []);
+}
+
+function faceSpan(skin, reach) {
+  const middle = (list) => [...list].sort((a, b) => a - b)[Math.floor(list.length / 2)];
+  const [cx, cy] = [middle(skin.map(([x]) => x)), middle(skin.map(([, y]) => y))];
+  const near = skin.filter(([x, y]) => Math.hypot(x - cx, y - cy) <= reach);
+  const kept = near.length >= MIN_SKIN ? near : skin;
+  const xs = kept.map(([x]) => x).sort((a, b) => a - b);
+  const ys = kept.map(([, y]) => y).sort((a, b) => a - b);
+  const spread = (list) => list[Math.floor(list.length * 0.9)] - list[Math.floor(list.length * 0.1)] + 1;
+  return Math.max(spread(xs), spread(ys));
+}
 
 export function skinPixel(image, x, y) {
   const i = (y * image.width + x) * 4;
@@ -305,6 +382,8 @@ export function faceOf(image) {
       }
   if (bottom < 0) return null;
   const height = bottom - top + 1;
+  const wide = wideFace(image, top, bottom);
+  if (wide) return wide;
   const headH = Math.max(4, Math.round(height * HEAD_SHARE));
   const axisBand = Math.min(image.height, top + Math.round(height * AXIS_SHARE));
   const column = Array.from({ length: image.width }, (_, x) => {
@@ -336,11 +415,11 @@ export function faceOf(image) {
   const skinIn = (from, to) => {
     const found = [];
     for (let y = Math.round(from); y < Math.min(image.height, Math.round(to)); y++)
-      for (let x = best; x < Math.min(image.width, best + span); x++) if (opaque(x, y) && skinPixel(image, x, y)) found.push([x, y]);
+      for (let x = best; x < Math.min(image.width, best + span); x++) if (opaque(x, y) && skinPixel(image, x, y) && lightAt(image, x, y) >= FACE_SKIN_LIGHT) found.push([x, y]);
     return found;
   };
-  let skin = skinIn(headTop, headTop + headH * 1.15);
-  if (skin.length < MIN_SKIN) skin = skinIn(headTop + headH * 0.6, headTop + headH * 1.7);
+  let skin = largestPatch(skinIn(headTop, headTop + headH * 1.15));
+  if (skin.length < MIN_SKIN) skin = largestPatch(skinIn(headTop + headH * 0.6, headTop + headH * 1.7));
   if (skin.length >= MIN_SKIN) {
     sumX = skin.reduce((a, [x]) => a + x, 0) * (count / skin.length);
     sumY = skin.reduce((a, [, y]) => a + y, 0) * (count / skin.length);
@@ -354,7 +433,8 @@ export function faceOf(image) {
         maxX = Math.max(maxX, x);
       }
   const headW = maxX >= minX ? maxX - minX + 1 : headH;
-  const size = Math.max(headH, headW * 0.85);
+  const outline = Math.max(headH, headW * 0.85);
+  const size = skin.length >= MIN_SKIN ? Math.min(outline * FACE_MAX_GROW, Math.max(outline * FACE_MIN_SHRINK, faceSpan(skin, headH * FACE_REACH) * HEAD_FROM_FACE)) : outline;
   const round = (n) => Math.round(n * 1000) / 1000;
   return { x: round((sumX / count + 0.5) / image.width), y: round((sumY / count + 0.5) / image.height), h: round(size / image.height) };
 }
