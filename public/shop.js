@@ -118,7 +118,7 @@ export const SHOP_ITEMS = [
   })),
 ];
 
-export const AI_BALLS = [DEFAULT_BALL, ...SHOP_ITEMS.filter((item) => item.kind === 'ball' && ['free', 'common', 'rare'].includes(item.rarity)).map((item) => item.key)];
+export const AI_BALLS = [DEFAULT_BALL, ...SHOP_ITEMS.filter((item) => item.kind === 'ball' && ['free', 'common'].includes(item.rarity)).map((item) => item.key)];
 
 export const aiBallFor = (roll) => AI_BALLS[Math.min(AI_BALLS.length - 1, Math.floor(roll * AI_BALLS.length))];
 

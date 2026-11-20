@@ -74,12 +74,12 @@ test('every Ball on sale sounds like its theme, with sounds PokeRogue has upstre
   assert.deepEqual(ballSounds('pb'), []);
 });
 
-test('the AI throws a random Ball: the free one, a common or a rare, never rarer', async () => {
+test('the AI throws a random Ball: the free one or a common, never rarer', async () => {
   const { aiBallFor, AI_BALLS, DEFAULT_BALL } = await import('../../public/shop.js');
   assert.ok(AI_BALLS.includes(DEFAULT_BALL));
   const rarity = Object.fromEntries(SHOP_ITEMS.filter((item) => item.kind === 'ball').map((item) => [item.key, item.rarity]));
-  for (const ball of AI_BALLS.filter((key) => key !== DEFAULT_BALL)) assert.ok(['free', 'common', 'rare'].includes(rarity[ball]), ball);
-  for (const [key, tier] of Object.entries(rarity)) if (['free', 'common', 'rare'].includes(tier)) assert.ok(AI_BALLS.includes(key), `${key} is in the AI rotation`);
+  for (const ball of AI_BALLS.filter((key) => key !== DEFAULT_BALL)) assert.ok(['free', 'common'].includes(rarity[ball]), ball);
+  for (const [key, tier] of Object.entries(rarity)) if (['free', 'common'].includes(tier)) assert.ok(AI_BALLS.includes(key), `${key} is in the AI rotation`);
   assert.equal(aiBallFor(0), AI_BALLS[0]);
   assert.equal(aiBallFor(0.9999), AI_BALLS.at(-1));
   assert.equal(new Set(Array.from({ length: 200 }, (_, i) => aiBallFor(i / 200))).size, AI_BALLS.length);
