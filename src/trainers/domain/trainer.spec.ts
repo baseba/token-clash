@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Trainer } from './trainer.js';
+import { MAX_SESSIONS, nameKey, Trainer } from './trainer.js';
 import { STARTER_SPRITES, TRAINER_SPRITES } from '../../catalog/domain/trainer-sprites.js';
 
-const fresh = (id = 't1') => Trainer.register({ id, name: 'Ana', tokenHash: 'h', at: 0 });
+const fresh = (id = 't1') => Trainer.register({ id, name: 'Ana', tokenHash: 'h', passwordHash: 'p', at: 0 });
 
 test('a trainer looks like one of the trainer sprites until they pick one, always the same', () => {
   const ana = fresh();
@@ -33,7 +33,7 @@ test('the shop balance is what the save gained since the shop opened, minus what
 });
 
 test('the balance is every token the save has used, and a reset save keeps what was already there', () => {
-  const fresh = Trainer.register({ id: 'n1', name: 'Nuevo', tokenHash: 'h', at: 0 });
+  const fresh = Trainer.register({ id: 'n1', name: 'Nuevo', tokenHash: 'h', passwordHash: 'p', at: 0 });
   fresh.importSave({ roster: [], totalTokens: 900_000_000 } as any, 1);
   assert.equal(fresh.balance, 900_000_000);
   fresh.buy('ball:gb');
@@ -79,9 +79,44 @@ test('a trainer that left the shop gives back what was paid for it, once', () =>
 });
 
 test('a free Ball is owned by everyone and can be equipped without buying it', () => {
-  const ana = Trainer.register({ id: 'f1', name: 'Ana', tokenHash: 'h', at: 0 });
+  const ana = Trainer.register({ id: 'f1', name: 'Ana', tokenHash: 'h', passwordHash: 'p', at: 0 });
   for (const key of ['mt', 'sk', 'oc', 'li', 'ma']) assert.ok(ana.owns(`ball:${key}`), key);
   assert.ok(!ana.owns('ball:gb'), 'a common one still has to be bought');
   ana.equip('ball', 'oc');
   assert.equal(ana.ball, 'oc');
+});
+
+test('each device logged in with the password gets its own session, up to a limit', () => {
+  const ana = fresh();
+  ana.openSession('phone', 1);
+  ana.openSession('laptop', 2);
+  assert.deepEqual(ana.sessionHashes, ['h', 'phone', 'laptop']);
+  for (let i = 0; i < MAX_SESSIONS; i++) ana.openSession(`device-${i}`, 3 + i);
+  assert.equal(ana.sessions!.length, MAX_SESSIONS);
+  assert.ok(!ana.sessionHashes.includes('phone'), 'the oldest login is the one that expires');
+  assert.ok(ana.sessionHashes.includes('h'), 'the device that created the account keeps its session');
+});
+
+test('logging out closes only that device, and the first device can log out too', () => {
+  const ana = fresh();
+  ana.openSession('phone', 1);
+  ana.closeSession('phone', 'unused');
+  assert.deepEqual(ana.sessionHashes, ['h']);
+  ana.closeSession('h', 'replacement');
+  assert.deepEqual(ana.sessionHashes, ['replacement']);
+});
+
+test('an account without a password cannot log out: it could never come back', () => {
+  const old = Trainer.restore({ id: 'o2', name: 'Beto', tokenHash: 'h', roster: [], team: [], wins: 0, losses: 0, totalTokens: 0, createdAt: 0 });
+  assert.equal(old.hasPassword, false);
+  assert.throws(() => old.closeSession('h', 'replacement'), /contraseña/);
+  old.setPassword('hash');
+  assert.equal(old.hasPassword, true);
+});
+
+test('two names are the same name when they differ only in case or spacing', () => {
+  assert.equal(nameKey('  Ana   Ketchum '), nameKey('ana ketchum'));
+  assert.equal(nameKey('ÁNGEL'), nameKey('ángel'));
+  assert.notEqual(nameKey('Ángel'), nameKey('Angel'), 'an accent makes another name');
+  assert.equal(nameKey('Ana\u200f'), nameKey('Ana'), 'invisible characters do not make another name');
 });

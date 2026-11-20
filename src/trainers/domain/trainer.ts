@@ -17,6 +17,8 @@ export interface TrainerState {
   name: string;
   /** sha256 of the session token: the token itself is never stored. */
   tokenHash: string;
+  passwordHash?: string;
+  sessions?: TrainerSession[];
   roster: RosterEntry[];
   /** Roster entry ids, leader first. */
   team: string[];
@@ -35,6 +37,13 @@ export interface TrainerState {
   recycled?: RecycledRecord[];
 }
 
+export interface TrainerSession {
+  tokenHash: string;
+  openedAt: number;
+}
+
+export const MAX_SESSIONS = 10;
+
 export const SHOP_TRAINER_NOT_BOUGHT = 'Ese entrenador se compra en tu perfil.';
 
 export const EQUIP_KINDS = ['ball', 'window', 'frame'] as const;
@@ -51,6 +60,10 @@ export function cleanName(raw: string, max = 24): string {
     .slice(0, max);
 }
 
+export function nameKey(name: string): string {
+  return cleanName(name).normalize('NFC').replace(/\s+/g, ' ').toLocaleLowerCase('es');
+}
+
 /** The best 6 of a roster (level, then rarity, then shiny), one per species. */
 export function defaultTeam(roster: RosterEntry[]): string[] {
   const best = [...roster].sort((a, b) => b.level - a.level || RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity] || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0));
@@ -63,6 +76,8 @@ export class Trainer implements TrainerState {
   id: string;
   name: string;
   tokenHash: string;
+  passwordHash?: string;
+  sessions?: TrainerSession[];
   roster: RosterEntry[];
   team: string[];
   wins: number;
@@ -89,8 +104,31 @@ export class Trainer implements TrainerState {
   }
 
   /** A new player: they get an id and a session token hash, and an empty roster until they import. */
-  static register({ id, name, tokenHash, at }: { id: string; name: string; tokenHash: string; at: number }): Trainer {
-    return new Trainer({ id, name, tokenHash, roster: [], team: [], wins: 0, losses: 0, totalTokens: 0, createdAt: at, lastSeen: at });
+  static register({ id, name, tokenHash, passwordHash, at }: { id: string; name: string; tokenHash: string; passwordHash: string; at: number }): Trainer {
+    return new Trainer({ id, name, tokenHash, passwordHash, roster: [], team: [], wins: 0, losses: 0, totalTokens: 0, createdAt: at, lastSeen: at });
+  }
+
+  get hasPassword(): boolean {
+    return !!this.passwordHash;
+  }
+
+  get sessionHashes(): string[] {
+    return [this.tokenHash, ...(this.sessions ?? []).map((session) => session.tokenHash)];
+  }
+
+  setPassword(passwordHash: string): void {
+    this.passwordHash = passwordHash;
+  }
+
+  openSession(tokenHash: string, at: number): void {
+    this.sessions = [...(this.sessions ?? []), { tokenHash, openedAt: at }].slice(-MAX_SESSIONS);
+  }
+
+  /** @throws {DomainError} the account has no password, so closing the session would lock it for good */
+  closeSession(tokenHash: string, replacementHash: string): void {
+    if (!this.hasPassword) throw conflict('Agrega una contraseña antes de cerrar sesión: sin ella no podrías volver a entrar.');
+    if (tokenHash === this.tokenHash) this.tokenHash = replacementHash;
+    else this.sessions = (this.sessions ?? []).filter((session) => session.tokenHash !== tokenHash);
   }
 
   get look(): string {

@@ -11,7 +11,7 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 | --- | --- | --- |
 | `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI y Pokémon Showdown), la Pokédex, los artículos de la tienda, los sprites de entrenador y las canciones de la radio con su duración | archivos `src/catalog/data/*.json` y las listas compartidas de `public/` |
 | `combat` | Cómo se pelea: motor de batalla, qué movimientos se pueden usar, elegir 3 de 6, sorteo aleatorio, IA, Skynet | nada (es puro) |
-| `trainers` | Quién juega: entrenador, colección, equipo, sesión, importar el save | tablas `trainers`, `roster_entries` |
+| `trainers` | Quién juega: entrenador, colección, equipo, cuenta y sesiones, importar el save | tablas `trainers`, `roster_entries`, `trainer_sessions` |
 | `arena` | Dónde se pelea: salas, emparejamiento, peleas en vivo, torneos | tablas `challenges`, `tournaments`, `tournament_seats`, `tournament_matches` |
 | `chat` | Mensajes en salas y torneos | memoria (se borra al reiniciar, a propósito) |
 | `radio` | Las estaciones de los entrenadores: la cola que elige el dueño, qué suena y quién escucha | tabla `radio_stations` (los oyentes, en memoria) |

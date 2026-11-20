@@ -4,15 +4,22 @@
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { newId, newToken, now, sha256 } from '../../shared/domain/clock.js';
-import { invalid } from '../../shared/domain/errors.js';
+import { conflict, forbidden, invalid } from '../../shared/domain/errors.js';
 import { RARITIES } from '../../catalog/domain/shop.js';
 import { RETIRED_RECOLORS, RETIRED_SHOP_TRAINERS } from '../../catalog/domain/trainer-sprites.js';
+import { checkPassword, hashPassword, passwordMatches } from '../domain/credentials.js';
+import { basicCredentials, bearerToken } from './auth-headers.js';
 import type { RecycledRecord } from '../domain/recycling.js';
 import { parseSave } from '../domain/save-file.js';
-import { cleanName, Trainer, type EquipKind } from '../domain/trainer.js';
+import { cleanName, nameKey, Trainer, type EquipKind } from '../domain/trainer.js';
 import { TrainerRepository } from '../domain/trainer.repository.js';
 
-const TOKEN_FORMAT = /^[A-Za-z0-9_-]{20,100}$/;
+const DECOY_PASSWORD_HASH = hashPassword(newToken());
+
+export interface Credentials {
+  name: string;
+  password: string;
+}
 
 export interface ProfileChanges {
   name?: string;
@@ -77,32 +84,90 @@ export class TrainersService implements OnModuleInit {
 
   /** Same, from an `Authorization: Bearer <token>` header. */
   authenticateHeader(header: string | undefined): Trainer | undefined {
-    const match = /^Bearer (.+)$/.exec(header ?? '');
-    return match && TOKEN_FORMAT.test(match[1]) ? this.authenticate(match[1]) : undefined;
+    const token = bearerToken(header);
+    return token ? this.authenticate(token) : undefined;
   }
 
   /**
    * Imports a save. Without a session it registers a new trainer and returns their token (shown
    * once: only its hash is stored). With a session it updates that trainer's collection.
    */
-  importSave(current: Trainer | undefined, input: { save: string; name?: string }): { token: string | null; trainer: Trainer } {
+  importSave(current: Trainer | undefined, input: { save: string; name?: string; password?: string }): { token: string | null; trainer: Trainer } {
     const parsed = parseSave(input.save);
     const name = cleanName(input.name ?? '');
     let trainer = current;
     let token: string | null = null;
     if (!trainer) {
       if (!name) throw invalid('Ponte un nombre de entrenador.');
+      this.ensureNameFree(name);
+      checkPassword(input.password ?? '');
       token = newToken();
-      trainer = Trainer.register({ id: newId(), name, tokenHash: sha256(token), at: now() });
-    } else if (name) trainer.rename(name);
+      trainer = Trainer.register({ id: newId(), name, tokenHash: sha256(token), passwordHash: hashPassword(input.password ?? ''), at: now() });
+    } else if (name) this.rename(trainer, name);
     trainer.importSave(parsed, now());
     this.trainers.save(trainer);
     return { token, trainer };
   }
 
-  /** @throws {DomainError} the chosen look is not a trainer sprite */
+  private verify(credentials: Credentials): Trainer | undefined {
+    const key = nameKey(credentials.name);
+    const trainer = this.trainers.all().find((candidate) => candidate.hasPassword && nameKey(candidate.name) === key);
+    const matches = passwordMatches(credentials.password, trainer?.passwordHash ?? DECOY_PASSWORD_HASH);
+    return trainer && matches ? trainer : undefined;
+  }
+
+  logIn(credentials: Credentials): { token: string; trainer: Trainer } | undefined {
+    const trainer = this.verify(credentials);
+    if (!trainer) return undefined;
+    const token = newToken();
+    trainer.openSession(sha256(token), now());
+    this.trainers.save(trainer);
+    return { token, trainer };
+  }
+
+  /** @throws {DomainError} the save is not a PokeTokenBar save */
+  syncSave(authorization: string | undefined, save: string): Trainer | undefined {
+    const credentials = basicCredentials(authorization);
+    const trainer = credentials && this.verify(credentials);
+    if (!trainer) return undefined;
+    return this.importSave(trainer, { save }).trainer;
+  }
+
+  /** @throws {DomainError} the session can't be closed because the account has no password */
+  logOut(trainer: Trainer, token: string): void {
+    trainer.closeSession(sha256(token), sha256(newToken()));
+    this.trainers.save(trainer);
+  }
+
+  /** @throws {DomainError} another trainer has the same name, the password is too short, or the current password is wrong */
+  setPassword(trainer: Trainer, input: { password: string; currentPassword?: string }): Trainer {
+    if (trainer.passwordHash && !passwordMatches(input.currentPassword ?? '', trainer.passwordHash)) throw forbidden('Tu contraseña actual no coincide.');
+    if (this.namesake(trainer.name, trainer)) throw conflict(`Otro entrenador también se llama ${trainer.name}: cámbiate el nombre antes de agregar una contraseña, porque con él entras.`);
+    checkPassword(input.password);
+    trainer.setPassword(hashPassword(input.password));
+    this.trainers.save(trainer);
+    return trainer;
+  }
+
+  private namesake(name: string, owner?: Trainer): Trainer | undefined {
+    const key = nameKey(name);
+    return this.trainers.all().find((other) => other !== owner && nameKey(other.name) === key);
+  }
+
+  /** @throws {DomainError} another trainer already has that name */
+  private ensureNameFree(name: string, owner?: Trainer): void {
+    if (this.namesake(name, owner)) throw conflict(`Ya hay un entrenador que se llama ${cleanName(name)}, elige otro nombre.`);
+  }
+
+  /** @throws {DomainError} another trainer already has that name */
+  private rename(trainer: Trainer, name: string): void {
+    if (cleanName(name)) this.ensureNameFree(name, trainer);
+    trainer.rename(name);
+  }
+
+  /** @throws {DomainError} the chosen look is not a trainer sprite, or another trainer already has the new name */
   updateProfile(trainer: Trainer, changes: ProfileChanges): Trainer {
-    if (changes.name !== undefined) trainer.rename(changes.name);
+    if (changes.name !== undefined) this.rename(trainer, changes.name);
     if (changes.avatar !== undefined) trainer.chooseAvatar(changes.avatar);
     if (changes.team) trainer.chooseTeam(changes.team);
     if (changes.nickname) trainer.setNickname(changes.nickname.id, changes.nickname.name);

@@ -3,14 +3,16 @@
 import type { Gender, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { compact } from '../../shared/infrastructure/database/compact.js';
 import { Trainer } from '../domain/trainer.js';
-import type { rosterEntries, RosterEntryRow, TrainerRow, trainers } from './trainer.schema.js';
+import type { rosterEntries, RosterEntryRow, TrainerRow, trainers, trainerSessions, TrainerSessionRow } from './trainer.schema.js';
 
-export function toDomain(row: TrainerRow, roster: RosterEntryRow[]): Trainer {
+export function toDomain(row: TrainerRow, roster: RosterEntryRow[], sessions: TrainerSessionRow[] = []): Trainer {
   return Trainer.restore(
     compact({
       id: row.id,
       name: row.name,
       tokenHash: row.tokenHash,
+      passwordHash: row.passwordHash ?? undefined,
+      sessions: sessions.length ? [...sessions].sort((a, b) => a.openedAt - b.openedAt).map(({ tokenHash, openedAt }) => ({ tokenHash, openedAt })) : undefined,
       team: row.team,
       wins: row.wins,
       losses: row.losses,
@@ -58,6 +60,7 @@ export function toRow(trainer: Trainer): typeof trainers.$inferInsert {
     id: trainer.id,
     name: trainer.name,
     tokenHash: trainer.tokenHash,
+    passwordHash: trainer.passwordHash ?? null,
     team: trainer.team,
     wins: trainer.wins,
     losses: trainer.losses,
@@ -98,4 +101,8 @@ export function entryToRow(trainerId: string, entry: RosterEntry, position: numb
     chainLen: entry.chainLen ?? null,
     active: entry.active ?? null,
   };
+}
+
+export function sessionsToRows(trainer: Trainer): (typeof trainerSessions.$inferInsert)[] {
+  return (trainer.sessions ?? []).map(({ tokenHash, openedAt }) => ({ tokenHash, trainerId: trainer.id, openedAt }));
 }

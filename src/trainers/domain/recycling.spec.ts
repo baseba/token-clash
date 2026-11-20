@@ -7,7 +7,7 @@ import { DomainError } from '../../shared/domain/errors.js';
 const duplicate = (id: string, rarity: 'common' | 'uncommon' | 'rare' | 'legendary' = 'common', shiny = false) => ({ id, finalID: 25, rarity, shiny, level: 50 });
 
 const withDuplicates = (...duplicates: ReturnType<typeof duplicate>[]) => {
-  const trainer = Trainer.register({ id: 't1', name: 'Ana', tokenHash: 'h', at: 0 });
+  const trainer = Trainer.register({ id: 't1', name: 'Ana', tokenHash: 'h', passwordHash: 'p', at: 0 });
   trainer.importSave({ roster: [], duplicates, totalTokens: 1_000_000_000 }, 1);
   return trainer;
 };

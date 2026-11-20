@@ -16,7 +16,11 @@ En vivo: **https://clash.mirrordev.xyz**
 
 1. En PokeTokenBar: Ajustes → Backup & Transfer → Exportar (`PokeTokenBar-Save-YYYY-MM-DD.json`).
    También sirve el archivo vivo `~/Library/Application Support/PokeTokenBar/companion-state.json`.
-2. Arrástralo en la web con tu nombre de entrenador. El sitio tiene cuatro pestañas:
+2. En la web, **Crear cuenta**: tu nombre de entrenador, una contraseña y el save. El nombre es único (sin importar
+   mayúsculas ni espacios) y es tu usuario: desde otro dispositivo eliges **Iniciar sesión** con tu nombre y tu
+   contraseña, y juegas con la misma cuenta y el mismo save. Cada dispositivo tiene su propia sesión y cerrarla no
+   cierra las demás. Las cuentas creadas antes solo vivían en el navegador: pueden agregar una contraseña en su perfil
+   (es opcional, pero sin ella no se puede cerrar sesión ni entrar desde otro lado). El sitio tiene cuatro pestañas:
    - **Inicio:** tu equipo, las salas abiertas y la nueva batalla.
    - **Colección** (`/coleccion`): tus Pokémon ordenados por número de Pokédex, con filtros por nombre, tipo y
      shiny. Si tienes repetidos de una especie, queda el primero que capturaste (el shiny y el normal se muestran
@@ -59,8 +63,10 @@ En vivo: **https://clash.mirrordev.xyz**
      rival entran al campo, lanzan sus Pokémon y se retiran, y vuelven al terminar (el tuyo, en espejo y más grande).
      Las IAs usan un entrenador al azar por pelea (el mismo durante todo un torneo), como sus nombres.
 3. En **Colección** armas tus 6, los ordenas arrastrando (el primero es el líder) y eliges los
-   movimientos y la habilidad de cada uno. "Descargar save editado" baja tu save con esos cambios para
-   importarlo de vuelta en PokeTokenBar, y "Actualizar save" sube uno más nuevo.
+   movimientos y la habilidad de cada uno. "Actualizar save" sube uno más nuevo, y su pestaña **Modo hacker**
+   explica paso a paso cómo dejar el Mac subiéndolo solo: un script que lee tu contraseña del Llavero y un
+   LaunchAgent de `launchd` que lo corre cada vez que PokeTokenBar escribe su archivo (`POST /api/sync`, con tu
+   nombre y contraseña; no abre sesión y solo actualiza el save).
 4. En **Nueva batalla** eliges el modo y el rival:
    - **🎒 Batalla con tu equipo:** los 6 que armaste.
    - **🎲 Batalla aleatoria:** los dados sortean hasta 6 de la colección de cada uno, sin repetir especie, con
@@ -233,7 +239,7 @@ Por carpeta:
 | --- | --- |
 | `src/catalog/` | Especies, movimientos, habilidades y tipos de PokeAPI (`data/*.json`), la Pokédex y las listas que comparte con el navegador: la tienda y los entrenadores. Solo datos y reglas puras. |
 | `src/combat/` | El motor de batalla, la elección de 3, el sorteo aleatorio, la IA y Skynet (cliente y proxy de Jev). |
-| `src/trainers/` | Entrenadores: importar el save, la colección, el equipo, la sesión, el saldo, lo comprado y el reciclaje. Dueño de `trainers` y `roster_entries`. |
+| `src/trainers/` | Entrenadores: importar el save, la colección, el equipo, la cuenta y sus sesiones, el saldo, lo comprado y el reciclaje. Dueño de `trainers`, `roster_entries` y `trainer_sessions`. |
 | `src/arena/` | Salas 1 contra 1, emparejamiento, peleas en vivo y torneos. Dueño de `challenges` y `tournament*`. |
 | `src/chat/` | El chat de salas y torneos (en memoria). |
 | `src/radio/` | Las estaciones de radio de los entrenadores: la cola que elige el DJ, qué suena y quién escucha. Dueño de `radio_stations`. |
@@ -255,7 +261,8 @@ Por tema:
 
 | Tema | Reglas (servidor) | Entrada | Navegador |
 | --- | --- | --- | --- |
-| Importar el save | `src/trainers/domain/save-file.ts` | `POST /api/import` en `trainers/interface/trainers.controller.ts` | `public/savestore.js`, `public/savepatch.js` (save editado) |
+| Importar el save | `src/trainers/domain/save-file.ts` | `POST /api/import` en `trainers/interface/trainers.controller.ts` | `public/savestore.js` |
+| Cuenta: nombre único, contraseña y sesiones | `src/trainers/domain/credentials.ts` (largo y hash con scrypt), `nameKey` y sesiones en `src/trainers/domain/trainer.ts`, nombre libre en `trainers.service.ts` | `POST /api/login`, `POST /api/logout`, `PUT /api/me/password`, `POST /api/sync` (Basic, para el Mac; headers en `trainers/application/auth-headers.ts`) en `trainers/interface/trainers.controller.ts`; el token de cada request lo lee `session.guard.ts` | `public/app.js` |
 | Colección, equipo, movimientos | `src/trainers/domain/trainer.ts` | `PUT /api/me`, `PUT /api/me/mons/:id` | `public/app.js` |
 | Pokédex | `src/catalog/domain/pokedex.ts` | `GET /api/pokedex` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
 | Motor de batalla | `src/combat/domain/battle.ts` (mapa de archivos al principio), `move-rules.ts`, `ability-effects.ts` | WebSocket, por la arena | `public/battle-anims.js`, `public/fx.js` |
