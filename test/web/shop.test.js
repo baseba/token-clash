@@ -61,6 +61,29 @@ test('every Ball on sale has an opening effect themed on it, as rich as its rari
   assert.equal(ballFx('pb'), null, 'the free Poké Ball keeps the PokeRogue sparkles');
 });
 
+test('every Ball has its own signature effect, and rarer Balls stack more of them', async () => {
+  const { ballFx, ballFxNote, SIGNATURE_LABELS } = await import('../../public/ball-fx.js');
+  const { SIGNATURE_KINDS } = await import('../../public/ball-burst.js');
+  assert.deepEqual(Object.keys(SIGNATURE_LABELS).sort(), [...SIGNATURE_KINDS].sort());
+  const balls = SHOP_ITEMS.filter((item) => item.kind === 'ball');
+  for (const ball of balls) {
+    const { signature } = ballFx(ball.key);
+    assert.ok(signature.length, ball.key);
+    for (const name of signature) assert.ok(SIGNATURE_KINDS.includes(name), `${ball.key}: ${name}`);
+  }
+  const fewest = (rarity) => Math.min(...balls.filter((ball) => ball.rarity === rarity).map((ball) => ballFx(ball.key).signature.length));
+  assert.ok(fewest('legendary') >= 2);
+  assert.ok(fewest('mythic') >= 3);
+  assert.equal(ballFxNote('el'), 'Rayos eléctricos.');
+  const combos = balls.map((ball) => ballFx(ball.key).signature.join('+'));
+  assert.equal(new Set(combos).size, combos.length, 'no two Balls share the same effects');
+  assert.equal(ballFxNote('au'), 'Una lluvia de monedas que rebotan y una lluvia de oro y destellos.');
+  const owners = {};
+  for (const ball of balls) for (const name of ballFx(ball.key).signature) (owners[name] ??= []).push(ball.rarity);
+  for (const [name, rarities] of Object.entries(owners)) assert.equal(new Set(rarities).size, rarities.length, `${name} only repeats as an upgrade to a rarer Ball`);
+  assert.equal(ballFxNote('pb'), '');
+});
+
 test('every Ball on sale sounds like its theme, with sounds PokeRogue has upstream', async () => {
   const { readFileSync } = await import('node:fs');
   const { ballSounds } = await import('../../public/ball-fx.js');
@@ -74,12 +97,12 @@ test('every Ball on sale sounds like its theme, with sounds PokeRogue has upstre
   assert.deepEqual(ballSounds('pb'), []);
 });
 
-test('the AI throws a random Ball: the free one, a common or a rare, never rarer', async () => {
+test('the AI throws a random Ball: the free one or a common, never rarer', async () => {
   const { aiBallFor, AI_BALLS, DEFAULT_BALL } = await import('../../public/shop.js');
   assert.ok(AI_BALLS.includes(DEFAULT_BALL));
   const rarity = Object.fromEntries(SHOP_ITEMS.filter((item) => item.kind === 'ball').map((item) => [item.key, item.rarity]));
-  for (const ball of AI_BALLS.filter((key) => key !== DEFAULT_BALL)) assert.ok(['free', 'common', 'rare'].includes(rarity[ball]), ball);
-  for (const [key, tier] of Object.entries(rarity)) if (['free', 'common', 'rare'].includes(tier)) assert.ok(AI_BALLS.includes(key), `${key} is in the AI rotation`);
+  for (const ball of AI_BALLS.filter((key) => key !== DEFAULT_BALL)) assert.ok(['free', 'common'].includes(rarity[ball]), ball);
+  for (const [key, tier] of Object.entries(rarity)) if (['free', 'common'].includes(tier)) assert.ok(AI_BALLS.includes(key), `${key} is in the AI rotation`);
   assert.equal(aiBallFor(0), AI_BALLS[0]);
   assert.equal(aiBallFor(0.9999), AI_BALLS.at(-1));
   assert.equal(new Set(Array.from({ length: 200 }, (_, i) => aiBallFor(i / 200))).size, AI_BALLS.length);

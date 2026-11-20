@@ -813,7 +813,7 @@ export function createFx(arena, field = arena) {
     await Promise.all([
       play(open, [{ transform: at(land), opacity: 1 }, { transform: at(land), opacity: 0 }], { duration: 200 }),
       ballFx(kind) ? bursts.play(ground, k * near, ballFx(kind)) : openParticles(ground, k * near),
-      ballFx(kind)?.tier >= SHAKE_TIER ? shakeField(k) : null,
+      ballFx(kind)?.tier >= SHAKE_TIER || ballFx(kind)?.shake ? shakeField(k) : null,
       grow?.finished.catch(() => {}),
     ]);
   }
