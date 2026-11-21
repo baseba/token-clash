@@ -64,6 +64,8 @@ const SCREEN_TRACKS = {
 export const MUSIC_TRACKS = [...new Set([...Object.values(SCENE_TRACKS), ...Object.values(SCREEN_TRACKS), ...RADIO_TRACKS.map((track) => track.id)])];
 
 export function trackFor(id) {
+  const track = /^track:(.+)$/.exec(id ?? '')?.[1];
+  if (track) return track;
   const radio = /^radio:(.+)$/.exec(id ?? '')?.[1];
   if (radio) return radioTrack(radio)?.id ?? null;
   const scene = /^scene:(.+)$/.exec(id ?? '')?.[1];

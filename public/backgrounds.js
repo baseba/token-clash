@@ -29,3 +29,9 @@ export function sceneFor(battleId) {
   const scene = SCENES[hash % SCENES.length];
   return { file: scene.file, image: `/backgrounds/${scene.file}.png`, me: scene.me, foe: scene.foe };
 }
+
+/** One of our scenes by name (the Tower picks the scene of each floor), or the usual one for the battle. */
+export function sceneNamed(file, battleId) {
+  const scene = SCENES.find((candidate) => candidate.file === file);
+  return scene ? { file: scene.file, image: `/backgrounds/${scene.file}.png`, me: scene.me, foe: scene.foe } : sceneFor(battleId);
+}

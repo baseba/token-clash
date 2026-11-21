@@ -2,7 +2,7 @@
 // here may be an AI (`ai:hard`), and the arena must not depend on how trainers are stored.
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
-import type { FinalBattleState } from '../domain/challenge.js';
+import type { FinalBattleState, Staging } from '../domain/challenge.js';
 import type { MatchRef } from '../domain/tournament.js';
 
 export const challenges = sqliteTable(
@@ -31,6 +31,8 @@ export const challenges = sqliteTable(
     final: text({ mode: 'json' }).$type<FinalBattleState>(),
     createdAt: integer('created_at').notNull(),
     finishedAt: integer('finished_at'),
+    /** How another mode dressed the battle (scene, music, rival sprite): JSON. */
+    staging: text({ mode: 'json' }).$type<Staging>(),
   },
   (t) => [index('challenges_host').on(t.hostId), index('challenges_guest').on(t.guestId), index('challenges_status').on(t.status), index('challenges_tournament').on(t.tournamentId)],
 );

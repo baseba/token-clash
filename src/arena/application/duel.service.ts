@@ -16,7 +16,8 @@ import { conflict } from '../../shared/domain/errors.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository } from '../domain/arena.repositories.js';
-import { Challenge, type BattleMode } from '../domain/challenge.js';
+import { Challenge, type BattleMode, type Staging } from '../domain/challenge.js';
+import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { aiName } from '../domain/tournament.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
@@ -53,6 +54,23 @@ export class DuelService {
       aiTeam,
       mode,
       at: now(),
+    });
+    this.challenges.save(challenge);
+    this.previews.open(this.presence.room(challenge));
+    return challenge;
+  }
+
+  /** A battle against the AI that another mode sets up with its own teams and look (the Tower). */
+  startStaged(trainer: Trainer, input: { level: AiLevel; hostTeam: RosterEntry[]; aiName: string; aiTeam: RosterEntry[]; staging: Staging }): Challenge {
+    const challenge = Challenge.againstAi({
+      id: newId(),
+      host: trainer,
+      hostTeam: input.hostTeam,
+      ai: { id: aiTrainerId(input.level), name: input.aiName, level: input.level },
+      aiTeam: input.aiTeam,
+      mode: 'team',
+      at: now(),
+      staging: input.staging,
     });
     this.challenges.save(challenge);
     this.previews.open(this.presence.room(challenge));

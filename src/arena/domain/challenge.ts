@@ -22,6 +22,19 @@ export const BATTLE_MODES = ['team', 'random'] as const;
 export type BattleMode = (typeof BATTLE_MODES)[number];
 export const VISIBILITIES = ['public', 'private'] as const;
 export type Visibility = (typeof VISIBILITIES)[number];
+/**
+ * How another mode dresses a battle against the AI it sets up (the Tower): the scene and music the
+ * clients show, the rival's trainer sprite, and the page to go back to when it ends.
+ */
+export interface Staging {
+  scene: string;
+  music: string;
+  guestAvatar: string;
+  returnTo: string;
+  /** What the battle screen says it is part of, like "Torre · Piso 12". */
+  label?: string;
+}
+
 /** What we keep of a finished battle: its public state (who fought, who won). */
 export interface FinalBattleState {
   winner: number | null;
@@ -52,6 +65,7 @@ export interface ChallengeState {
   turns?: number;
   final?: FinalBattleState;
   finishedAt?: number;
+  staging?: Staging;
 }
 
 /**
@@ -86,6 +100,7 @@ export class Challenge implements ChallengeState {
   turns?: number;
   final?: FinalBattleState;
   finishedAt?: number;
+  staging?: Staging;
 
   private constructor(state: ChallengeState) {
     Object.assign(this, state);
@@ -101,7 +116,7 @@ export class Challenge implements ChallengeState {
   }
 
   /** A battle against the AI starts at once. Private: nobody else can take its seat. */
-  static againstAi(input: { id: string; host: Player; hostTeam: RosterEntry[]; ai: Player & { level: string }; aiTeam: RosterEntry[]; mode: BattleMode; at: number }): Challenge {
+  static againstAi(input: { id: string; host: Player; hostTeam: RosterEntry[]; ai: Player & { level: string }; aiTeam: RosterEntry[]; mode: BattleMode; at: number; staging?: Staging }): Challenge {
     return new Challenge({
       id: input.id,
       hostId: input.host.id,
@@ -115,6 +130,7 @@ export class Challenge implements ChallengeState {
       ai: input.ai.level,
       status: 'active',
       createdAt: input.at,
+      ...(input.staging ? { staging: input.staging } : {}),
     });
   }
 

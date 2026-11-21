@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts && rm -rf /root/.npm
 COPY tsconfig.json ./
-COPY public/types.js public/trainer-sprites.js public/trainer-variants.js public/shop.js public/radio.js public/upstream.js public/stat-formula.js public/natures.js ./public/
+COPY public/types.js public/trainer-sprites.js public/trainer-variants.js public/shop.js public/radio.js public/upstream.js public/stat-formula.js public/natures.js public/tower-cast.js ./public/
 COPY src ./src
 RUN npm run build
 
@@ -14,8 +14,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && rm -rf /root/.npm
-# The battle animations are converted, and the trainers cropped and recolored, at build time (the
-# server has no egress). Sprites, cries, sounds and music load from jsDelivr in the browser.
+# The battle animations are converted, the trainers cropped and recolored, and the trainers' overworld
+# sprites normalized and recolored, at build time (the server has no egress). Sprites, cries, sounds
+# and music load from jsDelivr in the browser.
 COPY scripts/sync-battle-anims.js scripts/upstream-files.js ./scripts/
 COPY public/music.js public/battle-anims.js public/radio.js public/shop.js public/trainer-sprites.js public/trainer-variants.js public/upstream.js ./public/
 COPY public/upstream/pokerogue.json ./public/upstream/pokerogue.json
@@ -26,6 +27,8 @@ RUN node scripts/sync-trainers.js
 COPY src/catalog/data ./src/catalog/data
 COPY drizzle ./drizzle
 COPY public ./public
+COPY scripts/sync-overworlds.js scripts/overworld-recolor.mjs scripts/overworld-compose.mjs scripts/overworld-sources.json scripts/plan-trainer-variants.mjs scripts/sprite-ramps.mjs scripts/shipped-recolors.json ./scripts/
+RUN node scripts/sync-overworlds.js
 COPY --from=build /app/dist/src ./dist/src
 COPY --from=build /app/dist/public ./dist/public
 RUN mkdir -p /data && chown node:node /data

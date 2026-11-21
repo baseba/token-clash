@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createBattle, submit, validActions, needsAction } from './battle.js';
 import { rng, speciesData } from '../../catalog/domain/creatures.js';
 import { buildFighter } from './fighter.js';
-import { AI_LEVELS, AI_POOL_SHARE, LAST_AI_SPECIES, aiFrame, aiPool, aiTeamPool, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
+import { AI_LEVELS, AI_POOL_SHARE, AI_PROFILES, LAST_AI_SPECIES, aiFrame, scoreMoves, aiPool, aiTeamPool, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
 import { SHOP_ITEMS } from '../../catalog/domain/shop.js';
 
 const fullyEvolved = (id) => {
@@ -188,4 +188,25 @@ test('each AI level wears its own frame, which the shop never sells', () => {
   const frames = AI_LEVELS.map(aiFrame);
   assert.equal(new Set(frames).size, AI_LEVELS.length);
   assert.ok(frames.every((frame) => !SHOP_ITEMS.some((item) => item.kind === 'frame' && item.key === frame)));
+});
+
+test('each harder AI keeps the modules of the easier one and adds its own, like the trainer flags of the games', () => {
+  const order = ['easy', 'mid', 'hard', 'veryhard'] as const;
+  for (let i = 1; i < order.length; i++) {
+    const [easier, harder] = [AI_PROFILES[order[i - 1]], AI_PROFILES[order[i]]];
+    assert.ok(easier.modules.every((module) => harder.modules.includes(module)), order[i]);
+    assert.ok(harder.modules.length > easier.modules.length, order[i]);
+    assert.ok(harder.noise <= easier.noise && harder.switchFailure <= easier.switchFailure, order[i]);
+  }
+  assert.deepEqual([...AI_PROFILES.mid.modules], ['checkBadMove', 'tryToFaint', 'checkViability']);
+});
+
+test('a move that cannot do anything scores under the base, a knock out over it', () => {
+  const jolteon = mon('j', 135, ['thunder-wave', 'thunderbolt']);
+  const b = duel([jolteon], [mon('t', 121, ['surf'])]);
+  b.sides[1].team[0].status = 'par';
+  b.sides[1].team[0].hp = 10;
+  const scores = Object.fromEntries(scoreMoves(b, 0, AI_PROFILES.mid, () => 0).map((x) => [moveKey(b, 0, x.action), x.score]));
+  assert.ok(scores['thunder-wave'] < 100);
+  assert.ok(scores.thunderbolt > 100 + 30);
 });

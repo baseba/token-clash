@@ -29,6 +29,26 @@ En vivo: **https://clash.mirrordev.xyz**
      que tienes muestran sprite, stats base y línea evolutiva; una preevolución de algo que tienes también queda
      registrada. Cada una tiene un switch para verla shiny si la tienes shiny.
    - **Stats:** tus batallas y torneos, el ranking y las stats del servidor.
+   - **La Torre** (`/torre`): un modo inspirado en PokeRogue y en Emerald Rogue con tu colección. Eliges dificultad
+     (la de la IA) y largo (10, 25, 50 pisos o infinita). En el laboratorio, el Profesor Rowan te ofrece Pokémon de tu
+     colección (balanceados, con un solo legendario como máximo) y te llevas 3, en nivel 5 y en la primera forma de su
+     línea. En cada piso normal el camino se divide, como en Emerald Rogue: una ruta, una ruta difícil (rival entrenado,
+     2 niveles más, premio raro), una tranquila (más débil, premio común), una parada (dos premios sin pelear), una
+     madriguera (reclutas sin pelear), una guarida villana (premio épico) o un pacto oscuro (dejas ir a uno por dos
+     premios épicos). Cada 5 pisos hay un líder de gimnasio y, al cierre de cada bloque de 25, cuatro del Alto Mando y
+     un campeón, de todas las regiones y sin repetirse, con su tipo, su escenario, la música de su región y su as. Los
+     entrenadores de ruta usan Pokémon de su tema. Ves cada piso como un mapa visto desde arriba, dibujado según el
+     escenario de la pelea, con los sprites de mapa de los entrenadores; caminas hasta el rival, te ve y empieza la
+     pelea en nuestros fondos. Ganas experiencia (curva media-rápida y fórmula escalada de la 5.ª generación), subes
+     de nivel sin pasar el tope del piso siguiente, evolucionas hacia la forma que criaste (las que evolucionan por
+     piedra o intercambio lo hacen a un nivel justo según su poder) y aprendes movimientos. Entre pisos eliges premios
+     de tres rarezas, cada uno dice a quién le sirve y por qué (MT, tutor, vitaminas, Menta, Cápsula y Parche
+     Habilidad, Caramelos, Piedra Evolutiva y Huevo Suerte), puedes cambiarlos una vez, y cambias movimientos y
+     habilidades. Cada piso se sortea al llegar (sus caminos y rivales no se conocen antes). Cada piso ganado da puntos:
+     el piso (ruta 100, gimnasio 300, Alto Mando 450, campeón 800) más el equipo rival (nivel × stats base), por el
+     camino (difícil ×1,5, tranquila ×0,6) y la dificultad (de ×0,5 en Fácil a ×3 en Skynet). Si pierdes, la subida
+     termina. Se guarda después de cada piso y solo da puntos y récords, en un ranking por dificultad en Stats con el
+     detalle piso por piso: no toca tokens ni el ranking de batallas.
    - **Reciclaje** (`/reciclaje`): los Pokémon repetidos de tu save (copias de una especie y variante que ya tienes;
      la colección se queda con la primera) se arrastran a una trituradora que los convierte en tokens, más mientras
      más raros y el triple si son shiny. Cada repetido se recicla una sola vez: queda en un registro aunque vuelvas
@@ -43,7 +63,7 @@ En vivo: **https://clash.mirrordev.xyz**
    - **Entrenadores** (pestaña del perfil): eliges tu entrenador entre los ~300 sprites de PokeRogue, agrupados por
      personaje: al tocar uno ves el original y sus recolores, cada uno con su logro (también los ya conseguidos).
      Todos los originales se ganan con logros (`src/stats/domain/achievements.ts`, metas en
-     `src/stats/domain/trainer-goals.ts`), más difíciles según su rareza: las clases comunes piden 3 Pokémon de su
+     `src/catalog/domain/trainer-goals.ts`), más difíciles según su rareza: las clases comunes piden 3 Pokémon de su
      tipo o un Pokémon temático (los reclutas, a los de su equipo; el ❔ de la meta dice cuáles cuentan), las raras 5,
      las épicas 8; los protagonistas piden iniciales; los líderes de gimnasio 3, 6, 10 y 15 de su tipo, el Alto Mando
      12 y victorias, los campeones la Pokédex regional (cerca de un 30 % de la región), torneos o el ranking (Red: primer
@@ -210,6 +230,12 @@ GAME FREAK inc.
 - Sprites de entrenadores: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (material de Nintendo,
   Creatures y GAME FREAK; `bug_type_superfan` es de Chani von Karpa y `aliana`, `celosia` y `mable` de Red, con
   CC BY-NC-SA 4.0). Se descargan al instalar y no se versionan.
+- La Torre: íconos de objetos de [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (CC BY-NC-SA 4.0
+  salvo lo que marcan como material de Nintendo); sprites de mapa de los entrenadores de
+  [Pokabbie/pokeemerald-rogue](https://github.com/Pokabbie/pokeemerald-rogue) y de los decompilados
+  [pret/pokeemerald](https://github.com/pret/pokeemerald), [pret/pokefirered](https://github.com/pret/pokefirered) y
+  [pret/pokeplatinum](https://github.com/pret/pokeplatinum) (material de Nintendo, Creatures y GAME FREAK). Se
+  descargan al instalar, fijados a un commit, y no se versionan.
 - Animaciones de batalla, sus sonidos, la Poké Ball y los efectos de sonido: [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets), de
   Pagefault Games y sus colaboradores. Las animaciones y los sonidos `PRSFX-` son de
   [Pokémon Reborn](https://www.rebornevo.com/); las animaciones `GEN8-` son del Gen 8 Animation Project
@@ -243,6 +269,7 @@ Por carpeta:
 | `src/arena/` | Salas 1 contra 1, emparejamiento, peleas en vivo y torneos. Dueño de `challenges` y `tournament*`. |
 | `src/chat/` | El chat de salas y torneos (en memoria). |
 | `src/radio/` | Las estaciones de radio de los entrenadores: la cola que elige el DJ, qué suena y quién escucha. Dueño de `radio_stations`. |
+| `src/tower/` | La Torre: subidas con tu colección, pisos, crecimiento, premios y récords. Dueño de `tower_runs`. |
 | `src/stats/` | La página de stats y los logros. No guarda nada: los cambios del entrenador se los pide a `TrainersService`. |
 | `src/realtime/` | El protocolo WebSocket (`/ws`). |
 | `src/web/` | El frontend estático y los health checks. |
@@ -275,6 +302,7 @@ Por tema:
 | Logros y entrenador del perfil | `src/stats/domain/achievements.ts` | `GET /api/me/achievements`, `PUT /api/me/look` en `stats/interface/achievements.controller.ts` | `public/trainer-sprites.js` |
 | Variantes de colores de entrenadores | `public/trainer-sprites.js` (a mano), `public/trainer-variants.js` (lo genera `scripts/plan-trainer-variants.mjs` con las rampas de `scripts/sprite-ramps.mjs`); `scripts/sync-trainers.js` pinta los sprites al instalar | | `public/app.js` |
 | Tienda | artículos y precios en `public/shop.js` (tipados en `src/catalog/domain/shop.ts`); saldo y compra en `src/trainers/domain/trainer.ts`; "pide al original" en `src/stats/domain/achievements.ts` | `GET /api/shop`, `POST /api/shop/buy`, `PUT /api/me/equip` en `stats/interface/achievements.controller.ts`, con los DTOs de `trainers/interface/dto/shop.dto.ts` | `public/shop.js`, `public/app.js` (la tienda está en `/perfil`) |
+| La Torre | `src/tower/domain/tower-run.ts` (la subida y sus estados), `floors.ts` (qué hay en cada piso), `growth.ts` (experiencia, evolución y movimientos), `lab.ts` (ofertas de tu colección), `foe-team.ts` (el equipo rival), `rewards.ts` (premios y sus rarezas), `score.ts` (puntos de cada piso); salas del camino en `floors.ts` (`roomsAt`); personajes, escenarios y música en `public/tower-cast.js` (tipados en `src/catalog/domain/tower-cast.ts`) | `/api/tower/...` en `tower/interface/tower.controller.ts`; cada piso es una sala contra la IA con `staging` (`DuelService.startStaged`) | `public/app.js` (página `/torre`), `public/tower-map.js` (el mapa de cada piso), `public/overworld.js` (sprites de mapa) |
 | Tipos y efectividad | `public/types.js` (lo comparten servidor y navegador) | | |
 | Escenario de batalla y sprites de Pokémon | | | `public/backgrounds.js`, `public/creature.js` (URL de cada sprite según `public/upstream/sprites.json`) |
 | Archivos externos (jsDelivr y respaldo en GitHub) | | | `public/upstream.js` (commits fijados, URLs y respaldo), `public/upstream/*.json`; la CSP que los permite está en `src/shared/http/security-headers.middleware.ts` |
@@ -298,6 +326,13 @@ Datos externos:
 - `scripts/sync-trainers.js`: descarga los entrenadores de la lista de `public/trainer-sprites.js` a `public/trainers/`,
   recortando el primer cuadro de cada hoja de sprites (corre solo en `npm install`, o `npm run trainers`). Los sirve el
   juego porque no son copias exactas: el recorte y las variantes de colores salen de acá.
+- `scripts/sync-overworlds.js` (`npm run overworlds`): arma `public/overworlds/<clave>.png`, el sprite de mapa de
+  cada entrenador y variante, en una hoja común de 16 cuadros de 32×32. Toma el oficial de la tabla
+  `scripts/overworld-sources.json`. A quien no tiene oficial lo arma `scripts/overworld-compose.mjs` con piezas
+  oficiales de su género (cuerpo y cabeza) repintadas con los colores de su sprite de batalla. Las variantes
+  repintan sus rampas con las reglas del sprite de batalla (`scripts/overworld-recolor.mjs`): el reemplazo se decide
+  en el cuadro de frente y se copia color por color a la espalda y los costados. Corre en `npm install` y en la
+  imagen.
 - `scripts/sync-radio.js` (`npm run radio`): baja cada canción de la radio del commit fijado de pokerogue-assets, mide su duración leyendo los frames del mp3 y escribe `src/catalog/data/radio-durations.json`. Córrelo si cambia el commit o la lista de `public/radio.js`: el servidor no arranca si a una canción le falta su duración.
 - `scripts/upstream-files.js`: lo que comparten esos scripts para leer los repos externos en el commit fijado (reintentos, HEAD, manifiestos con una entrada por línea).
 - `public/battle-anims.js`: intérprete propio del formato de animación de PokeRogue (cuadros de 50 ms, focos en atacante, objetivo o pantalla, fondos).

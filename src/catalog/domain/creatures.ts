@@ -87,6 +87,7 @@ interface RawSpecies {
   stage?: number;
   chainLen?: number;
   evolvesFrom?: number;
+  evolvesAt?: number;
 }
 
 export interface BaseStats {

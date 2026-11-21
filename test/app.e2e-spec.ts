@@ -213,6 +213,59 @@ test('a battle against the AI starts at once and stays out of the ranking and th
   assert.deepEqual(list.data.challenges, []);
 });
 
+test('a Tower climb: the lab, a floor fought against the AI, the rest after it and giving up', async () => {
+  const a = await call('/api/import', { method: 'POST', ip: '203.0.113.40', body: { name: 'Escalador', save, ...newAccount() } });
+  const token = a.data.token;
+  assert.equal((await call('/api/tower', { token })).data.run, null);
+  const started = await call('/api/tower', { method: 'POST', token, body: { difficulty: 'easy', length: 10 } });
+  assert.equal(started.status, 200);
+  const run = started.data.run;
+  assert.equal(run.status, 'drafting');
+  assert.ok(run.offers.length >= run.starters && run.offers.every((offer: any) => offer.level === 5));
+  assert.equal((await call('/api/tower', { method: 'POST', token, body: { difficulty: 'easy', length: 10 } })).status, 409);
+  const drafted = await call('/api/tower/draft', { method: 'POST', token, body: { offers: run.offers.slice(0, run.starters).map((offer: any) => offer.id) } });
+  assert.equal(drafted.data.run.status, 'climbing');
+  assert.equal(drafted.data.run.current.number, 1);
+  assert.equal((await call('/api/tower/fight', { method: 'POST', token })).status, 409, 'first choose a way');
+  assert.equal(drafted.data.run.rooms[0].kind, 'trainer');
+  const chosen = await call('/api/tower/room', { method: 'POST', token, body: { room: 'trainer' } });
+  assert.equal(chosen.data.run.room, 'trainer');
+  const fight = await call('/api/tower/fight', { method: 'POST', token });
+  assert.equal(fight.status, 200);
+  assert.equal((await call('/api/tower/fight', { method: 'POST', token })).data.challengeId, fight.data.challengeId, 'the same battle while it lasts');
+  const room = await call(`/api/challenges/${fight.data.challengeId}`, { token });
+  assert.equal(room.data.challenge.staging.returnTo, '/torre');
+  assert.equal(room.data.challenge.staging.label, 'Torre · Piso 1');
+  assert.equal(room.data.challenge.hostTeam[0].level, 5);
+  const host = player(fight.data.challengeId, token);
+  const end = await host.ended;
+  host.ws.close();
+  let after = await call('/api/tower', { token });
+  for (let i = 0; i < 20 && after.data.run?.status === 'climbing'; i++) {
+    await new Promise((r) => setTimeout(r, 50));
+    after = await call('/api/tower', { token });
+  }
+  if (end.state.winner === 0) {
+    assert.equal(after.data.run.status, 'resting');
+    assert.equal(after.data.run.cleared, 1);
+    assert.ok(after.data.run.rewards.length);
+    const rerolled = await call('/api/tower/reroll', { method: 'POST', token });
+    assert.equal(rerolled.data.run.rerolls, 0);
+    assert.equal((await call('/api/tower/reroll', { method: 'POST', token })).status, 409);
+    const moved = await call('/api/tower/move-on', { method: 'POST', token });
+    assert.equal(moved.data.run.status, 'climbing');
+    assert.equal(moved.data.run.current.number, 2);
+    const abandoned = await call('/api/tower', { method: 'DELETE', token });
+    assert.equal(abandoned.data.run.status, 'abandoned');
+    assert.ok((await call('/api/tower/records')).data.records.some((record: any) => record.name === 'Escalador' && record.cleared === 1));
+  } else {
+    assert.equal(after.data.run, null);
+    assert.equal(after.data.last.status, 'lost');
+  }
+  assert.equal((await call('/api/tower', { token })).data.run, null);
+  assert.equal((await call('/api/me', { token })).data.me.wins, 0, 'the Tower stays out of the ranking');
+});
+
 test('against Skynet, Jev picks the AI\'s actions and the battle ends', async () => {
   const a = await call('/api/import', { method: 'POST', body: { name: 'Sarah', save, ...newAccount() } });
   assert.ok(a.data.me.aiLevels.includes('skynet'));

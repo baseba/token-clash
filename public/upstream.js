@@ -18,6 +18,9 @@ export const UPSTREAM = {
   sprites: { repo: 'PokeAPI/sprites', commit: 'c0542f7c51215d9672439012838c99f520596cbd' },
   cries: { repo: 'PokeAPI/cries', commit: 'b3a9044bb839b5e3152aaa536c7b463a0fcf0140' },
   pokerogue: { repo: 'pagefaultgames/pokerogue-assets', commit: 'b7ce1013491141864da412fa733d5ac585b5d453' },
+  emerald: { repo: 'pret/pokeemerald', commit: '9103e529c2fbdd7add4a1ff3350c6c1f92112c42' },
+  firered: { repo: 'pret/pokefirered', commit: 'ce6406d8c2eaf46d543c8a2606de0c3cb1951982' },
+  rogue: { repo: 'Pokabbie/pokeemerald-rogue', commit: '5ccb74cf1ef2c0349dfa5d70883b030bbc9ff803' },
 };
 
 const encodePath = (path) => path.split('/').map(encodeURIComponent).join('/');

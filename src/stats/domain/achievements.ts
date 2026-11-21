@@ -1,7 +1,7 @@
 import { finalForms, lineage, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { EARNED_VARIANTS, ELITE_FOUR, GYM_LEADERS, isShopTrainer, originalTier, SHINY_VARIANTS, TRAINER_SPRITES, TRAINER_VARIANTS, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
-import { CLASS_TRAINERS, SIGNATURE, SPECIES_NEED, STARTER_IDS, STARTER_NEED, TYPE_NEED, type ClassTrainer, type TrainerRarity } from './trainer-goals.js';
+import { CLASS_TRAINERS, SIGNATURE, SPECIES_NEED, STARTER_IDS, STARTER_NEED, TYPE_NEED, type ClassTrainer, type TrainerRarity } from '../../catalog/domain/trainer-goals.js';
 import { RARITIES, shopItem, shopItemOf } from '../../catalog/domain/shop.js';
 import { TYPES } from '../../catalog/domain/type-chart.js';
 import type { ChallengeState } from '../../arena/domain/challenge.js';

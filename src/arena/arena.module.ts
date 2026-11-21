@@ -42,7 +42,7 @@ import { TournamentsController } from './interface/tournaments.controller.js';
     ArenaQueries,
     ArenaChatService,
   ],
-  // For the realtime gateway (socket messages) and the read-only stats.
-  exports: [LobbyService, DuelService, TeamPreviewService, LiveBattleService, TournamentsService, ArenaChatService, ArenaQueries],
+  // For the realtime gateway (socket messages), the read-only stats and the Tower (its battles).
+  exports: [LobbyService, DuelService, TeamPreviewService, LiveBattleService, TournamentsService, ArenaChatService, ArenaQueries, ArenaEvents],
 })
 export class ArenaModule {}

@@ -52,9 +52,10 @@ test('old rooms without mode or visibility become private team battles; nothing 
   const after = rawRows(file);
 
   const defaults = { mode: 'team', visibility: 'private' };
+  const addedLater = { staging: null };
   assert.deepEqual(
     after,
-    before.map((row) => ({ ...row, mode: row.mode ?? defaults.mode, visibility: row.visibility ?? defaults.visibility })),
+    before.map((row) => ({ ...row, ...addedLater, mode: row.mode ?? defaults.mode, visibility: row.visibility ?? defaults.visibility })),
   );
   const read = Object.fromEntries(new DrizzleChallengeRepository(db).all().map((c) => [c.id, [c.mode, c.visibility]]));
   assert.deepEqual(read, {

@@ -33,6 +33,7 @@
     "public/types.js",
     "public/trainer-sprites.js",
     "public/shop.js",
+    "public/tower-cast.js",
     "public/radio.js",
     "public/trainer-variants.js",
     "public/upstream.js"

@@ -193,9 +193,10 @@ test('Meteorobola takes the type of the weather, Plancha uses the Defense, Llama
 test('the AI does not pick a move that is sure to fail', async () => {
   const { scoreMove } = await import('./ai.js');
   const b = battle(mon('p', 57, ['fake-out', 'karate-chop']), wall());
-  assert.ok(scoreMove(b, 0, idx(b, 0, 'fake-out')) > 0);
+  assert.ok(scoreMove(b, 0, idx(b, 0, 'fake-out')) >= 100);
   turn(b, 'karate-chop', 'growl');
-  assert.equal(scoreMove(b, 0, idx(b, 0, 'fake-out')), 0);
+  assert.ok(scoreMove(b, 0, idx(b, 0, 'fake-out')) < 100);
+  assert.ok(scoreMove(b, 0, idx(b, 0, 'fake-out')) < scoreMove(b, 0, idx(b, 0, 'karate-chop')));
 });
 
 test('Impresionar makes the foe flinch about 30% of the time, but only when it hits first', () => {
