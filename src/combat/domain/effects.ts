@@ -327,9 +327,13 @@ export function transform(battle: BattleState, fighter: BattleFighter, into: Bat
 export function changeForm(battle: BattleState, fighter: BattleFighter, form: string | null, { permanent = false }: { permanent?: boolean } = {}): void {
   const data = form ? formData(form) : null;
   if (form && !data) return;
-  const stats = data ? statsFor(data.base, fighter.ivs, fighter.level) : { ...fighter.speciesStats };
+  const stats = data ? statsFor(data.base, fighter.ivs, fighter.level, fighter.nature, fighter.evs) : { ...fighter.speciesStats };
   const gained = stats.hp - fighter.stats.hp;
   fighter.stats = stats;
+  if (data) {
+    const [hp, atk, def, satk, sdef, spd] = data.base;
+    fighter.speciesBase = { hp, atk, def, satk, sdef, spd };
+  }
   fighter.hp = fighter.hp > 0 ? clamp(fighter.hp + gained, 1, stats.hp) : 0;
   fighter.types = data ? [...data.types] : [...fighter.speciesTypes];
   fighter.sprite = data ? data.sprite : String(fighter.speciesId);

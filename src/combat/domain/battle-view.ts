@@ -137,7 +137,7 @@ export interface VisibleFighterView {
   volatiles: ReturnType<typeof publicVolatiles>;
   abilityInfo: AbilityInfo | null;
   moves: PublicMove[];
-  baseStats?: Stats;
+  speciesBase?: Stats;
   evs?: Ivs;
   natureInfo?: NatureInfo | null;
 }
@@ -173,7 +173,7 @@ export function fighterView(battle: BattleState, sideIndex: number, slot: number
     volatiles: publicVolatiles(fighter),
     abilityInfo: abilityKnown ? abilityInfo(fighter.ability) : null,
     moves: publicMoves(fighter, own ? null : fighter.revealedMoves),
-    ...(own && !fighter.volatiles.transformed ? { baseStats: fighter.baseStats, evs: fighter.evs, natureInfo: fighter.natureInfo } : {}),
+    ...(own && !fighter.volatiles.transformed ? { speciesBase: fighter.speciesBase, evs: fighter.evs, natureInfo: fighter.natureInfo } : {}),
     ...(disguise ?? {}),
   };
 }
