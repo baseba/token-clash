@@ -120,6 +120,8 @@ function monFrom(offer: Offer): TowerMon {
 
 const NO_EVS: Ivs = { hp: 0, atk: 0, def: 0, satk: 0, sdef: 0, spd: 0 };
 export const REROLLS_PER_REST = 1;
+/** Extra experience for each level a Pokémon is below the next floor's cap. */
+const CATCH_UP_PER_LEVEL = 0.35;
 const DEAL_PICKS = 2;
 const REST_PICKS = 2;
 
@@ -243,7 +245,7 @@ export class TowerRun implements TowerRunState {
     if (room === 'deal') this.party.splice(this.party.indexOf(this.member(releaseUid as string)), 1);
     const floor = this.currentFloor();
     const random = rng(`${this.seed}:room:${floor.number}`);
-    this.lastResult = { floor: floor.number, room, won: true, growth: [] };
+    this.lastResult = { floor: floor.number, room, won: true, growth: this.train(floor.number) };
     this.cleared = floor.number;
     this.floor += 1;
     this.room = null;
@@ -348,14 +350,25 @@ export class TowerRun implements TowerRunState {
     this.updatedAt = at;
   }
 
-  /** Experience up to the level cap of the next floor: the party never outgrows the rivals ahead. */
+  /**
+   * Experience up to the level cap of the next floor: the party never outgrows the rivals ahead. Like
+   * Emerald Rogue's soft cap, the further below the cap a Pokémon is, the faster it catches up.
+   */
   private gainExperience(floor: Floor): Growth[] {
     const foes = this.foeTeam();
-    const cap = expForLevel(Math.min(MAX_LEVEL, levelCap(floor.number + 1)));
+    const nextCap = Math.min(MAX_LEVEL, levelCap(floor.number + 1));
+    const cap = expForLevel(nextCap);
     return this.party.map((mon) => {
       const gained = foes.reduce((sum, foe) => sum + expYield({ speciesId: foe.finalID, level: foe.battleLevel ?? foe.level }, mon.level, isBoss(floor.kind)), 0);
-      return this.grow(mon, Math.max(mon.exp, Math.min(cap, mon.exp + gained)));
+      const catchUp = 1 + CATCH_UP_PER_LEVEL * Math.max(0, nextCap - mon.level);
+      return this.grow(mon, Math.max(mon.exp, Math.min(cap, mon.exp + Math.round(gained * catchUp))));
     });
+  }
+
+  /** A floor without a battle still trains the party: each Pokémon goes halfway to the next floor's cap. */
+  private train(floorNumber: number): Growth[] {
+    const nextCap = Math.min(MAX_LEVEL, levelCap(floorNumber + 1));
+    return this.party.map((mon) => this.grow(mon, Math.max(mon.exp, expForLevel(Math.min(nextCap, mon.level + Math.ceil((nextCap - mon.level) / 2))))));
   }
 
   /** New level, maybe a new form, and the moves it learns on the way: into a free slot, or known. */

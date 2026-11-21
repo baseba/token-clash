@@ -303,3 +303,22 @@ test('every floor won is scored and the climb adds them up', () => {
   assert.equal(run.log.length, 2);
   assert.ok(run.points > run.log[0].points);
 });
+
+test('a floor without a battle still trains the party halfway to the next cap', () => {
+  const run = climbing();
+  for (let draw = 0; !run.rooms().includes('rest'); draw++) run.rolls = { ...run.rolls, [run.floor]: `draw${draw}` };
+  const before = run.party.map((mon) => mon.level);
+  run.chooseRoom('rest', { at: 5, roster });
+  const cap = levelCap(2);
+  run.party.forEach((mon, i) => assert.equal(mon.level, Math.min(cap, before[i] + Math.ceil((cap - before[i]) / 2))));
+  assert.ok(run.lastResult?.growth.length);
+});
+
+test('a Pokémon far below the cap catches up faster than one near it', () => {
+  const run = climbing();
+  run.party[0].level = 2;
+  run.party[0].exp = expForLevel(2);
+  win(run);
+  const [behind, , other] = run.party;
+  assert.ok(behind.level - 2 > other.level - 5, `${behind.level} ${other.level}`);
+});

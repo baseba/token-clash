@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
-import { TYPE_SCENES } from '../../catalog/domain/tower-cast.js';
-import { floorAt, floorKind, foeLevel, levelCap, roomsAt, teamSize } from './floors.js';
+import { START_LEVEL, TYPE_SCENES } from '../../catalog/domain/tower-cast.js';
+import { floorAt, floorKind, foeLevel, levelCap, roomsAt, stretchStart, teamSize } from './floors.js';
 
 const kinds = (length: number | null, upTo: number) => Array.from({ length: upTo }, (_, i) => floorKind(i + 1, length));
 const baseOf = (floor: number, length: number | null, seed: string) => floorAt(floor, length, 'mid', seed).foe?.base;
@@ -83,16 +83,26 @@ test('the same climb always meets the same trainers, and another climb others', 
   assert.notDeepEqual(route('a'), route('b'));
 });
 
-test('rivals start a level over your party and pull further ahead every few floors; bosses and difficulty add more', () => {
-  assert.equal(foeLevel(1, 'trainer', 'mid'), levelCap(1) + 1, 'from the first floor');
-  assert.ok(foeLevel(1, 'trainer', 'easy') <= levelCap(1));
-  const gap = (floor: number) => foeLevel(floor, 'trainer', 'mid') - levelCap(floor);
-  assert.ok(gap(13) > gap(1) && gap(37) > gap(13));
-  assert.ok(foeLevel(5, 'gym', 'mid') > foeLevel(5, 'trainer', 'mid'));
-  assert.ok(foeLevel(25, 'champion', 'mid') > foeLevel(24, 'elite', 'mid'));
-  assert.ok(foeLevel(10, 'trainer', 'veryhard') > foeLevel(10, 'trainer', 'mid'));
+test('like Emerald Rogue, route rivals stay under your level cap and bosses fight right at it', () => {
+  for (let floor = 1; floor <= 49; floor++) {
+    const kind = floorKind(floor, null);
+    const level = foeLevel(floor, kind, 'mid');
+    if (kind === 'trainer') assert.ok(level < levelCap(floor), `${floor}`);
+    else assert.ok(level >= levelCap(floor) && level <= levelCap(floor) + 1, `${floor}`);
+  }
+  assert.equal(foeLevel(5, 'gym', 'mid'), levelCap(5));
+  assert.equal(foeLevel(25, 'champion', 'mid'), levelCap(25) + 1);
+  assert.ok(foeLevel(1, 'trainer', 'mid') <= 4, 'the first floor is gentle');
+  assert.equal(foeLevel(10, 'trainer', 'veryhard'), foeLevel(10, 'trainer', 'mid') + 1);
+  assert.equal(foeLevel(10, 'trainer', 'easy'), foeLevel(10, 'trainer', 'mid') - 1);
 });
 
+test('a stretch between bosses starts at the level of the last boss', () => {
+  assert.equal(stretchStart(3), START_LEVEL - 2);
+  assert.equal(stretchStart(7), levelCap(5));
+  assert.equal(stretchStart(10), levelCap(5));
+  assert.equal(stretchStart(11), levelCap(10));
+});
 test('each way of a floor is its own rival: a tough one stronger, trained and with one more Pokémon, a calm one weaker', () => {
   for (const seed of ['a', 'b', 'c', 'd']) {
     const plain = floorAt(9, 25, 'mid', seed, 'trainer');
@@ -100,8 +110,8 @@ test('each way of a floor is its own rival: a tough one stronger, trained and wi
     const calm = floorAt(9, 25, 'mid', seed, 'calm');
     assert.notEqual(tough.foe?.base, plain.foe?.base, seed);
     assert.notEqual(calm.foe?.base, plain.foe?.base, seed);
-    assert.equal(tough.level, plain.level + 2);
-    assert.equal(calm.level, plain.level - 2);
+    assert.ok(calm.level < plain.level && plain.level < tough.level, seed);
+    assert.equal(calm.level, stretchStart(9));
     assert.ok(tough.trained && !calm.trained);
     assert.equal(tough.teamSize, plain.teamSize + 1);
     assert.equal(calm.teamSize, 3);
