@@ -2,7 +2,7 @@
 // can be used, its PP, the announcement, calling rules (Metronome…), and the whole effect of a status move.
 // Attacks go on in damage.ts.
 import type { Weather } from '../../catalog/domain/creatures.js';
-import { aimedTarget, moveAt, moveData, type MoveData, type MoveTarget, STRUGGLE, STRUGGLE_MOVE } from './moves.js';
+import { aimedTarget, hiddenPowerType, moveAt, moveData, type MoveData, type MoveTarget, STRUGGLE, STRUGGLE_MOVE } from './moves.js';
 import { MOVE_RULES } from './move-rules.js';
 import { isSun, stageMult } from './conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState, MoveEvent, OrderReason } from './battle-types.js';
@@ -131,6 +131,7 @@ function adaptMove(battle: BattleState, me: BattleFighter, move: BattleMove): vo
     move.power = 100;
   }
   if (move.id === 'revelation-dance') move.type = me.types[0];
+  if (move.id === 'hidden-power') move.type = hiddenPowerType(me.nature);
   if (move.id === 'photon-geyser' && me.stats.atk * stageMult(me.boosts.atk) > me.stats.satk * stageMult(me.boosts.satk)) move.category = 'physical';
 }
 

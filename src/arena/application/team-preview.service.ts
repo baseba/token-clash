@@ -2,8 +2,9 @@
 // those still arriving), each side picking 3 of its 6 with a clock, the AI's picks, and the
 // reveal of both picks before LiveBattleService starts the battle.
 import { Injectable, Logger } from '@nestjs/common';
-import { aiLevelOf, aiPicks, type AiLevel } from '../../combat/domain/ai.js';
-import { createPreview, fillMissing, pick, picksNeeded, previewReady } from '../../combat/domain/team-preview.js';
+import { aiLevelOf, aiPicks, aiRerollCandidates, aiRerollIndex, type AiLevel } from '../../combat/domain/ai.js';
+import { reroll } from '../../combat/domain/random-party.js';
+import { canReroll, createPreview, fillMissing, pick, picksNeeded, previewReady } from '../../combat/domain/team-preview.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { now } from '../../shared/domain/clock.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
@@ -110,6 +111,20 @@ export class TeamPreviewService {
     else broadcast(room, { t: 'preview' });
   }
 
+  reroll(ws: ClientConnection, index: number): void {
+    const room = this.presence.roomOf(ws);
+    if (room?.phase.kind !== 'preview') return;
+    const { preview } = room.phase;
+    const sideIndex = sideIn(preview.sides, ws.trainerId);
+    if (sideIndex === null) return;
+    try {
+      reroll(preview, sideIndex, index, this.trainers.byId(ws.trainerId!)?.roster ?? []);
+    } catch (error) {
+      return refuse(ws, error, this.logger);
+    }
+    broadcast(room, { t: 'preview' });
+  }
+
   /** People who follow a tournament (on its page or in one of its rooms) and are not AIs. */
   private tournamentFollowers(tournamentId: string): string[] {
     const ids = new Set<string>();
@@ -158,22 +173,35 @@ export class TeamPreviewService {
   /** The AI marks its picks one by one (viewers see them), then confirms. */
   private scheduleAiPick(room: Room, phase: PreviewPhase, sideIndex: number, level: AiLevel): void {
     const { preview } = phase;
-    const choice = aiPicks({ difficulty: level, own: preview.sides[sideIndex].entries });
-    const still = () => room.phase === phase && !preview.sides[sideIndex].picks;
-    const step = this.timings.aiPickMs / (choice.length + 1);
-    choice.forEach((_, i) => {
+    const side = preview.sides[sideIndex];
+    const still = () => room.phase === phase && !side.picks;
+    const count = picksNeeded(preview, sideIndex);
+    const step = this.timings.aiPickMs / (count + 2);
+    let choice: number[] = [];
+    setTimeout(
+      () => {
+        if (!still()) return;
+        if (canReroll(preview, sideIndex)) {
+          reroll(preview, sideIndex, aiRerollIndex({ difficulty: level, own: side.entries }), aiRerollCandidates(side.entries));
+          broadcast(room, { t: 'preview' });
+        }
+        choice = aiPicks({ difficulty: level, own: side.entries });
+      },
+      this.timings.diceAnimationMs + step,
+    ).unref();
+    Array.from({ length: count }).forEach((_, i) => {
       setTimeout(
         () => {
           if (!still()) return;
-          preview.sides[sideIndex].draft = choice.slice(0, i + 1);
+          side.draft = choice.slice(0, i + 1);
           broadcastToViewers(room, preview);
         },
-        this.timings.diceAnimationMs + step * (i + 1),
+        this.timings.diceAnimationMs + step * (i + 2),
       ).unref();
     });
     setTimeout(() => {
       if (!still()) return;
-      pick(preview, sideIndex, choice);
+      pick(preview, sideIndex, choice.length ? choice : aiPicks({ difficulty: level, own: side.entries }));
       if (previewReady(preview)) this.reveal(room, phase);
       else broadcast(room, { t: 'preview' });
     }, this.timings.diceAnimationMs + this.timings.aiPickMs).unref();

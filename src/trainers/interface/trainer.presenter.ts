@@ -1,6 +1,6 @@
 // The JSON shapes the frontend reads for a trainer and their Pokémon. Presenters only read.
 import { abilityInfo } from '../../catalog/domain/abilities.js';
-import { abilityOptions, moveOrigins, speciesData } from '../../catalog/domain/creatures.js';
+import { abilityOptions, moveOrigins, natureFor, natureInfo, NATURE_KEYS, speciesData } from '../../catalog/domain/creatures.js';
 import { buildFighter, movepool, movesetFor, MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import type { Trainer } from '../domain/trainer.js';
@@ -77,6 +77,9 @@ export function monDetail(entry: RosterEntry) {
       chosen: chosen.has(m.key),
     })),
     abilityOptions: abilityOptions(entry).map((a) => ({ ...abilityInfo(a.key), hidden: a.hidden })),
+    currentNature: natureInfo(natureFor(entry) ?? 'hardy'),
+    savedNature: entry.nature ?? null,
+    natureOptions: NATURE_KEYS.map(natureInfo),
     maxMoves: MOVES_PER_FIGHTER,
   };
 }

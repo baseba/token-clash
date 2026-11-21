@@ -30,7 +30,7 @@ test('the AI team rolls the same dice as the random mode', () => {
   for (const difficulty of AI_LEVELS) {
     const team = buildAiTeam({ difficulty, random: rng(`d:${difficulty}`) });
     for (const e of team) {
-      assert.deepEqual(e.ivs, { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 }, difficulty);
+      assert.deepEqual(e.ivs, { hp: 31, atk: 31, def: 31, satk: 31, sdef: 31, spd: 31 }, difficulty);
       assert.equal(e.nature, undefined, difficulty);
     }
   }

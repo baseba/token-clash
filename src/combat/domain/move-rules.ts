@@ -6,7 +6,7 @@ import { TYPES } from '../../catalog/domain/type-chart.js';
 import type { MoveRuleApi } from './move-rule-api.js';
 import type { BattleFighter, BattleMove, SideCondition, Volatiles } from './battle-types.js';
 import { stageMult } from './conditions.js';
-import { moveData, type MoveData } from './moves.js';
+import { FULL_FRIENDSHIP_POWER, moveData, type MoveData } from './moves.js';
 
 /** What a calling move (Metronome, Copycat…) asks the engine to use instead. */
 export interface CalledMove {
@@ -628,8 +628,8 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   'grass-knot': { power: (api, me, target) => weightPower(api.weight(target)) },
   'heavy-slam': { power: (api, me, target) => fixedRatio(api.weight(me) / api.weight(target), [[5, 120], [4, 100], [3, 80], [2, 60], [0, 40]]) },
   'heat-crash': { power: (api, me, target) => fixedRatio(api.weight(me) / api.weight(target), [[5, 120], [4, 100], [3, 80], [2, 60], [0, 40]]) },
-  return: { power: () => 102 },
-  frustration: { power: () => 102 },
+  return: { power: () => FULL_FRIENDSHIP_POWER },
+  frustration: { power: () => FULL_FRIENDSHIP_POWER },
   'trump-card': { power: (api, me, target, move) => [200, 80, 60, 50][me.pp[move.key] ?? 4] ?? 40 },
   punishment: { power: (api, me, target) => Math.min(200, 60 + 20 * positive(target.boosts)) },
   magnitude: {

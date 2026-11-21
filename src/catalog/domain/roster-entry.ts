@@ -35,6 +35,8 @@ export interface RosterEntry {
   moveset?: string[];
   /** Ability chosen in the collection screen (or by the dice). */
   abilityChoice?: string;
+  natureChoice?: string;
+  evs?: Ivs;
   nickname?: string;
   /** Position in its evolution chain (0 = first form) and the chain's length. */
   stage?: number;

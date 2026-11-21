@@ -16,6 +16,7 @@ export interface PreviewSide {
   picks: number[] | null;
   /** What the side has marked so far, shown to spectators. */
   draft?: number[];
+  rerolled?: number;
 }
 
 export interface PreviewState {
@@ -62,6 +63,9 @@ export function fillMissing(preview: PreviewState, random: () => number = Math.r
   });
 }
 
+export const canReroll = (preview: PreviewState, sideIndex: number): boolean =>
+  preview.mode === 'random' && !preview.revealed && preview.sides[sideIndex].rerolled === undefined && !preview.sides[sideIndex].picks;
+
 export const previewReady = (preview: PreviewState): boolean => preview.sides.every((s) => s.picks);
 
 export const chosenEntries = (preview: PreviewState, sideIndex: number): RosterEntry[] =>
@@ -94,6 +98,8 @@ export interface PreviewSideView {
   picks: number[] | null;
   draft: number[] | null;
   locked: number[] | null;
+  canReroll: boolean;
+  rerolled: number | null;
 }
 
 export interface PreviewView {
@@ -121,6 +127,8 @@ export function previewView(preview: PreviewState, viewer: number | null = null)
         picks: own || (watching && preview.revealed) ? side.picks : null,
         draft: watching && !side.picks ? side.draft ?? [] : null,
         locked: watching && !!side.picks ? side.picks : null,
+        canReroll: canReroll(preview, sideIndex),
+        rerolled: side.rerolled ?? null,
       };
     }),
     revealed: !!preview.revealed,
