@@ -6,12 +6,14 @@ import { aimedTarget, hiddenPowerType, moveAt, moveData, type MoveData, type Mov
 import { MOVE_RULES } from './move-rules.js';
 import { isSun, stageMult } from './conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState, MoveEvent, OrderReason } from './battle-types.js';
-import { attack, blockedByProtection, bypassesSub, HIDDEN_BY, hiddenFrom, hits, typeEffectiveness } from './damage.js';
+import { attack, baseDamage, blockedByProtection, bypassesSub, damageRoll, HIDDEN_BY, hiddenFrom, hits, typeEffectiveness } from './damage.js';
 import { faint } from './switching.js';
 import { activeOf, addVolatile, asleep, boost, clearHazards, clearScreens, cure, currentWeather, emit, foeOf, grounded, heal, hurt, nameOf, onField, setScreen, setStatus, setTerrain, setWeather, sideIndexOf, statusImmune } from './effects.js';
 import { abilityKey, anyActiveHas, flag, run, showAbility } from './ability-engine.js';
 import { moveApi } from './move-rule-api.js';
 import { shownTarget } from './battle-view.js';
+
+const CONFUSION_POWER = 40;
 
 const HEALS_WITH_WEATHER: Record<string, Weather> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
 
@@ -61,9 +63,10 @@ function canAct(battle: BattleState, me: BattleFighter, move: BattleMove): boole
     else {
       emit(battle, { t: 'confused', side: sideIndex, name: nameOf(me) });
       if (battle.random() < 1 / 3) {
-        const attack = me.stats.atk * stageMult(me.boosts.atk);
-        const defense = me.stats.def * stageMult(me.boosts.def);
-        hurt(battle, me, (((2 * me.level) / 5 + 2) * 40 * (attack / defense)) / 50 + 2, 'confusion');
+        const attack = Math.max(1, Math.floor(me.stats.atk * stageMult(me.boosts.atk)));
+        const defense = Math.max(1, Math.floor(me.stats.def * stageMult(me.boosts.def)));
+        const roll = damageRoll(battle.random());
+        hurt(battle, me, Math.floor((baseDamage(me.level, CONFUSION_POWER, attack, defense) * roll) / 100), 'confusion');
         return false;
       }
     }

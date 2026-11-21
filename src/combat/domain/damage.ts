@@ -241,7 +241,7 @@ function rollCrit(battle: BattleState, me: BattleFighter, target: BattleFighter,
   if (flag(battle, target, 'critImmune') || battle.sides[sideIndexOf(battle, target)].conds.luckychant) return false;
   if (me.volatiles.laserFocus != null && me.volatiles.laserFocus >= battle.turn) return true;
   const stage = chain(battle, me, 'onCritStage', (move.crit || 0) + (me.volatiles.focusEnergy ? 2 : 0), move, target);
-  return battle.random() < [1 / 16, 1 / 8, 1 / 2, 1][clamp(stage, 0, 3)];
+  return battle.random() < [1 / 24, 1 / 8, 1 / 2, 1][clamp(stage, 0, 3)];
 }
 
 function ruin(battle: BattleState, fighter: BattleFighter, key: string): number {
@@ -285,30 +285,63 @@ export function computeDamage(
   if (crit && defStage > 0) defStage = 0;
   const weather = currentWeather(battle);
 
-  const attack = attacker.stats[atkKey]
-    * stageMult(atkStage)
+  const attack = Math.max(1, pokeRound(Math.floor(attacker.stats[atkKey] * stageMult(atkStage))
     * mul(battle, me, 'onAttack', move, target)
-    * ruin(battle, me, physical ? 'tablets-of-ruin' : 'vessel-of-ruin');
+    * ruin(battle, me, physical ? 'tablets-of-ruin' : 'vessel-of-ruin')));
   const defStat = battle.field.rooms.wonderroom ? (defKey === 'def' ? 'sdef' : 'def') : defKey;
-  let defense = target.stats[defStat]
-    * stageMult(defStage)
+  let defense = Math.max(1, pokeRound(Math.floor(target.stats[defStat] * stageMult(defStage))
     * mul(battle, target, 'onDefense', move, me)
-    * ruin(battle, target, physical ? 'sword-of-ruin' : 'beads-of-ruin');
-  if (weather === 'sand' && !physical && target.types.includes('rock')) defense *= 1.5;
-  if (weather === 'snow' && physical && target.types.includes('ice')) defense *= 1.5;
+    * ruin(battle, target, physical ? 'sword-of-ruin' : 'beads-of-ruin')));
+  if ((weather === 'sand' && !physical && target.types.includes('rock')) || (weather === 'snow' && physical && target.types.includes('ice'))) defense = pokeRound(defense * 1.5);
 
-  let dmg = (((2 * me.level) / 5 + 2) * hitPower * powerMods(battle, me, target, move) * (attack / defense)) / 50 + 2;
+  const power = Math.max(1, pokeRound(hitPower * powerMods(battle, me, target, move)));
   const mw = weatherFor(battle, me);
-  if (isSun(mw)) dmg *= move.type === 'fire' || move.id === 'hydro-steam' ? 1.5 : move.type === 'water' ? 0.5 : 1;
-  if (isRain(mw)) dmg *= move.type === 'water' ? 1.5 : move.type === 'fire' ? 0.5 : 1;
-  if (move.type && me.types.includes(move.type)) dmg *= abilityDef(battle, me)?.stab ?? 1.5;
-  dmg *= eff * (0.85 + battle.random() * 0.15) * (crit ? 1.5 : 1);
-  if (me.status === 'brn' && physical && !flag(battle, me, 'ignoresBurn') && move.id !== 'facade') dmg *= 0.5;
-  if (!crit && screened(battle, me, target, move)) dmg *= 0.5;
-  if ((move.id === 'collision-course' || move.id === 'electro-drift') && eff > 1) dmg *= 5461 / 4096;
-  if (target.volatiles.glaiveRush != null && battle.turn - target.volatiles.glaiveRush <= 1) dmg *= 2;
-  dmg *= mul(battle, me, 'onAttackerFinal', move, target, { eff, crit }) * mul(battle, target, 'onDefenderFinal', move, me, { eff, crit });
-  return { dmg: Math.max(1, Math.round(dmg)), crit };
+  const weatherMod = isSun(mw)
+    ? move.type === 'fire' || move.id === 'hydro-steam' ? 1.5 : move.type === 'water' ? 0.5 : 1
+    : isRain(mw) ? (move.type === 'water' ? 1.5 : move.type === 'fire' ? 0.5 : 1) : 1;
+  let final = !crit && screened(battle, me, target, move) ? 0.5 : 1;
+  if ((move.id === 'collision-course' || move.id === 'electro-drift') && eff > 1) final *= 5461 / 4096;
+  if (target.volatiles.glaiveRush != null && battle.turn - target.volatiles.glaiveRush <= 1) final *= 2;
+  final *= mul(battle, me, 'onAttackerFinal', move, target, { eff, crit }) * mul(battle, target, 'onDefenderFinal', move, me, { eff, crit });
+  const dmg = finishDamage(baseDamage(me.level, power, attack, defense), {
+    weather: weatherMod,
+    crit,
+    roll: damageRoll(battle.random()),
+    stab: move.type && me.types.includes(move.type) ? abilityDef(battle, me)?.stab ?? 1.5 : 1,
+    eff,
+    burned: me.status === 'brn' && physical && !flag(battle, me, 'ignoresBurn') && move.id !== 'facade',
+    final,
+  });
+  return { dmg, crit };
+}
+
+export const pokeRound = (value: number): number => (value % 1 > 0.5 ? Math.ceil(value) : Math.floor(value));
+
+export const damageRoll = (random: number): number => 85 + Math.min(15, Math.floor(random * 16));
+
+export function baseDamage(level: number, power: number, attack: number, defense: number): number {
+  return Math.floor(Math.floor(Math.floor((2 * level) / 5 + 2) * power * attack / defense) / 50) + 2;
+}
+
+export interface DamageModifiers {
+  weather: number;
+  crit: boolean;
+  roll: number;
+  stab: number;
+  eff: number;
+  burned: boolean;
+  final: number;
+}
+
+export function finishDamage(base: number, mods: DamageModifiers): number {
+  let dmg = pokeRound(base * mods.weather);
+  if (mods.crit) dmg = Math.floor(dmg * 1.5);
+  dmg = Math.floor((dmg * mods.roll) / 100);
+  dmg = pokeRound(dmg * mods.stab);
+  dmg = Math.floor(dmg * mods.eff);
+  if (mods.burned) dmg = Math.floor(dmg / 2);
+  dmg = pokeRound(dmg * mods.final);
+  return Math.max(1, dmg);
 }
 
 function applySecondaries(battle: BattleState, me: BattleFighter, target: BattleFighter, move: BattleMove): void {
