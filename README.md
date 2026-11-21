@@ -39,8 +39,10 @@ En vivo: **https://clash.mirrordev.xyz**
      un campeón, de todas las regiones y sin repetirse, con su tipo, su escenario, la música de su región y su as. Los
      entrenadores de ruta usan Pokémon de su tema. Ves cada piso como un mapa visto desde arriba, dibujado según el
      escenario de la pelea, con los sprites de mapa de los entrenadores; caminas hasta el rival, te ve y empieza la
-     pelea en nuestros fondos. Ganas experiencia (curva media-rápida y fórmula escalada de la 5.ª generación), subes
-     de nivel sin pasar el tope del piso siguiente, evolucionas hacia la forma que criaste (las que evolucionan por
+     pelea en nuestros fondos. Los niveles siguen a Emerald Rogue: los rivales de ruta van bajo tu tope (la tranquila al nivel del jefe anterior,
+     la normal a medio camino, la difícil 2 bajo el tope) y los jefes pelean justo en él. Ganas experiencia (curva media-rápida y fórmula escalada de la 5.ª generación), subes
+     de nivel sin pasar el tope del piso siguiente (más rápido mientras más lejos estás de él; los pisos sin pelea
+     te entrenan a medio camino), evolucionas hacia la forma que criaste (las que evolucionan por
      piedra o intercambio lo hacen a un nivel justo según su poder) y aprendes movimientos. Entre pisos eliges premios
      de tres rarezas, cada uno dice a quién le sirve y por qué (MT, tutor, vitaminas, Menta, Cápsula y Parche
      Habilidad, Caramelos, Piedra Evolutiva y Huevo Suerte), puedes cambiarlos una vez, y cambias movimientos y

@@ -3,10 +3,11 @@
 // a rest stop, a den, a villain hideout, a dark deal). Every 5 floors a gym leader, and at the end of
 // each block of 25 (or of a shorter climb) four of the Elite Four and a champion. Leaders, Elite Four
 // and champions come from every region, never repeated in a climb, each with its type, its scene, its
-// region's music and its own words. Your Pokémon never outgrow the floor ahead (a level cap, like in
-// challenge runs) while rivals start a level over you and pull further ahead every few floors, so the
-// climb gets harder and is won by the team and the plan. Each way of a floor brings its own rival: a
-// calm one is weaker, a tough one stronger, trained and with one more Pokémon.
+// region's music and its own words. Levels follow Emerald Rogue: your Pokémon never outgrow the floor
+// ahead (a level cap), bosses fight right at that cap, and route rivals stay below it: a calm one at
+// the level of the last boss, a plain one halfway, a tough one just under your cap but trained and
+// with one more Pokémon. The challenge is the bosses and how rivals are built, not levels you can't
+// reach. Difficulty moves levels by one at most; it trains more rivals and sharpens the AI.
 import type { AiLevel } from '../../combat/domain/ai.js';
 import { hash, rng, shuffled, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
 import { CLASS_TRAINERS, SIGNATURE } from '../../catalog/domain/trainer-goals.js';
@@ -62,14 +63,15 @@ export interface Floor {
 }
 
 const LEVELS_PER_FLOOR = 1.9;
-const BOSS_LEVELS: Record<FloorKind, number> = { trainer: 0, gym: 1, elite: 2, champion: 3 };
-const ROOM_LEVELS: Partial<Record<RoomKind, number>> = { tough: 2, calm: -2, hideout: 1 };
+const BOSS_LEVELS: Record<FloorKind, number> = { trainer: 0, gym: 0, elite: 0, champion: 1 };
+/** A tough rival is this many levels under your cap (Emerald Rogue uses 5 for full parties of 6; battles here are 3 against 3). */
+const TOUGH_BELOW = 2;
 const ROOM_STRENGTH: Partial<Record<RoomKind, Strength>> = { tough: 'strong', calm: 'weak', hideout: 'strong' };
-const DIFFICULTY_LEVELS: Record<AiLevel, number> = { easy: -1, mid: 1, hard: 2, veryhard: 3, skynet: 3 };
-/** Rivals gain a level on your party every this many floors. */
-const RAMP_FLOORS = 6;
-/** From which floor each difficulty's rivals are trained (natures and EVs); never on easy. */
-const TRAINED_FROM: Record<AiLevel, number> = { easy: Infinity, mid: 10, hard: 1, veryhard: 1, skynet: 1 };
+const DIFFICULTY_LEVELS: Record<AiLevel, number> = { easy: -1, mid: 0, hard: 0, veryhard: 1, skynet: 1 };
+/** From which floor each difficulty trains its plain route rivals (natures and EVs). */
+const ROUTES_TRAINED_FROM: Record<AiLevel, number> = { easy: Infinity, mid: Infinity, hard: 10, veryhard: 1, skynet: 1 };
+/** From which floor each difficulty trains its bosses. */
+const BOSSES_TRAINED_FROM: Record<AiLevel, number> = { easy: Infinity, mid: 10, hard: 1, veryhard: 1, skynet: 1 };
 const WARM_UP_FLOORS = 2;
 /** Before this level a party knows little more than Normal moves: no Ghost-themed rival. */
 const GHOSTS_FROM_LEVEL = 15;
@@ -100,17 +102,26 @@ function variantOf(base: string, seed: string): string {
 /** The level of the floor: the rivals' base and the most your Pokémon can reach before fighting it. */
 export const levelCap = (floor: number): number => Math.min(MAX_LEVEL, Math.round(START_LEVEL + (floor - 1) * LEVELS_PER_FLOOR));
 
+/** Where the rivals of a stretch between bosses start: the cap of the last boss, or below your starters before the first. */
+export function stretchStart(floor: number): number {
+  const lastBoss = Math.floor((floor - 1) / GYM_EVERY) * GYM_EVERY;
+  return lastBoss ? levelCap(lastBoss) : START_LEVEL - 2;
+}
+
 export function foeLevel(floor: number, kind: FloorKind, difficulty: AiLevel, room: RoomKind | null = null): number {
-  const ramp = Math.floor((floor - 1) / RAMP_FLOORS);
-  return Math.min(MAX_LEVEL, Math.max(2, levelCap(floor) + BOSS_LEVELS[kind] + DIFFICULTY_LEVELS[difficulty] + ramp + (ROOM_LEVELS[room ?? 'trainer'] ?? 0)));
+  const cap = levelCap(floor);
+  const start = Math.min(stretchStart(floor), cap);
+  const route = room === 'calm' || room === 'hideout' ? start : room === 'tough' ? Math.max(start, cap - TOUGH_BELOW) : Math.round((start + cap) / 2);
+  const level = kind === 'trainer' ? route : cap + BOSS_LEVELS[kind];
+  return Math.min(MAX_LEVEL, Math.max(2, level + DIFFICULTY_LEVELS[difficulty]));
 }
 
 /** Always at least the 3 a battle takes; later rivals bring more, so they also choose. A tough rival brings one more, a calm one just 3. */
 export function teamSize(floor: number, kind: FloorKind, room: RoomKind | null = null): number {
   if (kind === 'champion' || kind === 'elite') return 6;
-  if (kind === 'gym') return Math.min(6, 4 + Math.floor(floor / 12));
+  if (kind === 'gym') return floor <= 5 ? 3 : floor <= 15 ? 4 : floor <= 20 ? 5 : 6;
   if (room === 'calm') return 3;
-  return Math.min(6, 3 + Math.floor(floor / 8) + (room === 'tough' || room === 'hideout' ? 1 : 0));
+  return Math.min(6, 3 + (floor >= 10 ? 1 : 0) + (floor >= 25 ? 1 : 0) + (room === 'tough' || room === 'hideout' ? 1 : 0));
 }
 
 function championFloor(floor: number, length: number | null): number {
@@ -193,7 +204,7 @@ export function floorAt(floor: number, length: number | null, difficulty: AiLeve
     room: chosen,
     level: foeLevel(floor, kind, difficulty, chosen),
     teamSize: teamSize(floor, kind, chosen),
-    trained: chosen !== 'calm' && (floor >= TRAINED_FROM[difficulty] || chosen === 'tough' || (kind !== 'trainer' && difficulty !== 'easy')),
+    trained: kind === 'trainer' ? chosen === 'tough' || chosen === 'hideout' || (chosen !== 'calm' && floor >= ROUTES_TRAINED_FROM[difficulty]) : floor >= BOSSES_TRAINED_FROM[difficulty],
     strength: kind === 'trainer' ? (ROOM_STRENGTH[chosen ?? 'trainer'] ?? 'normal') : 'strong',
   };
   if (chosen && !ROOMS[chosen].battle)
