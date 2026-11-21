@@ -28,7 +28,7 @@ export function tintFilter(hex) {
   const delta = max - min;
   const hue = delta === 0 ? 0 : max === r ? ((g - b) / delta) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
   const SEPIA_HUE = 38;
-  return `sepia(1) saturate(${delta < 0.15 ? 0.4 : 3.2}) hue-rotate(${Math.round(hue * 60 - SEPIA_HUE)}deg) drop-shadow(0 0 3px ${hex})`;
+  return `sepia(1) saturate(${delta < 0.15 ? 0.6 : 6}) hue-rotate(${Math.round(hue * 60 - SEPIA_HUE)}deg) brightness(1.08) drop-shadow(0 0 4px ${hex}) drop-shadow(0 0 9px ${hex})`;
 }
 
 export const statusAnim = (status) => STATUS_ANIMS[status] ?? null;
