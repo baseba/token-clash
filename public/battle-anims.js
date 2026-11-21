@@ -20,15 +20,17 @@ const CONDITION_ANIMS = { protect: 'common-protect', confusion: 'common-confusio
 const WEATHER_ANIMS = { sun: 'common-sunny', harshsun: 'common-harsh-sun', rain: 'common-rain', heavyrain: 'common-heavy-rain', sand: 'common-sandstorm', hail: 'common-hail', snow: 'common-snow', wind: 'common-strong-winds' };
 const TERRAIN_ANIMS = { electric: 'common-electric-terrain', grassy: 'common-grassy-terrain', misty: 'common-misty-terrain', psychic: 'common-psychic-terrain' };
 
-export function tintFilter(hex) {
-  if (!hex) return '';
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-  const hue = delta === 0 ? 0 : max === r ? ((g - b) / delta) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
-  const SEPIA_HUE = 38;
-  return `sepia(1) saturate(${delta < 0.15 ? 0.6 : 6}) hue-rotate(${Math.round(hue * 60 - SEPIA_HUE)}deg) brightness(1.08) drop-shadow(0 0 4px ${hex}) drop-shadow(0 0 9px ${hex})`;
+const TINT_CORE = 0.55;
+
+export function tintPixels(data, hex) {
+  const tint = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  for (let i = 0; i < data.length; i += 4) {
+    if (!data[i + 3]) continue;
+    const light = (data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11) / 255;
+    const core = light ** 3 * TINT_CORE;
+    const body = Math.min(1, light * 1.25);
+    for (let c = 0; c < 3; c++) data[i + c] = Math.round(tint[c] * body * (1 - core) + 255 * core);
+  }
 }
 
 export const statusAnim = (status) => STATUS_ANIMS[status] ?? null;
@@ -125,6 +127,35 @@ export function createAnimPlayer(field) {
 
   // A sheet by its key, from the first of its URLs that loads: CSS backgrounds have no error
   // fallback of their own, so they use the loaded image's src.
+  const tintedSheets = new Map();
+  function tintedSheet(sheet, hex) {
+    const key = `${sheet.src}|${hex}`;
+    if (!tintedSheets.has(key)) {
+      tintedSheets.set(key, new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const g = canvas.getContext('2d');
+            g.drawImage(img, 0, 0);
+            const pixels = g.getImageData(0, 0, canvas.width, canvas.height);
+            tintPixels(pixels.data, hex);
+            g.putImageData(pixels, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          } catch {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = sheet.src;
+      }));
+    }
+    return tintedSheets.get(key);
+  }
+
   function loadImage(graphic) {
     if (!graphic) return Promise.resolve(null);
     if (!images.has(graphic)) {
@@ -224,6 +255,7 @@ export function createAnimPlayer(field) {
     const cell = CELL * geo.scale;
     const sheet = await loadImage(config.graphic);
     if (config.graphic && !sheet) return false;
+    const sheetSrc = sheet ? (tint && (await withTimeout(tintedSheet(sheet, tint)))) || sheet.src : null;
     const columns = sheet ? sheetColumns(sheet.naturalWidth) : 1;
     const mons = [userEl, targetEl].map(shownSprite);
     const graphics = [];
@@ -253,14 +285,14 @@ export function createAnimPlayer(field) {
         zIndex: entry[11] === 2 ? '0' : '1',
         width: `${cell}px`,
         height: `${cell}px`,
-        backgroundImage: sheet ? `url("${sheet.src}")` : '',
+        backgroundImage: sheet ? `url("${sheetSrc}")` : '',
         backgroundSize: sheet ? `${(sheet.naturalWidth / CELL) * cell}px ${(sheet.naturalHeight / CELL) * cell}px` : '',
         backgroundPosition: `${-(frame % columns) * cell}px ${-Math.floor(frame / columns) * cell}px`,
         transform: `translate(${p.x - cell / 2}px, ${p.y - cell / 2}px) rotate(${p.angle}deg) scale(${p.scaleX}, ${p.scaleY})`,
         opacity: String(entry[10] / 255),
         visibility: entry[7] ? 'visible' : 'hidden',
         mixBlendMode: BLEND[entry[8]] ?? 'normal',
-        filter: [toneFilter(entry[13]), tintFilter(tint)].filter(Boolean).join(' '),
+        filter: toneFilter(entry[13]),
       });
     };
 

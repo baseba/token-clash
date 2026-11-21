@@ -149,3 +149,14 @@ test('a wave move ends when its wave is gone, so the damage lands right after it
     assert.ok(animLength(player) <= 50, `${key} lasts ${animLength(player)} frames`);
   }
 });
+
+test('a type-shifting move tints its white sheet with the type color, keeping a bright core', async () => {
+  const { tintPixels } = await import('../../public/battle-anims.js');
+  const pixels = new Uint8ClampedArray([255, 255, 255, 255, 128, 128, 128, 255, 0, 0, 0, 0]);
+  tintPixels(pixels, '#e8603c');
+  const [r, g, b] = pixels;
+  assert.ok(r > g && g > b, 'the white pixel turns toward the fire color');
+  assert.ok(b > 60, 'the brightest pixels keep a light core');
+  assert.ok(pixels[4] > pixels[6] && pixels[4] < 200, 'a mid pixel takes the color without the core');
+  assert.deepEqual([...pixels.slice(8)], [0, 0, 0, 0], 'transparent pixels stay untouched');
+});
