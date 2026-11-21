@@ -20,6 +20,17 @@ const CONDITION_ANIMS = { protect: 'common-protect', confusion: 'common-confusio
 const WEATHER_ANIMS = { sun: 'common-sunny', harshsun: 'common-harsh-sun', rain: 'common-rain', heavyrain: 'common-heavy-rain', sand: 'common-sandstorm', hail: 'common-hail', snow: 'common-snow', wind: 'common-strong-winds' };
 const TERRAIN_ANIMS = { electric: 'common-electric-terrain', grassy: 'common-grassy-terrain', misty: 'common-misty-terrain', psychic: 'common-psychic-terrain' };
 
+export function tintFilter(hex) {
+  if (!hex) return '';
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const hue = delta === 0 ? 0 : max === r ? ((g - b) / delta) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+  const SEPIA_HUE = 38;
+  return `sepia(1) saturate(${delta < 0.15 ? 0.4 : 3.2}) hue-rotate(${Math.round(hue * 60 - SEPIA_HUE)}deg) drop-shadow(0 0 3px ${hex})`;
+}
+
 export const statusAnim = (status) => STATUS_ANIMS[status] ?? null;
 export const causeAnim = (cause) => CAUSE_ANIMS[cause] ?? null;
 export const conditionAnim = (kind) => CONDITION_ANIMS[kind] ?? null;
@@ -201,7 +212,7 @@ export function createAnimPlayer(field) {
     }
   }
 
-  async function play(key, { userSpot, targetSpot = userSpot, byPlayer = true }) {
+  async function play(key, { userSpot, targetSpot = userSpot, byPlayer = true, tint = null }) {
     if (reduced()) return true;
     const anim = await withTimeout(load(key));
     const variant = pickVariant(anim, byPlayer);
@@ -212,6 +223,7 @@ export function createAnimPlayer(field) {
     const geo = { user: center(userEl), target: center(targetEl), scale: 1, width: FIELD.width, height: FIELD.height };
     const cell = CELL * geo.scale;
     const sheet = await loadImage(config.graphic);
+    if (config.graphic && !sheet) return false;
     const columns = sheet ? sheetColumns(sheet.naturalWidth) : 1;
     const mons = [userEl, targetEl].map(shownSprite);
     const graphics = [];
@@ -248,7 +260,7 @@ export function createAnimPlayer(field) {
         opacity: String(entry[10] / 255),
         visibility: entry[7] ? 'visible' : 'hidden',
         mixBlendMode: BLEND[entry[8]] ?? 'normal',
-        filter: toneFilter(entry[13]),
+        filter: [toneFilter(entry[13]), tintFilter(tint)].filter(Boolean).join(' '),
       });
     };
 
@@ -308,6 +320,10 @@ export function createAnimPlayer(field) {
 
   return {
     play,
+    async bare(key) {
+      const anim = await withTimeout(load(key));
+      return !!anim?.length && anim.every((side) => !side.graphic && !side.bg?.length);
+    },
     preload(keys) {
       for (const key of new Set(keys)) if (key) load(key);
     },

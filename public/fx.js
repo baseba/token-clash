@@ -1,4 +1,5 @@
 import { createBallBursts } from './ball-burst.js?v=dev';
+import { TYPES } from './types.js?v=dev';
 import { ballFx } from './ball-fx.js?v=dev';
 import { causeAnim, chargeAnim, conditionAnim, createAnimPlayer, shownSprite, statusAnim, terrainAnim, weatherAnim } from './battle-anims.js?v=dev';
 
@@ -110,6 +111,8 @@ export function moveShape(ev) {
   if (flags.includes('contact')) return 'strike';
   return 'projectile';
 }
+
+const TYPE_SHIFTING_MOVES = new Set(['hidden-power', 'revelation-dance', 'weather-ball', 'terrain-pulse']);
 
 export function createFx(arena, field = arena) {
   const layer = document.createElement('div');
@@ -899,9 +902,11 @@ export function createFx(arena, field = arena) {
   }
 
   return {
-    move(ev, fromSpot, toSpot) {
+    async move(ev, fromSpot, toSpot) {
       const targetSpot = ev.target === 'self' ? fromSpot : toSpot;
-      return playOr(ev.key, { userSpot: fromSpot, targetSpot }, () => synthMove(ev, fromSpot, toSpot));
+      const tint = TYPE_SHIFTING_MOVES.has(ev.key) && ev.type && ev.type !== 'normal' ? TYPES[ev.type]?.color ?? null : null;
+      if (await anims.bare(ev.key)) return Promise.all([anims.play(ev.key, { byPlayer: isMe(fromSpot), userSpot: fromSpot, targetSpot, tint }), synthMove(ev, fromSpot, toSpot)]);
+      return playOr(ev.key, { userSpot: fromSpot, targetSpot, tint }, () => synthMove(ev, fromSpot, toSpot));
     },
     charge(key, spot, otherSpot) {
       return playOr(chargeAnim(key), { userSpot: spot, targetSpot: otherSpot }, () => Promise.resolve());
