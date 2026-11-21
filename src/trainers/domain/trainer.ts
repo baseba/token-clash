@@ -195,6 +195,17 @@ export class Trainer implements TrainerState {
     return (this.duplicates ?? []).filter((duplicate) => !done.has(duplicate.id));
   }
 
+  topUpRecycled(): number {
+    let added = 0;
+    this.recycled = (this.recycled ?? []).map((record) => {
+      const owed = recycleReward(record);
+      if (record.tokens >= owed) return record;
+      added += owed - record.tokens;
+      return { ...record, tokens: owed };
+    });
+    return added;
+  }
+
   /** @throws {DomainError} the Pokémon is not a repeated one, or it was already recycled */
   recycle(entryId: string, at: number): RecycledRecord {
     if ((this.recycled ?? []).some((record) => record.id === entryId)) throw conflict('Ese Pokémon ya pasó por la trituradora.');

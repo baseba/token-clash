@@ -41,6 +41,7 @@ export class TrainersService implements OnModuleInit {
     let relooked = 0;
     let refunded = 0;
     let moved = 0;
+    let recycledUp = 0;
     const retiredPrices = {
       ...Object.fromEntries(Object.entries({ ...RETIRED_SHOP_TRAINERS, ...RETIRED_RECOLORS }).map(([key, rarity]) => [`trainer:${key}`, RARITIES[rarity].price])),
       ...Object.fromEntries(Object.entries(RETIRED_BALLS).map(([key, rarity]) => [`ball:${key}`, RARITIES[rarity].price])),
@@ -50,7 +51,9 @@ export class TrainersService implements OnModuleInit {
       const dropped = trainer.dropRepeatedSpecies();
       const released = trainer.releaseShopLook();
       const refund = trainer.refundRetired(retiredPrices);
-      if (renamed || dropped || released || refund) this.trainers.save(trainer);
+      const toppedUp = trainer.topUpRecycled();
+      if (renamed || dropped || released || refund || toppedUp) this.trainers.save(trainer);
+      if (toppedUp) recycledUp += 1;
       if (renamed) moved += 1;
       if (dropped) fixed += 1;
       if (released) relooked += 1;
@@ -59,6 +62,7 @@ export class TrainersService implements OnModuleInit {
     if (moved) this.logger.log(`Pasé ${moved} entrenador(es) a los nombres nuevos de sus recolores.`);
     if (fixed) this.logger.log(`Quité especies repetidas de ${fixed} entrenador(es).`);
     if (refunded) this.logger.log(`Devolví los tokens de lo que ya no se vende en la tienda a ${refunded} entrenador(es).`);
+    if (recycledUp) this.logger.log(`Completé lo que faltaba del reciclaje a la tarifa nueva a ${recycledUp} entrenador(es).`);
     if (relooked) this.logger.log(`${relooked} entrenador(es) tenían un entrenador que ahora se vende en la tienda: les tocó otro.`);
   }
 
