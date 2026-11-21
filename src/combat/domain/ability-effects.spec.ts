@@ -341,3 +341,19 @@ test('every species with every one of its abilities can fight to the end', () =>
   }
   assert.ok(buildFighter(mon(1, 'overgrow')).moves.every((m) => m.category && m.pp > 0));
 });
+
+test('a form change keeps the nature and the EVs of the Pokémon', () => {
+  const trained = { nature: 'modest', evs: { hp: 6, atk: 0, def: 0, satk: 252, sdef: 0, spd: 252 } };
+  const plain = duel(mon(68, 'guts'), mon(555, 'zen-mode'));
+  const boosted = duel(mon(68, 'guts'), mon(555, 'zen-mode', trained));
+  for (const b of [plain, boosted]) {
+    const darm = fighter(b, 1);
+    darm.hp = Math.floor(darm.stats.hp / 2);
+    turn(b, idle(b, 0), idle(b, 1));
+  }
+  const [zen, trainedZen] = [fighter(plain, 1), fighter(boosted, 1)];
+  assert.equal(trainedZen.form, 'darmanitan-zen');
+  assert.ok(trainedZen.stats.satk > Math.floor(zen.stats.satk * 1.1), 'modest and 252 EVs still raise the special attack');
+  assert.ok(trainedZen.stats.atk < zen.stats.atk, 'modest still lowers the attack');
+  assert.equal(trainedZen.speciesBase.satk, 140, 'the info card reads the base of the new form');
+});

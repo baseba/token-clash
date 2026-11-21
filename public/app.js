@@ -462,7 +462,7 @@ function infoCard(f, { own, owner, close }) {
       ? h('section', null, h('div', { class: 'stats-head' }, h('h3', null, 'Características'), natureTag(f)), h('div', { class: 'info-stats' }, [['PS', 'hp'], ['Ataque', 'atk'], ['Defensa', 'def'], ['At. Esp.', 'satk'], ['Def. Esp.', 'sdef'], ['Velocidad', 'spd']].map(([l, k]) => {
           const stage = k === 'hp' ? 0 : f.boosts?.[k] ?? 0;
           const now = Math.floor(f.stats[k] * stageMult(k, stage));
-          const breakdown = f.baseStats ? statBreakdown(k, f.baseStats[k], f.evs?.[k] ?? 0, f.natureInfo) : null;
+          const breakdown = f.speciesBase ? statBreakdown(k, f.speciesBase[k], f.evs?.[k] ?? 0, f.natureInfo) : null;
           return h('span', { class: [stage > 0 ? 'up' : stage < 0 ? 'down' : null, natureClass(f, k)].filter(Boolean).join(' ') || null, tabindex: 0, 'data-tip': [breakdown, stage ? `${f.stats[k]} sin cambios · ${multText(k, stage)}` : null].filter(Boolean).join(' · ') || null }, h('b', null, now, stage ? h('i', { 'aria-hidden': 'true' }, stage > 0 ? ' ▲' : ' ▼') : null), h('span', { class: 'stat-name' }, l, natureMark(f, k)), evGain(f, k));
         })))
       : null,
@@ -3326,7 +3326,7 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
   const sameSpread = (a, b) => STAT_KEYS.every((key) => a[key] === b[key]);
   const statsWith = (natureKey, ivSet, evSet) => {
     const info = natureByKey.get(natureKey);
-    return Object.fromEntries(STAT_KEYS.map((key) => [key, statValue(key, mon.baseStats[key], ivSet[key], evSet[key], mon.level, info?.up === key ? 1.1 : info?.down === key ? 0.9 : 1)]));
+    return Object.fromEntries(STAT_KEYS.map((key) => [key, statValue(key, mon.speciesBase[key], ivSet[key], evSet[key], mon.level, info?.up === key ? 1.1 : info?.down === key ? 0.9 : 1)]));
   };
   let filter = '';
   let onlyUsable = true;
@@ -3352,7 +3352,7 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
       h('span', { class: 'ng-head up', 'aria-hidden': 'true' }, STAT_SHORT[up]),
       ...NATURE_STATS.map((down) => {
         const option = natureAt(up, down);
-        const suggested = SUGGESTED_NATURES[mon.baseStats.atk >= mon.baseStats.satk ? 'physical' : 'special'].includes(option.key);
+        const suggested = SUGGESTED_NATURES[mon.speciesBase.atk >= mon.speciesBase.satk ? 'physical' : 'special'].includes(option.key);
         const cell = h('button', { type: 'button', role: 'radio', class: `ng-cell${up === down ? ' neutral' : ''}${suggested ? ' suggested' : ''}`, 'aria-label': `${natureLabel(option)}${suggested ? ', recomendada' : ''}`, 'data-tip': `${natureLabel(option)}${suggested ? ' · recomendada para este Pokémon' : ''}`, onclick: () => pickNature(option.key) },
           suggested ? h('i', { class: 'ng-star', 'aria-hidden': 'true' }, '★') : null,
           h('span', null, option.name),
@@ -3370,7 +3370,7 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
     paint();
   }
 
-  const physical = mon.baseStats.atk >= mon.baseStats.satk;
+  const physical = mon.speciesBase.atk >= mon.speciesBase.satk;
   const spread = (values) => Object.fromEntries(STAT_KEYS.map((key) => [key, values[key] ?? 0]));
   const EV_PRESETS = [
     { label: 'Sugerido', note: physical ? 'Ataque y Velocidad al máximo: pega fuerte y primero.' : 'At. Esp. y Velocidad al máximo: pega fuerte y primero.', evs: spread(physical ? { atk: 252, spd: 252, hp: 6 } : { satk: 252, spd: 252, hp: 6 }), star: true },
@@ -3467,7 +3467,7 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
     for (const row of statRows) {
       const value = now[row.k];
       const change = value - before[row.k];
-      row.el.dataset.tip = statBreakdown(row.k, mon.baseStats[row.k], evs[row.k], picked);
+      row.el.dataset.tip = statBreakdown(row.k, mon.speciesBase[row.k], evs[row.k], picked);
       row.el.classList.toggle('up', picked.up === row.k);
       row.el.classList.toggle('down', picked.down === row.k);
       tweenNumber(row.value, value);
@@ -4541,7 +4541,7 @@ function prepInfoCard(f, { own, foes, close, action }) {
       h('div', null, h('h2', null, f.name, ' ', genderMark(f.gender) ?? ''), typeChips(f.types ?? []), own && f.abilityInfo ? h('p', { class: 'prep-ability' }, abilityChip(f.abilityInfo), ' ', h('span', { class: 'muted small' }, f.abilityInfo.desc)) : null),
     ),
     h('section', { class: 'prep-matchup' }, ...(matchup.length ? matchup : [h('p', { class: 'muted' }, 'Sin ventajas ni amenazas de tipo contra el otro equipo.')])),
-    own && f.baseStats ? h('section', null, h('div', { class: 'stats-head' }, h('h3', null, 'Stats'), natureTag(f)), statChips(f)) : null,
+    own && f.speciesBase ? h('section', null, h('div', { class: 'stats-head' }, h('h3', null, 'Stats'), natureTag(f)), statChips(f)) : null,
     own
       ? h('section', null, h('ul', { class: 'info-moves' }, f.moves.map((m) => h('li', null, ...moveDetails(m)))))
       : h('section', null, h('p', { class: 'muted small' }, 'Sus movimientos y su habilidad se descubren durante la pelea.')),
@@ -4562,7 +4562,7 @@ function natureTag(f) {
 }
 
 function statChips(f) {
-  return h('div', { class: 'stat-chips' }, STAT_ROWS.map(([label, key]) => h('span', { class: natureClass(f, key), tabindex: 0, 'data-tip': `${label}: ${statBreakdown(key, f.baseStats[key], f.evs?.[key] ?? 0, f.natureInfo)}` },
+  return h('div', { class: 'stat-chips' }, STAT_ROWS.map(([label, key]) => h('span', { class: natureClass(f, key), tabindex: 0, 'data-tip': `${label}: ${statBreakdown(key, f.speciesBase[key], f.evs?.[key] ?? 0, f.natureInfo)}` },
     h('small', null, STAT_SHORT[key], natureMark(f, key)),
     h('b', null, f.stats[key]),
     evGain(f, key) ?? h('small', { class: 'ev-gain none' }, '·'))));

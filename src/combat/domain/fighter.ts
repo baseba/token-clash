@@ -25,7 +25,7 @@ export interface Fighter {
   nature: string | null;
   natureInfo: NatureInfo | null;
   evs: Ivs;
-  baseStats: Stats;
+  speciesBase: Stats;
   ivs: Ivs;
 }
 
@@ -95,6 +95,6 @@ export function buildFighter(entry: RosterEntry): Fighter {
     natureInfo: nature ? natureInfo(nature) : null,
     ivs: iv,
     evs,
-    baseStats: sp.stats,
+    speciesBase: sp.stats,
   };
 }
