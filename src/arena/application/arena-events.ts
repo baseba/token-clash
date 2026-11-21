@@ -1,6 +1,6 @@
-// Events inside the arena. A finished match doesn't know about tournaments (the dependency goes
-// the other way: tournaments use matches), so it announces that it ended and whoever cares — the
-// tournament that scheduled it — reacts.
+// Events of the arena. A finished match doesn't know about tournaments or the Tower (the dependency
+// goes the other way: they use matches), so it announces that it ended and whoever cares — the
+// tournament or the climb that scheduled it — reacts.
 import { Injectable } from '@nestjs/common';
 import { EventEmitter } from 'node:events';
 import type { Challenge } from '../domain/challenge.js';

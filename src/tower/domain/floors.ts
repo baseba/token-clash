@@ -1,0 +1,242 @@
+// What waits on each floor of the Tower. Between two bosses you choose your way, like the adventure
+// paths of Emerald Rogue: each plain floor offers two or three rooms (a trainer, a tough or calm one,
+// a rest stop, a den, a villain hideout, a dark deal). Every 5 floors a gym leader, and at the end of
+// each block of 25 (or of a shorter climb) four of the Elite Four and a champion. Leaders, Elite Four
+// and champions come from every region, never repeated in a climb, each with its type, its scene, its
+// region's music and its own words. Your Pokémon never outgrow the floor ahead (a level cap, like in
+// challenge runs) while rivals start a level over you and pull further ahead every few floors, so the
+// climb gets harder and is won by the team and the plan. Each way of a floor brings its own rival: a
+// calm one is weaker, a tough one stronger, trained and with one more Pokémon.
+import type { AiLevel } from '../../combat/domain/ai.js';
+import { hash, rng, shuffled, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
+import { CLASS_TRAINERS, SIGNATURE } from '../../catalog/domain/trainer-goals.js';
+import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, TRAINER_VARIANTS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
+import {
+  BOSS_LINES,
+  ELITE_FLOORS,
+  GYM_EVERY,
+  LEAGUE_BLOCK,
+  MAX_LEVEL,
+  MUSIC,
+  NAMES,
+  REGIONS,
+  ROOMS,
+  ROUTE_SCENES,
+  START_LEVEL,
+  TYPE_LINES,
+  TYPE_SCENES,
+  type Region,
+  type RoomKind,
+} from '../../catalog/domain/tower-cast.js';
+
+export type FloorKind = 'trainer' | 'gym' | 'elite' | 'champion';
+export type Strength = 'weak' | 'normal' | 'strong';
+
+export interface Foe {
+  /** The trainer sprite (a colour variant or the original). */
+  key: string;
+  base: string;
+  name: string;
+  title: string;
+}
+
+export interface Floor {
+  number: number;
+  kind: FloorKind;
+  room: RoomKind | null;
+  foe: Foe | null;
+  type: string | null;
+  types: readonly string[];
+  /** Species a themed class always brings (a team's grunts, a Harlequin's Mr. Mime…). */
+  species: readonly number[];
+  /** The boss's ace, as a fully evolved species. */
+  signature: number | null;
+  scene: string;
+  music: string;
+  level: number;
+  teamSize: number;
+  trained: boolean;
+  /** Which part of the theme's species it draws from: the weakest, any, or the strongest. */
+  strength: Strength;
+  lines: { hello: string; lose: string };
+}
+
+const LEVELS_PER_FLOOR = 1.9;
+const BOSS_LEVELS: Record<FloorKind, number> = { trainer: 0, gym: 1, elite: 2, champion: 3 };
+const ROOM_LEVELS: Partial<Record<RoomKind, number>> = { tough: 2, calm: -2, hideout: 1 };
+const ROOM_STRENGTH: Partial<Record<RoomKind, Strength>> = { tough: 'strong', calm: 'weak', hideout: 'strong' };
+const DIFFICULTY_LEVELS: Record<AiLevel, number> = { easy: -1, mid: 1, hard: 2, veryhard: 3, skynet: 3 };
+/** Rivals gain a level on your party every this many floors. */
+const RAMP_FLOORS = 6;
+/** From which floor each difficulty's rivals are trained (natures and EVs); never on easy. */
+const TRAINED_FROM: Record<AiLevel, number> = { easy: Infinity, mid: 10, hard: 1, veryhard: 1, skynet: 1 };
+const WARM_UP_FLOORS = 2;
+/** Before this level a party knows little more than Normal moves: no Ghost-themed rival. */
+const GHOSTS_FROM_LEVEL = 15;
+const LATE_FLOOR = 20;
+const ROOM_WEIGHTS: [RoomKind, number][] = [['tough', 30], ['calm', 18], ['rest', 20], ['den', 14], ['hideout', 10], ['deal', 6]];
+const EARLY_ROOMS: readonly RoomKind[] = ['tough', 'calm', 'rest', 'den'];
+const FEMALE = new Set([
+  'misty', 'erika', 'janine', 'sabrina', 'lorelei', 'agatha', 'whitney', 'jasmine', 'clair', 'karen', 'roxanne', 'flannery', 'winona', 'liza', 'phoebe', 'glacia',
+  'gardenia', 'maylene', 'fantina', 'candice', 'bertha', 'cynthia', 'lenora', 'elesa', 'skyla', 'iris', 'roxie', 'shauntal', 'caitlin', 'viola', 'korrina', 'valerie',
+  'olympia', 'malva', 'drasna', 'diantha', 'olivia', 'acerola', 'kahili', 'nessa', 'bea', 'opal', 'melony', 'katy', 'iono', 'tulip', 'rika', 'poppy', 'geeta',
+  'nemona', 'amarys', 'lacey', 'courtney', 'shelly', 'tabitha', 'mars', 'jupiter', 'ariana', 'bryony', 'aliana', 'celosia', 'mable', 'plumeria', 'lusamine', 'oleana',
+  'penny', 'mela', 'eri', 'cheryl', 'mira', 'marley', 'mysterious_sisters', 'twins', 'sis_and_bro',
+]);
+
+const REGION_OF = new Map<string, Region>(Object.entries(REGIONS).flatMap(([region, keys]) => keys.map((key) => [key, region as Region] as const)));
+const regionOf = (key: string): Region => REGION_OF.get(key) ?? 'kanto';
+const isFemale = (key: string): boolean => key.endsWith('_f') || FEMALE.has(key);
+const pick = <T>(list: readonly T[], seed: string): T => list[hash(seed) % list.length];
+
+const NAME_FIXES: Record<string, string> = { lt_surge: 'Lt. Surge', crasher_wake: 'Crasher Wake', rocket_boss_giovanni_1: 'Giovanni' };
+export const displayName = (key: string): string => NAME_FIXES[key] ?? key.split('_').map((part) => part[0].toUpperCase() + part.slice(1)).join(' ');
+
+function variantOf(base: string, seed: string): string {
+  const options = TRAINER_VARIANTS.filter((variant) => variant.base === base && !variant.pokemon).map((variant) => variant.key);
+  return options.length && hash(`${seed}:look`) % 2 ? pick(options, `${seed}:variant`) : base;
+}
+
+/** The level of the floor: the rivals' base and the most your Pokémon can reach before fighting it. */
+export const levelCap = (floor: number): number => Math.min(MAX_LEVEL, Math.round(START_LEVEL + (floor - 1) * LEVELS_PER_FLOOR));
+
+export function foeLevel(floor: number, kind: FloorKind, difficulty: AiLevel, room: RoomKind | null = null): number {
+  const ramp = Math.floor((floor - 1) / RAMP_FLOORS);
+  return Math.min(MAX_LEVEL, Math.max(2, levelCap(floor) + BOSS_LEVELS[kind] + DIFFICULTY_LEVELS[difficulty] + ramp + (ROOM_LEVELS[room ?? 'trainer'] ?? 0)));
+}
+
+/** Always at least the 3 a battle takes; later rivals bring more, so they also choose. A tough rival brings one more, a calm one just 3. */
+export function teamSize(floor: number, kind: FloorKind, room: RoomKind | null = null): number {
+  if (kind === 'champion' || kind === 'elite') return 6;
+  if (kind === 'gym') return Math.min(6, 4 + Math.floor(floor / 12));
+  if (room === 'calm') return 3;
+  return Math.min(6, 3 + Math.floor(floor / 8) + (room === 'tough' || room === 'hideout' ? 1 : 0));
+}
+
+function championFloor(floor: number, length: number | null): number {
+  const blockEnd = Math.ceil(floor / LEAGUE_BLOCK) * LEAGUE_BLOCK;
+  return length === null ? blockEnd : Math.min(blockEnd, length);
+}
+
+export function floorKind(floor: number, length: number | null): FloorKind {
+  const champion = championFloor(floor, length);
+  if (floor === champion) return 'champion';
+  if (champion - floor <= ELITE_FLOORS && champion % LEAGUE_BLOCK === 0) return 'elite';
+  return floor % GYM_EVERY === 0 ? 'gym' : 'trainer';
+}
+
+/** The rooms a plain floor offers: always a trainer, and one or two other ways. */
+/** What a floor's draw is made of: the climb, and the roll made when you reached that floor. */
+export type Rolls = Readonly<Record<number, string>>;
+const drawOf = (seed: string, rolls: Rolls, floor: number): string => (rolls[floor] ? `${seed}:${rolls[floor]}` : seed);
+
+export function roomsAt(floor: number, length: number | null, seed: string, rolls: Rolls = {}): RoomKind[] {
+  if (floorKind(floor, length) !== 'trainer') return [];
+  const random = rng(`${drawOf(seed, rolls, floor)}:rooms:${floor}`);
+  const pool = ROOM_WEIGHTS.filter(([room]) => floor > WARM_UP_FLOORS || EARLY_ROOMS.includes(room));
+  const rooms: RoomKind[] = ['trainer'];
+  const extra = random() < 0.5 ? 2 : 1;
+  while (rooms.length < 1 + extra && pool.length) {
+    const total = pool.reduce((sum, [, weight]) => sum + weight, 0);
+    let roll = random() * total;
+    const index = pool.findIndex(([, weight]) => (roll -= weight) <= 0);
+    rooms.push(pool.splice(Math.max(0, index), 1)[0][0]);
+  }
+  return rooms;
+}
+
+const typedClasses = Object.entries(CLASS_TRAINERS).filter(([key, cls]) => (cls.goal.kind === 'type' || cls.goal.kind === 'species') && !key.includes('_grunt') && cls.rarity !== 'legendary');
+const villainClasses = Object.entries(CLASS_TRAINERS).filter(([key, cls]) => key.includes('_grunt') && cls.goal.kind !== 'total');
+const speciesOf = (names: readonly string[]): number[] => names.map((name) => speciesIdByName(name)).filter((id): id is number => !!id);
+const signatureOf = (key: string): number | null => (SIGNATURE[key] ? speciesIdByName(SIGNATURE[key]) : null);
+const typesOfSpecies = (ids: readonly number[]): string[] => [...new Set(ids.flatMap((id) => speciesData(id)?.types ?? []))];
+
+function linesFor(key: string, type: string | null): { hello: string; lose: string } {
+  const [hello, lose] = BOSS_LINES[key] ?? TYPE_LINES[type ?? 'normal'] ?? TYPE_LINES.normal;
+  return { hello, lose };
+}
+
+function sceneFor(type: string | null, seed: string, fallback: string): string {
+  const scenes = type ? TYPE_SCENES[type] : null;
+  return scenes?.length ? pick(scenes, `${seed}:scene`) : fallback;
+}
+
+const themeOf = ([, cls]: (typeof typedClasses)[number]): string =>
+  (cls.goal.kind === 'type' ? [cls.goal.type] : typesOfSpecies(speciesOf(cls.goal.kind === 'species' ? cls.goal.names : []))).sort().join();
+
+/** The class of a floor's route trainer, never of the theme of the floor below nor, for another way, of the plain route's. */
+function classAt(seed: string, rolls: Rolls, floor: number, room: RoomKind | null, level: number): (typeof typedClasses)[number] {
+  const indexAt = (number: number, way: RoomKind | null) => hash(`${drawOf(seed, rolls, number)}:${number}${way && way !== 'trainer' ? `:${way}` : ''}:class`) % typedClasses.length;
+  const avoid = new Set([floor > 1 ? themeOf(typedClasses[indexAt(floor - 1, null)]) : '', room && room !== 'trainer' ? themeOf(typedClasses[indexAt(floor, null)]) : ''].filter(Boolean));
+  let index = indexAt(floor, room);
+  const unfit = (entry: (typeof typedClasses)[number]) => avoid.has(themeOf(entry)) || (level < GHOSTS_FROM_LEVEL && themeOf(entry).includes('ghost'));
+  for (let tries = 0; tries < typedClasses.length && unfit(typedClasses[index]); tries++) index = (index + 1) % typedClasses.length;
+  return typedClasses[index];
+}
+
+const routeScene = (floor: number): string => ROUTE_SCENES[Math.floor((floor - 1) / GYM_EVERY) % ROUTE_SCENES.length];
+
+function themedTrainer(key: string, cls: (typeof typedClasses)[number][1], at: string) {
+  const species = cls.goal.kind === 'species' ? speciesOf(cls.goal.names) : [];
+  const types = cls.goal.kind === 'type' ? [cls.goal.type] : typesOfSpecies(species);
+  return { foe: { key: variantOf(key, at), base: key, name: pick(NAMES[isFemale(key) ? 'f' : 'm'], `${at}:name`), title: cls.title }, species, types };
+}
+
+/** Route trainers and ways come from the floor's roll; the order of bosses is fixed for the climb so none repeats. */
+export function floorAt(floor: number, length: number | null, difficulty: AiLevel, seed: string, room: RoomKind | null = null, rolls: Rolls = {}): Floor {
+  const kind = floorKind(floor, length);
+  const chosen: RoomKind | null = kind === 'trainer' ? (room ?? 'trainer') : null;
+  const at = `${drawOf(seed, rolls, floor)}:${floor}${chosen && chosen !== 'trainer' ? `:${chosen}` : ''}`;
+  const base = {
+    number: floor,
+    kind,
+    room: chosen,
+    level: foeLevel(floor, kind, difficulty, chosen),
+    teamSize: teamSize(floor, kind, chosen),
+    trained: chosen !== 'calm' && (floor >= TRAINED_FROM[difficulty] || chosen === 'tough' || (kind !== 'trainer' && difficulty !== 'easy')),
+    strength: kind === 'trainer' ? (ROOM_STRENGTH[chosen ?? 'trainer'] ?? 'normal') : 'strong',
+  };
+  if (chosen && !ROOMS[chosen].battle)
+    return { ...base, foe: null, type: null, types: [], species: [], signature: null, scene: routeScene(floor), music: MUSIC.route, lines: { hello: '', lose: '' } };
+  if (chosen === 'hideout') {
+    if (hash(`${at}:boss`) % 3 === 0) {
+      const key = pick(floor >= LATE_FLOOR ? [...VILLAINS.admin, ...VILLAINS.boss] : VILLAINS.admin, `${at}:villain`);
+      const ace = signatureOf(key);
+      const types = ace ? [...(speciesData(ace)?.types ?? [])] : ['dark'];
+      return { ...base, foe: { key: variantOf(key, at), base: key, name: displayName(key), title: VILLAINS.boss.includes(key) ? 'Jefe' : 'Comandante' }, type: types[0] ?? null, types, species: [], signature: ace, scene: pick(['path-night', 'cave-night', 'beach-night'], at), music: MUSIC.hideout, lines: linesFor(key, 'dark') };
+    }
+    const [key, cls] = pick(villainClasses, `${at}:grunt`);
+    const { foe, species, types } = themedTrainer(key, cls, at);
+    return { ...base, foe, type: null, types, species, signature: null, scene: pick(['path-night', 'cave-night'], at), music: MUSIC.hideout, lines: linesFor(key, 'dark') };
+  }
+  if (kind === 'trainer') {
+    const [key, cls] = classAt(seed, rolls, floor, chosen, base.level);
+    const { foe, species, types } = themedTrainer(key, cls, at);
+    return { ...base, foe, type: null, types, species, signature: null, scene: sceneFor(types[0] ?? null, at, routeScene(floor)), music: floor >= LATE_FLOOR ? MUSIC.lateRoute : MUSIC.route, lines: linesFor(key, types[0] ?? null) };
+  }
+  const block = Math.floor((floor - 1) / LEAGUE_BLOCK);
+  let key: string;
+  let type: string | null = null;
+  if (kind === 'gym') {
+    const leaders = shuffled(Object.entries(GYM_LEADERS).flatMap(([t, keys]) => keys.map((k) => [k, t] as const)), rng(`${seed}:gyms`));
+    [key, type] = leaders[(Math.floor(floor / GYM_EVERY) - 1) % leaders.length];
+  } else if (kind === 'elite') {
+    const elite = shuffled(Object.entries(ELITE_FOUR), rng(`${seed}:elite:${block}`));
+    [key, type] = elite[(ELITE_FLOORS - (championFloor(floor, length) - floor)) % elite.length];
+  } else key = shuffled(CHAMPIONS, rng(`${seed}:champions`))[block % CHAMPIONS.length];
+  const title = kind === 'gym' ? 'Líder' : kind === 'elite' ? 'Alto Mando' : isFemale(key) ? 'Campeona' : 'Campeón';
+  return {
+    ...base,
+    foe: { key: variantOf(key, at), base: key, name: displayName(key), title },
+    type,
+    types: type ? [type] : [],
+    species: [],
+    signature: signatureOf(key),
+    scene: kind === 'champion' ? pick(['snow-night', 'cave-2', 'mountain-night'], at) : sceneFor(type, at, 'path'),
+    music: MUSIC[kind][regionOf(key)],
+    lines: linesFor(key, type),
+  };
+}
+
+export const isBoss = (kind: FloorKind): boolean => kind !== 'trainer';
+export const isLastFloor = (floor: number, length: number | null): boolean => length !== null && floor >= length;

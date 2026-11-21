@@ -1,6 +1,9 @@
 import { creatureHTML, loadSprites, preloadSprites, spritesLoaded, spriteURL } from './creature.js?v=dev';
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
-import { sceneFor } from './backgrounds.js?v=dev';
+import { sceneFor, sceneNamed } from './backgrounds.js?v=dev';
+import { overworldSprite } from './overworld.js?v=dev';
+import { PARTY_LIMIT, PROFESSOR, PROFESSOR_LINES, RECRUIT_LINE, ROOMS, sceneMusic, TOWER_LENGTHS } from './tower-cast.js?v=dev';
+import { exitRows, ROWS as MAP_ROWS, towerMap } from './tower-map.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
 import { createFx, moveShape } from './fx.js?v=dev';
 import { ballFxBare, ballFxNote, ballSounds } from './ball-fx.js?v=dev';
@@ -11,7 +14,7 @@ import { RADIO_KINDS, RADIO_REGIONS, RADIO_TRACKS, radioTrack } from './radio.js
 import { createStationFeed, myStationPanel, stationsPanel } from './radio-station.js?v=dev';
 import { createNotifier } from './notify.js?v=dev';
 import { RARITIES, SHOP_KINDS } from './shop.js?v=dev';
-import { fallBackToRaw } from './upstream.js?v=dev';
+import { fallBackToRaw, UPSTREAM, upstreamURLs } from './upstream.js?v=dev';
 import { glyph } from './glyphs.js?v=dev';
 import { evTotal, MAX_EV, MAX_EV_TOTAL, STAT_KEYS, statValue } from './stat-formula.js?v=dev';
 import { hiddenPowerType } from './natures.js?v=dev';
@@ -698,6 +701,7 @@ function loadingTextFor(path) {
     '/perfil': 'Abriendo tu perfil…',
     '/tienda': 'Abriendo tu perfil…',
     '/reciclaje': 'Buscando repetidos en tu save…',
+    '/torre': 'Subiendo a la torre…',
   }[path] ?? 'Cargando…';
 }
 document.addEventListener('click', (e) => {
@@ -1074,6 +1078,7 @@ function route() {
   }
   if (location.pathname === '/perfil') return profilePage(seq);
   if (location.pathname === '/reciclaje') return recyclingPage(seq);
+  if (location.pathname === '/torre') return towerPage(seq);
   const t = /^\/t\/([A-Za-z0-9_-]{4,20})$/.exec(location.pathname);
   if (t) return tournamentPage(t[1], seq);
   return homePage(seq);
@@ -2273,14 +2278,21 @@ function renderHome() {
   const byId = new Map(me.roster.map((f) => [f.uid, f]));
   const team = me.team.map((id) => byId.get(id)).filter(Boolean);
   let mode = 'team';
-  let rival = 'friend';
+  let rival = new URLSearchParams(location.search).get('rival') === 'torre' ? 'tower' : 'friend';
+  let towerLength = 25;
+  let climb = null;
   let visibility = 'public';
   let size = 8;
   let aiLevel = 'mid';
 
   async function createChallenge(btn) {
+    if (rival === 'tower' && climb) return nav('/torre');
     btn.disabled = true;
     try {
+      if (rival === 'tower') {
+        await api('/api/tower', { method: 'POST', body: { difficulty: aiLevel, length: towerLength } });
+        return nav('/torre');
+      }
       if (rival === 'tournament') {
         const { tournament, joined } = await api('/api/tournaments', { method: 'POST', body: { mode, size, visibility } });
         if (joined) toast('Te uniste a un torneo abierto');
@@ -2309,6 +2321,13 @@ function renderHome() {
   const field = (label, control, ...rest) => h('div', { class: 'nb-field' }, h('span', { class: 'nb-label' }, label), control, ...rest);
 
   const aiNote = h('p', { class: 'nb-note' });
+  const towerLengthField = field('Pisos', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Pisos de la torre' }, choice('seg', TOWER_LENGTHS.map((value) => ({ value, label: lengthLabel(value) })), towerLength, (v) => { towerLength = v; paint(); })), h('p', { class: 'nb-note' }, 'Un gimnasio cada 5 pisos; cada 25, el Alto Mando y el campeón. La infinita sigue hasta que caigas.'));
+  const climbNote = h('div', { class: 'nb-climb' });
+  const climbField = field('En curso', climbNote);
+  const modeField = field('Modo', h('div', { class: 'cards2', role: 'group', 'aria-label': 'Modo de juego' }, choice('pick', [
+    { value: 'team', icon: MODE_ICON.team, label: MODE_LABEL.team, desc: `Los ${PARTY_SIZE} que armaste.` },
+    { value: 'random', icon: MODE_ICON.random, label: MODE_LABEL.random, desc: `Los dados sortean ${PARTY_SIZE} de tu colección, con movimientos y habilidad al azar.` },
+  ], mode, (v) => { mode = v; paint(); })));
   const startBtn = h('button', { class: 'btn primary nb-start', onclick: (e) => createChallenge(e.currentTarget) });
   const aiField = field('Dificultad', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Dificultad de la IA' }, choice('seg', AI_ORDER.filter((k) => (me.aiLevels ?? AI_ORDER).includes(k)).map((k) => ({ value: k, label: AI_LABEL[k] })), aiLevel, (v) => { aiLevel = v; paint(); })), aiNote);
   const roomNote = h('p', { class: 'nb-note' });
@@ -2316,10 +2335,19 @@ function renderHome() {
   const sizeField = field('Jugadores', h('div', { class: 'segmented', role: 'group', 'aria-label': 'Jugadores del torneo' }, choice('seg', TOURNAMENT_SIZES.map((n) => ({ value: n, label: String(n) })), size, (v) => { size = v; paint(); })), h('p', { class: 'nb-note' }, 'Llaves de eliminación directa. El dueño puede rellenar los asientos libres con IAs.'));
   function paint() {
     const tour = rival === 'tournament';
-    aiField.classList.toggle('is-hidden', rival !== 'ai');
-    roomField.classList.toggle('is-hidden', rival === 'ai');
+    const tower = rival === 'tower';
+    modeField.classList.toggle('is-hidden', tower);
+    aiField.classList.toggle('is-hidden', !(rival === 'ai' || (tower && !climb)));
+    towerLengthField.classList.toggle('is-hidden', !tower || !!climb);
+    climbField.classList.toggle('is-hidden', !tower || !climb);
+    roomField.classList.toggle('is-hidden', rival === 'ai' || tower);
     sizeField.classList.toggle('is-hidden', !tour);
-    aiNote.textContent = AI_NOTES[aiLevel][mode];
+    aiNote.textContent = tower ? TOWER_NOTES[aiLevel] : AI_NOTES[aiLevel][mode];
+    if (tower) {
+      const [icon, text] = climb ? ['flag', `Continuar subida · piso ${climb.floor}`] : ['flag', `Subir a la torre · ${AI_LABEL[aiLevel]} · ${lengthLabel(towerLength)}`];
+      startBtn.replaceChildren(glyph(icon), ` ${text}`);
+      return;
+    }
     roomNote.textContent = visibility === 'public'
       ? tour ? 'Si ya hay un torneo abierto con este modo y tamaño, entras a ese. Si no, abrimos el tuyo y aparece en Salas abiertas.' : 'Si ya hay una sala abierta con este modo, entras a esa. Si no, abrimos la tuya y aparece en Salas abiertas.'
       : 'No aparece en Salas abiertas: solo entra quien tenga el link que te damos.';
@@ -2329,20 +2357,25 @@ function renderHome() {
   const battleForm = h(
     'div',
     { class: 'nb-form' },
-    field('Modo', h('div', { class: 'cards2', role: 'group', 'aria-label': 'Modo de juego' }, choice('pick', [
-      { value: 'team', icon: MODE_ICON.team, label: MODE_LABEL.team, desc: `Los ${PARTY_SIZE} que armaste.` },
-      { value: 'random', icon: MODE_ICON.random, label: MODE_LABEL.random, desc: `Los dados sortean ${PARTY_SIZE} de tu colección, con movimientos y habilidad al azar.` },
-    ], mode, (v) => { mode = v; paint(); }))),
-    field('Rival', h('div', { class: 'cards3', role: 'group', 'aria-label': 'Rival' }, choice('pick', [
+    field('Juego', h('div', { class: 'cards4', role: 'group', 'aria-label': 'Tipo de juego' }, choice('pick', [
       { value: 'friend', icon: 'users', label: 'Contra otro jugador', desc: 'Entras a una sala abierta o abres una nueva.' },
       { value: 'ai', icon: 'robot', label: 'La IA', desc: 'Peleas ahora mismo, con Pokémon de la 1.ª a la 5.ª generación.' },
       { value: 'tournament', icon: 'trophy', label: 'Torneo', desc: 'De 4, 8 o 16 jugadores, con IAs para rellenar.' },
+      { value: 'tower', icon: 'flag', label: 'La Torre', desc: 'Sube piso a piso desde el nivel 5 con tu colección. Se guarda entre pisos.' },
     ], rival, (v) => { rival = v; paint(); }))),
+    modeField,
     sizeField,
     roomField,
     aiField,
+    towerLengthField,
+    climbField,
     startBtn,
   );
+  api('/api/tower').then((data) => {
+    climb = data.run;
+    if (climb) climbNote.replaceChildren(glyph('flag'), h('span', null, h('b', null, `Subida en curso · piso ${climb.floor}${climb.length ? ` de ${climb.length}` : ''}`), h('small', null, ` ${AI_LABEL[climb.difficulty]} · ${climb.party.length} Pokémon · ${climb.cleared} ${climb.cleared === 1 ? 'piso superado' : 'pisos superados'}`)));
+    paint();
+  }, () => {});
   paint();
 
   $app.replaceChildren(
@@ -2370,6 +2403,808 @@ function renderHome() {
     ),
     ...openRoomsCard().map((card) => h('section', null, card)),
   );
+}
+
+// ---------- tower ----------
+const FLOOR_KIND = {
+  trainer: { label: 'Ruta', icon: 'swords' },
+  gym: { label: 'Gimnasio', icon: 'shield' },
+  elite: { label: 'Alto Mando', icon: 'star' },
+  champion: { label: 'Campeón', icon: 'crown' },
+};
+const TOWER_NOTES = {
+  easy: 'Rivales unos niveles bajo la curva y una IA que ataca casi sin pensar. Para conocer la torre.',
+  mid: 'Rivales a tu nivel. La IA evita lo inútil y busca el KO, como un entrenador normal.',
+  hard: 'Rivales a tu nivel, entrenados. La IA prefiere el mayor daño, se prepara y a veces cambia.',
+  veryhard: 'Rivales sobre la curva, entrenados. La IA calcula velocidad y daño y prevé tu respuesta.',
+  skynet: 'Rivales sobre la curva. Jev, un modelo de decisiones, juega cada turno del rival.',
+};
+const TIER_LABEL = { common: 'Común', rare: 'Rara', epic: 'Épica' };
+const VITAMINS = { hp: 'hp_up', atk: 'protein', def: 'iron', satk: 'calcium', sdef: 'zinc', spd: 'carbos' };
+const ATTACK_STAT = { physical: ['atk', 'Ataque'], special: ['satk', 'At. Esp.'] };
+const lengthLabel = (length) => (length ? `${length} pisos` : 'Infinita');
+const itemURL = (name) => upstreamURLs(UPSTREAM.pokerogue, `images/items/${name}.png`)[0];
+const itemImg = (name) => h('img', { class: 'tw-item', src: itemURL(name), alt: '', draggable: 'false' });
+const REWARD_INFO = {
+  candy: { name: (r) => `Caramelo Raro ×${r.levels}`, icon: () => 'rare_candy', text: (r) => `Sube ${r.levels} niveles, sin pasar el tope del piso. Puede evolucionar y aprender movimientos.` },
+  expCandy: { name: () => 'Caramelo Exp.', icon: () => 'rarer_candy', text: () => 'Sube 1 nivel a quien esté bajo el tope del piso.' },
+  vitamin: { name: (r) => `Vitamina · ${STAT_NAME[r.stat] ?? r.stat}`, icon: (r) => VITAMINS[r.stat] ?? 'protein', text: (r) => `Suma 32 EVs de ${STAT_NAME[r.stat] ?? r.stat} (máximo 252 por stat y 510 en total). Cada 4 EVs es +1 en el stat.` },
+  tm: { name: (r) => `MT · ${r.moveInfo.name}`, icon: (r) => `tm_${r.moveInfo.type ?? 'normal'}`, text: () => 'Queda en su lista de movimientos; lo equipas cuando quieras.' },
+  tutor: { name: (r) => `Tutor · ${r.moveInfo.name}`, icon: () => 'elixir', text: () => 'Un movimiento de tutor o de huevo. Queda en su lista; lo equipas cuando quieras.' },
+  mint: { name: () => 'Menta', icon: () => 'mint_neutral', text: () => 'Cambia la naturaleza: un stat sube 10 % y otro baja 10 %.' },
+  capsule: { name: () => 'Cápsula Habilidad', icon: () => 'ability_capsule', text: () => 'Desbloquea otra habilidad normal de su especie. Luego las alternas entre pisos.' },
+  patch: { name: () => 'Parche Habilidad', icon: () => 'ability_charm', text: () => 'Desbloquea la habilidad oculta de su especie.' },
+  stone: { name: () => 'Piedra Evolutiva', icon: () => 'dawn_stone', text: () => 'Evoluciona ya a quien evoluciona por piedra, intercambio o amistad, si está a 6 niveles o menos de su nivel justo.' },
+  egg: { name: () => 'Huevo Suerte', icon: () => 'lucky_egg', text: () => 'Trae a un Pokémon más de tu colección para reclutar.' },
+};
+
+const playerOverworld = () => me?.avatar || 'player_m';
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const isDesk = () => matchMedia('(min-width: 900px)').matches;
+const sessionFlag = {
+  get: (key) => { try { return sessionStorage.getItem(key); } catch { return null; } },
+  set: (key) => { try { sessionStorage.setItem(key, '1'); } catch { /* shown again next time */ } },
+};
+
+/** A panel: a sheet that rises from the bottom on the phone, a centered card on the computer. */
+function towerDialog(title, ...body) {
+  const dlg = h('dialog', { class: 'info-dlg tw-dlg', 'aria-label': title ?? body.find((node) => node?.querySelector?.('h2'))?.querySelector('h2')?.textContent ?? '', onclick: (e) => e.target === e.currentTarget && dlg.close(), onclose: () => dlg.remove() },
+    h('div', { class: 'tw-dlg-body' },
+      h('span', { class: 'tw-grab', 'aria-hidden': 'true' }),
+      title
+        ? h('div', { class: 'tw-dlg-head' }, h('h2', null, title), h('button', { type: 'button', class: 'info-close', 'aria-label': 'Cerrar', onclick: () => dlg.close() }, '×'))
+        : h('button', { type: 'button', class: 'info-close tw-float-close', 'aria-label': 'Cerrar', onclick: () => dlg.close() }, '×'),
+      ...body));
+  document.body.append(dlg);
+  dlg.showModal();
+  return dlg;
+}
+
+async function towerCall(btn, path, { method = 'POST', body, render = true } = {}) {
+  if (btn) btn.disabled = true;
+  try {
+    const res = await api(path, { method, body });
+    if (res.run) towerData = res.run.status === 'abandoned' ? { ...towerData, run: null, last: res.run } : { ...towerData, run: res.run };
+    if (render && res.run && location.pathname === '/torre') renderTower(towerData);
+    return res;
+  } catch (e) {
+    toast(e.message);
+    if (btn?.isConnected) btn.disabled = false;
+    return null;
+  }
+}
+
+/** What someone says, like the games' text box: the words appear one by one; a tap shows them all. */
+function sayBox(speaker, text, { mini = null } = {}) {
+  const words = h('span', { class: 'tw-say-text' });
+  const box = h('div', { class: 'tw-say', role: 'status' }, mini ? overworldSprite(mini, { facing: 'down', scale: 1, cls: 'tw-say-mini' }) : null, h('div', null, speaker ? h('span', { class: 'tw-speaker' }, speaker) : null, words));
+  let timer = null;
+  box.done = new Promise((resolve) => {
+    const finish = () => {
+      clearInterval(timer);
+      words.textContent = text;
+      box.classList.add('done');
+      resolve();
+    };
+    box.addEventListener('click', finish);
+    if (reducedMotion()) return finish();
+    let shown = 0;
+    timer = setInterval(() => {
+      shown += 2;
+      words.textContent = text.slice(0, shown);
+      if (shown >= text.length) finish();
+    }, 26);
+  });
+  return box;
+}
+
+const battleScene = (c) => (c.staging ? sceneNamed(c.staging.scene, c.id) : sceneFor(c.id));
+const battleMusicFor = (c) => (c.staging ? `track:${c.staging.music}` : `scene:${battleScene(c).file}`);
+
+let towerData = null;
+async function towerPage(seq) {
+  document.title = 'Torre · Token Clash';
+  await loadMe();
+  if (stale(seq)) return;
+  renderWho();
+  if (!me) return renderLanding();
+  try {
+    towerData = await api('/api/tower');
+  } catch (e) {
+    if (stale(seq)) return;
+    $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No pude abrir la torre'), h('p', { class: 'muted' }, e.message)));
+    return;
+  }
+  if (stale(seq)) return;
+  renderTower(towerData);
+}
+
+function renderTower(data) {
+  towerData = data;
+  const run = data.run;
+  if (!run) return towerSetup(data);
+  music.play(`track:${run.status === 'drafting' ? 'laboratory' : sceneMusic(run.current.scene)}`);
+  if (run.status === 'drafting') return towerLab(run);
+  if (run.status === 'resting' && !sessionFlag.get(resultKey(run))) return towerResults(run);
+  return towerClimb(run);
+}
+
+// ----- pieces shared by the screens -----
+
+function expBar(mon, { cap = mon.atCap } = {}) {
+  const span = Math.max(1, mon.exp.to - mon.exp.from);
+  const pct = cap ? 100 : Math.max(0, Math.min(100, ((mon.exp.now - mon.exp.from) / span) * 100));
+  return h('div', { class: `tw-exp${cap ? ' cap' : ''}`, 'aria-label': cap ? 'En el tope del piso' : `Experiencia ${Math.round(pct)}%` }, h('i', { style: { width: `${pct}%` } }));
+}
+
+function infoStats(mon, after = null) {
+  return h('div', { class: 'info-stats' }, STAT_ROWS.map(([label, key]) => {
+    const now = mon.stats[key];
+    const next = after?.stats?.[key] ?? now;
+    const change = next > now ? 'up' : next < now ? 'down' : null;
+    const nature = after?.natureInfo ?? mon.natureInfo;
+    const natureCls = nature?.up === key ? 'nat-up' : nature?.down === key ? 'nat-down' : null;
+    return h('span', { class: [change, natureCls].filter(Boolean).join(' ') || null, tabindex: 0, 'data-tip': mon.speciesBase ? statBreakdown(key, mon.speciesBase[key], mon.evs?.[key] ?? 0, mon.natureInfo) : null },
+      h('b', null, next !== now ? `${now}→${next}` : now),
+      h('span', { class: 'stat-name' }, label, natureMark(after ?? mon, key)),
+      evGain(mon, key));
+  }));
+}
+
+function evoLine(line, current = null) {
+  if (!line || line.length < 2) return null;
+  return h('div', { class: 'tw-evo-line', 'aria-label': 'Línea evolutiva' }, line.flatMap((step, i) => [
+    i ? h('small', null, step.level ? `Nv ${step.level}` : '→') : null,
+    h('span', { class: `tw-evo-step${step.id === current ? ' here' : ''}`, 'data-tip': step.name, html: creatureHTML({ sprite: step.sprite, rarity: 'common' }) }),
+  ]));
+}
+
+/** The Collection's card: stats with their nature, the ability and what it does, every move and its line. */
+function towerInfoCard(mon, { cap = null, line = mon.line, moves = true, ability = true, extra = null } = {}) {
+  return h('div', { class: 'info-card tw-info-card' },
+    h('header', null,
+      h('div', { class: 'info-sprite', html: creatureHTML(mon) }),
+      h('div', null,
+        h('h2', null, ...shinyName(mon), ' ', genderMark(mon.gender) ?? ''),
+        h('p', { class: 'muted small' }, `Nv ${mon.level}${cap ? ` · tope del piso ${cap}` : ''}`),
+        typeChips(mon.types ?? []),
+        mon.exp ? expBar(mon) : null)),
+    mon.speciesBase ? h('section', null, h('div', { class: 'stats-head' }, h('h3', null, 'Características'), natureTag(mon)), infoStats(mon)) : null,
+    ability && mon.abilityInfo ? h('section', null, h('h3', null, 'Habilidad'), h('p', null, abilityChip(mon.abilityInfo)), h('p', { class: 'small' }, mon.abilityInfo.desc)) : null,
+    moves ? h('section', null, h('h3', null, 'Movimientos'), h('ul', { class: 'info-moves' }, mon.moves.map((move) => h('li', null, ...moveDetails(move))))) : null,
+    extra,
+    line?.length > 1 ? h('section', null, h('h3', null, 'Evolución'), evoLine(line, mon.speciesId)) : null);
+}
+
+/** The rivals of the next floors, for the "strong against / careful with" lines of a Pokémon's card. */
+const upcomingFoes = (run) => (run.status === 'climbing' && run.room && run.current?.foe && run.current.types?.length ? [{ name: `${run.current.foe.title} ${run.current.foe.name}`, types: run.current.types }] : []);
+
+/** The battle prep's card for a Pokémon: matchups against what comes, stats, ability and moves, its line, and the action. */
+function towerPrepInfo(run, mon, { line = mon.line, action = () => null } = {}) {
+  const dlg = h('dialog', { class: 'info-dlg', 'aria-label': mon.name, onclick: (e) => e.target === e.currentTarget && dlg.close(), onclose: () => dlg.remove() });
+  const paint = () => {
+    const foes = upcomingFoes(run);
+    const card = prepInfoCard(mon, { own: true, foes, close: () => dlg.close(), action: action(dlg, paint) });
+    if (!foes.length) card.querySelector('.prep-matchup')?.replaceWith(typeDefense(mon));
+    card.querySelector('header h2')?.after(h('p', { class: 'muted small' }, `Nv ${mon.level} · tope del piso ${run.cap}`));
+    const evo = line?.length > 1 ? h('section', null, h('h3', null, 'Evolución'), evoLine(line, mon.speciesId)) : null;
+    if (evo) card.insertBefore(evo, card.querySelector('.prep-info-action'));
+    dlg.replaceChildren(card);
+  };
+  paint();
+  document.body.append(dlg);
+  dlg.showModal();
+  return dlg;
+}
+
+/** Which attacking types hurt it more and which less: what to know before taking it. */
+function typeDefense(mon) {
+  const rows = Object.keys(TYPES).map((type) => [type, effectiveness(type, mon.types ?? [])]);
+  const list = (test) => rows.filter(([, times]) => test(times)).sort((a, b) => b[1] - a[1]).map(([type, times]) => h('span', { class: 'tw-def' }, typeChip(type), times >= 4 ? h('small', null, '×4') : times === 0 ? h('small', null, '×0') : null));
+  const weak = list((times) => times >= 2);
+  const strong = list((times) => times < 1);
+  return h('section', { class: 'prep-matchup tw-defense' },
+    h('p', null, h('span', { class: 'tag-weak' }, glyph('shield'), ' Débil ante '), ...(weak.length ? weak : [h('span', { class: 'muted' }, 'nada')])),
+    h('p', null, h('span', { class: 'tag-strong' }, glyph('shield'), ' Resiste '), ...(strong.length ? strong : [h('span', { class: 'muted' }, 'nada')])));
+}
+
+const moveBlock = (move, { fresh = false } = {}) => h('ul', { class: 'info-moves' }, h('li', { class: fresh ? 'mv-new' : null }, ...moveDetails(move)));
+
+function partyCell(mon, { selected = false, order = null, onclick, label }) {
+  return h('div', {
+    class: `party-cell${selected ? ' selected' : ''}`, role: 'button', tabindex: 0, 'aria-pressed': String(selected), 'aria-label': label ?? mon.name,
+    onclick,
+    onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onclick(); } },
+  },
+  order ? h('span', { class: 'slot-num' }, order) : null,
+  ballFrame(mon),
+  h('div', { class: 'name-plate' }, h('b', null, ...shinyName(mon), genderMark(mon.gender)), h('small', null, `Nv ${mon.level}`), typeChips(mon.types ?? [])));
+}
+
+/** The party in one line: each Poké Ball with its level; a tap shows the details. */
+function teamStrip(run) {
+  return h('button', { type: 'button', class: 'tw-strip', 'aria-label': 'Ver tu equipo', onclick: () => teamSheet(run) },
+    Array.from({ length: PARTY_LIMIT }, (_, i) => {
+      const mon = run.party[i];
+      return h('span', { class: 'tw-strip-slot' }, ballFrame(mon ?? null, { size: 'sm' }), mon ? h('small', { class: mon.atCap ? 'cap' : null }, `Nv ${mon.level}`) : h('small', null, ' '));
+    }));
+}
+
+function teamRows(run, { growth = null } = {}) {
+  return h('div', { class: 'tw-rows' }, run.party.map((mon) => {
+    const g = growth?.find((entry) => entry.uid === mon.uid);
+    const gained = g ? g.toLevel - g.fromLevel : 0;
+    return h('button', { type: 'button', class: 'tw-row', onclick: () => monEditor(run, mon) },
+      h('span', { html: creatureHTML(mon) }),
+      h('span', { class: 'tw-row-text' }, h('b', null, mon.name, ' ', h('small', null, g && gained ? `Nv ${g.fromLevel} → ${g.toLevel}` : `Nv ${mon.level}`)), expBar(mon)),
+      g ? h('small', { class: mon.atCap ? 'tw-up cap' : 'tw-up' }, mon.atCap ? 'Tope' : gained ? `+${gained}` : '') : glyph('pencil'));
+  }));
+}
+
+function teamSheet(run) {
+  return towerDialog('Tu equipo', teamRows(run), h('p', { class: 'nb-note' }, `En cada pelea eliges ${BATTLE_SIZE}. Toca uno para cambiar sus movimientos o su habilidad. Tope de nivel en este piso: ${run.cap}.`));
+}
+
+function floorLabel(step) {
+  if (!step.known) return step.kind === 'trainer' ? '?' : FLOOR_KIND[step.kind].label;
+  return step.kind !== 'trainer' ? `${FLOOR_KIND[step.kind].label} · ${step.foe?.name ?? ''}` : step.foe ? `${step.foe.title} ${step.foe.name}` : 'Ruta';
+}
+
+function towerFloors(run, { ahead = Infinity } = {}) {
+  return h('div', { class: 'tw-floors' }, run.trail.filter((step) => step.number >= run.floor - 1 && step.number < run.floor + ahead).map((step) => {
+    const state = step.number < run.floor ? 'is-done' : step.number === run.floor && run.status !== 'resting' ? 'is-here' : '';
+    return h('div', { class: `tw-floor ${state}${step.known ? '' : ' unknown'}` },
+      step.known && step.foe ? overworldSprite(step.foe.key, { facing: 'down', scale: 1 }) : glyph(step.known || step.kind !== 'trainer' ? FLOOR_KIND[step.kind].icon : 'question'),
+      h('span', null, `Piso ${step.number} · ${floorLabel(step)}`),
+      h('small', null, state === 'is-done' ? '✓' : state === 'is-here' ? 'Ahora' : ''));
+  }));
+}
+
+function floorPill(run, { button = true } = {}) {
+  const text = run.status === 'resting' ? `Piso ${run.floor - 1} ✓` : `Piso ${run.floor}${run.length ? ` de ${run.length}` : ''}`;
+  if (!button) return h('span', { class: 'tw-floor-pill' }, glyph('flag'), text);
+  return h('button', { type: 'button', class: 'tw-floor-pill', onclick: () => towerDialog('La torre', towerFloors(run), h('p', { class: 'nb-note' }, `Tu tope de nivel en este piso: ${run.cap}. Superados: ${run.cleared}.`)) }, glyph('flag'), text);
+}
+
+function towerTop(run) {
+  const menu = h('details', { class: 'tw-menu' }, h('summary', { 'aria-label': 'Opciones' }, glyph('menu')), h('div', { class: 'tw-menu-list' }, h('button', { class: 'btn ghost sm', onclick: towerAbandon }, glyph('flag'), ' Abandonar')));
+  return h('div', { class: 'tw-top' }, floorPill(run), h('span', { class: 'chip' }, AI_LABEL[run.difficulty]), h('span', { class: 'chip', 'data-tip': 'Tus puntos en esta subida' }, glyph('trophy'), ` ${pointsText(run.points ?? 0)}`), menu);
+}
+
+// ----- the setup, the end and the records -----
+
+function towerSummary(last) {
+  const won = last.status === 'cleared';
+  const rival = last.lastResult?.rival;
+  const title = won ? 'Salón de la Fama' : last.status === 'lost' ? `Caíste en el piso ${last.floor}` : `Abandonaste en el piso ${last.floor}`;
+  const detail = [won && rival ? `Venciste a ${rival.title} ${rival.name}` : !won && last.status === 'lost' && last.current?.foe ? `contra ${last.current.foe.title} ${last.current.foe.name}` : null, AI_LABEL[last.difficulty], lengthLabel(last.length)].filter(Boolean).join(' · ');
+  return h('div', { class: `card tw-end ${last.status}` },
+    won && !reducedMotion() ? h('div', { class: 'pz-confetti', 'aria-hidden': 'true' }) : null,
+    glyph(won ? 'crown' : last.status === 'lost' ? 'skull' : 'flag'),
+    h('h2', null, title),
+    h('small', { class: 'muted' }, detail),
+    h('div', { class: 'tw-fame' }, last.party.map((mon) => h('span', { class: 'tw-fame-mon', 'data-tip': `${mon.name} · Nv ${mon.level}` }, ballFrame(mon), h('small', null, `Nv ${mon.level}`)))),
+    won && rival?.lose ? sayBox(`${rival.title} ${rival.name}`, rival.lose, { mini: rival.key }) : null,
+    h('span', { class: 'chip' }, glyph('trophy'), ` ${pointsText(last.points ?? 0)} · ${last.cleared} ${last.cleared === 1 ? 'piso superado' : 'pisos superados'}`));
+}
+
+function towerSetup(data) {
+  if (!data.last) {
+    history.replaceState(null, '', '/?rival=torre');
+    return route();
+  }
+  music.play('tab:home');
+  $app.replaceChildren(h('section', { class: 'tw-narrow' },
+    towerSummary(data.last),
+    h('a', { class: 'btn primary block', href: '/?rival=torre', 'data-link': true }, glyph('flag'), ' Otra subida'),
+    towerStatsCard(data.records)));
+}
+
+function towerAbandon() {
+  const dlg = towerDialog('¿Abandonar la subida?',
+    h('p', null, 'Tu récord se queda con los pisos que ya superaste. No hay vuelta atrás.'),
+    h('div', { class: 'tw-dlg-actions' },
+      h('button', { class: 'btn', onclick: () => dlg.close() }, 'Seguir subiendo'),
+      h('button', { class: 'btn danger', onclick: async (e) => { if (await towerCall(e.currentTarget, '/api/tower', { method: 'DELETE' })) dlg.close(); } }, glyph('flag'), ' Abandonar')));
+}
+
+// ----- the lab -----
+
+function towerLab(run) {
+  const picked = [];
+  const cells = h('div', { class: 'party-row' });
+  const chosen = h('div', { class: 'tw-chosen' });
+  const goBtn = h('button', { class: 'btn primary', onclick: (e) => towerCall(e.currentTarget, '/api/tower/draft', { body: { offers: picked } }) });
+  const offerOf = (id) => run.offers.find((offer) => offer.id === id);
+  const toggle = (offer) => {
+    const at = picked.indexOf(offer.id);
+    if (at >= 0) picked.splice(at, 1);
+    else if (picked.length < run.starters) picked.push(offer.id);
+    else return toast(`Ya elegiste ${run.starters}: toca uno para quitarlo.`);
+    paint();
+  };
+  const sheet = (offer) => towerPrepInfo(run, offer.mon, {
+    line: offer.line,
+    action: (dlg) => {
+      const order = picked.indexOf(offer.id);
+      if (order >= 0) return h('button', { type: 'button', class: 'btn', onclick: () => { toggle(offer); dlg.close(); } }, `Quitar del equipo (${order + 1}º)`);
+      if (picked.length >= run.starters) return h('button', { type: 'button', class: 'btn', disabled: true }, `Ya elegiste ${run.starters}: quita uno primero`);
+      return h('button', { type: 'button', class: 'btn primary', onclick: () => { toggle(offer); dlg.close(); } }, `Elegir · ${picked.length + 1}º de ${run.starters}`);
+    },
+  });
+  function paint() {
+    cells.replaceChildren(...run.offers.map((offer) => partyCell(offer.mon, {
+      selected: picked.includes(offer.id), order: picked.includes(offer.id) ? picked.indexOf(offer.id) + 1 : null,
+      onclick: () => sheet(offer), label: `Ver la ficha de ${offer.mon.name}`,
+    })));
+    chosen.replaceChildren(...Array.from({ length: run.starters }, (_, i) => {
+      const offer = offerOf(picked[i]);
+      return h('button', { type: 'button', class: 'tw-chosen-slot', disabled: !offer, 'aria-label': offer ? `Quitar a ${offer.mon.name}` : 'Espacio libre', onclick: () => offer && toggle(offer) }, ballFrame(offer?.mon ?? null, { size: 'sm' }));
+    }));
+    goBtn.disabled = picked.length !== run.starters;
+    goBtn.replaceChildren(picked.length === run.starters ? '¡Vamos!' : `Elige ${run.starters - picked.length} más`);
+  }
+  paint();
+  const cast = towerMap({ scene: 'lab', seed: run.id, hero: playerOverworld(), foe: PROFESSOR.key, label: 'Laboratorio del Profesor Rowan' });
+  const talk = sayBox(PROFESSOR.name, PROFESSOR_LINES.hello);
+  const hint = h('p', { class: 'tw-tap-hint' }, 'Toca para seguir');
+  const pick = h('div', { class: 'card tw-main tw-pick', hidden: true },
+    h('div', { class: 'tw-panel-head' }, h('h2', null, `Elige ${run.starters}`), h('button', { class: 'btn ghost sm', onclick: towerAbandon }, 'Cancelar')),
+    h('p', { class: 'nb-note' }, 'Toca uno para ver su ficha y elegirlo. Empiezan en nivel 5 y evolucionan hacia la forma que criaste.'),
+    cells,
+    h('div', { class: 'tw-pick-bar' }, chosen, goBtn));
+  const page = h('section', { class: 'tw-page' }, h('div', { class: 'tw-top' }, h('span', { class: 'tw-floor-pill' }, glyph('flag'), 'Laboratorio')), cast.el, talk, hint, pick);
+  const toPick = () => {
+    pick.hidden = false;
+    hint.remove();
+    talk.classList.add('tw-talk-done');
+    page.classList.add('picking');
+    if (!isDesk()) pick.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  };
+  talk.addEventListener('click', () => talk.done.then(toPick));
+  hint.addEventListener('click', toPick);
+  if (isDesk()) toPick();
+  $app.replaceChildren(page);
+  if (!reducedMotion()) cast.approach();
+}
+
+// ----- after a win: experience, levels, moves, evolutions -----
+
+const resultKey = (run) => `tw-seen:${run.id}:${run.lastResult?.floor}`;
+
+/** Why a move is worth having for this Pokémon: same-type bonus, the stat it hits with, its side effects. */
+function moveWhy(mon, move) {
+  const tags = [];
+  if (move.category !== 'status' && mon.types?.includes(move.type)) tags.push(['good', 'STAB ×1,5']);
+  const stat = ATTACK_STAT[move.category];
+  if (stat) tags.push([mon.stats?.[stat[0]] >= Math.max(mon.stats?.atk ?? 0, mon.stats?.satk ?? 0) ? 'good' : '', `${CATEGORY[move.category]}: usa su ${stat[1]} (${mon.stats?.[stat[0]]})`]);
+  for (const effect of move.secondary ?? []) {
+    if (effect.status) tags.push(['', `${effect.chance} % ${INFLICT[effect.status]}`]);
+    if (effect.flinch) tags.push(['', `${effect.chance} % amedrentar`]);
+  }
+  if (move.priority > 0) tags.push(['good', 'Va primero']);
+  return tags;
+}
+
+const moveWorth = (mon, move) => (move.category === 'status' ? 45 : (move.power || 40) * (mon.types?.includes(move.type) ? 1.5 : 1) * ((move.accuracy || 100) / 100));
+
+/** Which equipped move a new one should replace: the one worth least, if it is worth less than the new one. */
+function suggestedSwap(mon, move) {
+  const equipped = mon.known.filter((known) => mon.equipped.includes(known.key));
+  const weakest = [...equipped].sort((a, b) => moveWorth(mon, a) - moveWorth(mon, b))[0];
+  return weakest && moveWorth(mon, weakest) < moveWorth(mon, move) ? weakest : weakest ?? null;
+}
+
+function compareTag(mon, known, move) {
+  if (known.category === 'status') return ['', `Sin daño: ${(known.desc ?? '').split('.')[0].toLowerCase() || 'de estado'}`];
+  if (!known.power) return ['', 'Daño fijo: vale menos cada nivel'];
+  const stab = mon.types?.includes(known.type);
+  if (moveWorth(mon, known) >= moveWorth(mon, move)) return ['bad', stab ? 'Más fuerte y del mismo tipo: mejor no' : 'Más fuerte: mejor no'];
+  return ['good', stab ? 'Más débil' : 'Más débil y sin STAB'];
+}
+
+/** "¿Cuál olvida?": the new move with why it helps, and each move it carries with what it gives. */
+function forgetPicker(mon, move, { onForget, onSkip, skipLabel }) {
+  const equipped = mon.known.filter((known) => mon.equipped.includes(known.key));
+  let choice = suggestedSwap(mon, move);
+  const suggestion = choice;
+  const cta = h('button', { class: 'btn primary' });
+  const grid = h('div', { class: 'tw-cmps' });
+  const paint = () => {
+    grid.replaceChildren(...equipped.map((known) => {
+      const [tone, text] = compareTag(mon, known, move);
+      return h('button', { type: 'button', class: `tw-cmp${known.key === choice?.key ? ' picked' : ''}`, onclick: () => { choice = known; paint(); } },
+        h('span', { class: 'tw-cmp-head' }, h('b', null, known.name), typeChip(known.type), known.key === suggestion?.key ? h('span', { class: 'tw-sug' }, 'Sugerido') : null),
+        h('small', null, `${CATEGORY[known.category] ?? ''}${known.power ? ` · Poder ${known.power}` : ''} · ${known.accuracy ? `${known.accuracy} %` : 'siempre acierta'}`),
+        h('span', { class: `tw-tag ${tone}` }, text));
+    }));
+    cta.textContent = choice ? `Olvidar ${choice.name}` : 'Elige cuál';
+    cta.disabled = !choice;
+  };
+  cta.onclick = (e) => onForget(e.currentTarget, choice);
+  paint();
+  return h('div', { class: 'tw-learn' },
+    moveBlock(move, { fresh: true }),
+    h('div', { class: 'tw-why' }, moveWhy(mon, move).map(([tone, text]) => h('span', { class: `tw-tag ${tone}` }, text))),
+    h('span', { class: 'nb-label' }, '¿Cuál olvida?'),
+    grid,
+    h('div', { class: 'tw-learn-actions' }, h('button', { class: 'btn ghost', onclick: (e) => onSkip(e.currentTarget) }, skipLabel), cta));
+}
+
+function towerResults(run) {
+  const result = run.lastResult;
+  const steps = [];
+  const rows = result.growth;
+  if (result.rival || rows.length) steps.push(() => h('div', { class: 'tw-step-screen' },
+    result.rival ? sayBox(`${result.rival.title} ${result.rival.name}`, result.rival.lose, { mini: result.rival.key }) : null,
+    h('div', { class: 'card' }, h('div', { class: 'tw-panel-head' }, h('h2', null, `Piso ${result.floor} superado`), run.log?.at(-1)?.floor === result.floor ? h('span', { class: 'chip' }, glyph('trophy'), ` +${pointsText(run.log.at(-1).points)}`) : null), teamRows(run, { growth: rows }))));
+  for (const g of rows.filter((entry) => entry.toLevel > entry.fromLevel)) {
+    const mon = run.party.find((member) => member.uid === g.uid);
+    if (!mon) continue;
+    steps.push(() => h('div', { class: 'tw-step-screen' }, h('div', { class: 'card tw-levelup' },
+      h('span', { html: creatureHTML({ sprite: g.fromSprite, rarity: 'common' }) }),
+      h('b', null, `¡${g.fromName} subió al nivel ${g.toLevel}!`),
+      h('div', { class: 'tw-stat-table' }, STAT_ROWS.flatMap(([label, key]) => [
+        h('span', null, label), h('span', null, g.statsAfter[key]),
+        h('span', { class: 'tw-up' }, g.statsAfter[key] > g.statsBefore[key] ? `+${g.statsAfter[key] - g.statsBefore[key]}` : ''),
+      ])))));
+    for (const move of g.learned) {
+      steps.push((next) => {
+        const current = towerData.run.party.find((member) => member.uid === g.uid);
+        if (!current || current.equipped.includes(move.key)) return null;
+        if (current.equipped.length < 4) return null;
+        return h('div', { class: 'tw-step-screen' },
+          sayBox(current.name, `¡Quiere aprender ${move.name}! Pero ya lleva cuatro movimientos.`),
+          forgetPicker(current, move, {
+            skipLabel: 'No aprenderlo',
+            onSkip: () => next(),
+            onForget: async (btn, known) => {
+              const moves = current.equipped.map((key) => (key === known.key ? move.key : key));
+              if (await towerCall(btn, `/api/tower/party/${encodeURIComponent(current.uid)}`, { method: 'PUT', body: { moves }, render: false })) next();
+            },
+          }));
+      });
+    }
+    if (g.toSpecies !== g.fromSpecies) {
+      steps.push((next) => {
+        const sprite = h('div', { class: 'tw-evo-stage', html: creatureHTML({ sprite: g.fromSprite, rarity: 'common' }) });
+        const say = sayBox('', `¿Eh? ¡${g.fromName} está evolucionando!`);
+        const stop = h('button', { class: 'btn block', onclick: async (e) => {
+          if (await towerCall(e.currentTarget, `/api/tower/party/${encodeURIComponent(g.uid)}/hold`, { render: false })) {
+            say.replaceWith(sayBox('', `${g.fromName} dejó de evolucionar. Lo intentará en su próximo nivel.`));
+            stop.remove();
+            sprite.classList.remove('glowing');
+          }
+        } }, 'Detener');
+        const screen = h('div', { class: 'tw-step-screen tw-evolving' }, sprite, say, stop);
+        (async () => {
+          if (!reducedMotion()) {
+            sprite.classList.add('glowing');
+            await wait(2600);
+          }
+          if (!stop.isConnected) return;
+          sprite.innerHTML = creatureHTML({ sprite: g.toSprite, rarity: 'common' });
+          sprite.classList.remove('glowing');
+          stop.remove();
+          say.replaceWith(sayBox('', `¡Felicidades! ¡Tu ${g.fromName} evolucionó en ${g.toName}!`));
+        })();
+        return screen;
+      });
+    }
+  }
+  let at = 0;
+  const finish = () => {
+    sessionFlag.set(resultKey(run));
+    renderTower(towerData);
+  };
+  const show = () => {
+    while (at < steps.length) {
+      const view = steps[at](() => { at += 1; show(); });
+      if (!view) { at += 1; continue; }
+      const interactive = view.querySelector('.tw-learn');
+      const hint = interactive ? null : h('p', { class: 'tw-tap-hint' }, 'Toca para seguir');
+      const page = h('section', { class: 'tw-narrow tw-steps' }, view, hint);
+      if (!interactive) page.addEventListener('click', (e) => { if (e.target.closest('button')) return; at += 1; show(); });
+      $app.replaceChildren(page);
+      return;
+    }
+    finish();
+  };
+  show();
+}
+
+// ----- the editor -----
+
+function monEditor(run, mon) {
+  const equipped = [...mon.equipped];
+  let ability = mon.ability;
+  const learnedNow = new Set((run.lastResult?.growth ?? []).filter((g) => g.uid === mon.uid).flatMap((g) => g.learned.map((move) => move.key)));
+  const carry = h('ul', { class: 'info-moves' });
+  const also = h('ul', { class: 'info-moves' });
+  const abilityBox = h('div');
+  const moveItem = (move, inUse) => h('li', { class: `tw-move-pick${learnedNow.has(move.key) ? ' mv-new' : ''}`, role: 'button', tabindex: 0, 'aria-label': inUse ? `Dejar de llevar ${move.name}` : `Llevar ${move.name}`, onclick: () => {
+    if (inUse) {
+      if (equipped.length <= 1) return toast('Lleva al menos 1 movimiento');
+      equipped.splice(equipped.indexOf(move.key), 1);
+    } else {
+      if (equipped.length >= 4) return toast('Ya lleva 4: quita uno de arriba primero');
+      equipped.push(move.key);
+    }
+    paint();
+  } }, ...moveDetails(move), h('span', { class: 'tw-move-action' }, inUse ? 'Quitar' : 'Llevar'));
+  const paint = () => {
+    carry.replaceChildren(...equipped.map((key) => moveItem(mon.known.find((move) => move.key === key), true)));
+    const rest = mon.known.filter((move) => !equipped.includes(move.key));
+    also.replaceChildren(...(rest.length ? rest.map((move) => moveItem(move, false)) : [h('li', { class: 'muted' }, 'Aún no sabe otros.')]));
+    const info = mon.abilities.find((option) => option.key === ability) ?? mon.abilityInfo;
+    abilityBox.replaceChildren(
+      h('p', null, abilityChip(info)), h('p', { class: 'small' }, info?.desc ?? ''),
+      h('div', { class: 'tw-ab-choices' }, mon.abilityOptions.map((option) => {
+        const unlocked = mon.abilities.some((owned) => owned.key === option.key);
+        return h('button', { type: 'button', class: `chip ${option.key === ability ? 'ab-on' : unlocked ? '' : 'ab-off'}`, disabled: !unlocked, 'data-tip': unlocked ? option.desc : option.hidden ? 'Se abre con un Parche Habilidad' : 'Se abre con una Cápsula Habilidad', onclick: () => { ability = option.key; paint(); } },
+          option.name, option.hidden ? ' · oculta' : '', unlocked ? null : [' ', glyph('lock')]);
+      })));
+  };
+  paint();
+  const done = h('button', { class: 'btn primary block' }, 'Listo');
+  const dlg = towerDialog(null,
+    towerInfoCard(mon, { cap: run.cap, moves: false, ability: false, extra: [
+      h('section', null, h('h3', null, 'Habilidad'), abilityBox),
+      h('section', null, h('h3', null, 'Lleva a la pelea'), carry),
+      h('section', null, h('h3', null, 'También sabe'), also),
+    ] }),
+    done,
+    run.party.length > 1 ? h('button', { class: 'btn ghost danger sm', onclick: (e) => {
+      if (!window.confirm(`¿Dejar ir a ${mon.name} para siempre?`)) return;
+      towerCall(e.currentTarget, `/api/tower/party/${encodeURIComponent(mon.uid)}`, { method: 'DELETE' }).then((res) => res && dlg.close());
+    } }, 'Dejar ir') : null);
+  done.onclick = async () => {
+    const same = equipped.join() === mon.equipped.join() && ability === mon.ability;
+    if (same || await towerCall(done, `/api/tower/party/${encodeURIComponent(mon.uid)}`, { method: 'PUT', body: { moves: equipped, ...(ability ? { ability } : {}) } })) dlg.close();
+  };
+}
+
+// ----- the rest: rewards and recruits -----
+
+const joinNames = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} y ${list.at(-1)}` : list[0] ?? '');
+
+/** The reward as it would work on your party right now. */
+function rewardSummary(run, reward) {
+  const fits = run.party.filter((mon) => reward.fits.includes(mon.uid));
+  const names = fits.map((mon) => mon.name);
+  if (reward.kind === 'tm' || reward.kind === 'tutor') {
+    const move = reward.moveInfo;
+    return `${CATEGORY[move.category]} · ${typeLabel(move.type)}${move.power ? ` · Poder ${move.power}` : ''} · ${move.accuracy ? `${move.accuracy} %` : 'siempre acierta'}. Para ${joinNames(names)}`;
+  }
+  if (reward.kind === 'vitamin') return `+${Math.min(32, ...fits.map((mon) => 252 - (mon.evs?.[reward.stat] ?? 0)))} EVs de ${STAT_NAME[reward.stat]} para ${joinNames(names)}`;
+  if (['candy', 'expCandy', 'vitamin', 'stone'].includes(reward.kind)) return joinNames(fits.map((mon) => `${mon.name} ${reward.reasons?.[mon.uid] ?? ''}`.trim()));
+  if (reward.kind === 'capsule' || reward.kind === 'patch') return `Para ${joinNames(names)}`;
+  return REWARD_INFO[reward.kind].text(reward);
+}
+
+function rewardRow(run, reward, { pick = false, onclick = null } = {}) {
+  const info = REWARD_INFO[reward.kind];
+  return h(onclick ? 'button' : 'div', { type: onclick ? 'button' : null, class: `tw-reward${pick ? ' pick' : ''}`, onclick },
+    itemImg(info.icon(reward)),
+    h('div', null, h('span', { class: `tw-tier tier-${reward.tier}` }, TIER_LABEL[reward.tier]), h('b', null, info.name(reward)), h('small', null, rewardSummary(run, reward))));
+}
+
+/** The nature a Mint gives and how this Pokémon's stats end up with it. */
+function mintStep(run, reward, mon, send) {
+  let nature = null;
+  const stats = h('div');
+  const tag = h('span', { class: 'nature-tag' });
+  const cta = h('button', { class: 'btn primary block', disabled: true });
+  const chips = h('div', { class: 'tw-natures' });
+  const factor = (info, key) => (info?.up === key ? 1.1 : info?.down === key ? 0.9 : 1);
+  const paint = () => {
+    const after = nature ? { natureInfo: nature, stats: Object.fromEntries(STAT_ROWS.map(([, key]) => [key, key === 'hp' ? mon.stats.hp : Math.floor((mon.stats[key] / factor(mon.natureInfo, key)) * factor(nature, key))])) } : null;
+    stats.replaceChildren(infoStats(mon, after));
+    tag.textContent = nature ? `${mon.natureInfo?.name ?? '—'} → ${nature.name}` : mon.natureInfo?.name ?? '';
+    chips.replaceChildren(...run.natures.filter((option) => option.key !== mon.natureInfo?.key).map((option) => h('button', { type: 'button', class: `chip${option.key === nature?.key ? ' ab-on' : ''}`, 'data-tip': option.up ? `+${STAT_NAME[option.up]} −${STAT_NAME[option.down]}` : 'neutra', onclick: () => { nature = option; paint(); } }, option.name)));
+    cta.disabled = !nature;
+    cta.textContent = nature ? `Usar Menta ${nature.name}` : 'Elige una naturaleza';
+  };
+  cta.onclick = () => send(cta, { uid: mon.uid, nature: nature.key });
+  paint();
+  return [h('div', { class: 'info-card tw-info-card' }, h('div', { class: 'stats-head' }, h('h3', null, 'Así quedan sus stats'), tag), stats), chips, cta];
+}
+
+function abilityStep(reward, mon, send) {
+  const options = mon.locked[reward.kind];
+  return [h('div', { class: 'tw-ability-list' }, options.map((option) => h('button', { type: 'button', class: 'tw-ability', onclick: (e) => send(e.currentTarget, { uid: mon.uid, ability: option.key }) },
+    h('b', null, option.name, option.hidden ? ' · oculta' : ''), h('small', { class: 'muted' }, option.desc))))];
+}
+
+function rewardDetail(run, reward) {
+  const info = REWARD_INFO[reward.kind];
+  const fits = run.party.filter((mon) => reward.fits.includes(mon.uid));
+  let target = fits.length === 1 ? fits[0] : null;
+  const body = h('div', { class: 'tw-reward-body' });
+  const dlg = towerDialog(info.name(reward), body);
+  const send = async (btn, choice) => {
+    const res = await towerCall(btn, '/api/tower/reward', { body: { reward: reward.id, ...choice } });
+    if (res) dlg.close();
+  };
+  const verb = { tm: 'Enseñársela a', tutor: 'Enseñársela a', candy: 'Dárselo a', expCandy: 'Dárselo a', vitamin: 'Dársela a', stone: 'Evolucionar a', capsule: 'Usarla en', patch: 'Usarlo en', mint: 'Usarla en' }[reward.kind];
+  const effect = (mon) => {
+    if (reward.kind === 'mint') return body.replaceChildren(h('h3', null, `Menta para ${mon.name}`), ...mintStep(run, reward, mon, send));
+    if (reward.kind === 'capsule' || reward.kind === 'patch') return body.replaceChildren(h('h3', null, `Habilidad para ${mon.name}`), ...abilityStep(reward, mon, send));
+    if ((reward.kind === 'tm' || reward.kind === 'tutor') && mon.equipped.length >= 4) {
+      return body.replaceChildren(rewardRow(run, reward, { pick: true }), forgetPicker(mon, reward.moveInfo, {
+        skipLabel: 'Solo aprenderlo',
+        onSkip: (btn) => send(btn, { uid: mon.uid }),
+        onForget: (btn, known) => send(btn, { uid: mon.uid, replace: known.key }),
+      }));
+    }
+    return send(null, { uid: mon.uid });
+  };
+  const paint = () => {
+    const cta = reward.kind === 'egg'
+      ? h('button', { class: 'btn primary block', onclick: (e) => send(e.currentTarget, { uid: run.party[0].uid }) }, 'Abrir el huevo')
+      : h('button', { class: 'btn primary block', disabled: !target, onclick: () => effect(target) }, target ? `${verb} ${target.name}` : 'Elige a quién');
+    body.replaceChildren(...[
+      rewardRow(run, reward, { pick: true }),
+      h('p', { class: 'small' }, info.text(reward)),
+      reward.moveInfo ? moveBlock(reward.moveInfo) : null,
+      reward.kind === 'stone' && target?.stone ? h('div', { class: 'tw-evo-line' }, h('span', { html: creatureHTML(target) }), glyph('arrow'), h('span', { html: creatureHTML({ sprite: target.stone.sprite, rarity: 'common' }) })) : null,
+      reward.kind === 'egg' ? null : h('span', { class: 'nb-label' }, reward.kind === 'tm' || reward.kind === 'tutor' ? 'Quién puede aprenderla' : 'A quién le sirve'),
+      reward.kind === 'egg' ? null : h('div', { class: 'tw-fits' }, run.party.map((mon) => {
+        const fit = reward.fits.includes(mon.uid);
+        const swap = fit && (reward.kind === 'tm' || reward.kind === 'tutor') && mon.equipped.length >= 4 ? suggestedSwap(mon, reward.moveInfo) : null;
+        return h('button', { type: 'button', class: `tw-fit${fit ? '' : ' no'}${mon === target ? ' picked' : ''}`, disabled: !fit, onclick: () => { target = mon; paint(); } },
+          h('span', { html: creatureHTML(mon) }), h('b', null, mon.name), h('small', null, swap ? `Reemplaza a ${swap.name}` : reward.reasons?.[mon.uid] ?? ''));
+      })),
+      cta].filter(Boolean));
+  };
+  paint();
+}
+
+function recruitPanel(run) {
+  const guide = run.offers[0]?.guide;
+  if (!run.offers.length || sessionFlag.get(`tw-recruit-skip:${run.id}:${run.floor}`)) return null;
+  const join = async (offer, btn, release = null) => towerCall(btn, '/api/tower/recruit', { body: { offer: offer.id, ...(release ? { release } : {}) } });
+  const choose = (offer) => {
+    if (run.party.length < PARTY_LIMIT) {
+      towerPrepInfo(run, offer.mon, { line: offer.line, action: (dlg) => h('button', { type: 'button', class: 'btn primary', onclick: async (e) => { if (await join(offer, e.currentTarget)) dlg.close(); } }, glyph('ball'), ` Sumar a ${offer.mon.name}`) });
+      return;
+    }
+    const dlg = towerDialog('Tu equipo está lleno', h('p', null, `¿A quién dejas ir para sumar a ${offer.mon.name}?`),
+      h('div', { class: 'party-row' }, run.party.map((mon) => partyCell(mon, { onclick: async () => { if (await join(offer, null, mon.uid)) dlg.close(); } }))));
+  };
+  return h('div', { class: 'tw-recruit' },
+    sayBox(guide.title, guide.line || RECRUIT_LINE, { mini: guide.key !== 'den' ? guide.key : null }),
+    h('div', { class: 'party-row' }, run.offers.map((offer) => partyCell(offer.mon, { onclick: () => choose(offer), label: `Ver la ficha de ${offer.mon.name}` }))),
+    h('button', { class: 'btn block', onclick: () => { sessionFlag.set(`tw-recruit-skip:${run.id}:${run.floor}`); renderTower(towerData); } }, 'Ahora no'));
+}
+
+function restPanel(run) {
+  const recruit = recruitPanel(run);
+  if (run.picks > 0 && run.rewards.length) {
+    return h('div', { class: 'tw-panel' },
+      h('div', { class: 'tw-panel-head' }, h('h2', null, run.picks > 1 ? `Elige ${run.picks} premios` : 'Elige un premio'),
+        run.rerolls ? h('button', { type: 'button', class: 'chip tw-reroll', onclick: (e) => towerCall(e.currentTarget, '/api/tower/reroll') }, glyph('dice'), ` Sortear · ${run.rerolls}`) : null),
+      run.rewards.map((reward) => rewardRow(run, reward, { onclick: () => rewardDetail(run, reward) })));
+  }
+  return recruit ?? h('div', { class: 'tw-panel' }, h('h2', null, 'Listo para subir'), h('p', { class: 'nb-note' }, 'Tu equipo se recuperó. Toca tu equipo para cambiar movimientos o habilidades antes de seguir.'));
+}
+
+// ----- each floor -----
+
+let towerCast = null;
+
+/** You walk to the way you chose on the map, then the floor goes on from there. */
+async function takeRoom(run, room, body) {
+  document.querySelectorAll('.tw-room, .tw-sign').forEach((button) => { button.disabled = true; });
+  if (!reducedMotion()) await towerCast?.takeExit(run.rooms.findIndex((option) => option.kind === room.kind));
+  const res = await towerCall(null, '/api/tower/room', { body });
+  if (!res) document.querySelectorAll('.tw-room, .tw-sign').forEach((button) => { button.disabled = false; });
+  return res;
+}
+
+function chooseRoom(run, room) {
+  if (room.kind !== 'deal') return takeRoom(run, room, { room: room.kind });
+  const dlg = towerDialog('Pacto oscuro',
+    h('p', null, 'Una figura en la sombra ofrece premios épicos… a cambio de uno de tu equipo. Se irá para siempre.'),
+    h('div', { class: 'party-row' }, run.party.map((mon) => partyCell(mon, { onclick: () => { dlg.close(); takeRoom(run, room, { room: 'deal', release: mon.uid }); } }))));
+  return null;
+}
+
+function roomRow(run, room) {
+  return h('button', { type: 'button', class: `tw-reward tw-room room-${room.kind}`, onclick: () => chooseRoom(run, room) },
+    room.foe ? overworldSprite(room.foe.key, { facing: 'down', scale: 1, cls: 'tw-room-mini' }) : h('span', { class: 'tw-room-icon' }, glyph(room.icon)),
+    h('div', null,
+      h('b', null, room.label, room.foe ? h('span', { class: 'tw-room-who' }, ` · ${room.foe.title} ${room.foe.name}`) : null),
+      room.foe ? h('span', { class: 'tw-room-meta' }, typeChips(room.types ?? []), ` Nv ${room.level} · ${room.teamSize} Pokémon${room.trained ? ' · entrenados' : ''}`) : null,
+      h('small', null, room.hint)));
+}
+
+/** Who in your party hits the rival's types hard, and who its types hit hard: what decides who you bring. */
+function matchupAgainst(run, types) {
+  if (!types?.length) return null;
+  const hits = (mon) => [...new Set([...(mon.types ?? []), ...mon.known.filter((move) => mon.equipped.includes(move.key) && move.category !== 'status').map((move) => move.type)])].filter((type) => types.some((foeType) => effectiveness(type, [foeType]) >= 2));
+  const fears = (mon) => types.filter((type) => effectiveness(type, mon.types ?? []) >= 2);
+  const strong = run.party.map((mon) => ({ mon, by: hits(mon) })).filter((entry) => entry.by.length);
+  const weak = run.party.map((mon) => ({ mon, by: fears(mon) })).filter((entry) => entry.by.length);
+  const line = (tone, label, list, word) => h('div', { class: 'tw-match-line' }, h('span', { class: `tw-tag ${tone}` }, label),
+    list.length ? h('span', null, joinNames(list.map(({ mon, by }) => `${mon.name} (${word} ${by.map(typeLabel).join(', ')})`))) : h('span', { class: 'muted' }, 'Nadie'));
+  return h('div', { class: 'tw-match' },
+    line('good', 'Le ganan', strong, 'con'),
+    line('bad', 'Sufren', weak, 'por'));
+}
+
+function nextBattlePanel(run, cta) {
+  const floor = run.current;
+  const levels = run.party.map((mon) => mon.level);
+  const yours = Math.min(...levels) === Math.max(...levels) ? `Nv ${levels[0]}` : `Nv ${Math.min(...levels)} a ${Math.max(...levels)}`;
+  const kind = floor.room && floor.room !== 'trainer' ? ROOMS[floor.room].label : FLOOR_KIND[floor.kind].label;
+  return h('div', { class: 'tw-panel' },
+    h('div', { class: 'tw-foe-head' },
+      avatarPic(floor.foe.key, 'md'),
+      h('div', null, h('span', { class: 'tw-kind' }, glyph(FLOOR_KIND[floor.kind].icon), ` ${kind}`), h('h2', null, `${floor.foe.title} ${floor.foe.name}`))),
+    h('div', { class: 'tw-facts' },
+      h('div', null, h('small', null, 'Tema'), h('span', null, floor.types?.length ? typeChips(floor.types) : 'Variado')),
+      h('div', null, h('small', null, 'Nivel'), h('b', null, `Nv ${floor.level}`)),
+      h('div', null, h('small', null, 'Tuyos'), h('b', null, yours), h('small', null, `tope ${run.cap}`)),
+      h('div', { 'data-tip': `Al empezar eliges ${BATTLE_SIZE} de tu equipo y el rival ${BATTLE_SIZE} de los suyos.` }, h('small', null, 'Trae'), h('b', null, `${floor.teamSize} Poké.`), floor.trained ? h('small', { class: 'tw-warn' }, 'entrenados') : null)),
+    matchupAgainst(run, floor.types),
+    cta);
+}
+
+function towerClimb(run) {
+  const floor = run.current;
+  const choosing = run.status === 'climbing' && run.rooms.length > 0;
+  const resting = run.status === 'resting';
+  const lastStep = run.trail.find((step) => step.number === run.floor - 1);
+  const cast = towerMap({
+    scene: resting ? (lastStep?.scene ?? floor.scene) : floor.scene,
+    seed: `${run.id}:${resting ? run.floor - 1 : run.floor}`,
+    hero: playerOverworld(),
+    foe: choosing ? null : resting ? lastStep?.foe?.key ?? null : floor.foe?.key ?? null,
+    boss: !choosing && !resting && floor.kind !== 'trainer',
+    type: floor.type,
+    stage: choosing ? 'fork' : resting ? 'rest' : 'arrive',
+    forks: run.rooms.length,
+    label: choosing ? 'El camino se divide' : floor.foe ? `${floor.foe.title} ${floor.foe.name} te espera` : 'Descanso',
+    compact: resting,
+  });
+  towerCast = cast;
+  if (choosing) cast.el.append(...exitRows(run.rooms.length).map((row, i) => h('button', { type: 'button', class: `tw-sign room-${run.rooms[i].kind}`, style: { '--y': String(Math.min(MAP_ROWS - 2, row + 1)) }, 'data-tip': run.rooms[i].label, 'aria-label': run.rooms[i].label, onclick: () => chooseRoom(run, run.rooms[i]) }, glyph(run.rooms[i].icon))));
+  const say = h('div', { class: 'tw-say-slot' });
+  let main;
+  if (choosing) main = h('div', { class: 'tw-panel' }, h('h2', null, 'El camino se divide'), h('p', { class: 'nb-note' }, 'Cada camino trae un rival o un premio distinto. Lo que no tomes no vuelve.'), run.rooms.map((room) => roomRow(run, room)));
+  else if (resting) {
+    const waiting = run.picks > 0 && run.rewards.length;
+    main = h('div', { class: 'tw-panel' }, restPanel(run),
+      h('button', { class: `btn ${waiting ? 'ghost' : 'primary'} block tw-cta`, onclick: (e) => towerCall(e.currentTarget, '/api/tower/move-on') }, glyph('arrow'), waiting ? ' Subir sin premio' : ` Subir al piso ${run.floor}`));
+  } else {
+    const cta = h('button', { class: 'btn primary block tw-cta' }, glyph('swords'), run.challengeId ? ' Volver a la pelea' : ' ¡A pelear!');
+    cta.onclick = async () => {
+      cta.disabled = true;
+      if (!run.challengeId && !reducedMotion()) {
+        await cast.approach();
+        const talk = sayBox(`${floor.foe.title} ${floor.foe.name}`, floor.lines.hello, { mini: floor.foe.key });
+        say.replaceChildren(talk);
+        say.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        await Promise.race([talk.done.then(() => wait(900)), wait(2000 + floor.lines.hello.length * 26)]);
+        await cast.closeIn();
+      }
+      const res = await towerCall(cta, '/api/tower/fight', { render: false });
+      if (res) nav(`/b/${res.challengeId}`);
+    };
+    main = nextBattlePanel(run, cta);
+  }
+  $app.replaceChildren(h('section', { class: 'tw-page' },
+    towerTop(run),
+    cast.el,
+    say,
+    h('div', { class: 'tw-cols' },
+      h('div', { class: 'card tw-main' }, main),
+      h('div', { class: 'tw-side' },
+        h('div', { class: 'tw-mobile-only' }, teamStrip(run)),
+        h('div', { class: 'card tw-desk-only' }, h('div', { class: 'tw-panel-head' }, h('h2', null, 'Tu equipo'), h('span', { class: 'party-count' }, `${run.party.length}/${PARTY_LIMIT}`)), teamRows(run)),
+        h('div', { class: 'card tw-desk-only' }, h('h2', null, 'La torre'), towerFloors(run, { ahead: 5 }))))));
 }
 
 let roomsFeed = null;
@@ -2612,6 +3447,37 @@ function rankingCard(ranking) {
   return h('div', { class: 'card' }, h('div', { class: 'row between' }, h('h2', null, glyph('trophy'), ' Ranking'), h('span', { class: 'muted small' }, 'Solo batallas entre jugadores')), ...body);
 }
 
+const DIFFICULTY_MULTIPLIER = { easy: 0.5, mid: 1, hard: 1.5, veryhard: 2, skynet: 3 };
+const pointsText = (points) => `${points.toLocaleString('es')} pts`;
+
+/** A climb's points floor by floor: the floor, the rival team, the way and the difficulty. */
+function towerScoreSheet(record) {
+  const roomLabel = (entry) => (entry.room && entry.room !== 'trainer' ? ROOMS[entry.room]?.label : FLOOR_KIND[entry.kind].label);
+  return towerDialog(`${record.name} · ${pointsText(record.points)}`,
+    h('p', { class: 'nb-note' }, `${AI_LABEL[record.difficulty]} (×${DIFFICULTY_MULTIPLIER[record.difficulty]}) · ${record.finished ? `completó ${lengthLabel(record.length)}` : `${plural(record.cleared, 'piso superado', 'pisos superados')}`}. Cada piso suma sus puntos (ruta 100, gimnasio 300, Alto Mando 450, campeón 800) más el equipo rival (nivel × stats base), por el camino y la dificultad.`),
+    h('div', { class: 'list rank-list tw-score-list' }, record.log.map((entry) => h('div', { class: 'item' },
+      h('span', { class: 'row' }, h('span', { class: 'rank' }, entry.floor), h('span', { class: 'rank-who' }, h('strong', null, entry.rival ?? roomLabel(entry)), h('small', { class: 'muted' }, `${roomLabel(entry)} · ${entry.base} + ${entry.team} equipo × ${entry.multiplier.toLocaleString('es')}`))),
+      h('span', { class: 'chip' }, pointsText(entry.points))))));
+}
+
+function towerStatsCard(records) {
+  const head = h('div', { class: 'row between' }, h('h2', null, glyph('flag'), ' La Torre'), h('span', { class: 'muted small', tabindex: 0, 'data-tip': 'La mejor subida de cada jugador en cada dificultad. Toca a alguien para ver sus puntos piso por piso.' }, 'Por puntos, separado por dificultad'));
+  if (!records.length) return h('div', { class: 'card' }, head, h('p', { class: 'muted' }, 'Nadie ha superado un piso todavía. Sube desde el inicio.'));
+  const levels = Object.keys(AI_LABEL).filter((level) => records.some((record) => record.difficulty === level));
+  let shown = levels.includes('mid') ? 'mid' : levels[0];
+  const tabs = h('div', { class: 'segmented', role: 'group', 'aria-label': 'Dificultad' });
+  const list = h('div', { class: 'list rank-list' });
+  const paint = () => {
+    tabs.replaceChildren(...levels.map((level) => h('button', { type: 'button', class: 'seg-item', 'aria-pressed': String(level === shown), onclick: () => { shown = level; paint(); } }, AI_LABEL[level], h('small', null, ` ×${DIFFICULTY_MULTIPLIER[level]}`))));
+    list.replaceChildren(...records.filter((record) => record.difficulty === shown).slice(0, 15).map((record, i) => h('button', { type: 'button', class: `item tw-rank-item${me && record.trainerId === me.id ? ' is-me' : ''}`, onclick: () => towerScoreSheet(record) },
+      h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 1}`), overworldSprite(record.avatar || 'player_m', { facing: 'down', scale: 1 }),
+        h('span', { class: 'rank-who' }, h('strong', null, record.name), h('small', { class: 'muted' }, record.finished ? `Completó ${lengthLabel(record.length)}` : `Piso ${record.cleared} · ${lengthLabel(record.length)}`))),
+      h('span', { class: 'chip' }, glyph('trophy'), ` ${pointsText(record.points)}`))));
+  };
+  paint();
+  return h('div', { class: 'card' }, head, tabs, list);
+}
+
 function tournamentStatsSection({ totals, ranking, recent }) {
   const head = h('div', { class: 'row between' }, h('h2', null, glyph('trophy'), ' Torneos'), h('span', { class: 'muted small', tabindex: 0, 'data-tip': 'Solo cuentan los torneos terminados con al menos 2 personas. No suman al ranking de batallas 1 contra 1.' }, 'Aparte del ranking 1 contra 1'));
   if (!totals.tournaments) return h('section', null, h('div', { class: 'card' }, head, h('p', { class: 'muted' }, 'Todavía no termina ningún torneo con al menos 2 personas. Arma uno desde el inicio.')));
@@ -2700,8 +3566,9 @@ async function statsPage(seq) {
   renderWho();
   $app.replaceChildren(loadingScreen('Cargando…'));
   let data;
+  let climbs = [];
   try {
-    data = await api('/api/stats');
+    [data, climbs] = await Promise.all([api('/api/stats'), api('/api/tower/records').then((res) => res.records).catch(() => [])]);
   } catch (e) {
     if (stale(seq)) return;
     $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No pude cargar las stats'), h('p', { class: 'muted' }, e.message)));
@@ -2732,6 +3599,7 @@ async function statsPage(seq) {
     h('section', null, rankingCard(ranking)),
     h('section', { class: 'grid2' }, recentCard(recent), numbersCard(totals)),
     tournaments ? tournamentStatsSection(tournaments) : '',
+    h('section', null, towerStatsCard(climbs)),
     topMonsSection(topMons),
     h('section', null, h('p', { class: 'muted small center' }, `Versión ${live.version} · servidor encendido ${ago(live.startedAt)}`)),
   );
@@ -2993,23 +3861,23 @@ function trainerName(name, attrs = {}, avatar = null) {
 }
 const AI_NOTES = {
   easy: {
-    team: 'Los dados sortean sus 6 entre todos los Pokémon evolucionados de la 1.ª a la 5.ª generación. Ataca sin pensar, como un Pokémon salvaje.',
-    random: 'Sus 6 también salen de los dados, solo entre Pokémon evolucionados. Ataca sin pensar, como un Pokémon salvaje.',
+    team: 'Los dados sortean sus 6 entre todos los Pokémon evolucionados de la 1.ª a la 5.ª generación, con movimientos al azar. Ataca casi sin pensar, como un Pokémon salvaje.',
+    random: 'Sus 6 también salen de los dados, solo entre Pokémon evolucionados. Ataca casi sin pensar, como un Pokémon salvaje.',
   },
   mid: {
-    team: 'Los dados sortean sus 6 entre el 80 % más fuerte de los evolucionados. Evita movimientos inútiles, pero no cambia de Pokémon.',
-    random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados. Evita movimientos inútiles, pero no cambia de Pokémon.',
+    team: 'Sus 6 salen del 80 % más fuerte de los evolucionados, con movimientos al azar. Como un entrenador normal: evita movimientos inútiles y busca el KO, pero no cambia de Pokémon.',
+    random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados. Como un entrenador normal: evita movimientos inútiles y busca el KO, pero no cambia de Pokémon.',
   },
   hard: {
-    team: 'Los dados sortean sus 6 entre el 60 % más fuerte de los evolucionados. Busca el KO y a veces cambia si va perdiendo.',
-    random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados. Elige bien a quién sacar, busca el KO y a veces cambia si va perdiendo.',
+    team: 'Sus 6 salen del 60 % más fuerte, entrenados: movimientos con STAB y cobertura, naturaleza y EVs a su favor. Prefiere el mayor daño, se prepara el primer turno y a veces cambia si va perdiendo.',
+    random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados. Prefiere el mayor daño, se prepara el primer turno, elige bien quién entra y a veces cambia si va perdiendo.',
   },
   veryhard: {
-    team: 'Los dados sortean sus 6 entre el 50 % más fuerte de los evolucionados. Calcula velocidad y daño, y cambia cuando le conviene.',
-    random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados, pero calcula velocidad y daño, elige el mejor enfrentamiento y cambia cuando le conviene.',
+    team: 'Sus 6 salen del 50 % más fuerte, entrenados y llevando a los mejores. Calcula la carrera de velocidad y los KO en dos golpes, prevé tu respuesta y cambia cuando le conviene, sin errores.',
+    random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados, pero calcula velocidad y daño, prevé tu respuesta y cambia cuando le conviene.',
   },
   skynet: {
-    team: 'Los dados sortean sus 6 entre el 40 % más fuerte de los evolucionados. En cada turno Jev, un modelo de decisiones, elige qué ataque usar o a quién sacar.',
+    team: 'Sus 6 salen del 40 % más fuerte, entrenados. En cada turno Jev, un modelo de decisiones, elige qué ataque usar o a quién sacar.',
     random: 'Sus 6 salen de los dados, solo entre Pokémon evolucionados. En cada turno Jev, un modelo de decisiones, elige qué ataque usar o a quién sacar.',
   },
 };
@@ -3698,7 +4566,7 @@ async function battlePage(id, seq) {
       }
       if (!battle) {
         battle = battleUI(c, (action) => ws?.readyState === 1 && ws.send(JSON.stringify({ t: 'act', action })), (turn) => send({ t: 'seen', turn }), chat, bar, () => send({ t: 'surrender' }));
-        music.play(`scene:${sceneFor(c.id).file}`);
+        music.play(battleMusicFor(c));
       }
       battle.push(msg);
     };
@@ -3722,7 +4590,7 @@ async function battlePage(id, seq) {
     const you = me ? c.final.sides.findIndex((s) => s.trainerId === me.id) : -1;
     bar.update(you === -1 ? null : you, c.final.sides);
     battle = battleUI(c, () => {}, undefined, null, bar);
-    music.play(`scene:${sceneFor(c.id).file}`);
+    music.play(battleMusicFor(c));
     battle.push({ state: c.final, you: you === -1 ? null : you, actions: [], deadline: null });
     return;
   }
@@ -3999,7 +4867,7 @@ function roomBar(c, requestWatchers) {
       menuBtn,
       h('span', { class: 'room-bar-tag' }, glyph(watching ? 'eye' : 'swords'), watching ? ' Estás mirando' : ' Tu pelea'),
       ...(status ? [status.turn, status.vs] : []),
-      h('span', { class: 'room-bar-text' }, tour ? [glyph('trophy'), ` ${tour.round} · Pelea ${tour.number} de ${tour.total}`] : null, tour && vs ? ' · ' : null, vs),
+      h('span', { class: 'room-bar-text' }, tour ? [glyph('trophy'), ` ${tour.round} · Pelea ${tour.number} de ${tour.total}`] : c.staging?.label ? [glyph('flag'), ` ${c.staging.label}`] : null, (tour || c.staging?.label) && vs ? ' · ' : null, vs),
       ...(status ? [status.field, status.timer, status.forfeit] : []),
       ...(tour ? [h('a', { class: 'btn sm', href: `/t/${tour.id}`, 'data-link': true }, 'Ver llaves')] : []),
       ...(watching ? [] : [watch.el]),
@@ -5114,7 +5982,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
   const skinClass = windowSkin ? ` win-theme win-${windowSkin}` : '';
   els.say.className += skinClass;
   els.controls.className += windowSkin ? ` win-moves win-${windowSkin}` : '';
-  const scene = sceneFor(c.id);
+  const scene = battleScene(c);
   const field = h(
     'div',
     { class: 'battle-field' },
@@ -5552,7 +6420,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
       const outcome = st.winner === null ? 'draw' : you === null ? 'watch' : won ? 'win' : 'lose';
       const title = st.winner === null ? 'Empate' : you === null ? `¡Gana ${trainerShort(st.sides[st.winner].name)}!` : won ? '¡Ganaste!' : 'Perdiste…';
       const icon = { draw: 'draw', watch: 'trophy', win: 'trophy', lose: 'skull' }[outcome];
-      const rematch = me && !c.tournament
+      const rematch = me && !c.tournament && !c.staging
         ? h('button', {
             type: 'button',
             class: 'btn primary',
@@ -5578,7 +6446,8 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
           h('div', { class: 'pb-actions' },
             rematch,
             c.tournament ? h('a', { class: 'btn primary', href: `/t/${c.tournament.id}`, 'data-link': true }, glyph('trophy'), ' Ver llaves') : null,
-            me && !c.tournament ? h('a', { class: 'btn', href: '/coleccion', 'data-link': true }, glyph('ball'), ' Ajustar equipo') : null,
+            c.staging && you !== null ? h('a', { class: 'btn primary', href: c.staging.returnTo, 'data-link': true }, glyph('flag'), won ? ' Volver a la torre' : ' Ver tu subida') : null,
+            me && !c.tournament && !c.staging ? h('a', { class: 'btn', href: '/coleccion', 'data-link': true }, glyph('ball'), ' Ajustar equipo') : null,
             h('a', { class: 'btn ghost', href: '/', 'data-link': true }, glyph('home'), ' Inicio'))),
       );
       return;

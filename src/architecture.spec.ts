@@ -8,7 +8,7 @@ import { dirname, join, normalize, relative } from 'node:path';
 import { PROJECT_ROOT } from './shared/paths.js';
 
 const SRC = join(PROJECT_ROOT, 'src');
-const CONTEXTS = ['arena', 'catalog', 'chat', 'combat', 'radio', 'stats', 'trainers'];
+const CONTEXTS = ['arena', 'catalog', 'chat', 'combat', 'radio', 'stats', 'tower', 'trainers'];
 
 interface Import {
   /** The importing file, relative to src/ ("arena/domain/lobby.ts"). */

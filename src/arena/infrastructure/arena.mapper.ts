@@ -28,6 +28,7 @@ export function challengeToDomain(row: ChallengeRow): Challenge {
       final: row.final ?? undefined,
       createdAt: row.createdAt,
       finishedAt: row.finishedAt ?? undefined,
+      staging: row.staging ?? undefined,
     }),
   });
 }
@@ -54,6 +55,7 @@ export function challengeToRow(challenge: Challenge): typeof challenges.$inferIn
     final: challenge.final ?? null,
     createdAt: challenge.createdAt,
     finishedAt: challenge.finishedAt ?? null,
+    staging: challenge.staging ?? null,
   };
 }
 

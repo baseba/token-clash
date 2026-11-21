@@ -6,6 +6,7 @@
 //   arena     duel rooms, live matches, tournaments        ← owns challenges, tournaments, seats, matches
 //   chat      room and tournament chat (in memory)
 //   radio     trainers' radio stations and their queues   ← owns radio_stations
+//   tower     climbs of the Tower with your collection     ← owns tower_runs
 //   stats     read model for /stats
 //   realtime  the WebSocket protocol (/ws)
 //   web       the static frontend and health checks
@@ -24,6 +25,7 @@ import { SecurityHeadersMiddleware } from './shared/http/security-headers.middle
 import { validationPipe } from './shared/http/validation.pipe.js';
 import { DatabaseModule } from './shared/infrastructure/database/database.module.js';
 import { StatsModule } from './stats/stats.module.js';
+import { TowerModule } from './tower/tower.module.js';
 import { TrainersModule } from './trainers/trainers.module.js';
 import { WebRoutesModule } from './web/web-routes.module.js';
 
@@ -37,6 +39,7 @@ import { WebRoutesModule } from './web/web-routes.module.js';
     ArenaModule,
     ChatModule,
     RadioModule,
+    TowerModule,
     StatsModule,
     RealtimeModule,
     // Last: its catch-all route serves the frontend and must not shadow anything above.

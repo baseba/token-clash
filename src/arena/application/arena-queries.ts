@@ -21,6 +21,10 @@ export class ArenaQueries {
     return this.tournaments.all();
   }
 
+  challengeStatus(id: string): Challenge['status'] | null {
+    return this.challenges.findById(id)?.status ?? null;
+  }
+
   liveBattles(): number {
     return this.presence.liveBattles();
   }

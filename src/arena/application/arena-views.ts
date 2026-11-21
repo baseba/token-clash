@@ -48,6 +48,7 @@ export class ArenaViews {
       winnerId: challenge.winnerId ?? null,
       turns: challenge.turns ?? null,
       final: challenge.final ?? null,
+      staging: challenge.staging ?? null,
     };
   }
 
@@ -165,7 +166,8 @@ export class ArenaViews {
     };
   }
 
-  avatarOf(id: string, room: Pick<Challenge, 'id' | 'tournamentId'>): string {
+  avatarOf(id: string, room: Pick<Challenge, 'id' | 'tournamentId'> & Partial<Pick<Challenge, 'guestId' | 'staging'>>): string {
+    if (room.staging && id === room.guestId) return room.staging.guestAvatar;
     if (aiLevelOf(id)) return trainerSpriteFor(`${room.tournamentId ?? room.id}:${id}`);
     return this.trainers.byId(id)?.look ?? trainerSpriteFor(id, STARTER_SPRITES);
   }

@@ -43,6 +43,8 @@ export interface RosterEntry {
   chainLen?: number;
   /** The one currently growing in PokeTokenBar. */
   active?: boolean;
+  /** The level it fights at, when a mode sets one (the Tower); otherwise every battle is at level 100. */
+  battleLevel?: number;
 }
 
 const variantKey = (entry: Pick<RosterEntry, 'finalID' | 'shiny'>) => `${entry.finalID}:${entry.shiny ? 'shiny' : 'plain'}`;

@@ -15,6 +15,7 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 | `arena` | Dónde se pelea: salas, emparejamiento, peleas en vivo, torneos | tablas `challenges`, `tournaments`, `tournament_seats`, `tournament_matches` |
 | `chat` | Mensajes en salas y torneos | memoria (se borra al reiniciar, a propósito) |
 | `radio` | Las estaciones de los entrenadores: la cola que elige el dueño, qué suena y quién escucha | tabla `radio_stations` (los oyentes, en memoria) |
+| `tower` | La Torre: subidas con tu colección, pisos y caminos, experiencia, evolución, premios y récords | tabla `tower_runs` |
 | `stats` | La página de stats y los logros | nada: lee de los otros dominios y le pide los cambios a `trainers` |
 
 Más tres piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
@@ -32,13 +33,20 @@ Más tres piezas que no son dominios sino entradas y plomería: `realtime` (el p
 
    realtime (WS), HTTP ──▶ radio ──▶ trainers
                              └─────▶ catalog
+
+   HTTP ──▶ tower ──▶ arena (cada piso es una sala contra la IA)
+              ├────▶ trainers (tu colección)
+              └────▶ combat, catalog
 ```
 
 Las flechas son "usa a". Nunca hay una flecha de vuelta: `trainers` no sabe que existen las salas, `combat` no
 sabe que existen los entrenadores, `catalog` no sabe que existe el motor, y `chat` guarda mensajes por canal sin
 saber qué es una sala. `radio` usa `catalog` (qué canciones hay y cuánto dura cada una) y `trainers` (el nombre
 del DJ), y nadie sabe que existe: escuchar una estación no tiene nada que ver con las salas, y un jugador puede
-escucharla mientras pelea. `src/architecture.spec.ts` lo revisa.
+escucharla mientras pelea. `tower` usa `arena` para jugar cada piso: le pide una sala contra la IA con sus
+propios equipos y su puesta en escena (`Staging`: escenario, música, sprite del rival, a dónde volver y la etiqueta del piso) y escucha
+`matchFinished` para avanzar la subida, como un torneo. La arena no sabe que la torre existe.
+`src/architecture.spec.ts` lo revisa.
 
 ## 2. Las capas dentro de un dominio
 

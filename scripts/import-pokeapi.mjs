@@ -127,11 +127,13 @@ await mapLimit(ids, async (id) => {
 });
 
 console.error(`${chainIds.size} cadenas evolutivas…`);
-// stage = depth in the chain (0 = first form); chainLen = forms on the longest path through it.
+// stage = depth in the chain (0 = first form); chainLen = forms on the longest path through it;
+// evolvesAt = the level it evolves into this form by leveling up, when a level does it.
 const placement = {};
 function walk(node, depth) {
   const below = node.evolves_to.length ? Math.max(...node.evolves_to.map((c) => walk(c, depth + 1))) : 0;
-  placement[idFromUrl(node.species.url)] = { stage: depth, chainLen: depth + 1 + below };
+  const levels = node.evolution_details.filter((d) => d.trigger?.name === 'level-up' && d.min_level).map((d) => d.min_level);
+  placement[idFromUrl(node.species.url)] = { stage: depth, chainLen: depth + 1 + below, ...(levels.length ? { evolvesAt: Math.min(...levels) } : {}) };
   return below + 1;
 }
 await mapLimit([...chainIds], async (cid) => {
@@ -273,7 +275,7 @@ const lines = Object.keys(species)
   .map((id) => {
     const { chainId, ...s } = species[id];
     const p = placement[id] ?? { stage: 0, chainLen: 1 };
-    return `  "${id}": ${JSON.stringify({ ...s, stage: p.stage, chainLen: p.chainLen })}`;
+    return `  "${id}": ${JSON.stringify({ ...s, stage: p.stage, chainLen: p.chainLen, ...(p.evolvesAt ? { evolvesAt: p.evolvesAt } : {}) })}`;
   });
 
 const header = { source: 'https://pokeapi.co', fetchedAt: new Date().toISOString().slice(0, 10), stats: ['hp', 'attack', 'defense', 'special-attack', 'special-defense', 'speed'] };

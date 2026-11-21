@@ -68,7 +68,7 @@ export function movesetFor(entry: EntryLike): string[] {
 
 export function buildFighter(entry: RosterEntry): Fighter {
   const sp = species(entry);
-  const level = BATTLE_LEVEL;
+  const level = entry.battleLevel ?? BATTLE_LEVEL;
   const iv = PERFECT_IVS;
   const evs = entry.evs ?? NO_EVS;
   const ability = abilityFor(entry);

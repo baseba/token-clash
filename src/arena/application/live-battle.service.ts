@@ -212,7 +212,7 @@ export class LiveBattleService {
       this.trainers.recordRankedResult(battle.sides[battle.winner].trainerId, battle.sides[1 - battle.winner].trainerId);
     this.challenges.save(challenge);
     this.lobby.notify();
-    if (challenge.tournamentId) this.events.matchFinished({ challenge, winnerSide: battle.winner });
+    this.events.matchFinished({ challenge, winnerSide: battle.winner });
     // Keep the finished room a while for late viewers, then drop it.
     setTimeout(() => {
       if (this.presence.rooms.get(challenge.id) === room && room.sockets.size === 0) this.presence.rooms.delete(challenge.id);
