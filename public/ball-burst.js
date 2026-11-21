@@ -121,7 +121,25 @@ function spriteFor(shape, [light, mid, dark], glow) {
       g.stroke();
     }
   }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  snapToPalette(g, SPRITE, SPRITE, [light, mid, dark, '#ffffff'], true);
   sprites.set(id, canvas);
+  return canvas;
+}
+
+const lightSprites = new Map();
+
+function lightSprite(key, width, height, paint) {
+  const id = `${key}|${Math.round(width)}|${Math.round(height)}`;
+  if (lightSprites.has(id)) return lightSprites.get(id);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width * LIGHT_SCALE));
+  canvas.height = Math.max(1, Math.round(height * LIGHT_SCALE));
+  const g = canvas.getContext('2d');
+  g.scale(LIGHT_SCALE, LIGHT_SCALE);
+  paint(g);
+  if (lightSprites.size > 64) lightSprites.delete(lightSprites.keys().next().value);
+  lightSprites.set(id, canvas);
   return canvas;
 }
 
@@ -2592,38 +2610,45 @@ const SIGNATURES = {
     const dur = 2400;
     const root = { x: body.x, y: body.y - 4 * k };
     const shafts = [-0.42, -0.2, 0.05, 0.28, 0.5].map((tilt) => ({ tilt, sway: rnd(0, TAU), width: rnd(7, 12) }));
-    glow((g, u, w, h) => {
-      const beam = ease.inOut(swell(u, 0.2, 0.78));
-      g.globalCompositeOperation = 'source-over';
-      g.globalAlpha = 0.6 * beam;
-      g.fillStyle = radial(g, root.x, root.y - 20 * k, Math.max(w, h) * 0.75, [[0, alpha('#0a0c1e', 0)], [0.12, alpha('#0a0c1e', 0)], [0.45, alpha('#0a0c1e', 0.75)], [1, alpha('#0a0c1e', 0.9)]]);
-      g.fillRect(0, 0, w, h);
+    const reach = Math.max(1, root.y + 10 * k);
+    const holyLight = lightSprite(`seraph|${k.toFixed(2)}|${Math.round(root.y)}`, 160 * k, reach, (g) => {
+      const center = 80 * k;
       g.globalCompositeOperation = 'lighter';
       for (const shaft of shafts) {
-        const tilt = shaft.tilt + Math.sin(u * TAU * 0.6 + shaft.sway) * 0.04;
-        const top = { x: root.x + Math.tan(tilt) * root.y, y: 0 };
+        const top = { x: center + Math.tan(shaft.tilt) * root.y, y: 0 };
         const half = shaft.width * k;
-        const fill = g.createLinearGradient(top.x, top.y, root.x, root.y);
+        const fill = g.createLinearGradient(top.x, top.y, center, root.y);
         fill.addColorStop(0, alpha('#fff6d8', 0));
-        fill.addColorStop(0.6, alpha('#fff6d8', 0.35));
+        fill.addColorStop(0.6, alpha('#fff6d8', 0.3));
         fill.addColorStop(1, alpha('#ffffff', 0.05));
-        g.globalAlpha = beam * 0.8;
         g.fillStyle = fill;
         g.beginPath();
         g.moveTo(top.x - half * 2, top.y);
         g.lineTo(top.x + half * 2, top.y);
-        g.lineTo(root.x + half * 0.3, root.y);
-        g.lineTo(root.x - half * 0.3, root.y);
+        g.lineTo(center + half * 0.3, root.y);
+        g.lineTo(center - half * 0.3, root.y);
         g.closePath();
         g.fill();
       }
-      g.globalAlpha = beam;
       g.save();
-      g.translate(root.x, root.y * 0.5);
+      g.translate(center, root.y * 0.5);
       g.scale(1, Math.max(1, root.y / (60 * k)));
       g.fillStyle = radial(g, 0, 0, 60 * k, [[0, alpha('#ffffff', 0.9)], [0.22, alpha('#fff6d8', 0.6)], [0.55, alpha('#e6ecff', 0.25)], [1, alpha('#e6ecff', 0)]]);
       g.fillRect(-60 * k, -60 * k, 120 * k, 120 * k);
       g.restore();
+    });
+    glow((g, u, w, h) => {
+      const beam = ease.inOut(swell(u, 0.2, 0.78));
+      const darkness = lightSprite(`holy-dark|${Math.round(root.x)}|${Math.round(root.y)}`, w, h, (dg) => {
+        dg.fillStyle = radial(dg, root.x, root.y - 20 * k, Math.max(w, h) * 0.75, [[0, alpha('#0a0c1e', 0)], [0.12, alpha('#0a0c1e', 0)], [0.45, alpha('#0a0c1e', 0.75)], [1, alpha('#0a0c1e', 0.9)]]);
+        dg.fillRect(0, 0, w, h);
+      });
+      g.globalCompositeOperation = 'source-over';
+      g.globalAlpha = 0.6 * beam;
+      g.drawImage(darkness, 0, 0, w, h);
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = beam;
+      g.drawImage(holyLight, root.x - 80 * k, 0, 160 * k, reach);
     }, dur, 100);
     const cross = paintedSprite('holy-cross', (g, r) => {
       g.fillStyle = '#ffffff';
@@ -2694,29 +2719,26 @@ const SIGNATURES = {
       const radius = 54 * k * (0.5 + 0.5 * ease.out(Math.min(1, u / 0.3))) * 0.74;
       const sweep = u * 1.6;
       g.globalCompositeOperation = 'lighter';
+      const column = lightSprite(`holy-column|${k.toFixed(2)}`, 18 * k, 80 * k, (cg) => {
+        const fill = cg.createLinearGradient(0, 71 * k, 0, 0);
+        fill.addColorStop(0, alpha('#fff6d8', 0.8));
+        fill.addColorStop(1, alpha('#fff6d8', 0));
+        cg.fillStyle = fill;
+        cg.fillRect(6 * k, 0, 6 * k, 71 * k);
+        cg.fillStyle = radial(cg, 9 * k, 71 * k, 9 * k, [[0, alpha('#ffffff', 0.9)], [1, alpha('#fff6d8', 0)]]);
+        cg.fillRect(0, 62 * k, 18 * k, 18 * k);
+      });
       for (let i = 0; i < HOLY_POINTS; i++) {
         const angle = -u * 0.6 - Math.PI / 2 + (i / HOLY_POINTS) * TAU;
         const foot = { x: p.x + Math.cos(angle) * radius, y: p.y + Math.sin(angle) * radius * 0.36 };
         const phase = (sweep - i / HOLY_POINTS + 1) % 1;
         const lit = Math.exp(-((phase - 0.15) ** 2) / 0.012);
         g.globalAlpha = show * (0.25 + 0.75 * lit);
-        const column = g.createLinearGradient(foot.x, foot.y, foot.x, foot.y - 70 * k);
-        column.addColorStop(0, alpha('#fff6d8', 0.8));
-        column.addColorStop(1, alpha('#fff6d8', 0));
-        g.fillStyle = column;
-        g.fillRect(foot.x - 3 * k, foot.y - 70 * k, 6 * k, 70 * k);
-        g.fillStyle = radial(g, foot.x, foot.y, 9 * k, [[0, alpha('#ffffff', 0.9)], [1, alpha('#fff6d8', 0)]]);
-        g.fillRect(foot.x - 9 * k, foot.y - 9 * k, 18 * k, 18 * k);
+        g.drawImage(column, foot.x - 9 * k, foot.y - 71 * k, 18 * k, 80 * k);
       }
     }, dur, 150);
-    glow((g, u) => {
-      const t = (u - 0.3) / 0.7;
-      if (t < 0) return;
-      g.globalCompositeOperation = 'lighter';
-      g.globalAlpha = 0.45 * swell(t, 0.25, 0.7);
-      g.save();
-      g.translate(body.x, body.y - 12 * k);
-      g.rotate(u * 0.5);
+    const radiance = lightSprite(`radiance|${k.toFixed(2)}`, 180 * k, 180 * k, (g) => {
+      g.translate(90 * k, 90 * k);
       g.fillStyle = radial(g, 0, 0, 90 * k, [[0, alpha('#fff6d8', 0.7)], [0.4, alpha('#fff6d8', 0.25)], [1, alpha('#fff6d8', 0)]]);
       for (let i = 0; i < 16; i++) {
         g.rotate(TAU / 16);
@@ -2727,7 +2749,15 @@ const SIGNATURES = {
         g.closePath();
         g.fill();
       }
-      g.restore();
+    });
+    glow((g, u) => {
+      const t = (u - 0.3) / 0.7;
+      if (t < 0) return;
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.45 * swell(t, 0.25, 0.7);
+      g.translate(body.x, body.y - 12 * k);
+      g.rotate(u * 0.5);
+      g.drawImage(radiance, -90 * k, -90 * k, 180 * k, 180 * k);
     }, dur, 150);
     const spark = spriteFor('dot', ['#ffffff', '#fff6d8', '#f2d27a'], true);
     for (let ring = 0; ring < 3; ring++) {
@@ -2948,25 +2978,27 @@ function planBurst(p, k, theme) {
   }, dur, delay);
 
   const calm = theme.soft ?? 1;
+  const raySprite = lightSprite(`rays|${light}|${mid}|${k.toFixed(2)}`, 160 * k, 160 * k, (rg) => {
+    rg.translate(80 * k, 80 * k);
+    rg.fillStyle = radial(rg, 0, 0, 80 * k, [[0, light], [0.25, alpha(light, 0.9)], [0.6, alpha(mid, 0.4)], [1, alpha(mid, 0)]]);
+    for (let i = 0; i < 12; i++) {
+      rg.rotate(Math.PI / 6);
+      rg.beginPath();
+      rg.moveTo(0, 0);
+      rg.lineTo(80 * k, -80 * k * 0.045);
+      rg.lineTo(80 * k, 80 * k * 0.045);
+      rg.closePath();
+      rg.fill();
+    }
+  });
   const rays = (dur, reverse) => lighting((g, u) => {
     const turn = (reverse ? -1 : 1) * (u < 0.3 ? (u / 0.3) * 0.87 : 0.87 + ((u - 0.3) / 0.7) * 1.75);
     const reach = 65 * k * (u < 0.3 ? 0.2 + (u / 0.3) * 0.8 : 1 + (u - 0.3) * 0.36);
     g.globalAlpha = (u < 0.3 ? u / 0.3 : 1 - (u - 0.3) / 0.7) * calm;
     g.globalCompositeOperation = 'lighter';
-    g.save();
     g.translate(p.x, p.y);
     g.rotate(turn + (reverse ? 0.26 : 0));
-    g.fillStyle = radial(g, 0, 0, reach, [[0, light], [0.25, alpha(light, 0.9)], [0.6, alpha(mid, 0.4)], [1, alpha(mid, 0)]]);
-    for (let i = 0; i < 12; i++) {
-      g.rotate(Math.PI / 6);
-      g.beginPath();
-      g.moveTo(0, 0);
-      g.lineTo(reach, -reach * 0.045);
-      g.lineTo(reach, reach * 0.045);
-      g.closePath();
-      g.fill();
-    }
-    g.restore();
+    g.drawImage(raySprite, -reach, -reach, reach * 2, reach * 2);
   }, dur);
 
   if (tier >= 3) {
@@ -2980,8 +3012,11 @@ function planBurst(p, k, theme) {
       lighting((g, u, w, h) => {
         g.globalAlpha = u < 0.2 ? (u / 0.2) * 0.9 : u < 0.65 ? 0.9 - ((u - 0.2) / 0.45) * 0.15 : 0.75 * (1 - (u - 0.65) / 0.35);
         g.globalCompositeOperation = 'source-over';
-        g.fillStyle = radial(g, p.x, p.y, 80 * k, [[0, alpha(dark, 0)], [12 / 80, alpha(dark, 0)], [1, alpha(dark, 0.93)]]);
-        g.fillRect(0, 0, w, h);
+        const vignette = lightSprite(`vignette|${dark}|${Math.round(p.x)}|${Math.round(p.y)}|${k.toFixed(2)}`, w, h, (vg) => {
+          vg.fillStyle = radial(vg, p.x, p.y, 80 * k, [[0, alpha(dark, 0)], [12 / 80, alpha(dark, 0)], [1, alpha(dark, 0.93)]]);
+          vg.fillRect(0, 0, w, h);
+        });
+        g.drawImage(vignette, 0, 0, w, h);
       }, ms + 400);
     }
   }
@@ -3105,7 +3140,8 @@ export function createBallBursts(host) {
       burst.light.width = pw;
       burst.light.height = ph;
     }
-    const lc = burst.light.getContext('2d');
+    burst.lightCtx ??= burst.light.getContext('2d');
+    const lc = burst.lightCtx;
     lc.setTransform(1, 0, 0, 1, 0, 0);
     lc.globalAlpha = 1;
     lc.globalCompositeOperation = 'source-over';
@@ -3128,7 +3164,8 @@ export function createBallBursts(host) {
       burst.lo.width = cw;
       burst.lo.height = ch;
     }
-    const lo = burst.lo.getContext('2d');
+    burst.loCtx ??= burst.lo.getContext('2d');
+    const lo = burst.loCtx;
     lo.setTransform(1, 0, 0, 1, 0, 0);
     lo.globalAlpha = 1;
     lo.globalCompositeOperation = 'source-over';
@@ -3140,7 +3177,6 @@ export function createBallBursts(host) {
     lo.globalCompositeOperation = 'source-over';
     lo.globalAlpha = 1;
     for (const item of burst.items) if (item.above) drawItem(lo, burst, item, time, width, height);
-    snapToPalette(lo, cw, ch, burst.palette, true);
     paintLights(burst, time, width, height);
     g.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
     g.globalCompositeOperation = 'source-over';
