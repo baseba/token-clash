@@ -100,12 +100,13 @@ export function pickMoveset(entry: RosterEntry, difficulty: AiLevel, random: Ran
   while (chosen.length < MOVES_PER_FIGHTER) {
     const types = new Set(chosen.filter((x) => x.move.kind === 'attack').map((x) => x.move.type));
     const statusCount = chosen.filter((x) => x.move.kind === 'status').length;
-    const attacks = chosen.length - statusCount;
+    const attacks = chosen.filter((x) => alwaysDamages(x.id)).length;
     let best: (typeof scored)[number] | null = null;
     let bestValue = -1;
     for (const candidate of scored) {
       if (chosen.includes(candidate)) continue;
-      if (candidate.move.kind === 'status' && (statusCount >= maxStatus || attacks < 2)) continue;
+      if (candidate.move.kind === 'status' && (statusCount >= maxStatus || attacks < GUARANTEED_ATTACKS)) continue;
+      if (attacks < GUARANTEED_ATTACKS && !alwaysDamages(candidate.id) && chosen.length >= MOVES_PER_FIGHTER - GUARANTEED_ATTACKS + attacks) continue;
       let value = candidate.value;
       if (candidate.move.kind === 'attack') value *= types.has(candidate.move.type) ? 0.4 : types.size ? 1.3 : 1;
       if (value > bestValue) [best, bestValue] = [candidate, value];
@@ -143,9 +144,24 @@ export function aiTeamPool(difficulty: AiLevel): number[] {
   return pool;
 }
 
+const TRAINED_LEVELS: readonly AiLevel[] = ['hard', 'veryhard', 'skynet'];
+const FAST_BASE_SPEED = 80;
+const FULL_EVS = 252;
+
+function trainedEntry(id: number, { random, index, difficulty }: { random: Random; index: number; difficulty: AiLevel }): RosterEntry {
+  const base = diceBase(id, index);
+  const [, attack, , specialAttack, , speed] = (speciesData(id) as SpeciesData).stats;
+  const physical = attack >= specialAttack;
+  const fast = speed >= FAST_BASE_SPEED;
+  const nature = physical ? (fast ? 'jolly' : 'adamant') : fast ? 'timid' : 'modest';
+  const evs = { hp: 6, atk: physical ? FULL_EVS : 0, def: 0, satk: physical ? 0 : FULL_EVS, sdef: 0, spd: FULL_EVS };
+  const rolled = randomize(base, random);
+  return { ...rolled, moveset: pickMoveset(base, tactics(difficulty), random), natureChoice: nature, evs };
+}
+
 export function buildAiTeam({ difficulty, random = Math.random }: { difficulty: AiLevel; random?: Random }): RosterEntry[] {
   const ids = shuffled(aiTeamPool(difficulty), random).slice(0, PARTY_SIZE);
-  return ids.map((id, index) => diceEntry(id, { random, index }));
+  return ids.map((id, index) => (TRAINED_LEVELS.includes(difficulty) ? trainedEntry(id, { random, index, difficulty }) : diceEntry(id, { random, index })));
 }
 
 export function buildAiRandomParty({ random = Math.random }: { random?: Random } = {}): RosterEntry[] {
@@ -154,6 +170,7 @@ export function buildAiRandomParty({ random = Math.random }: { random?: Random }
 }
 
 const REROLL_CHOICES = 3;
+const PICK_NOISE: Record<'hard' | 'veryhard', number> = { hard: 2, veryhard: 0.5 };
 
 export function aiRerollCandidates(own: RosterEntry[], random: Random = Math.random): RosterEntry[] {
   const taken = new Set(own.map((entry) => entry.finalID));
@@ -182,7 +199,7 @@ export function aiPicks({ difficulty: level, own, random = Math.random }: { diff
   if (difficulty === 'easy' || difficulty === 'mid') return shuffled(order, random).slice(0, count);
   const strength = (index: number) => bst(speciesData(own[index].finalID) ?? { stats: [0] }) / 150;
   return order
-    .map((index) => ({ index, score: strength(index) + random() * 2 }))
+    .map((index) => ({ index, score: strength(index) + random() * PICK_NOISE[difficulty] }))
     .sort((a, b) => b.score - a.score)
     .slice(0, count)
     .map((x) => x.index);
@@ -305,61 +322,115 @@ function statusImmune(target: BattleFighter, status: string): boolean {
   return (STATUS_IMMUNE_TYPES[status] ?? []).some((t) => target.types.includes(t));
 }
 
-export function scoreMove(battle: BattleState, sideIndex: number, idx: number, knowsAbilities = true, deep = true): number {
+export const AI_MODULES = ['checkBadMove', 'tryToFaint', 'checkViability', 'preferHighestDamage', 'hpAware', 'setupFirstTurn', 'smartSwitching', 'smartMonChoices', 'tryTo2hko', 'speedRace', 'lookahead'] as const;
+export type AiModule = (typeof AI_MODULES)[number];
+
+export interface AiProfile {
+  modules: readonly AiModule[];
+  noise: number;
+  switchFailure: number;
+}
+
+const BASIC: readonly AiModule[] = ['checkBadMove', 'tryToFaint', 'checkViability'];
+const SMART: readonly AiModule[] = [...BASIC, 'preferHighestDamage', 'hpAware', 'setupFirstTurn', 'smartSwitching', 'smartMonChoices'];
+
+export const AI_PROFILES: Record<Exclude<AiLevel, typeof JEV_LEVEL>, AiProfile> = {
+  easy: { modules: [], noise: 60, switchFailure: 1 },
+  mid: { modules: BASIC, noise: 30, switchFailure: 1 },
+  hard: { modules: SMART, noise: 12, switchFailure: 0.4 },
+  veryhard: { modules: [...SMART, 'tryTo2hko', 'speedRace', 'lookahead'], noise: 0, switchFailure: 0 },
+};
+
+const BASE_SCORE = 100;
+const BAD_MOVE = -100;
+const KO_BONUS = 40;
+const PRIORITY_KO_BONUS = 20;
+const DAMAGE_WEIGHT = 30;
+const HIGHEST_DAMAGE_BONUS = 15;
+const SETUP_FIRST_TURN_BONUS = 15;
+const LOW_HP = 0.3;
+const TWO_HIT_BONUS = 10;
+const DOOMED_PENALTY = 25;
+
+const has = (profile: AiProfile, module: AiModule): boolean => profile.modules.includes(module);
+
+function badMove(battle: BattleState, sideIndex: number, idx: number, me: BattleFighter, foe: BattleFighter, knowsAbilities: boolean): boolean {
+  const move = moveAt(me, idx);
+  const side = battle.sides[sideIndex];
+  if (moveWillFail(battle, sideIndex, idx)) return true;
+  if (move.kind !== 'status' && move.category !== 'status') return estimateDamage(battle, me, foe, move, knowsAbilities) <= 0;
+  if (move.status) return statusImmune(foe, move.status);
+  if (move.heal) return hpShare(me) >= 1;
+  if (move.screen) return !!side.screens?.[move.screen] || (move.screen === 'auroraveil' && !['hail', 'snow'].includes(battle.field.weather as string));
+  if (move.weather && battle.field.weather === move.weather) return true;
+  if (move.terrain && battle.field.terrain === move.terrain) return true;
+  if (move.boosts && move.target === 'self') {
+    const ups = (Object.entries(move.boosts) as [keyof BattleFighter['boosts'], number][]).filter(([, v]) => v > 0);
+    return !ups.length || ups.every(([k]) => (me.boosts[k] ?? 0) >= 6);
+  }
+  if (move.boosts) return (Object.keys(move.boosts) as (keyof BattleFighter['boosts'])[]).every((k) => (foe.boosts[k] ?? 0) <= -6);
+  if (move.volatile === 'leechseed') return foe.types.includes('grass') || !!foe.volatiles?.leechSeed;
+  if (move.volatile === 'confusion') return !!foe.volatiles?.confusion;
+  if (move.volatile === 'attract') return !!foe.volatiles?.attract;
+  return false;
+}
+
+function viability(battle: BattleState, sideIndex: number, move: MoveData, me: BattleFighter, foe: BattleFighter, damage: number, threat: number): number {
+  if (move.kind !== 'status' && move.category !== 'status') {
+    let score = DAMAGE_WEIGHT * Math.min(1, damage / Math.max(1, foe.hp));
+    if (move.selfDestruct) score -= 30;
+    if (move.flags.includes('recharge') && damage < foe.hp) score -= 15;
+    return score;
+  }
+  if (move.status) return move.status === 'par' && speedOf(foe) <= speedOf(me) ? -5 : ((STATUS_VALUE[move.status] ?? 30) - 40) / 2;
+  if (move.heal) return hpShare(me) < 0.5 ? 25 : hpShare(me) < 0.7 ? 5 : -20;
+  if (move.screen) return threat > 0.25 ? 12 : 0;
+  if (move.weather || move.terrain) return (move.weather === 'rain' && me.types.includes('water')) || (move.weather === 'sun' && me.types.includes('fire')) ? 10 : -10;
+  if (move.boosts && move.target === 'self') return hpShare(me) >= 0.6 && threat < 0.5 ? 12 : -12;
+  if (move.boosts) return -8;
+  if (move.volatile === 'leechseed') return 6;
+  if (move.clearsScreens) return Object.keys(battle.sides[1 - sideIndex].screens ?? {}).length ? 12 : -15;
+  return -15;
+}
+
+export function scoreMoves(battle: BattleState, sideIndex: number, profile: AiProfile, random: Random, legal: Action[] = validActions(battle, sideIndex)): { action: MoveAction; score: number }[] {
   const side = battle.sides[sideIndex];
   const me = side.team[side.active];
   const foeSide = battle.sides[1 - sideIndex];
   const foe = foeSide.team[foeSide.active];
-  const move = moveAt(me, idx);
-  if (!foe || foe.hp <= 0) return 1;
-  if (moveWillFail(battle, sideIndex, idx)) return 0;
-  if (move.kind !== 'status' && move.category !== 'status') {
-    const dmg = estimateDamage(battle, me, foe, move, knowsAbilities);
-    if (dmg <= 0) return 0;
-    let score = Math.min(1, dmg / foe.hp) * 100;
-    if (deep) score = Math.max(score, 100 / Math.ceil(foe.hp / dmg));
-    if (dmg >= foe.hp) {
-      score += 60;
-      const threatened = bestDamage(battle, foe, me, knowsAbilities) >= me.hp;
-      if (deep && move.priority > 0 && threatened && speedOf(foe) >= speedOf(me)) score += 45;
+  const actions = legal.filter((o): o is MoveAction => o.type === 'move');
+  const smart = has(profile, 'tryToFaint') || has(profile, 'checkViability');
+  if (!foe || foe.hp <= 0) return actions.map((action) => ({ action, score: BASE_SCORE }));
+  const threat = smart ? bestDamage(battle, foe, me, true) / Math.max(1, me.hp) : 0;
+  const damages = actions.map((action) => estimateDamage(battle, me, foe, moveAt(me, action.move), true));
+  const strongest = Math.max(...damages);
+  const firstTurn = !me.volatiles.acted;
+  return actions.map((action, i) => {
+    const move = moveAt(me, action.move);
+    const damage = damages[i];
+    const attacking = move.kind !== 'status' && move.category !== 'status';
+    let score = BASE_SCORE;
+    if (has(profile, 'checkBadMove') && badMove(battle, sideIndex, action.move, me, foe, true)) score += BAD_MOVE;
+    if (has(profile, 'tryToFaint') && attacking && damage >= foe.hp) {
+      score += KO_BONUS;
+      if (move.priority > 0 && threat >= 1 && speedOf(foe) >= speedOf(me)) score += PRIORITY_KO_BONUS;
     }
-    if (move.selfDestruct) score *= hpShare(me) < 0.3 ? 1 : 0.3;
-    if (move.flags.includes('recharge') && dmg < foe.hp) score *= 0.6;
-    return score;
-  }
-  const threat = bestDamage(battle, foe, me, knowsAbilities) / me.hp;
-  if (move.status) {
-    if (statusImmune(foe, move.status)) return 0;
-    if (move.status === 'par' && speedOf(foe) <= speedOf(me)) return 25;
-    return STATUS_VALUE[move.status] ?? 30;
-  }
-  if (move.heal) return hpShare(me) < 0.5 ? 75 : hpShare(me) < 0.7 ? 30 : 0;
-  if (move.screen) {
-    if (side.screens?.[move.screen]) return 0;
-    if (move.screen === 'auroraveil' && !['hail', 'snow'].includes(battle.field.weather as string)) return 0;
-    return threat > 0.25 ? 50 : 25;
-  }
-  if (move.weather || move.terrain) {
-    if (move.weather && battle.field.weather === move.weather) return 0;
-    if (move.terrain && battle.field.terrain === move.terrain) return 0;
-    const helps = (move.weather === 'rain' && me.types.includes('water')) || (move.weather === 'sun' && me.types.includes('fire'));
-    return helps ? 45 : 8;
-  }
-  if (move.boosts && move.target === 'self') {
-    const ups = (Object.entries(move.boosts) as [keyof BattleFighter['boosts'], number][]).filter(([, v]) => v > 0);
-    if (!ups.length || ups.every(([k]) => (me.boosts[k] ?? 0) >= 4)) return 0;
-    if (hpShare(me) < 0.6 || threat >= 0.5) return 10;
-    return 50 + ups.length * 8;
-  }
-  if (move.boosts) {
-    const downs = Object.keys(move.boosts) as (keyof BattleFighter['boosts'])[];
-    return downs.every((k) => (foe.boosts[k] ?? 0) <= -2) ? 0 : 15;
-  }
-  if (move.volatile === 'leechseed') return foe.types.includes('grass') || foe.volatiles?.leechSeed ? 0 : 35;
-  if (move.volatile === 'confusion') return foe.volatiles?.confusion ? 0 : 28;
-  if (move.volatile === 'attract') return foe.volatiles?.attract ? 0 : 20;
-  if (move.clearsScreens) return Object.keys(foeSide.screens ?? {}).length ? 40 : 5;
-  return 5;
+    if (has(profile, 'checkViability')) score += viability(battle, sideIndex, move, me, foe, damage, threat);
+    if (has(profile, 'preferHighestDamage') && attacking && damage > 0 && damage === strongest) score += HIGHEST_DAMAGE_BONUS;
+    if (has(profile, 'tryTo2hko') && attacking && damage < foe.hp && damage * 2 >= foe.hp) score += TWO_HIT_BONUS;
+    if (has(profile, 'speedRace') && threat >= 1 && speedOf(foe) > speedOf(me) && !(attacking && damage >= foe.hp && move.priority > 0)) score -= DOOMED_PENALTY;
+    if (has(profile, 'hpAware') && hpShare(me) < LOW_HP) {
+      if (!attacking && !move.heal) score -= 20;
+      if (move.selfDestruct) score += 35;
+    }
+    if (has(profile, 'setupFirstTurn') && firstTurn && !attacking && ((move.boosts && move.target === 'self') || move.screen || move.sideCondition)) score += SETUP_FIRST_TURN_BONUS;
+    return { action, score: score + random() * (profile.noise || 0.01) };
+  });
+}
+
+export function scoreMove(battle: BattleState, sideIndex: number, idx: number): number {
+  const scored = scoreMoves(battle, sideIndex, AI_PROFILES.veryhard, () => 0, battle.sides[sideIndex].team[battle.sides[sideIndex].active].moves.map((_, move) => ({ type: 'move', move })));
+  return scored.find((x) => x.action.move === idx)?.score ?? 0;
 }
 
 function matchupScore(battle: BattleState, mon: BattleFighter, foe: BattleFighter | null | undefined, knowsAbilities: boolean): number {
@@ -368,17 +439,6 @@ function matchupScore(battle: BattleState, mon: BattleFighter, foe: BattleFighte
   const taken = Math.min(1, bestDamage(battle, foe, mon, knowsAbilities) / Math.max(1, mon.hp));
   const faster = speedOf(mon) > speedOf(foe) ? 0.15 : 0;
   return dealt - taken + faster + hpShare(mon) * 0.3;
-}
-
-function weighted<T>(items: { option: T; weight: number }[], random: Random): T {
-  const total = items.reduce((sum, x) => sum + x.weight, 0);
-  if (total <= 0) return pickOne(items, random).option;
-  let roll = random() * total;
-  for (const item of items) {
-    roll -= item.weight;
-    if (roll <= 0) return item.option;
-  }
-  return items[items.length - 1].option;
 }
 
 function sideValue(side: BattleSide): number {
@@ -415,7 +475,7 @@ function lookahead(battle: BattleState, sideIndex: number, options: Action[]): A
       return total / SEARCH_SEEDS;
     });
     // When every line looks the same (say, lost either way), the plain move score breaks the tie.
-    const tiebreak = mine.type === 'move' ? scoreMove(battle, sideIndex, mine.move) / 1e4 : 0;
+    const tiebreak = mine.type === 'move' ? scoreMove(battle, sideIndex, mine.move) / 1e5 : 0;
     const value = 0.6 * Math.min(...outcomes) + 0.4 * (outcomes.reduce((a, x) => a + x, 0) / outcomes.length) + tiebreak;
     if (value > bestValue) [best, bestValue] = [mine, value];
   }
@@ -430,61 +490,64 @@ function safeLookahead(battle: BattleState, sideIndex: number, options: Action[]
   }
 }
 
+function chooseReplacement(battle: BattleState, sideIndex: number, profile: AiProfile, switches: SwitchAction[], random: Random): SwitchAction {
+  if (!has(profile, 'smartMonChoices')) return profile.noise >= AI_PROFILES.easy.noise ? switches[0] : pickOne(switches, random);
+  const side = battle.sides[sideIndex];
+  const foeSide = battle.sides[1 - sideIndex];
+  const foe = foeSide.team[foeSide.active];
+  if (foe && foe.hp > 0) {
+    const revenge = switches.find((action) => {
+      const mon = side.team[action.to];
+      return speedOf(mon) > speedOf(foe) && bestDamage(battle, mon, foe, true) >= foe.hp;
+    });
+    if (revenge) return revenge;
+  }
+  return switches
+    .map((action) => ({ action, score: matchupScore(battle, side.team[action.to], foe, true) + random() * profile.noise * 0.002 }))
+    .sort((x, y) => y.score - x.score)[0].action;
+}
+
+function shouldSwitch(battle: BattleState, sideIndex: number, profile: AiProfile, best: number, switches: SwitchAction[], random: Random): SwitchAction | null {
+  if (!switches.length || !has(profile, 'smartSwitching') || random() < profile.switchFailure) return null;
+  const memory = battle.sides[sideIndex];
+  if (lastSwitchTurn.get(memory) === battle.turn - 1) return null;
+  const side = battle.sides[sideIndex];
+  const me = side.team[side.active];
+  const foeSide = battle.sides[1 - sideIndex];
+  const foe = foeSide.team[foeSide.active];
+  if (!foe || foe.hp <= 0) return null;
+  const canKo = bestDamage(battle, me, foe, true) >= foe.hp;
+  const doomed = bestDamage(battle, foe, me, true) >= me.hp && speedOf(foe) > speedOf(me);
+  const stuck = best < BASE_SCORE;
+  if (canKo || !(doomed || stuck)) return null;
+  const here = matchupScore(battle, me, foe, true);
+  const alt = switches
+    .map((action) => ({ action, score: matchupScore(battle, side.team[action.to], foe, true) }))
+    .sort((x, y) => y.score - x.score)[0];
+  if (alt.score <= here + 0.35) return null;
+  lastSwitchTurn.set(memory, battle.turn);
+  return alt.action;
+}
+
 export function chooseAction(battle: BattleState, sideIndex: number, level: AiLevel, random: Random = Math.random): Action | null {
-  const difficulty = tactics(level);
+  const profile = AI_PROFILES[tactics(level)];
   const options = validActions(battle, sideIndex);
   if (!options.length) return null;
   if (options.length === 1) return options[0];
   const belief = beliefOf(battle, sideIndex);
-  const side = belief.sides[sideIndex];
-  const memory = battle.sides[sideIndex];
-  const me = side.team[side.active];
-  const foe = belief.sides[1 - sideIndex].team[belief.sides[1 - sideIndex].active];
-  const smart = difficulty === 'hard' || difficulty === 'veryhard';
-  const moves = options.filter((o): o is MoveAction => o.type === 'move');
   const switches = options.filter((o): o is SwitchAction => o.type === 'switch');
+  const foeSide = belief.sides[1 - sideIndex];
+  const foe = foeSide.team[foeSide.active];
 
-  if (!moves.length) {
-    if (!smart) return pickOne(switches, random);
-    return switches
-      .map((action) => ({ action, score: matchupScore(belief, side.team[action.to], foe, true) + (difficulty === 'hard' ? random() * 0.3 : 0) }))
-      .sort((x, y) => y.score - x.score)[0].action;
-  }
-  if (difficulty === 'easy') return pickOne(moves, random);
-  if (difficulty === 'veryhard' && belief.phase === 'choose' && foe && foe.hp > 0) {
-    const chosen = safeLookahead(belief, sideIndex, options);
-    if (chosen) return chosen;
-  }
-
-  const veryhard = difficulty === 'veryhard';
-  const scored = moves.map((action) => ({ action, score: scoreMove(belief, sideIndex, action.move, veryhard, veryhard) }));
-  if (difficulty === 'mid') {
-    const useful = scored.filter((x) => x.score > 0);
-    return weighted((useful.length ? useful : scored).map((x) => ({ option: x.action, weight: x.score + 5 })), random);
-  }
-
-  scored.sort((x, y) => y.score - x.score);
-  const best = scored[0];
-  if (switches.length) {
-    const canKo = foe
-      && foe.hp > 0
-      && scored.some((x) => moveAt(me, x.action.move).kind !== 'status' && estimateDamage(belief, me, foe, moveAt(me, x.action.move)) >= foe.hp);
-    const doomed = foe && foe.hp > 0 && bestDamage(belief, foe, me, true) >= me.hp && speedOf(foe) > speedOf(me);
-    const stuck = best.score < 15;
-    const lastSwitched = lastSwitchTurn.get(memory) === belief.turn - 1;
-    const willing = veryhard ? true : random() < 0.35;
-    if (!canKo && (veryhard ? doomed || stuck : stuck) && !lastSwitched && willing) {
-      const here = matchupScore(belief, me, foe, true);
-      const alt = switches
-        .map((action) => ({ action, score: matchupScore(belief, side.team[action.to], foe, true) }))
-        .sort((x, y) => y.score - x.score)[0];
-      if (alt.score > here + 0.35) {
-        lastSwitchTurn.set(memory, belief.turn);
-        return alt.action;
-      }
+  if (!options.some((o) => o.type === 'move')) return chooseReplacement(belief, sideIndex, profile, switches, random);
+  const scored = scoreMoves(belief, sideIndex, profile, random, options).sort((x, y) => y.score - x.score);
+  if (has(profile, 'lookahead') && belief.phase === 'choose' && foe && foe.hp > 0) {
+    const shortlist = [...scored.map((x) => x.action), ...switches];
+    const chosen = safeLookahead(belief, sideIndex, shortlist);
+    if (chosen) {
+      if (chosen.type === 'switch') lastSwitchTurn.set(battle.sides[sideIndex], belief.turn);
+      return chosen;
     }
   }
-  if (difficulty === 'hard' && scored.length > 1 && scored[1].score > 0 && scored[1].score >= best.score * 0.6 && random() < 0.25)
-    return scored[1].action;
-  return best.action;
+  return shouldSwitch(belief, sideIndex, profile, scored[0].score, switches, random) ?? scored[0].action;
 }
