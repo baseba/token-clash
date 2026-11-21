@@ -72,10 +72,17 @@ test('a recolor on sale must be bought to be picked; one worn without buying it 
 test('a trainer that left the shop gives back what was paid for it, once', () => {
   const beto = Trainer.restore({ id: 'b1', name: 'Beto', tokenHash: 'h', roster: [], team: [], wins: 0, losses: 0, totalTokens: 2_000_000_000, createdAt: 0, shopSpent: 400_000_000, owned: ['trainer:nate', 'ball:gb'] });
   const before = beto.balance;
-  assert.equal(beto.refundRetired({ nate: 300_000_000 }), 300_000_000);
+  assert.equal(beto.refundRetired({ 'trainer:nate': 300_000_000 }), 300_000_000);
   assert.equal(beto.balance, before + 300_000_000);
   assert.deepEqual(beto.owned, ['ball:gb']);
-  assert.equal(beto.refundRetired({ nate: 300_000_000 }), 0);
+  assert.equal(beto.refundRetired({ 'trainer:nate': 300_000_000 }), 0);
+});
+
+test('a Ball that left the shop is refunded and taken off', () => {
+  const caro = Trainer.restore({ id: 'c1', name: 'Caro', tokenHash: 'h', roster: [], team: [], wins: 0, losses: 0, totalTokens: 1_000_000_000, createdAt: 0, shopSpent: 100_000_000, owned: ['ball:gv'], equipped: { ball: 'gv' } });
+  assert.equal(caro.refundRetired({ 'ball:gv': 100_000_000 }), 100_000_000);
+  assert.equal(caro.ball, 'pb');
+  assert.deepEqual(caro.owned, []);
 });
 
 test('a free Ball is owned by everyone and can be equipped without buying it', () => {
@@ -127,4 +134,22 @@ test('a renamed or merged trainer keeps whoever had it: the owned key and the wo
   assert.equal(ana.look, 'worker_f');
   assert.deepEqual(ana.owned, ['trainer:aether_grunt_f__peach', 'ball:gb']);
   assert.equal(ana.renameTrainers({ snow_worker_f: 'worker_f' }), false);
+});
+
+const withMon = () => Trainer.restore({ id: 't8', name: 'Ana', tokenHash: 'h', roster: [{ id: 'm1', finalID: 25, baseID: 25, rarity: 'rare', shiny: false, level: 50, ivs: { hp: 31, atk: 31, def: 31, satk: 31, sdef: 31, spd: 31 }, nature: 'hardy' }], team: ['m1'], wins: 0, losses: 0, totalTokens: 0, createdAt: 0 });
+
+test('a nature can be chosen for a Pokémon, and the one from the save is kept underneath', () => {
+  const trainer = withMon();
+  trainer.chooseNature('m1', 'timid');
+  assert.equal(trainer.entry('m1').natureChoice, 'timid');
+  assert.equal(trainer.entry('m1').nature, 'hardy');
+  assert.throws(() => trainer.chooseNature('m1', 'brave-ish'), /no existe/);
+});
+
+test('EVs can be spread up to 252 per stat and 510 in all', () => {
+  const trainer = withMon();
+  trainer.chooseEvs('m1', { hp: 6, atk: 252, def: 0, satk: 0, sdef: 0, spd: 252 });
+  assert.equal(trainer.entry('m1').evs?.atk, 252);
+  assert.throws(() => trainer.chooseEvs('m1', { hp: 0, atk: 253, def: 0, satk: 0, sdef: 0, spd: 0 }), /252/);
+  assert.throws(() => trainer.chooseEvs('m1', { hp: 252, atk: 252, def: 8, satk: 0, sdef: 0, spd: 0 }), /510/);
 });

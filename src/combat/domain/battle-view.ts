@@ -1,9 +1,9 @@
 // What each client sees of a battle: its own side in full, the rival as revealed so far (HP in percent, moves and
 // ability once used), and every event in those same terms. Pending choices stay hidden: only "ready" shows.
-import type { BoostKey, Stats } from '../../catalog/domain/creatures.js';
+import type { BoostKey, NatureInfo, Stats } from '../../catalog/domain/creatures.js';
 import type { MoveData } from './moves.js';
 import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
-import type { Gender, Rarity } from '../../catalog/domain/roster-entry.js';
+import type { Gender, Ivs, Rarity } from '../../catalog/domain/roster-entry.js';
 import type { BattleEvent, BattleFighter, BattleState } from './battle-types.js';
 import { needsAction } from './battle.js';
 import { currentWeather } from './effects.js';
@@ -137,6 +137,9 @@ export interface VisibleFighterView {
   volatiles: ReturnType<typeof publicVolatiles>;
   abilityInfo: AbilityInfo | null;
   moves: PublicMove[];
+  baseStats?: Stats;
+  evs?: Ivs;
+  natureInfo?: NatureInfo | null;
 }
 
 /** A rival Pokémon that hasn't come out yet. */
@@ -170,6 +173,7 @@ export function fighterView(battle: BattleState, sideIndex: number, slot: number
     volatiles: publicVolatiles(fighter),
     abilityInfo: abilityKnown ? abilityInfo(fighter.ability) : null,
     moves: publicMoves(fighter, own ? null : fighter.revealedMoves),
+    ...(own && !fighter.volatiles.transformed ? { baseStats: fighter.baseStats, evs: fighter.evs, natureInfo: fighter.natureInfo } : {}),
     ...(disguise ?? {}),
   };
 }

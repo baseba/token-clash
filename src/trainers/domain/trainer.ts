@@ -2,9 +2,10 @@
 // Every change to a trainer goes through these methods, which keep the rules in one place:
 // a team never repeats a species, has at most 6, and always points at Pokémon in the roster.
 
-import { abilityOptions, usableAbility } from '../../catalog/domain/creatures.js';
+import { abilityOptions, NATURE_NAMES, usableAbility } from '../../catalog/domain/creatures.js';
+import { MAX_EV, MAX_EV_TOTAL, validEvs } from '../../../public/stat-formula.js';
 import { validMoveset, MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
-import { uniqueSpecies, uniqueVariants, type RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { uniqueSpecies, uniqueVariants, type Ivs, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
 import { conflict, forbidden, invalid, notFound } from '../../shared/domain/errors.js';
 import { isShopTrainer, isTrainerSprite, STARTER_SPRITES, trainerSpriteFor } from '../../catalog/domain/trainer-sprites.js';
@@ -148,11 +149,12 @@ export class Trainer implements TrainerState {
     return true;
   }
 
-  /** Trainers that left the shop give back what was paid for them. Returns the tokens refunded. */
+  /** Items that left the shop give back what was paid for them, keyed by item id. Returns the tokens refunded. */
   refundRetired(prices: Readonly<Record<string, number>>): number {
-    const retired = (this.owned ?? []).filter((id) => id.startsWith('trainer:') && id.slice('trainer:'.length) in prices);
+    const retired = (this.owned ?? []).filter((id) => id in prices);
+    for (const kind of EQUIP_KINDS) if (this.equipped?.[kind] && `${kind}:${this.equipped[kind]}` in prices) this.equip(kind, null);
     if (!retired.length) return 0;
-    const refund = retired.reduce((sum, id) => sum + prices[id.slice('trainer:'.length)], 0);
+    const refund = retired.reduce((sum, id) => sum + prices[id], 0);
     this.owned = (this.owned ?? []).filter((id) => !retired.includes(id));
     this.shopSpent = Math.max(0, (this.shopSpent ?? 0) - refund);
     return refund;
@@ -191,6 +193,17 @@ export class Trainer implements TrainerState {
   get recyclable(): Duplicate[] {
     const done = new Set((this.recycled ?? []).map((record) => record.id));
     return (this.duplicates ?? []).filter((duplicate) => !done.has(duplicate.id));
+  }
+
+  topUpRecycled(): number {
+    let added = 0;
+    this.recycled = (this.recycled ?? []).map((record) => {
+      const owed = recycleReward(record);
+      if (record.tokens >= owed) return record;
+      added += owed - record.tokens;
+      return { ...record, tokens: owed };
+    });
+    return added;
   }
 
   /** @throws {DomainError} the Pokémon is not a repeated one, or it was already recycled */
@@ -266,7 +279,7 @@ export class Trainer implements TrainerState {
    */
   importSave(parsed: ParsedSave, at: number): void {
     const previous = this.roster;
-    const kept = new Map(previous.map((e) => [e.id, { nickname: e.nickname, moveset: e.moveset, abilityChoice: e.abilityChoice }]));
+    const kept = new Map(previous.map((e) => [e.id, { nickname: e.nickname, moveset: e.moveset, abilityChoice: e.abilityChoice, natureChoice: e.natureChoice, evs: e.evs }]));
     this.duplicates = parsed.duplicates;
     this.roster = parsed.roster.map((entry) => {
       const keptFields = kept.get(entry.id);
@@ -310,6 +323,18 @@ export class Trainer implements TrainerState {
     if (!abilityOptions(entry).some((a) => a.key === ability)) throw invalid('Esa habilidad no es de su especie.');
     if (!usableAbility(ability)) throw invalid('Esa habilidad no tiene efecto en Token Clash.');
     entry.abilityChoice = ability;
+  }
+
+  chooseNature(entryId: string, nature: string): void {
+    const entry = this.entry(entryId);
+    if (!NATURE_NAMES.has(nature)) throw invalid('Esa naturaleza no existe.');
+    entry.natureChoice = nature;
+  }
+
+  chooseEvs(entryId: string, evs: Ivs): void {
+    const entry = this.entry(entryId);
+    if (!validEvs(evs)) throw invalid(`Cada EV va de 0 a ${MAX_EV} y entre todos suman como mucho ${MAX_EV_TOTAL}.`);
+    entry.evs = { ...evs };
   }
 
   touch(at: number): void {

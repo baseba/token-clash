@@ -1,6 +1,6 @@
 // Use cases for duel rooms, as the HTTP API offers them: open (or find) a room, look at it, close
 // it, join it, and list your history.
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { uniqueSpecies } from '../../catalog/domain/roster-entry.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { newId, now } from '../../shared/domain/clock.js';
@@ -22,8 +22,12 @@ export interface NewChallenge {
   ai?: string;
 }
 
+const EXPIRY_SWEEP_MS = 60_000;
+
 @Injectable()
-export class ChallengesService implements OnModuleInit {
+export class ChallengesService implements OnModuleInit, OnModuleDestroy {
+  private sweep: NodeJS.Timeout | null = null;
+
   constructor(
     private readonly challenges: ChallengeRepository,
     private readonly tournaments: TournamentRepository,
@@ -44,6 +48,13 @@ export class ChallengesService implements OnModuleInit {
       // Older versions allowed repeated species in a team.
       if (challenge.dropRepeatedSpecies(uniqueSpecies)) this.challenges.save(challenge);
     }
+    this.duels.expireStale(now());
+    this.sweep = setInterval(() => this.duels.expireStale(now()), EXPIRY_SWEEP_MS);
+    this.sweep.unref();
+  }
+
+  onModuleDestroy(): void {
+    clearInterval(this.sweep ?? undefined);
   }
 
   find(id: string): Challenge {

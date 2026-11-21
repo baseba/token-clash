@@ -1,0 +1,1 @@
+ALTER TABLE `roster_entries` ADD `nature_choice` text;

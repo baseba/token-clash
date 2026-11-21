@@ -1,0 +1,1 @@
+ALTER TABLE `roster_entries` ADD `evs` text;

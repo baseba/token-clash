@@ -41,3 +41,14 @@ test('only repeats of the last save can be recycled', () => {
   const trainer = withDuplicates(duplicate('a'));
   assert.throws(() => trainer.recycle('kept-in-roster', 10), DomainError);
 });
+
+test('what was recycled at the old rate is topped up to the current one, once', () => {
+  const trainer = withDuplicates(duplicate('a', 'rare'), duplicate('b'));
+  trainer.recycle('a', 10);
+  trainer.recycle('b', 11);
+  trainer.recycled = trainer.recycled!.map((record) => ({ ...record, tokens: record.tokens / 2 }));
+  const before = trainer.balance;
+  assert.equal(trainer.topUpRecycled(), (RECYCLE_TOKENS.rare + RECYCLE_TOKENS.common) / 2);
+  assert.equal(trainer.balance, before + (RECYCLE_TOKENS.rare + RECYCLE_TOKENS.common) / 2);
+  assert.equal(trainer.topUpRecycled(), 0);
+});

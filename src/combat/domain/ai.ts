@@ -1,5 +1,5 @@
 // The AI: builds its team, picks its three, and chooses what to do each turn. Randomness is injected.
-import { speciesData, formData, statsFor, effectiveness, shuffled, rng, type Random, type SpeciesData } from '../../catalog/domain/creatures.js';
+import { speciesData, formData, statsFor, PERFECT_IVS, effectiveness, shuffled, rng, type Random, type SpeciesData } from '../../catalog/domain/creatures.js';
 import { BATTLE_LEVEL, buildFighter, usableMovepool, MOVES_PER_FIGHTER } from './fighter.js';
 import { moveAt, moveData, type MoveData } from './moves.js';
 import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';
@@ -7,7 +7,7 @@ import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { validActions, submit, needsAction, moveWillFail, BATTLE_SIZE } from './battle.js';
 import type { Action, BattleFighter, BattleSide, BattleState, MoveAction, SwitchAction } from './battle-types.js';
 import { isRain, isSun, stageMult } from './conditions.js';
-import { randomize } from './random-party.js';
+import { alwaysDamages, randomize, GUARANTEED_ATTACKS } from './random-party.js';
 import { PARTY_SIZE } from './team-preview.js';
 
 export const AI_LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'] as const;
@@ -22,6 +22,7 @@ export const AI_PREFIX = 'ai:';
 export const LAST_AI_SPECIES = DEX_LIMIT;
 
 export const aiTrainerId = (level: AiLevel): string => `${AI_PREFIX}${level}`;
+export const aiFrame = (level: AiLevel): string => `ai-${level}`;
 /** A tournament can seat several AIs of one level: each gets a number. */
 export const aiSeatId = (level: AiLevel, seatNumber: number): string => `${aiTrainerId(level)}#${seatNumber}`;
 export function aiLevelOf(trainerId: string): AiLevel | null {
@@ -116,23 +117,30 @@ export function pickMoveset(entry: RosterEntry, difficulty: AiLevel, random: Ran
 }
 
 function canAttack(id: number): boolean {
-  return usableMovepool({ id: 'probe', finalID: id, level: BATTLE_LEVEL, learned: [] }).some((k) => (moveData(k) as MoveData).kind === 'attack');
+  return usableMovepool({ id: 'probe', finalID: id, level: BATTLE_LEVEL, learned: [] }).filter(alwaysDamages).length >= GUARANTEED_ATTACKS;
 }
 
 export const AI_POOL_SHARE: Record<AiLevel, number> = { easy: 1, mid: 0.8, hard: 0.6, veryhard: 0.5, skynet: 0.4 };
 
-const DICE_IVS = { hp: 15, atk: 15, def: 15, satk: 15, sdef: 15, spd: 15 };
+
+const diceBase = (id: number, index: number): RosterEntry => ({ id: `ai-${index}-${id}`, finalID: id, baseID: id, rarity: rarityOf(speciesData(id) as SpeciesData), shiny: false, level: BATTLE_LEVEL, ivs: PERFECT_IVS, learned: [] });
 
 function diceEntry(id: number, { random, index }: { random: Random; index: number }): RosterEntry {
-  return randomize({ id: `ai-${index}-${id}`, finalID: id, baseID: id, rarity: rarityOf(speciesData(id) as SpeciesData), shiny: false, level: BATTLE_LEVEL, ivs: DICE_IVS, learned: [] }, random);
+  return randomize(diceBase(id, index), random);
 }
 
+const teamPools = new Map<AiLevel, number[]>();
+
 export function aiTeamPool(difficulty: AiLevel): number[] {
+  const cached = teamPools.get(difficulty);
+  if (cached) return cached;
   const ranked = aiPool()
     .filter((id) => fullyEvolved(speciesData(id) as SpeciesData) && canAttack(id))
     .sort((a, b) => bst(speciesData(b) as SpeciesData) - bst(speciesData(a) as SpeciesData) || a - b);
   const size = Math.max(PARTY_SIZE, Math.ceil(ranked.length * AI_POOL_SHARE[difficulty]));
-  return ranked.slice(0, size);
+  const pool = ranked.slice(0, size);
+  teamPools.set(difficulty, pool);
+  return pool;
 }
 
 export function buildAiTeam({ difficulty, random = Math.random }: { difficulty: AiLevel; random?: Random }): RosterEntry[] {
@@ -143,6 +151,26 @@ export function buildAiTeam({ difficulty, random = Math.random }: { difficulty: 
 export function buildAiRandomParty({ random = Math.random }: { random?: Random } = {}): RosterEntry[] {
   const ids = shuffled(aiTeamPool('easy'), random).slice(0, PARTY_SIZE);
   return ids.map((id, index) => diceEntry(id, { random, index }));
+}
+
+const REROLL_CHOICES = 3;
+
+export function aiRerollCandidates(own: RosterEntry[], random: Random = Math.random): RosterEntry[] {
+  const taken = new Set(own.map((entry) => entry.finalID));
+  const pool = aiTeamPool('easy');
+  const picked = new Set<number>();
+  for (let tries = 0; picked.size < REROLL_CHOICES && tries < REROLL_CHOICES * 20; tries++) {
+    const id = pool[Math.floor(random() * pool.length)];
+    if (!taken.has(id)) picked.add(id);
+  }
+  return [...picked].map((id, i) => diceBase(id, PARTY_SIZE + i));
+}
+
+export function aiRerollIndex({ difficulty: level, own, random = Math.random }: { difficulty: AiLevel; own: RosterEntry[]; random?: Random }): number {
+  const difficulty = tactics(level);
+  if (difficulty === 'easy' || difficulty === 'mid') return Math.floor(random() * own.length);
+  const strength = (index: number) => bst(speciesData(own[index].finalID) ?? { stats: [0] });
+  return own.map((_, index) => index).reduce((weakest, index) => (strength(index) < strength(weakest) ? index : weakest), 0);
 }
 
 // The three for the battle are picked on a hunch, without looking at the rival's party: easier
@@ -165,8 +193,6 @@ export function aiPicks({ difficulty: level, own, random = Math.random }: { diff
 // been out. The rest is a guess from the species, never the real thing. Its pending choice is
 // never there.
 
-const GUESS_IV = 15;
-const GUESS_IVS = { hp: GUESS_IV, atk: GUESS_IV, def: GUESS_IV, satk: GUESS_IV, sdef: GUESS_IV, spd: GUESS_IV };
 const guesses = new Map<string, MoveData[]>();
 
 // The moves a seasoned player would expect from that species at that level.
@@ -175,7 +201,7 @@ function expectedMoves(speciesId: number, level: number): MoveData[] {
   if (!guesses.has(key)) {
     let moves: MoveData[] = [];
     try {
-      const probe = { id: `guess-${speciesId}`, finalID: speciesId, baseID: speciesId, level, ivs: GUESS_IVS, learned: [] } as unknown as RosterEntry;
+      const probe = { id: `guess-${speciesId}`, finalID: speciesId, baseID: speciesId, level, ivs: PERFECT_IVS, learned: [] } as unknown as RosterEntry;
       moves = pickMoveset(probe, 'hard', () => 0.5).map(moveData) as MoveData[];
     } catch {
       // The probe is a bare entry, not a real Pokémon: if the catalog can't build one for this
@@ -203,7 +229,7 @@ function believedFoe(fighter: BattleFighter): BattleFighter {
     for (const key of ['charging', 'mustRecharge'] as const) if (volatiles[key] === undefined) delete volatiles[key];
   }
   const base = fighter.form ? formData(fighter.form)?.base : speciesData(fighter.speciesId)?.stats;
-  const stats = fighter.volatiles.transformed || !base ? { ...fighter.stats } : statsFor(base, GUESS_IVS, fighter.level);
+  const stats = fighter.volatiles.transformed || !base ? { ...fighter.stats } : statsFor(base, PERFECT_IVS, fighter.level);
   const share = fighter.hp / fighter.stats.hp;
   const ability = fighter.revealedAbilities.has(fighter.ability) ? fighter.ability : null;
   return {

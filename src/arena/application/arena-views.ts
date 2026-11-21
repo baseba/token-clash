@@ -2,7 +2,7 @@
 // only read: they never change an aggregate.
 import { Injectable } from '@nestjs/common';
 import { buildFighter } from '../../combat/domain/fighter.js';
-import { aiLevelOf } from '../../combat/domain/ai.js';
+import { aiFrame, aiLevelOf } from '../../combat/domain/ai.js';
 import { aiBallFor, DEFAULT_BALL } from '../../catalog/domain/shop.js';
 import { STARTER_SPRITES, trainerSpriteFor } from '../../catalog/domain/trainer-sprites.js';
 import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
@@ -171,7 +171,8 @@ export class ArenaViews {
   }
 
   frameOf(id: string): string | null {
-    return aiLevelOf(id) ? null : this.trainers.byId(id)?.equipped?.frame ?? null;
+    const level = aiLevelOf(id);
+    return level ? aiFrame(level) : this.trainers.byId(id)?.equipped?.frame ?? null;
   }
 
   ballOf(id: string): string {

@@ -10,6 +10,7 @@ import { catalogFile } from '../../shared/paths.js';
 import { effectiveness } from './type-chart.js';
 import { knownAbility, INERT } from './abilities.js';
 import type { Gender, Ivs, RosterEntry } from './roster-entry.js';
+import { statValue } from '../../../public/stat-formula.js';
 
 export { effectiveness };
 
@@ -279,7 +280,27 @@ const NATURES: Record<string, [StatKey, StatKey]> = {
   modest: ['satk', 'atk'], mild: ['satk', 'def'], quiet: ['satk', 'spd'], rash: ['satk', 'sdef'],
   calm: ['sdef', 'atk'], gentle: ['sdef', 'def'], sassy: ['sdef', 'spd'], careful: ['sdef', 'satk'],
 };
-export const NATURE_NAMES = new Set([...Object.keys(NATURES), 'hardy', 'docile', 'serious', 'bashful', 'quirky']);
+export const NATURE_KEYS = ['hardy', 'lonely', 'brave', 'adamant', 'naughty', 'bold', 'docile', 'relaxed', 'impish', 'lax', 'timid', 'hasty', 'serious', 'jolly', 'naive', 'modest', 'mild', 'quiet', 'bashful', 'rash', 'calm', 'gentle', 'sassy', 'careful', 'quirky'] as const;
+export const NATURE_NAMES = new Set<string>(NATURE_KEYS);
+const NATURE_LABELS: Record<string, string> = {
+  hardy: 'Fuerte', lonely: 'Huraña', brave: 'Audaz', adamant: 'Firme', naughty: 'Pícara', bold: 'Osada', docile: 'Dócil', relaxed: 'Plácida',
+  impish: 'Agitada', lax: 'Floja', timid: 'Miedosa', hasty: 'Activa', serious: 'Seria', jolly: 'Alegre', naive: 'Ingenua', modest: 'Modesta',
+  mild: 'Afable', quiet: 'Mansa', bashful: 'Tímida', rash: 'Alocada', calm: 'Serena', gentle: 'Amable', sassy: 'Grosera', careful: 'Cauta', quirky: 'Rara',
+};
+
+export interface NatureInfo {
+  key: string;
+  name: string;
+  up: StatKey | null;
+  down: StatKey | null;
+}
+
+export const natureInfo = (key: string): NatureInfo => ({ key, name: NATURE_LABELS[key] ?? key, up: NATURES[key]?.[0] ?? null, down: NATURES[key]?.[1] ?? null });
+
+export function natureFor(entry: Pick<RosterEntry, 'nature' | 'natureChoice'>): string | null {
+  if (entry.natureChoice && NATURE_NAMES.has(entry.natureChoice)) return entry.natureChoice;
+  return entry.nature ?? null;
+}
 
 const RARITY_BASE: Record<string, number> = { common: 55, uncommon: 65, rare: 75, legendary: 90 };
 
@@ -339,21 +360,15 @@ export function genderFor(entry: EntryLike): Gender | null {
   return hash(`gender:${entry.id ?? entry.finalID}`) % 8 < rate ? 'female' : 'male';
 }
 
-const scale = (base: number, iv: number, level: number) => Math.floor(((2 * base + iv) * level) / 100);
-
 /** IVs as stats read them: old fixtures may omit the special ones, which fall back to atk/def. */
 type IvsLike = Pick<Ivs, 'hp' | 'atk' | 'def' | 'spd'> & Partial<Pick<Ivs, 'satk' | 'sdef'>>;
 
-export function statsFor([hp, attack, defense, spAttack, spDefense, speed]: readonly number[], iv: IvsLike, level: number, nature: string | null = null): Stats {
+export function statsFor(bases: readonly number[], iv: IvsLike, level: number, nature: string | null = null, evs: Partial<Ivs> = {}): Stats {
   const [up, down] = NATURES[nature as string] ?? [];
-  const stat = (key: StatKey, base: number, value: number) => Math.floor((scale(base, value, level) + 5) * (key === up ? 1.1 : key === down ? 0.9 : 1));
-  return {
-    hp: hp === 1 ? 1 : scale(hp, iv.hp, level) + level + 10,
-    atk: stat('atk', attack, iv.atk),
-    def: stat('def', defense, iv.def),
-    satk: stat('satk', spAttack, iv.satk ?? iv.atk),
-    sdef: stat('sdef', spDefense, iv.sdef ?? iv.def),
-    spd: stat('spd', speed, iv.spd),
-  };
+  const ivOf: Record<StatKey, number> = { hp: iv.hp, atk: iv.atk, def: iv.def, satk: iv.satk ?? iv.atk, sdef: iv.sdef ?? iv.def, spd: iv.spd };
+  const stat = (key: StatKey, index: number) => statValue(key, bases[index], ivOf[key], evs[key] ?? 0, level, key === up ? 1.1 : key === down ? 0.9 : 1);
+  return { hp: stat('hp', 0), atk: stat('atk', 1), def: stat('def', 2), satk: stat('satk', 3), sdef: stat('sdef', 4), spd: stat('spd', 5) };
 }
+
+export const PERFECT_IVS: Ivs = { hp: 31, atk: 31, def: 31, satk: 31, sdef: 31, spd: 31 };
 

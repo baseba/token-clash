@@ -31,6 +31,7 @@ export const ClientMessage = z.discriminatedUnion('t', [
   z.object({ t: z.literal('seen'), turn: z.int().nonnegative().catch(0) }),
   /** The picks a player has marked so far, shown live to viewers. */
   z.object({ t: z.literal('choosing'), picks }),
+  z.object({ t: z.literal('reroll'), index: z.int().catch(-1) }),
   /** Confirm the 3 picks. */
   z.object({ t: z.literal('pick'), picks }),
   /** A move or a switch. */

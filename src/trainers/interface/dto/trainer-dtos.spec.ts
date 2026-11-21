@@ -55,3 +55,10 @@ test('the automatic upload takes the save file itself as the body', () => {
   assert.deepEqual(SyncSaveDto.parse({ format: 'poketokenbar.save', state: {} }), { format: 'poketokenbar.save', state: {} });
   assert.equal(SyncSaveDto.safeParse([1, 2]).error!.issues[0].message, 'El cuerpo tiene que ser el archivo de PokeTokenBar.');
 });
+
+test('UpdateMonDto takes a nature and an EV spread', () => {
+  const evs = { hp: 6, atk: 252, def: 0, satk: 0, sdef: 0, spd: 252 };
+  assert.deepEqual(UpdateMonDto.parse({ nature: 'timid', evs }), { nature: 'timid', evs });
+  assert.throws(() => UpdateMonDto.parse({ nature: 'sleepy' }));
+  assert.throws(() => UpdateMonDto.parse({ evs: { ...evs, atk: 300 } }));
+});

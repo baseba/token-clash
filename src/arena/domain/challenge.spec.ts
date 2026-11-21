@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DomainError } from '../../shared/domain/errors.js';
-import { Challenge, isHumanDuel } from './challenge.js';
+import { Challenge, isHumanDuel, ROOM_MAX_AGE_MS } from './challenge.js';
 
 const ana = { id: 'ana', name: 'Ana' };
 const beto = { id: 'beto', name: 'Beto' };
@@ -82,4 +82,23 @@ test('only a 1v1 between people is a human duel', () => {
   assert.equal(isHumanDuel(seated()), true);
   assert.equal(isHumanDuel({ ai: 'hard' }), false);
   assert.equal(isHumanDuel({ ai: null, tournamentId: 'T1' }), false);
+});
+
+test('a room that never started its battle closes itself after 20 minutes', () => {
+  const waiting = open();
+  assert.equal(waiting.expire(ROOM_MAX_AGE_MS, { readyCheck: false }), false);
+  assert.equal(waiting.expire(1 + ROOM_MAX_AGE_MS, { readyCheck: false }), true);
+  assert.equal(waiting.status, 'expired');
+  assert.equal(kindOf(() => waiting.join(beto, { guestTeam: [] })), 'gone');
+  const checking = seated();
+  assert.equal(checking.expire(1 + ROOM_MAX_AGE_MS, { readyCheck: true }), true);
+});
+
+test('a room already fighting, finished or of a tournament never expires', () => {
+  const fighting = seated();
+  assert.equal(fighting.expire(10 * ROOM_MAX_AGE_MS, { readyCheck: false }), false);
+  assert.equal(fighting.status, 'active');
+  const done = seated();
+  done.finish(result);
+  assert.equal(done.expire(10 * ROOM_MAX_AGE_MS, { readyCheck: false }), false);
 });

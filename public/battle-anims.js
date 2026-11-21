@@ -20,6 +20,19 @@ const CONDITION_ANIMS = { protect: 'common-protect', confusion: 'common-confusio
 const WEATHER_ANIMS = { sun: 'common-sunny', harshsun: 'common-harsh-sun', rain: 'common-rain', heavyrain: 'common-heavy-rain', sand: 'common-sandstorm', hail: 'common-hail', snow: 'common-snow', wind: 'common-strong-winds' };
 const TERRAIN_ANIMS = { electric: 'common-electric-terrain', grassy: 'common-grassy-terrain', misty: 'common-misty-terrain', psychic: 'common-psychic-terrain' };
 
+const TINT_CORE = 0.55;
+
+export function tintPixels(data, hex) {
+  const tint = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  for (let i = 0; i < data.length; i += 4) {
+    if (!data[i + 3]) continue;
+    const light = (data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11) / 255;
+    const core = light ** 3 * TINT_CORE;
+    const body = Math.min(1, light * 1.25);
+    for (let c = 0; c < 3; c++) data[i + c] = Math.round(tint[c] * body * (1 - core) + 255 * core);
+  }
+}
+
 export const statusAnim = (status) => STATUS_ANIMS[status] ?? null;
 export const causeAnim = (cause) => CAUSE_ANIMS[cause] ?? null;
 export const conditionAnim = (kind) => CONDITION_ANIMS[kind] ?? null;
@@ -114,6 +127,35 @@ export function createAnimPlayer(field) {
 
   // A sheet by its key, from the first of its URLs that loads: CSS backgrounds have no error
   // fallback of their own, so they use the loaded image's src.
+  const tintedSheets = new Map();
+  function tintedSheet(sheet, hex) {
+    const key = `${sheet.src}|${hex}`;
+    if (!tintedSheets.has(key)) {
+      tintedSheets.set(key, new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const g = canvas.getContext('2d');
+            g.drawImage(img, 0, 0);
+            const pixels = g.getImageData(0, 0, canvas.width, canvas.height);
+            tintPixels(pixels.data, hex);
+            g.putImageData(pixels, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          } catch {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = sheet.src;
+      }));
+    }
+    return tintedSheets.get(key);
+  }
+
   function loadImage(graphic) {
     if (!graphic) return Promise.resolve(null);
     if (!images.has(graphic)) {
@@ -201,7 +243,7 @@ export function createAnimPlayer(field) {
     }
   }
 
-  async function play(key, { userSpot, targetSpot = userSpot, byPlayer = true }) {
+  async function play(key, { userSpot, targetSpot = userSpot, byPlayer = true, tint = null }) {
     if (reduced()) return true;
     const anim = await withTimeout(load(key));
     const variant = pickVariant(anim, byPlayer);
@@ -212,6 +254,8 @@ export function createAnimPlayer(field) {
     const geo = { user: center(userEl), target: center(targetEl), scale: 1, width: FIELD.width, height: FIELD.height };
     const cell = CELL * geo.scale;
     const sheet = await loadImage(config.graphic);
+    if (config.graphic && !sheet) return false;
+    const sheetSrc = sheet ? (tint && (await withTimeout(tintedSheet(sheet, tint)))) || sheet.src : null;
     const columns = sheet ? sheetColumns(sheet.naturalWidth) : 1;
     const mons = [userEl, targetEl].map(shownSprite);
     const graphics = [];
@@ -241,7 +285,7 @@ export function createAnimPlayer(field) {
         zIndex: entry[11] === 2 ? '0' : '1',
         width: `${cell}px`,
         height: `${cell}px`,
-        backgroundImage: sheet ? `url("${sheet.src}")` : '',
+        backgroundImage: sheet ? `url("${sheetSrc}")` : '',
         backgroundSize: sheet ? `${(sheet.naturalWidth / CELL) * cell}px ${(sheet.naturalHeight / CELL) * cell}px` : '',
         backgroundPosition: `${-(frame % columns) * cell}px ${-Math.floor(frame / columns) * cell}px`,
         transform: `translate(${p.x - cell / 2}px, ${p.y - cell / 2}px) rotate(${p.angle}deg) scale(${p.scaleX}, ${p.scaleY})`,
@@ -308,6 +352,10 @@ export function createAnimPlayer(field) {
 
   return {
     play,
+    async bare(key) {
+      const anim = await withTimeout(load(key));
+      return !!anim?.length && anim.every((side) => !side.graphic && !side.bg?.length);
+    },
     preload(keys) {
       for (const key of new Set(keys)) if (key) load(key);
     },

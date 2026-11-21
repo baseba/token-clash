@@ -12,10 +12,10 @@ export interface RecycledRecord {
 }
 
 export const RECYCLE_TOKENS: Readonly<Record<Rarity, number>> = {
-  common: 20_000_000,
-  uncommon: 40_000_000,
-  rare: 100_000_000,
-  legendary: 300_000_000,
+  common: 40_000_000,
+  uncommon: 80_000_000,
+  rare: 200_000_000,
+  legendary: 600_000_000,
 };
 
 export const SHINY_RECYCLE_MULTIPLIER = 3;

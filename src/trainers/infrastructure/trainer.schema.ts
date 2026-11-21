@@ -53,6 +53,8 @@ export const rosterEntries = sqliteTable(
     learned: text({ mode: 'json' }).$type<string[]>(),
     moveset: text({ mode: 'json' }).$type<string[]>(),
     abilityChoice: text('ability_choice'),
+    natureChoice: text('nature_choice'),
+    evs: text({ mode: 'json' }).$type<Ivs>(),
     nickname: text(),
     stage: integer(),
     chainLen: integer('chain_len'),

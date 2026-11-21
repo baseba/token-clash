@@ -1,9 +1,9 @@
 // A Pokémon ready to fight: its stats, ability and gender from the catalog, and the moves it carries into
 // battle (up to four the engine can play).
 import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
-import { abilityFor, genderFor, learnedMoves, moveEntry, moveOrigins, rng, shuffled, species, statsFor, type EntryLike, type Stats } from '../../catalog/domain/creatures.js';
+import { abilityFor, genderFor, natureFor, PERFECT_IVS, natureInfo, type NatureInfo, learnedMoves, moveEntry, moveOrigins, rng, shuffled, species, statsFor, type EntryLike, type Stats } from '../../catalog/domain/creatures.js';
 import type { Gender, Ivs, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { moveData, type MoveData } from './moves.js';
+import { moveData, moveFor, type MoveData } from './moves.js';
 
 /** A fighter as the battle and the browser see it. */
 export interface Fighter {
@@ -23,14 +23,19 @@ export interface Fighter {
   abilityInfo: AbilityInfo | null;
   gender: Gender | null;
   nature: string | null;
+  natureInfo: NatureInfo | null;
+  evs: Ivs;
+  baseStats: Stats;
   ivs: Ivs;
 }
 
 export const MOVES_PER_FIGHTER = 4;
 export const BATTLE_LEVEL = 100;
+const NO_EVS: Ivs = { hp: 0, atk: 0, def: 0, satk: 0, sdef: 0, spd: 0 };
 
 export function movepool(entry: EntryLike): MoveData[] {
-  return learnedMoves(entry).map((id) => moveData(id) as MoveData);
+  const owner = { nature: natureFor(entry), types: species(entry).types };
+  return learnedMoves(entry).map((id) => moveFor(id, owner) as MoveData);
 }
 
 export function usableMovepool(entry: EntryLike): string[] {
@@ -64,10 +69,12 @@ export function movesetFor(entry: EntryLike): string[] {
 export function buildFighter(entry: RosterEntry): Fighter {
   const sp = species(entry);
   const level = BATTLE_LEVEL;
-  const iv = entry.ivs;
+  const iv = PERFECT_IVS;
+  const evs = entry.evs ?? NO_EVS;
   const ability = abilityFor(entry);
   const { hp, atk, def, satk, sdef, spd } = sp.stats;
-  const stats = statsFor([hp, atk, def, satk, sdef, spd], iv, level, entry.nature);
+  const nature = natureFor(entry);
+  const stats = statsFor([hp, atk, def, satk, sdef, spd], iv, level, nature, evs);
   return {
     uid: entry.id,
     name: entry.nickname || sp.name,
@@ -78,13 +85,16 @@ export function buildFighter(entry: RosterEntry): Fighter {
     shiny: entry.shiny,
     level,
     stats,
-    moves: movesetFor(entry).map((id) => moveData(id) as MoveData),
+    moves: movesetFor(entry).map((id) => moveFor(id, { nature, types: sp.types }) as MoveData),
     sprite: sp.sprite,
     floats: sp.floats,
     ability,
     abilityInfo: abilityInfo(ability),
     gender: genderFor(entry),
-    nature: entry.nature ?? null,
+    nature,
+    natureInfo: nature ? natureInfo(nature) : null,
     ivs: iv,
+    evs,
+    baseStats: sp.stats,
   };
 }

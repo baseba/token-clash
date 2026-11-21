@@ -4,6 +4,7 @@
 // what the engine can do.
 import { moveEntry, type MoveEntry } from '../../catalog/domain/creatures.js';
 import { IMPOSSIBLE_MOVES, MOVE_RULES } from './move-rules.js';
+import { hiddenPowerType } from '../../../public/natures.js';
 
 export type MoveTarget = 'foe' | 'self';
 
@@ -73,6 +74,20 @@ export const STRUGGLE: MoveData = {
 export const aimedTarget = (move: MoveData, aim: MoveTarget | null | undefined): string => (move.aimable ? aim ?? move.aimable : move.target);
 
 /** The move in a fighter's slot, or Struggle. */
+export const FULL_FRIENDSHIP_POWER = 102;
+const HIDDEN_POWER = 60;
+
+export { hiddenPowerType };
+
+export function moveFor(id: string, owner: { nature?: string | null; types?: string[] }): MoveData | null {
+  const move = moveData(id);
+  if (!move) return null;
+  if (id === 'hidden-power') return { ...move, type: hiddenPowerType(owner.nature), power: HIDDEN_POWER };
+  if (id === 'revelation-dance' && owner.types?.length) return { ...move, type: owner.types[0] };
+  if (id === 'return' || id === 'frustration') return { ...move, power: FULL_FRIENDSHIP_POWER };
+  return move;
+}
+
 export const moveAt = (fighter: { moves: MoveData[] }, slot: number): MoveData => (slot === STRUGGLE_MOVE ? STRUGGLE : fighter.moves[slot]);
 
 function supportedMove(move: MoveData): boolean {

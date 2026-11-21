@@ -157,6 +157,12 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
     if (connection?.roomId) this.previews.pick(connection, msg.picks);
   }
 
+  @SubscribeMessage('reroll')
+  onReroll(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'reroll'>): void {
+    const connection = this.conn(socket);
+    if (connection?.roomId) this.previews.reroll(connection, msg.index);
+  }
+
   @SubscribeMessage('act')
   onAct(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'act'>): void {
     const connection = this.conn(socket);
