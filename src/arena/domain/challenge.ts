@@ -15,7 +15,9 @@
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { conflict, type DomainError, forbidden, gone, invalid } from '../../shared/domain/errors.js';
 
-export type ChallengeStatus = 'open' | 'active' | 'finished' | 'cancelled' | 'abandoned';
+export type ChallengeStatus = 'open' | 'active' | 'finished' | 'cancelled' | 'abandoned' | 'expired';
+
+export const ROOM_MAX_AGE_MS = 20 * 60_000;
 export const BATTLE_MODES = ['team', 'random'] as const;
 export type BattleMode = (typeof BATTLE_MODES)[number];
 export const VISIBILITIES = ['public', 'private'] as const;
@@ -167,6 +169,8 @@ export class Challenge implements ChallengeState {
         return gone('El anfitrión cerró esta sala.');
       case 'abandoned':
         return gone('Esta sala se cortó cuando se reinició el servidor.');
+      case 'expired':
+        return gone('Esta sala se cerró sola: pasaron 20 minutos sin que empezara la pelea.');
     }
   }
 
@@ -200,6 +204,13 @@ export class Challenge implements ChallengeState {
     const waiting = this.status === 'open' || (this.status === 'active' && readyCheck);
     if (byTrainerId !== this.hostId || !waiting || this.tournamentId) throw forbidden('No puedes cerrar esta sala.');
     this.status = 'cancelled';
+  }
+
+  expire(at: number, { readyCheck }: { readyCheck: boolean }): boolean {
+    const waiting = this.status === 'open' || (this.status === 'active' && readyCheck);
+    if (!waiting || this.tournamentId || this.ai || at - this.createdAt < ROOM_MAX_AGE_MS) return false;
+    this.status = 'expired';
+    return true;
   }
 
   /** Battles live in memory: one left mid-fight by a restart can't be resumed. */

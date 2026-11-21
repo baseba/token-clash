@@ -91,6 +91,23 @@ export class DuelService {
     this.lobby.notify();
   }
 
+  expireStale(at: number): void {
+    const expired = this.challenges.all().filter((challenge) => {
+      const room = this.presence.rooms.get(challenge.id);
+      return challenge.expire(at, { readyCheck: room?.phase.kind === 'readyCheck' });
+    });
+    for (const challenge of expired) {
+      const room = this.presence.rooms.get(challenge.id);
+      if (room) {
+        clearTimeout(room.timer ?? undefined);
+        room.phase = { kind: 'waiting' };
+        for (const ws of room.sockets) if (ws.open) ws.send({ t: 'closed', reason: 'expired' });
+      }
+      this.challenges.save(challenge);
+    }
+    if (expired.length) this.lobby.notify();
+  }
+
   /** A client opens a room page. Returns the challenge, or null if it doesn't exist. */
   enter(ws: ClientConnection, roomId: string, token: string | undefined): Challenge | null {
     if (token !== undefined) ws.trainerId = this.trainers.authenticate(token)?.id ?? null;
