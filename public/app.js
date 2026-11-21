@@ -5585,8 +5585,15 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     }
 
     if (you === null) {
-      if (c.tournament) box.append(h('h2', null, glyph('eye'), ' Estás mirando'), h('p', { class: 'muted' }, `${trainerShort(st.sides[0].name)} vs ${trainerShort(st.sides[1].name)} · ${c.tournament.round}. Cuando termine te llevamos a las llaves y a la siguiente pelea.`), h('a', { class: 'btn', href: `/t/${c.tournament.id}`, 'data-link': true }, 'Ver llaves'));
-      else box.append(h('h2', null, 'Estás mirando'), h('p', { class: 'muted' }, `${trainerShort(st.sides[0].name)} vs ${trainerShort(st.sides[1].name)}. Para pelear tú, busca rival desde el inicio.`), h('a', { class: 'btn', href: '/', 'data-link': true }, 'Ir al inicio'));
+      const fighter = (side) => h('span', { class: 'watch-fighter' }, avatarPic(side.avatar, 'md', side.frame), h('b', null, trainerShort(side.name)));
+      box.append(h('div', { class: 'watch-card' },
+        h('span', { class: 'watch-tag' }, glyph('eye'), ' Estás mirando'),
+        h('div', { class: 'watch-match' }, fighter(st.sides[0]), h('span', { class: 'watch-vs' }, 'vs'), fighter(st.sides[1])),
+        c.tournament ? h('span', { class: 'chip watch-round' }, glyph('trophy'), ` ${c.tournament.round}`) : null,
+        h('p', { class: 'watch-note' }, c.tournament ? 'Cuando termine te llevamos a las llaves y a la siguiente pelea.' : 'Para pelear tú, busca rival desde el inicio.'),
+        c.tournament
+          ? h('a', { class: 'btn primary watch-action', href: `/t/${c.tournament.id}`, 'data-link': true }, glyph('trophy'), ' Ver llaves')
+          : h('a', { class: 'btn primary watch-action', href: '/', 'data-link': true }, glyph('home'), ' Ir al inicio')));
       return;
     }
 

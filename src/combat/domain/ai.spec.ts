@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { createBattle, submit, validActions, needsAction } from './battle.js';
 import { rng, speciesData } from '../../catalog/domain/creatures.js';
 import { buildFighter } from './fighter.js';
-import { AI_LEVELS, AI_POOL_SHARE, LAST_AI_SPECIES, aiPool, aiTeamPool, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
+import { AI_LEVELS, AI_POOL_SHARE, LAST_AI_SPECIES, aiFrame, aiPool, aiTeamPool, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
+import { SHOP_ITEMS } from '../../catalog/domain/shop.js';
 
 const fullyEvolved = (id) => {
   const d = speciesData(id);
@@ -181,4 +182,10 @@ test('a move the rival has used is known, and the AI plays around it', () => {
   gyarados.revealedMoves.add('surf');
   assert.ok(gyarados.moves.some((m) => m.key === 'surf'));
   assert.equal(moveKey(b, 0, chooseAction(b, 0, 'veryhard', rng(1))), 'thunderbolt');
+});
+
+test('each AI level wears its own frame, which the shop never sells', () => {
+  const frames = AI_LEVELS.map(aiFrame);
+  assert.equal(new Set(frames).size, AI_LEVELS.length);
+  assert.ok(frames.every((frame) => !SHOP_ITEMS.some((item) => item.kind === 'frame' && item.key === frame)));
 });

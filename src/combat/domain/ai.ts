@@ -22,6 +22,7 @@ export const AI_PREFIX = 'ai:';
 export const LAST_AI_SPECIES = DEX_LIMIT;
 
 export const aiTrainerId = (level: AiLevel): string => `${AI_PREFIX}${level}`;
+export const aiFrame = (level: AiLevel): string => `ai-${level}`;
 /** A tournament can seat several AIs of one level: each gets a number. */
 export const aiSeatId = (level: AiLevel, seatNumber: number): string => `${aiTrainerId(level)}#${seatNumber}`;
 export function aiLevelOf(trainerId: string): AiLevel | null {

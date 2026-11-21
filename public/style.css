@@ -2472,3 +2472,48 @@ tr.type-shift td { animation: type-row-flash .8s ease; }
 .wait-dots i:nth-child(3) { animation-delay: .3s; }
 @keyframes wait-dot { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .wait-dots i, .wait-card { animation: none; } }
+
+.avatar[class*="ring-ai-"] {
+  --ai: #4fd8ff; --ai-dim: rgb(79 216 255 / .35);
+  --metal: conic-gradient(from 30deg, #f6f8fb, #a7b0bf, #565e6d, #d4dae4, #7a8392, #eef2f7, #8d96a6, #f6f8fb);
+  box-shadow: 0 0 0 1px #07090d, 0 0 0 2px #2a303b;
+}
+.avatar.ring-ai-mid { --ai: #4fe08a; --ai-dim: rgb(79 224 138 / .35); }
+.avatar.ring-ai-hard { --ai: #ff9a3a; --ai-dim: rgb(255 154 58 / .35); --metal: conic-gradient(from 30deg, #c9ced8, #6d7480, #2c3139, #9aa1ad, #454b55, #b9c0cb, #5a616c, #c9ced8); }
+.avatar.ring-ai-veryhard { --ai: #ff3b3b; --ai-dim: rgb(255 59 59 / .4); --metal: conic-gradient(from 30deg, #b8bdc6, #555b66, #1e2228, #858c98, #33383f, #a3aab5, #444a53, #b8bdc6); }
+.avatar.ring-ai-skynet { --ai: #ff1f4f; --ai-dim: rgb(255 31 79 / .45); --metal: conic-gradient(from 30deg, #8a8f99, #2a2d33, #07080a, #5a5f68, #141619, #7a7f88, #1c1e22, #8a8f99); animation: ai-pulse 2.4s ease-in-out infinite; }
+.avatar[class*="ring-ai-"]::before {
+  content: ''; position: absolute; inset: -16%; z-index: -1; pointer-events: none; border-radius: 50%; background: var(--metal);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 84%, #000 85%, #000 97%, transparent 98%); mask: radial-gradient(circle closest-side, transparent 84%, #000 85%, #000 97%, transparent 98%);
+  box-shadow: inset 0 0 0 1px #07090d;
+}
+.avatar[class*="ring-ai-"]::after {
+  content: ''; position: absolute; inset: -12%; z-index: 0; pointer-events: none; border-radius: 50%;
+  -webkit-mask: radial-gradient(circle closest-side, transparent 88%, #000 90%, #000 94%, transparent 96%); mask: radial-gradient(circle closest-side, transparent 88%, #000 90%, #000 94%, transparent 96%);
+  filter: drop-shadow(0 0 2px var(--ai));
+}
+.avatar.ring-ai-easy::after { background: repeating-conic-gradient(var(--ai) 0 6deg, transparent 6deg 90deg); }
+.avatar.ring-ai-mid::after { background: repeating-conic-gradient(var(--ai) 0 5deg, transparent 5deg 45deg); animation: ai-blink 2.2s steps(2) infinite; }
+.avatar.ring-ai-hard::after { background: conic-gradient(var(--ai) 0 60deg, var(--ai-dim) 60deg 100deg, transparent 100deg 360deg); animation: frame-spin 3.2s linear infinite; }
+.avatar.ring-ai-veryhard::after { background: repeating-conic-gradient(var(--ai) 0 18deg, transparent 18deg 60deg); animation: frame-spin 4s linear infinite; }
+.avatar.ring-ai-skynet::after { background: conic-gradient(var(--ai) 0 34deg, var(--ai-dim) 34deg 60deg, transparent 60deg 180deg, var(--ai) 180deg 214deg, var(--ai-dim) 214deg 240deg, transparent 240deg 360deg); animation: frame-spin 2.6s linear infinite; }
+@keyframes ai-blink { 50% { opacity: .35; } }
+@keyframes ai-pulse { 50% { box-shadow: 0 0 0 1px #07090d, 0 0 0 2px #2a303b, 0 0 16px var(--ai); } }
+@media (prefers-reduced-motion: reduce) { .avatar[class*="ring-ai-"], .avatar[class*="ring-ai-"]::before, .avatar[class*="ring-ai-"]::after { animation: none; } }
+
+.watch-card { display: grid; justify-items: center; gap: .7rem; width: 100%; padding: .6rem 0; text-align: center; animation: pb-in .35s ease both; }
+.watch-tag { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .7rem; border-radius: 999px; background: rgb(255 255 255 / .06); border: 1px solid var(--line); color: var(--muted); font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.watch-tag .glyph { width: 1rem; height: 1rem; color: var(--accent); }
+.watch-match { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+.watch-fighter { display: inline-flex; flex-direction: column; align-items: center; gap: .45rem; min-width: 6rem; }
+.watch-fighter b { font-size: 1rem; }
+.watch-vs { font-weight: 900; font-size: 1.1rem; color: var(--accent); letter-spacing: .06em; }
+.watch-round { display: inline-flex; align-items: center; gap: .3rem; border-color: var(--accent); color: var(--accent); }
+.watch-round .glyph { width: .9rem; height: .9rem; }
+.watch-note { margin: 0; color: var(--muted); font-size: .88rem; max-width: 26rem; }
+.watch-action { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 46px; min-width: 12rem; }
+@media (max-width: 600px) {
+  .watch-action { width: 100%; }
+  .watch-match { gap: .6rem; }
+}
+@media (prefers-reduced-motion: reduce) { .watch-card { animation: none; } }
