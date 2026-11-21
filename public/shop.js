@@ -21,6 +21,8 @@ export const SHOP_KINDS = { ball: 'Poké Balls', window: 'Marcos de ventana', fr
 
 export const DEFAULT_BALL = 'pb';
 
+export const RETIRED_BALLS = { gv: 'common' };
+
 export const CUSTOM_BALLS = [
   { key: 'mt', name: 'Menta Ball', rarity: 'free', top: ['#0f5c45', '#178a64', '#2fc28c', '#a8f0d2'] },
   { key: 'sk', name: 'Sakura Ball', rarity: 'free', top: ['#7a1f4a', '#b8336f', '#ff6fae', '#ffc6de'] },
@@ -51,7 +53,6 @@ export const BALL_GROUPS = {
 };
 
 export const BALL_VARIANTS = [
-  { key: 'gv', name: 'Aurora Ball', rarity: 'common', base: 'gb', tint: { primary: { colors: { closed: ['#5a24a0', '#3a1470', '#9a62ec', '#ddc8fb'], open: ['#5a24a0', '#9a62ec'] } }, accent: { colors: { closed: ['#0f7468', '#1fb3a1', '#7ff0e0'], open: [] } } } },
   { key: 'ge', name: 'Trébol Ball', rarity: 'common', base: 'gb', tint: { primary: { colors: { closed: ['#1a7a48', '#0d4f2c', '#36cf7c', '#c4f3d9'], open: ['#1a7a48', '#36cf7c'] } }, accent: { colors: { closed: ['#946209', '#d9a51c', '#fff1a8'], open: [] } } } },
   { key: 'ur', name: 'Mariquita Ball', rarity: 'rare', base: 'ub', tint: { accent: { hue: 350 } } },
   { key: 'up', name: 'Galaxia Ball', rarity: 'epic', base: 'ub', tint: { accent: { colors: { closed: ['#5f78a8', '#9fb6e0', '#ffffff', '#d3e2fb'], open: ['#c5d8f7'] } } } },
@@ -70,6 +71,7 @@ export const BALL_VARIANTS = [
   { key: 'ms', name: 'Edén Ball', rarity: 'legendary', base: 'mb', tint: { primary: { hue: 145 }, accent: { hue: 48 } } },
   { key: 'mr', name: 'Ritual Ball', rarity: 'mythic', base: 'mb', tint: { primary: { colors: { closed: ['#08060a', '#1c1418', '#3a2a32', '#9a8a92'], open: ['#1c1418', '#3a2a32'] } }, accent: { colors: { closed: ['#7a0a18', '#d1121f', '#ff7a7a'], open: [] } } } },
   { key: 'mp', name: 'Celestial Ball', rarity: 'mythic', base: 'mb', tint: { primary: { colors: { closed: ['#3d4566', '#6c79a3', '#b3c0e6', '#f7f9ff'], open: ['#6c79a3', '#b3c0e6'] } }, accent: { colors: { closed: ['#7d5cff', '#5fd0ff', '#f3e6ff'], open: [] } }, bottom: { colors: { closed: ['#f4f6ff', '#8f9abd'], open: ['#f4f6ff', '#8f9abd'] } } } },
+  { key: 'mx', name: 'Dracónica Ball', rarity: 'mythic', base: 'mb', tint: { primary: { colors: { closed: ['#07060c', '#26243a', '#5e5a78', '#d8d6e6'], open: ['#26243a', '#5e5a78'] } }, accent: { colors: { closed: ['#7a4a10', '#f2c14a', '#fff0a8'], open: [] } }, bottom: { colors: { closed: ['#ffffff', '#9a96b4'], open: ['#ffffff', '#9a96b4'] } } } },
   { key: 'md', name: 'Tesoro Ball', rarity: 'mythic', base: 'mb', tint: { primary: { colors: { closed: ['#6b4a08', '#a8740f', '#e6b422', '#fff1a8'], open: ['#a8740f', '#e6b422'] } }, accent: { colors: { closed: ['#c98a1a', '#ffd75e', '#fff4c2'], open: [] } }, bottom: { colors: { closed: ['#fff8e1', '#c9b98a'], open: ['#fff8e1', '#c9b98a'] } } } },
 ];
 

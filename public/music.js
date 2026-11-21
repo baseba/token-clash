@@ -309,7 +309,33 @@ export function createPlayer({ storage = null } = {}) {
     return typeof path === 'string' ? loadBuffer(upstreamURLs(UPSTREAM.pokerogue, path)) : null;
   }
   const soundBuffer = (sound) => pokerogueBuffer('sounds', sound);
-  const cueBuffer = (cue) => pokerogueBuffer('moveSounds', cue.sound);
+  const synthBuffers = new Map();
+  function geigerBuffer() {
+    const seconds = 1.4;
+    const rate = ctx.sampleRate;
+    const buffer = ctx.createBuffer(1, Math.ceil(seconds * rate), rate);
+    const data = buffer.getChannelData(0);
+    let t = 0.02;
+    while (t < seconds - 0.01) {
+      const start = Math.floor(t * rate);
+      const length = Math.floor(0.0025 * rate);
+      const level = 0.55 + Math.random() * 0.45;
+      for (let i = 0; i < length && start + i < data.length; i++) {
+        const decay = Math.exp(-i / (length * 0.22));
+        data[start + i] += (Math.random() * 2 - 1) * level * decay + Math.sin(i * 0.9) * 0.35 * level * decay;
+      }
+      const intensity = Math.sin(Math.PI * Math.min(1, t / seconds * 1.15)) ** 1.5;
+      const clicksPerSecond = 5 + intensity * 55;
+      t += -Math.log(1 - Math.random() * 0.98) / clicksPerSecond;
+    }
+    return buffer;
+  }
+  const SYNTHS = { geiger: geigerBuffer };
+  const synthBuffer = (name) => {
+    if (!synthBuffers.has(name)) synthBuffers.set(name, SYNTHS[name]?.() ?? null);
+    return Promise.resolve(synthBuffers.get(name));
+  };
+  const cueBuffer = (cue) => (cue.sound.startsWith('synth:') ? synthBuffer(cue.sound.slice('synth:'.length)) : pokerogueBuffer('moveSounds', cue.sound));
   const moveCues = async (key, byPlayer) => moveSfxCues(await loadManifest(MOVE_SFX_MANIFEST), key, byPlayer);
 
   const cueSources = new Set();

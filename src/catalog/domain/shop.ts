@@ -14,6 +14,7 @@ export interface ShopItem {
 
 export const SHOP_ITEMS = shop.SHOP_ITEMS as readonly ShopItem[];
 export const RARITIES = shop.RARITIES;
+export const RETIRED_BALLS = shop.RETIRED_BALLS as Readonly<Record<string, keyof typeof shop.RARITIES>>;
 export const DEFAULT_BALL: string = shop.DEFAULT_BALL;
 export const aiBallFor = (roll: number): string => shop.aiBallFor(roll);
 export const shopItem = (id: string): ShopItem | null => shop.shopItem(id) as ShopItem | null;
