@@ -19,9 +19,10 @@
     "radio": "node scripts/sync-radio.js",
     "trainers": "node scripts/sync-trainers.js",
     "overworlds": "node scripts/sync-overworlds.js",
+    "tiles": "node scripts/sync-tilesets.js",
     "balls": "node scripts/sync-battle-anims.js --balls",
     "variants": "node scripts/plan-trainer-variants.mjs && node scripts/sync-trainers.js",
-    "postinstall": "(node scripts/sync-battle-anims.js || echo 'No se pudieron descargar las animaciones: corre npm run anims cuando tengas conexión.') && (node scripts/sync-trainers.js || echo 'No se pudieron descargar los entrenadores: corre npm run trainers cuando tengas conexión.') && (node scripts/sync-overworlds.js || echo 'No se pudieron descargar los sprites de mapa: corre npm run overworlds cuando tengas conexión.')"
+    "postinstall": "(node scripts/sync-battle-anims.js || echo 'No se pudieron descargar las animaciones: corre npm run anims cuando tengas conexión.') && (node scripts/sync-trainers.js || echo 'No se pudieron descargar los entrenadores: corre npm run trainers cuando tengas conexión.') && (node scripts/sync-overworlds.js || echo 'No se pudieron descargar los sprites de mapa: corre npm run overworlds cuando tengas conexión.') && (node scripts/sync-tilesets.js || echo 'No se pudieron descargar los tiles de los mapas: corre npm run tiles cuando tengas conexión.')"
   },
   "dependencies": {
     "@nestjs/common": "12.3.2",

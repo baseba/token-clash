@@ -16,7 +16,7 @@
 // to the collection.
 import { abilityFor, abilityOptions, hash, rng, type Random } from '../../catalog/domain/creatures.js';
 import type { Ivs, RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { MAX_LEVEL, PARTY_LIMIT, RECRUIT_LINE, ROOMS, START_LEVEL, STARTERS, type RoomKind } from '../../catalog/domain/tower-cast.js';
+import { MAX_LEVEL, PARTY_LIMIT, RECRUIT_LINE, ROOMS, START_LEVEL, STARTERS, TWIST_KEYS, type RoomKind, type TwistKey } from '../../catalog/domain/tower-cast.js';
 import type { AiLevel } from '../../combat/domain/ai.js';
 import { MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
@@ -25,7 +25,7 @@ import { foeTeam } from './foe-team.js';
 import { evolutionPath, expForLevel, expYield, formAtLevel, levelForExp, levelMovesUpTo, movesAtLevel } from './growth.js';
 import { labOffers, lineOf, natureOf, offerMoves, recruitOffers, type Offer } from './lab.js';
 import { floorScore, totalPoints, type FloorScore } from './score.js';
-import { isNature, lockedAbilities, restRewards, stoneEvolution, vitaminRoom, type RestContext, type Reward } from './rewards.js';
+import { isNature, lockedAbilities, MAX_IV, restRewards, stoneEvolution, TWIST_REWARDS, vitaminRoom, type RestContext, type Reward } from './rewards.js';
 
 export type RunStatus = 'drafting' | 'climbing' | 'resting' | 'lost' | 'cleared' | 'abandoned';
 export const OPEN_STATUSES: readonly RunStatus[] = ['drafting', 'climbing', 'resting'];
@@ -92,6 +92,8 @@ export interface TowerRunState {
   rolls: Rolls;
   /** The points of every floor won. */
   log: FloorScore[];
+  /** The rumour of this climb: what makes it play differently (null in climbs started before rumours). */
+  twist: TwistKey | null;
   challengeId: string | null;
   lastResult: FloorResult | null;
   cleared: number;
@@ -141,6 +143,7 @@ export class TowerRun implements TowerRunState {
   rerolls!: number;
   rolls!: Rolls;
   log!: FloorScore[];
+  twist!: TwistKey | null;
   challengeId!: string | null;
   lastResult!: FloorResult | null;
   cleared!: number;
@@ -175,6 +178,7 @@ export class TowerRun implements TowerRunState {
       rerolls: 0,
       rolls: {},
       log: [],
+      twist: TWIST_KEYS[hash(`${seed}:twist`) % TWIST_KEYS.length],
       challengeId: null,
       lastResult: null,
       cleared: 0,
@@ -214,7 +218,7 @@ export class TowerRun implements TowerRunState {
   }
 
   floorAt(number: number, room: RoomKind | null = null): Floor {
-    return floorAt(number, this.length, this.difficulty, this.seed, room, this.rolls);
+    return floorAt(number, this.length, this.difficulty, this.seed, room, this.rolls, this.twist);
   }
 
   currentFloor(): Floor {
@@ -223,7 +227,7 @@ export class TowerRun implements TowerRunState {
 
   /** The ways the current floor offers; empty on a boss floor or once one is taken. */
   rooms(): RoomKind[] {
-    return this.status === 'climbing' && !this.room ? roomsAt(this.floor, this.length, this.seed, this.rolls) : [];
+    return this.status === 'climbing' && !this.room ? roomsAt(this.floor, this.length, this.seed, this.rolls, this.twist) : [];
   }
 
   /** The floor each way leads to, to show who waits there before choosing. */
@@ -299,7 +303,7 @@ export class TowerRun implements TowerRunState {
       return true;
     }
     const floor = this.currentFloor();
-    this.log = [...this.log, floorScore(floor, this.foeTeam(), this.difficulty)];
+    this.log = [...this.log, floorScore(floor, this.foeTeam(), this.difficulty, this.twist)];
     this.lastResult = { floor: floor.number, room: floor.room, won: true, growth: this.gainExperience(floor) };
     this.cleared = floor.number;
     this.room = null;
@@ -320,7 +324,7 @@ export class TowerRun implements TowerRunState {
 
   /** What the party looks like to the rewards: who fits each one, and why. */
   rewardTargets() {
-    return this.party.map((mon) => ({ uid: mon.uid, speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level, known: mon.known, abilities: mon.abilities, evs: mon.evs }));
+    return this.party.map((mon) => ({ uid: mon.uid, speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level, known: mon.known, abilities: mon.abilities, evs: mon.evs, ivs: mon.entry.ivs }));
   }
 
   private restContext(floor: Floor, overrides: Partial<RestContext> = {}): RestContext {
@@ -333,6 +337,7 @@ export class TowerRun implements TowerRunState {
       minTier,
       ...(floor.room === 'calm' ? { maxTier: 'common' as const } : {}),
       recruitable: !boss,
+      ...(this.twist ? TWIST_REWARDS[this.twist] ?? {} : {}),
       ...overrides,
     };
   }
@@ -346,7 +351,7 @@ export class TowerRun implements TowerRunState {
     const floor = this.floorAt(this.floor - 1, this.lastResult?.room ?? null);
     const tiers = previous.map((reward) => reward.tier);
     const minTier = tiers.includes('epic') ? 'epic' : tiers.includes('rare') ? 'rare' : 'common';
-    this.rewards = restRewards(this.rewardTargets(), this.restContext(floor, { minTier, count: previous.length, maxTier: minTier === 'common' ? 'common' : undefined }), rng(`${this.seed}:reroll:${this.floor}:${this.rerolls}`)).map((reward) => ({ ...reward, id: `${reward.id}:r${this.rerolls}` }));
+    this.rewards = restRewards(this.rewardTargets(), this.restContext(floor, { minTier, count: previous.length, extra: 0, maxTier: minTier === 'common' ? 'common' : undefined }), rng(`${this.seed}:reroll:${this.floor}:${this.rerolls}`)).map((reward) => ({ ...reward, id: `${reward.id}:r${this.rerolls}` }));
     this.updatedAt = at;
   }
 
@@ -471,6 +476,12 @@ export class TowerRun implements TowerRunState {
       case 'mint':
         if (!choice.nature || !isNature(choice.nature)) throw invalid('Elige una naturaleza.');
         mon.nature = choice.nature;
+        return null;
+      case 'bottleCap':
+        mon.entry = { ...mon.entry, ivs: { ...mon.entry.ivs, [reward.stat as keyof Ivs]: MAX_IV } };
+        return null;
+      case 'goldCap':
+        mon.entry = { ...mon.entry, ivs: { hp: MAX_IV, atk: MAX_IV, def: MAX_IV, satk: MAX_IV, sdef: MAX_IV, spd: MAX_IV } };
         return null;
     }
   }

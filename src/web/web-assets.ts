@@ -18,17 +18,17 @@ const CACHEABLE = new Set(['.png', '.ico']);
 const recolored = (rel: string): boolean => /^anims[/\\]ui[/\\]/.test(rel) || (/^trainers[/\\]/.test(rel) && VARIANT_KEYS.has(rel.slice('trainers/'.length, -'.png'.length)));
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 
-// The manifests of public/upstream/ and the trainer sprites are part of the version, and the page
-// asks for them with it, like the app icons. A trainer sprite or icon asked for with another version
-// (or none) may be stale.
+// The manifests of public/upstream/, the trainer and overworld sprites and the Tower's tiles are part
+// of the version, and the page asks for them with it, like the app icons. One asked for with another
+// version (or none) may be stale.
 export const cacheFor = (rel: string, current: boolean): string => {
   if (/^upstream[/\\]/.test(rel)) return IMMUTABLE;
-  if (/^trainers[/\\].+\.png$/.test(rel) && current) return IMMUTABLE;
+  if (/^(trainers|overworlds|tiles)[/\\].+\.png$/.test(rel) && current) return IMMUTABLE;
   if (/^icons[/\\]/.test(rel) && current) return IMMUTABLE;
   return CACHEABLE.has(extname(rel)) && !recolored(rel) ? 'public, max-age=86400' : 'no-cache';
 };
 
-const TRAINERS = 'trainers';
+const GENERATED = ['trainers', 'overworlds', 'tiles'];
 const ICONS = 'icons';
 const VERSIONED = new Set(['.html', '.js', '.webmanifest']);
 
@@ -45,8 +45,8 @@ export class WebAssets {
     const code = readdirSync(PUBLIC_DIR).filter((f) => /\.(js|css|html|svg|webmanifest)$/.test(f));
     const icons = readdirSync(join(PUBLIC_DIR, ICONS)).map((f) => join(ICONS, f));
     const manifests = readdirSync(join(PUBLIC_DIR, 'upstream')).map((f) => join('upstream', f));
-    const trainers = existsSync(join(PUBLIC_DIR, TRAINERS)) ? readdirSync(join(PUBLIC_DIR, TRAINERS)).filter((f) => f.endsWith('.png')).map((f) => join(TRAINERS, f)) : [];
-    for (const file of [...code, ...icons, ...manifests, ...trainers].sort()) hash.update(file).update(readFileSync(join(PUBLIC_DIR, file)));
+    const generated = GENERATED.flatMap((dir) => (existsSync(join(PUBLIC_DIR, dir)) ? readdirSync(join(PUBLIC_DIR, dir)).filter((f) => f.endsWith('.png')).map((f) => join(dir, f)) : []));
+    for (const file of [...code, ...icons, ...manifests, ...generated].sort()) hash.update(file).update(readFileSync(join(PUBLIC_DIR, file)));
     return hash.digest('hex').slice(0, 10);
   })();
 

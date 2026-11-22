@@ -1,6 +1,6 @@
 // TowerRun ⇄ row.
 import type { AiLevel } from '../../combat/domain/ai.js';
-import type { RoomKind } from '../../catalog/domain/tower-cast.js';
+import type { RoomKind, TwistKey } from '../../catalog/domain/tower-cast.js';
 import { TowerRun, type RunStatus } from '../domain/tower-run.js';
 import type { towerRuns, TowerRunRow } from './tower.schema.js';
 
@@ -21,6 +21,7 @@ export function towerRunToDomain(row: TowerRunRow): TowerRun {
     rerolls: row.rerolls,
     rolls: row.rolls ?? {},
     log: row.log ?? [],
+    twist: (row.twist as TwistKey | null) ?? null,
     challengeId: row.challengeId ?? null,
     lastResult: row.lastResult ?? null,
     cleared: row.cleared,
@@ -47,6 +48,7 @@ export function towerRunToRow(run: TowerRun): typeof towerRuns.$inferInsert {
     rerolls: run.rerolls,
     rolls: run.rolls,
     log: run.log,
+    twist: run.twist,
     challengeId: run.challengeId,
     lastResult: run.lastResult,
     cleared: run.cleared,

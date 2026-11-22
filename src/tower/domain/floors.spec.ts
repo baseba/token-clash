@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
-import { START_LEVEL, TYPE_SCENES } from '../../catalog/domain/tower-cast.js';
+import { NAMES, START_LEVEL, TYPE_SCENES } from '../../catalog/domain/tower-cast.js';
 import { floorAt, floorKind, foeLevel, levelCap, roomsAt, stretchStart, teamSize } from './floors.js';
 
 const kinds = (length: number | null, upTo: number) => Array.from({ length: upTo }, (_, i) => floorKind(i + 1, length));
@@ -131,5 +131,32 @@ test('route trainers never repeat the theme of the floor below, and no Ghost the
         if (way.level < 15) assert.ok(!way.types.includes('ghost'), `${seed} ${floor} ${room}`);
       }
     }
+  }
+});
+
+test('a woman trainer gets a woman\'s name and her lines agree with her; a pair gets two names', () => {
+  const women = ['beauty', 'parasol_lady', 'maid', 'aroma_lady', 'swimmer_f'];
+  for (let seed = 0; seed < 300; seed++) {
+    const floor = floorAt(1 + (seed % 20), null, 'mid', `w${seed}`);
+    if (!floor.foe || floor.kind !== 'trainer') continue;
+    const text = `${floor.lines.hello} ${floor.lines.lose}`;
+    assert.ok(!text.includes('{o}'), text);
+    if (women.includes(floor.foe.base)) assert.ok(NAMES.f.includes(floor.foe.name), `${floor.foe.base}: ${floor.foe.name}`);
+    if (['twins', 'young_couple', 'hooligans'].includes(floor.foe.base)) assert.match(floor.foe.name, / y /);
+  }
+});
+
+test('names change from floor to floor, and lines vary within a climb', () => {
+  const floors = Array.from({ length: 12 }, (_, i) => floorAt(i + 1, null, 'mid', 'names')).filter((floor) => floor.kind === 'trainer');
+  const names = floors.map((floor) => floor.foe?.name);
+  assert.equal(new Set(names).size, names.length);
+  assert.ok(new Set(floors.map((floor) => floor.lines.hello)).size >= floors.length - 1);
+});
+
+test('rumours: wild routes always offer a tough way, a night climb turns every scene to night', () => {
+  for (let floor = 3; floor < 20; floor++) if (floor % 5) assert.ok(roomsAt(floor, 25, 'wild', {}, 'wild').includes('tough'), String(floor));
+  for (let floor = 1; floor < 10; floor++) {
+    const scene = floorAt(floor, 25, 'mid', 'n', null, {}, 'night').scene;
+    assert.match(scene, /-night$|underwater/, scene);
   }
 });
