@@ -14,20 +14,29 @@ import { CLASS_TRAINERS, SIGNATURE } from '../../catalog/domain/trainer-goals.js
 import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, TRAINER_VARIANTS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
 import {
   BOSS_LINES,
+  CLASS_LINES,
   ELITE_FLOORS,
+  FEMALE_CLASSES,
   GYM_EVERY,
   LEAGUE_BLOCK,
   MAX_LEVEL,
   MUSIC,
+  NAMED_CLASSES,
   NAMES,
+  PAIR_CLASSES,
+  PAIR_LINES,
   REGIONS,
+  ROOM_LINES,
   ROOMS,
   ROUTE_SCENES,
   START_LEVEL,
   TYPE_LINES,
   TYPE_SCENES,
+  VILLAIN_LINES,
+  type Line,
   type Region,
   type RoomKind,
+  type TwistKey,
 } from '../../catalog/domain/tower-cast.js';
 
 export type FloorKind = 'trainer' | 'gym' | 'elite' | 'champion';
@@ -77,6 +86,11 @@ const WARM_UP_FLOORS = 2;
 const GHOSTS_FROM_LEVEL = 15;
 const LATE_FLOOR = 20;
 const ROOM_WEIGHTS: [RoomKind, number][] = [['tough', 30], ['calm', 18], ['rest', 20], ['den', 14], ['hideout', 10], ['deal', 6]];
+/** How a climb's rumour changes the odds of each way. */
+const TWIST_WEIGHTS: Partial<Record<TwistKey, Partial<Record<RoomKind, number>>>> = { night: { hideout: 2 }, market: { rest: 2 }, migration: { den: 2.5 } };
+/** Scenes with a night version among our battle backgrounds. */
+const NIGHT_SCENES = ['beach', 'cave', 'desert', 'lake', 'mountain', 'ocean', 'path', 'snow', 'tall-grass'];
+const WAY_ORDER: readonly RoomKind[] = ['trainer', 'tough', 'calm', 'hideout'];
 const EARLY_ROOMS: readonly RoomKind[] = ['tough', 'calm', 'rest', 'den'];
 const FEMALE = new Set([
   'misty', 'erika', 'janine', 'sabrina', 'lorelei', 'agatha', 'whitney', 'jasmine', 'clair', 'karen', 'roxanne', 'flannery', 'winona', 'liza', 'phoebe', 'glacia',
@@ -88,7 +102,7 @@ const FEMALE = new Set([
 
 const REGION_OF = new Map<string, Region>(Object.entries(REGIONS).flatMap(([region, keys]) => keys.map((key) => [key, region as Region] as const)));
 const regionOf = (key: string): Region => REGION_OF.get(key) ?? 'kanto';
-const isFemale = (key: string): boolean => key.endsWith('_f') || FEMALE.has(key);
+const isFemale = (key: string): boolean => key.endsWith('_f') || FEMALE.has(key) || FEMALE_CLASSES.includes(key);
 const pick = <T>(list: readonly T[], seed: string): T => list[hash(seed) % list.length];
 
 const NAME_FIXES: Record<string, string> = { lt_surge: 'Lt. Surge', crasher_wake: 'Crasher Wake', rocket_boss_giovanni_1: 'Giovanni' };
@@ -141,13 +155,15 @@ export function floorKind(floor: number, length: number | null): FloorKind {
 export type Rolls = Readonly<Record<number, string>>;
 const drawOf = (seed: string, rolls: Rolls, floor: number): string => (rolls[floor] ? `${seed}:${rolls[floor]}` : seed);
 
-export function roomsAt(floor: number, length: number | null, seed: string, rolls: Rolls = {}): RoomKind[] {
+export function roomsAt(floor: number, length: number | null, seed: string, rolls: Rolls = {}, twist: TwistKey | null = null): RoomKind[] {
   if (floorKind(floor, length) !== 'trainer') return [];
   const random = rng(`${drawOf(seed, rolls, floor)}:rooms:${floor}`);
-  const pool = ROOM_WEIGHTS.filter(([room]) => floor > WARM_UP_FLOORS || EARLY_ROOMS.includes(room));
+  const boost = (twist && TWIST_WEIGHTS[twist]) ?? {};
+  const pool = ROOM_WEIGHTS.filter(([room]) => floor > WARM_UP_FLOORS || EARLY_ROOMS.includes(room)).map(([room, weight]): [RoomKind, number] => [room, weight * (boost[room] ?? 1)]);
   const rooms: RoomKind[] = ['trainer'];
+  if (twist === 'wild') rooms.push(pool.splice(pool.findIndex(([room]) => room === 'tough'), 1)[0][0]);
   const extra = random() < 0.5 ? 2 : 1;
-  while (rooms.length < 1 + extra && pool.length) {
+  while (rooms.length < Math.max(1 + extra, twist === 'wild' ? 2 : 0) && pool.length) {
     const total = pool.reduce((sum, [, weight]) => sum + weight, 0);
     let roll = random() * total;
     const index = pool.findIndex(([, weight]) => (roll -= weight) <= 0);
@@ -162,10 +178,39 @@ const speciesOf = (names: readonly string[]): number[] => names.map((name) => sp
 const signatureOf = (key: string): number | null => (SIGNATURE[key] ? speciesIdByName(SIGNATURE[key]) : null);
 const typesOfSpecies = (ids: readonly number[]): string[] => [...new Set(ids.flatMap((id) => speciesData(id)?.types ?? []))];
 
-function linesFor(key: string, type: string | null): { hello: string; lose: string } {
-  const [hello, lose] = BOSS_LINES[key] ?? TYPE_LINES[type ?? 'normal'] ?? TYPE_LINES.normal;
-  return { hello, lose };
+const classBase = (key: string): string => key.replace(/_(m|f)(_\d+)?$|_\d+$/, '');
+const agree = (text: string, female: boolean): string => text.replaceAll('{o}', female ? 'a' : 'o');
+
+/** What a trainer says: a boss its own words; others, by its class, its team, the way you took or the type of its theme. */
+function linesFor(key: string, type: string | null, at: string, room: RoomKind | null = null): { hello: string; lose: string } {
+  const own = BOSS_LINES[key];
+  if (own) return { hello: own[0], lose: own[1] };
+  const team = key.includes('_grunt') ? VILLAIN_LINES[key.split('_')[0]] : null;
+  const typed = TYPE_LINES[type ?? 'normal'] ?? TYPE_LINES.normal;
+  const voices: readonly Line[] = PAIR_CLASSES[key]
+    ? PAIR_LINES
+    : team ?? (room && ROOM_LINES[room] && hash(`${at}:mood`) % 2 ? ROOM_LINES[room] : hash(`${at}:voice`) % 2 && CLASS_LINES[classBase(key)] ? CLASS_LINES[classBase(key)] : typed);
+  const [hello, lose] = pick(voices, `${at}:line`);
+  return { hello: agree(hello, isFemale(key)), lose: agree(lose, isFemale(key)) };
 }
+
+/** A route trainer's name, from lists shuffled once per climb so names rarely repeat; two names for a pair. */
+function nameFor(key: string, seed: string, floor: number, room: RoomKind | null): string {
+  if (NAMED_CLASSES[key]) return NAMED_CLASSES[key];
+  const slot = floor * WAY_ORDER.length + Math.max(0, WAY_ORDER.indexOf(room ?? 'trainer'));
+  const nameAt = (gender: 'm' | 'f', offset: number) => {
+    const list = shuffled([...NAMES[gender]], rng(`${seed}:names:${gender}`));
+    return list[(slot * 2 + offset) % list.length];
+  };
+  const pair = PAIR_CLASSES[key];
+  if (pair) return `${nameAt(pair[0] as 'm' | 'f', 0)} y ${nameAt(pair[1] as 'm' | 'f', 1)}`;
+  return nameAt(isFemale(key) ? 'f' : 'm', 0);
+}
+
+const nightOf = (scene: string): string => {
+  const base = scene.replace(/-(2|night)$/, '');
+  return NIGHT_SCENES.includes(base) ? `${base}-night` : scene;
+};
 
 function sceneFor(type: string | null, seed: string, fallback: string): string {
   const scenes = type ? TYPE_SCENES[type] : null;
@@ -187,14 +232,21 @@ function classAt(seed: string, rolls: Rolls, floor: number, room: RoomKind | nul
 
 const routeScene = (floor: number): string => ROUTE_SCENES[Math.floor((floor - 1) / GYM_EVERY) % ROUTE_SCENES.length];
 
-function themedTrainer(key: string, cls: (typeof typedClasses)[number][1], at: string) {
+function themedTrainer(key: string, cls: (typeof typedClasses)[number][1], at: string, seed: string, floor: number, room: RoomKind | null) {
   const species = cls.goal.kind === 'species' ? speciesOf(cls.goal.names) : [];
   const types = cls.goal.kind === 'type' ? [cls.goal.type] : typesOfSpecies(species);
-  return { foe: { key: variantOf(key, at), base: key, name: pick(NAMES[isFemale(key) ? 'f' : 'm'], `${at}:name`), title: cls.title }, species, types };
+  const name = nameFor(key, seed, floor, room);
+  const title = cls.title === name ? (isFemale(key) ? 'Entrenadora' : 'Entrenador') : cls.title;
+  return { foe: { key: variantOf(key, at), base: key, name, title }, species, types };
 }
 
 /** Route trainers and ways come from the floor's roll; the order of bosses is fixed for the climb so none repeats. */
-export function floorAt(floor: number, length: number | null, difficulty: AiLevel, seed: string, room: RoomKind | null = null, rolls: Rolls = {}): Floor {
+export function floorAt(floor: number, length: number | null, difficulty: AiLevel, seed: string, room: RoomKind | null = null, rolls: Rolls = {}, twist: TwistKey | null = null): Floor {
+  const drawn = drawFloor(floor, length, difficulty, seed, room, rolls);
+  return twist === 'night' ? { ...drawn, scene: nightOf(drawn.scene) } : drawn;
+}
+
+function drawFloor(floor: number, length: number | null, difficulty: AiLevel, seed: string, room: RoomKind | null, rolls: Rolls): Floor {
   const kind = floorKind(floor, length);
   const chosen: RoomKind | null = kind === 'trainer' ? (room ?? 'trainer') : null;
   const at = `${drawOf(seed, rolls, floor)}:${floor}${chosen && chosen !== 'trainer' ? `:${chosen}` : ''}`;
@@ -214,16 +266,16 @@ export function floorAt(floor: number, length: number | null, difficulty: AiLeve
       const key = pick(floor >= LATE_FLOOR ? [...VILLAINS.admin, ...VILLAINS.boss] : VILLAINS.admin, `${at}:villain`);
       const ace = signatureOf(key);
       const types = ace ? [...(speciesData(ace)?.types ?? [])] : ['dark'];
-      return { ...base, foe: { key: variantOf(key, at), base: key, name: displayName(key), title: VILLAINS.boss.includes(key) ? 'Jefe' : 'Comandante' }, type: types[0] ?? null, types, species: [], signature: ace, scene: pick(['path-night', 'cave-night', 'beach-night'], at), music: MUSIC.hideout, lines: linesFor(key, 'dark') };
+      return { ...base, foe: { key: variantOf(key, at), base: key, name: displayName(key), title: VILLAINS.boss.includes(key) ? (isFemale(key) ? 'Jefa' : 'Jefe') : 'Comandante' }, type: types[0] ?? null, types, species: [], signature: ace, scene: pick(['path-night', 'cave-night', 'beach-night'], at), music: MUSIC.hideout, lines: linesFor(key, 'dark', at) };
     }
     const [key, cls] = pick(villainClasses, `${at}:grunt`);
-    const { foe, species, types } = themedTrainer(key, cls, at);
-    return { ...base, foe, type: null, types, species, signature: null, scene: pick(['path-night', 'cave-night'], at), music: MUSIC.hideout, lines: linesFor(key, 'dark') };
+    const { foe, species, types } = themedTrainer(key, cls, at, seed, floor, chosen);
+    return { ...base, foe, type: null, types, species, signature: null, scene: pick(['path-night', 'cave-night'], at), music: MUSIC.hideout, lines: linesFor(key, 'dark', at) };
   }
   if (kind === 'trainer') {
     const [key, cls] = classAt(seed, rolls, floor, chosen, base.level);
-    const { foe, species, types } = themedTrainer(key, cls, at);
-    return { ...base, foe, type: null, types, species, signature: null, scene: sceneFor(types[0] ?? null, at, routeScene(floor)), music: floor >= LATE_FLOOR ? MUSIC.lateRoute : MUSIC.route, lines: linesFor(key, types[0] ?? null) };
+    const { foe, species, types } = themedTrainer(key, cls, at, seed, floor, chosen);
+    return { ...base, foe, type: null, types, species, signature: null, scene: sceneFor(types[0] ?? null, at, routeScene(floor)), music: floor >= LATE_FLOOR ? MUSIC.lateRoute : MUSIC.route, lines: linesFor(key, types[0] ?? null, at, chosen) };
   }
   const block = Math.floor((floor - 1) / LEAGUE_BLOCK);
   let key: string;
@@ -245,7 +297,7 @@ export function floorAt(floor: number, length: number | null, difficulty: AiLeve
     signature: signatureOf(key),
     scene: kind === 'champion' ? pick(['snow-night', 'cave-2', 'mountain-night'], at) : sceneFor(type, at, 'path'),
     music: MUSIC[kind][regionOf(key)],
-    lines: linesFor(key, type),
+    lines: linesFor(key, type, at),
   };
 }
 

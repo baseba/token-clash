@@ -2,8 +2,8 @@ import { creatureHTML, loadSprites, preloadSprites, spritesLoaded, spriteURL } f
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor, sceneNamed } from './backgrounds.js?v=dev';
 import { overworldSprite } from './overworld.js?v=dev';
-import { PARTY_LIMIT, PROFESSOR, PROFESSOR_LINES, RECRUIT_LINE, ROOMS, sceneMusic, TOWER_LENGTHS } from './tower-cast.js?v=dev';
-import { exitRows, ROWS as MAP_ROWS, towerMap } from './tower-map.js?v=dev';
+import { PARTY_LIMIT, PROFESSOR, PROFESSOR_LINES, RECRUIT_LINE, ROOMS, sceneMusic, STOP_PEOPLE, TOWER_LENGTHS, TWISTS } from './tower-cast.js?v=dev';
+import { exitRows, preloadTiles, towerMap } from './tower-map.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
 import { createFx, moveShape } from './fx.js?v=dev';
 import { ballFxBare, ballFxNote, ballSounds } from './ball-fx.js?v=dev';
@@ -2423,11 +2423,11 @@ const TIER_LABEL = { common: 'Común', rare: 'Rara', epic: 'Épica' };
 const VITAMINS = { hp: 'hp_up', atk: 'protein', def: 'iron', satk: 'calcium', sdef: 'zinc', spd: 'carbos' };
 const ATTACK_STAT = { physical: ['atk', 'Ataque'], special: ['satk', 'At. Esp.'] };
 const lengthLabel = (length) => (length ? `${length} pisos` : 'Infinita');
-const itemURL = (name) => upstreamURLs(UPSTREAM.pokerogue, `images/items/${name}.png`)[0];
+const itemURL = (name) => (name.startsWith('pokeapi:') ? upstreamURLs(UPSTREAM.sprites, `sprites/items/${name.slice(8)}.png`)[0] : upstreamURLs(UPSTREAM.pokerogue, `images/items/${name}.png`)[0]);
 const itemImg = (name) => h('img', { class: 'tw-item', src: itemURL(name), alt: '', draggable: 'false' });
 const REWARD_INFO = {
   candy: { name: (r) => `Caramelo Raro ×${r.levels}`, icon: () => 'rare_candy', text: (r) => `Sube ${r.levels} niveles, sin pasar el tope del piso. Puede evolucionar y aprender movimientos.` },
-  expCandy: { name: () => 'Caramelo Exp.', icon: () => 'rarer_candy', text: () => 'Sube 1 nivel a quien esté bajo el tope del piso.' },
+  expCandy: { name: (r) => (r.levels > 1 ? `Caramelo Exp. ×${r.levels}` : 'Caramelo Exp.'), icon: () => 'rarer_candy', text: (r) => `Sube ${r.levels > 1 ? `${r.levels} niveles` : '1 nivel'} a quien esté bajo el tope del piso.` },
   vitamin: { name: (r) => `Vitamina · ${STAT_NAME[r.stat] ?? r.stat}`, icon: (r) => VITAMINS[r.stat] ?? 'protein', text: (r) => `Suma 32 EVs de ${STAT_NAME[r.stat] ?? r.stat} (máximo 252 por stat y 510 en total). Cada 4 EVs es +1 en el stat.` },
   tm: { name: (r) => `MT · ${r.moveInfo.name}`, icon: (r) => `tm_${r.moveInfo.type ?? 'normal'}`, text: () => 'Queda en su lista de movimientos; lo equipas cuando quieras.' },
   tutor: { name: (r) => `Tutor · ${r.moveInfo.name}`, icon: () => 'elixir', text: () => 'Un movimiento de tutor o de huevo. Queda en su lista; lo equipas cuando quieras.' },
@@ -2435,6 +2435,8 @@ const REWARD_INFO = {
   capsule: { name: () => 'Cápsula Habilidad', icon: () => 'ability_capsule', text: () => 'Desbloquea otra habilidad normal de su especie. Luego las alternas entre pisos.' },
   patch: { name: () => 'Parche Habilidad', icon: () => 'ability_charm', text: () => 'Desbloquea la habilidad oculta de su especie.' },
   stone: { name: () => 'Piedra Evolutiva', icon: () => 'dawn_stone', text: () => 'Evoluciona ya a quien evoluciona por piedra, intercambio o amistad, si está a 6 niveles o menos de su nivel justo.' },
+  bottleCap: { name: (r) => `Chapa · ${STAT_NAME[r.stat] ?? r.stat}`, icon: () => 'pokeapi:bottle-cap', text: (r) => `Lleva al máximo (31) el IV de ${STAT_NAME[r.stat] ?? r.stat}, como el entrenamiento extremo de los juegos.` },
+  goldCap: { name: () => 'Chapa Dorada', icon: () => 'pokeapi:gold-bottle-cap', text: () => 'Lleva al máximo (31) sus seis IVs.' },
   egg: { name: () => 'Huevo Suerte', icon: () => 'lucky_egg', text: () => 'Trae a un Pokémon más de tu colección para reclutar.' },
 };
 
@@ -2505,6 +2507,7 @@ const battleMusicFor = (c) => (c.staging ? `track:${c.staging.music}` : `scene:$
 let towerData = null;
 async function towerPage(seq) {
   document.title = 'Torre · Token Clash';
+  preloadTiles();
   await loadMe();
   if (stale(seq)) return;
   renderWho();
@@ -2667,9 +2670,27 @@ function floorPill(run, { button = true } = {}) {
   return h('button', { type: 'button', class: 'tw-floor-pill', onclick: () => towerDialog('La torre', towerFloors(run), h('p', { class: 'nb-note' }, `Tu tope de nivel en este piso: ${run.cap}. Superados: ${run.cleared}.`)) }, glyph('flag'), text);
 }
 
+/** This climb's rumour: what plays differently. */
+function twistChip(run) {
+  const twist = TWISTS[run.twist];
+  if (!twist) return null;
+  return h('button', { type: 'button', class: 'chip tw-twist', 'aria-label': `Rumor: ${twist.name}`, onclick: () => towerDialog(twist.name, h('p', null, twist.text), h('p', { class: 'nb-note' }, 'Cada subida trae un rumor distinto. Lo dijo el Profesor al empezar.')) }, glyph(twist.icon), h('span', { class: 'tw-twist-name' }, ` ${twist.name}`));
+}
+
+/** A line said to the player, agreeing with how their trainer looks ("cansado" or "cansada"). */
+const toPlayer = (text) => text.replaceAll('{o}', /(^|_)f(_|$)/.test(playerOverworld()) ? 'a' : 'o');
+const lineFor = (lines, seed) => lines[[...String(seed)].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7) % lines.length];
+
+/** Who waits at a floor with no battle (a rest stop, a den, a dark deal) and what they say. */
+function stopTalk(run) {
+  const person = STOP_PEOPLE[run.lastResult?.room];
+  if (!person || run.lastResult?.floor !== run.floor - 1) return null;
+  return sayBox(person.speaker, toPlayer(lineFor(person.lines, `${run.id}:${run.floor}`)));
+}
+
 function towerTop(run) {
   const menu = h('details', { class: 'tw-menu' }, h('summary', { 'aria-label': 'Opciones' }, glyph('menu')), h('div', { class: 'tw-menu-list' }, h('button', { class: 'btn ghost sm', onclick: towerAbandon }, glyph('flag'), ' Abandonar')));
-  return h('div', { class: 'tw-top' }, floorPill(run), h('span', { class: 'chip' }, AI_LABEL[run.difficulty]), h('span', { class: 'chip', 'data-tip': 'Tus puntos en esta subida' }, glyph('trophy'), ` ${pointsText(run.points ?? 0)}`), menu);
+  return h('div', { class: 'tw-top' }, floorPill(run), twistChip(run), h('span', { class: 'chip' }, AI_LABEL[run.difficulty]), h('span', { class: 'chip', 'data-tip': 'Tus puntos en esta subida' }, glyph('trophy'), ` ${pointsText(run.points ?? 0)}`), menu);
 }
 
 // ----- the setup, the end and the records -----
@@ -2715,7 +2736,18 @@ function towerLab(run) {
   const picked = [];
   const cells = h('div', { class: 'party-row' });
   const chosen = h('div', { class: 'tw-chosen' });
-  const goBtn = h('button', { class: 'btn primary', onclick: (e) => towerCall(e.currentTarget, '/api/tower/draft', { body: { offers: picked } }) });
+  const goBtn = h('button', { class: 'btn primary', onclick: async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    if (!reducedMotion()) {
+      talk.replaceWith(sayBox(PROFESSOR.name, PROFESSOR_LINES.picked));
+      page.classList.remove('picking');
+      await wait(1100);
+      await cast.leave();
+    }
+    towerEntrance = 'walk';
+    if (!(await towerCall(btn, '/api/tower/draft', { body: { offers: picked } }))) towerEntrance = null;
+  } });
   const offerOf = (id) => run.offers.find((offer) => offer.id === id);
   const toggle = (offer) => {
     const at = picked.indexOf(offer.id);
@@ -2746,8 +2778,10 @@ function towerLab(run) {
     goBtn.replaceChildren(picked.length === run.starters ? '¡Vamos!' : `Elige ${run.starters - picked.length} más`);
   }
   paint();
-  const cast = towerMap({ scene: 'lab', seed: run.id, hero: playerOverworld(), foe: PROFESSOR.key, label: 'Laboratorio del Profesor Rowan' });
-  const talk = sayBox(PROFESSOR.name, PROFESSOR_LINES.hello);
+  const cast = towerMap({ scene: 'lab', seed: run.id, hero: playerOverworld(), foe: PROFESSOR.key, label: 'Laboratorio del Profesor Rowan', place: { name: 'Laboratorio', detail: PROFESSOR.name }, entrance: takeEntrance() ?? 'walk' });
+  towerCast = cast;
+  const twist = TWISTS[run.twist];
+  const talk = sayBox(PROFESSOR.name, twist ? `${PROFESSOR_LINES.hello} ${PROFESSOR_LINES.twist} «${twist.name}». ${twist.text}` : PROFESSOR_LINES.hello);
   const hint = h('p', { class: 'tw-tap-hint' }, 'Toca para seguir');
   const pick = h('div', { class: 'card tw-main tw-pick', hidden: true },
     h('div', { class: 'tw-panel-head' }, h('h2', null, `Elige ${run.starters}`), h('button', { class: 'btn ghost sm', onclick: towerAbandon }, 'Cancelar')),
@@ -2765,8 +2799,8 @@ function towerLab(run) {
   talk.addEventListener('click', () => talk.done.then(toPick));
   hint.addEventListener('click', toPick);
   if (isDesk()) toPick();
-  $app.replaceChildren(page);
-  if (!reducedMotion()) cast.approach();
+  towerSwap(page);
+  if (!reducedMotion()) cast.arrive().then(() => cast.approach());
 }
 
 // ----- after a win: experience, levels, moves, evolutions -----
@@ -2894,6 +2928,7 @@ function towerResults(run) {
     }
   }
   let at = 0;
+  const cast = floorStage(run, takeEntrance());
   const finish = () => {
     sessionFlag.set(resultKey(run));
     renderTower(towerData);
@@ -2904,9 +2939,9 @@ function towerResults(run) {
       if (!view) { at += 1; continue; }
       const interactive = view.querySelector('.tw-learn');
       const hint = interactive ? null : h('p', { class: 'tw-tap-hint' }, 'Toca para seguir');
-      const page = h('section', { class: 'tw-narrow tw-steps' }, view, hint);
+      const page = h('section', { class: 'tw-narrow tw-steps' }, cast.el, view, hint);
       if (!interactive) page.addEventListener('click', (e) => { if (e.target.closest('button')) return; at += 1; show(); });
-      $app.replaceChildren(page);
+      towerSwap(page);
       return;
     }
     finish();
@@ -2978,7 +3013,7 @@ function rewardSummary(run, reward) {
     return `${CATEGORY[move.category]} · ${typeLabel(move.type)}${move.power ? ` · Poder ${move.power}` : ''} · ${move.accuracy ? `${move.accuracy} %` : 'siempre acierta'}. Para ${joinNames(names)}`;
   }
   if (reward.kind === 'vitamin') return `+${Math.min(32, ...fits.map((mon) => 252 - (mon.evs?.[reward.stat] ?? 0)))} EVs de ${STAT_NAME[reward.stat]} para ${joinNames(names)}`;
-  if (['candy', 'expCandy', 'vitamin', 'stone'].includes(reward.kind)) return joinNames(fits.map((mon) => `${mon.name} ${reward.reasons?.[mon.uid] ?? ''}`.trim()));
+  if (['candy', 'expCandy', 'vitamin', 'stone', 'bottleCap', 'goldCap'].includes(reward.kind)) return joinNames(fits.map((mon) => `${mon.name} ${reward.reasons?.[mon.uid] ?? ''}`.trim()));
   if (reward.kind === 'capsule' || reward.kind === 'patch') return `Para ${joinNames(names)}`;
   return REWARD_INFO[reward.kind].text(reward);
 }
@@ -3027,7 +3062,7 @@ function rewardDetail(run, reward) {
     const res = await towerCall(btn, '/api/tower/reward', { body: { reward: reward.id, ...choice } });
     if (res) dlg.close();
   };
-  const verb = { tm: 'Enseñársela a', tutor: 'Enseñársela a', candy: 'Dárselo a', expCandy: 'Dárselo a', vitamin: 'Dársela a', stone: 'Evolucionar a', capsule: 'Usarla en', patch: 'Usarlo en', mint: 'Usarla en' }[reward.kind];
+  const verb = { tm: 'Enseñársela a', tutor: 'Enseñársela a', candy: 'Dárselo a', expCandy: 'Dárselo a', vitamin: 'Dársela a', stone: 'Evolucionar a', capsule: 'Usarla en', patch: 'Usarlo en', mint: 'Usarla en', bottleCap: 'Usarla en', goldCap: 'Usarla en' }[reward.kind];
   const effect = (mon) => {
     if (reward.kind === 'mint') return body.replaceChildren(h('h3', null, `Menta para ${mon.name}`), ...mintStep(run, reward, mon, send));
     if (reward.kind === 'capsule' || reward.kind === 'patch') return body.replaceChildren(h('h3', null, `Habilidad para ${mon.name}`), ...abilityStep(reward, mon, send));
@@ -3074,7 +3109,7 @@ function recruitPanel(run) {
       h('div', { class: 'party-row' }, run.party.map((mon) => partyCell(mon, { onclick: async () => { if (await join(offer, null, mon.uid)) dlg.close(); } }))));
   };
   return h('div', { class: 'tw-recruit' },
-    sayBox(guide.title, guide.line || RECRUIT_LINE, { mini: guide.key !== 'den' ? guide.key : null }),
+    guide.key === 'den' ? sayBox(STOP_PEOPLE.den.speaker, toPlayer(lineFor(STOP_PEOPLE.den.lines, `${run.id}:${run.floor}`))) : sayBox(guide.title, guide.line || RECRUIT_LINE, { mini: guide.key }),
     h('div', { class: 'party-row' }, run.offers.map((offer) => partyCell(offer.mon, { onclick: () => choose(offer), label: `Ver la ficha de ${offer.mon.name}` }))),
     h('button', { class: 'btn block', onclick: () => { sessionFlag.set(`tw-recruit-skip:${run.id}:${run.floor}`); renderTower(towerData); } }, 'Ahora no'));
 }
@@ -3083,6 +3118,7 @@ function restPanel(run) {
   const recruit = recruitPanel(run);
   if (run.picks > 0 && run.rewards.length) {
     return h('div', { class: 'tw-panel' },
+      stopTalk(run),
       h('div', { class: 'tw-panel-head' }, h('h2', null, run.picks > 1 ? `Elige ${run.picks} premios` : 'Elige un premio'),
         run.rerolls ? h('button', { type: 'button', class: 'chip tw-reroll', onclick: (e) => towerCall(e.currentTarget, '/api/tower/reroll') }, glyph('dice'), ` Sortear · ${run.rerolls}`) : null),
       run.rewards.map((reward) => rewardRow(run, reward, { onclick: () => rewardDetail(run, reward) })));
@@ -3098,7 +3134,9 @@ let towerCast = null;
 async function takeRoom(run, room, body) {
   document.querySelectorAll('.tw-room, .tw-sign').forEach((button) => { button.disabled = true; });
   if (!reducedMotion()) await towerCast?.takeExit(run.rooms.findIndex((option) => option.kind === room.kind));
+  towerEntrance = 'walk';
   const res = await towerCall(null, '/api/tower/room', { body });
+  if (!res) towerEntrance = null;
   if (!res) document.querySelectorAll('.tw-room, .tw-sign').forEach((button) => { button.disabled = false; });
   return res;
 }
@@ -3152,50 +3190,97 @@ function nextBattlePanel(run, cta) {
     cta);
 }
 
-function towerClimb(run) {
+/** How you got to the screen being drawn: walking from the floor before, back from a battle, or none (a reload). */
+let towerEntrance = null;
+const takeEntrance = () => {
+  const entrance = towerEntrance;
+  towerEntrance = null;
+  return entrance;
+};
+
+/** Puts a Tower screen on the page. Between two Tower screens the map stays and the rest slides, like one game. */
+function towerSwap(page) {
+  const apply = () => $app.replaceChildren(page);
+  if (document.startViewTransition && !reducedMotion() && $app.querySelector('.tw-map')) document.startViewTransition(apply);
+  else apply();
+}
+
+/** The map of where the climb stands: the fork of a floor, its rival waiting, or the rest after it. */
+function floorStage(run, entrance) {
   const floor = run.current;
   const choosing = run.status === 'climbing' && run.rooms.length > 0;
   const resting = run.status === 'resting';
   const lastStep = run.trail.find((step) => step.number === run.floor - 1);
+  const stage = choosing ? 'fork' : resting ? 'rest' : 'arrive';
+  const number = resting ? run.floor - 1 : run.floor;
+  const id = `${run.id}:${number}:${stage}:${run.rooms.length}`;
+  if (towerCast?.id === id && !entrance) return towerCast;
+  const foe = choosing ? null : resting ? lastStep?.foe ?? null : floor.foe;
+  const kind = floor.room && floor.room !== 'trainer' ? ROOMS[floor.room].label : FLOOR_KIND[floor.kind].label;
   const cast = towerMap({
     scene: resting ? (lastStep?.scene ?? floor.scene) : floor.scene,
-    seed: `${run.id}:${resting ? run.floor - 1 : run.floor}`,
+    seed: `${run.id}:${number}`,
     hero: playerOverworld(),
-    foe: choosing ? null : resting ? lastStep?.foe?.key ?? null : floor.foe?.key ?? null,
-    boss: !choosing && !resting && floor.kind !== 'trainer',
-    type: floor.type,
-    stage: choosing ? 'fork' : resting ? 'rest' : 'arrive',
+    foe: foe?.key ?? null,
+    boss: stage === 'arrive' && floor.kind !== 'trainer',
+    stage,
     forks: run.rooms.length,
-    label: choosing ? 'El camino se divide' : floor.foe ? `${floor.foe.title} ${floor.foe.name} te espera` : 'Descanso',
+    label: choosing ? 'El camino se divide' : foe ? `${foe.title} ${foe.name}` : 'Descanso',
+    place: resting ? { name: 'Descanso', detail: `Piso ${number} superado` } : { name: `Piso ${number}`, detail: choosing ? 'El camino se divide' : kind },
     compact: resting,
+    entrance,
   });
+  cast.id = id;
+  if (choosing) cast.el.append(...exitRows(run.rooms.length).map((row, i) => h('button', { type: 'button', class: `tw-sign room-${run.rooms[i].kind}`, style: { '--y': String(row) }, 'data-tip': run.rooms[i].label, 'aria-label': run.rooms[i].label, onclick: () => chooseRoom(run, run.rooms[i]) }, glyph(run.rooms[i].icon))));
   towerCast = cast;
-  if (choosing) cast.el.append(...exitRows(run.rooms.length).map((row, i) => h('button', { type: 'button', class: `tw-sign room-${run.rooms[i].kind}`, style: { '--y': String(Math.min(MAP_ROWS - 2, row + 1)) }, 'data-tip': run.rooms[i].label, 'aria-label': run.rooms[i].label, onclick: () => chooseRoom(run, run.rooms[i]) }, glyph(run.rooms[i].icon))));
+  cast.arrive();
+  return cast;
+}
+
+/** You walk off the floor and up to the next one. */
+async function moveOn(btn) {
+  btn.disabled = true;
+  if (!reducedMotion()) await towerCast?.leave();
+  towerEntrance = 'walk';
+  if (!(await towerCall(btn, '/api/tower/move-on'))) towerEntrance = null;
+}
+
+/** You walk up to the rival, it speaks, a boss shows itself, and the screen closes into the battle. */
+async function startFight(run, cast, say, cta) {
+  const floor = run.current;
+  cta.disabled = true;
+  if (!run.challengeId && !reducedMotion()) {
+    await cast.approach();
+    const talk = sayBox(`${floor.foe.title} ${floor.foe.name}`, floor.lines.hello, { mini: floor.foe.key });
+    say.replaceChildren(talk);
+    say.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    await Promise.race([talk.done.then(() => wait(900)), wait(2000 + floor.lines.hello.length * 26)]);
+    if (floor.kind !== 'trainer') await cast.showdown(trainerImg(floor.foe.key, 'tw-vs-pic'), `${floor.foe.title} ${floor.foe.name}`);
+    await cast.closeIn();
+  }
+  const res = await towerCall(cta, '/api/tower/fight', { render: false });
+  if (!res) return;
+  towerEntrance = 'battle';
+  nav(`/b/${res.challengeId}`);
+}
+
+function towerClimb(run) {
+  const choosing = run.status === 'climbing' && run.rooms.length > 0;
+  const resting = run.status === 'resting';
+  const cast = floorStage(run, takeEntrance());
   const say = h('div', { class: 'tw-say-slot' });
   let main;
   if (choosing) main = h('div', { class: 'tw-panel' }, h('h2', null, 'El camino se divide'), h('p', { class: 'nb-note' }, 'Cada camino trae un rival o un premio distinto. Lo que no tomes no vuelve.'), run.rooms.map((room) => roomRow(run, room)));
   else if (resting) {
     const waiting = run.picks > 0 && run.rewards.length;
     main = h('div', { class: 'tw-panel' }, restPanel(run),
-      h('button', { class: `btn ${waiting ? 'ghost' : 'primary'} block tw-cta`, onclick: (e) => towerCall(e.currentTarget, '/api/tower/move-on') }, glyph('arrow'), waiting ? ' Subir sin premio' : ` Subir al piso ${run.floor}`));
+      h('button', { class: `btn ${waiting ? 'ghost' : 'primary'} block tw-cta`, onclick: (e) => moveOn(e.currentTarget) }, glyph('arrow'), waiting ? ' Subir sin premio' : ` Subir al piso ${run.floor}`));
   } else {
     const cta = h('button', { class: 'btn primary block tw-cta' }, glyph('swords'), run.challengeId ? ' Volver a la pelea' : ' ¡A pelear!');
-    cta.onclick = async () => {
-      cta.disabled = true;
-      if (!run.challengeId && !reducedMotion()) {
-        await cast.approach();
-        const talk = sayBox(`${floor.foe.title} ${floor.foe.name}`, floor.lines.hello, { mini: floor.foe.key });
-        say.replaceChildren(talk);
-        say.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        await Promise.race([talk.done.then(() => wait(900)), wait(2000 + floor.lines.hello.length * 26)]);
-        await cast.closeIn();
-      }
-      const res = await towerCall(cta, '/api/tower/fight', { render: false });
-      if (res) nav(`/b/${res.challengeId}`);
-    };
+    cta.onclick = () => startFight(run, cast, say, cta);
     main = nextBattlePanel(run, cta);
   }
-  $app.replaceChildren(h('section', { class: 'tw-page' },
+  towerSwap(h('section', { class: 'tw-page' },
     towerTop(run),
     cast.el,
     say,

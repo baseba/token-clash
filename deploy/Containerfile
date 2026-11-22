@@ -15,7 +15,7 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && rm -rf /root/.npm
 # The battle animations are converted, the trainers cropped and recolored, and the trainers' overworld
-# sprites normalized and recolored, at build time (the server has no egress). Sprites, cries, sounds
+# sprites normalized and recolored, and the Tower's map tiles rendered, at build time (the server has no egress). Sprites, cries, sounds
 # and music load from jsDelivr in the browser.
 COPY scripts/sync-battle-anims.js scripts/upstream-files.js ./scripts/
 COPY public/music.js public/battle-anims.js public/radio.js public/shop.js public/trainer-sprites.js public/trainer-variants.js public/upstream.js ./public/
@@ -29,6 +29,8 @@ COPY drizzle ./drizzle
 COPY public ./public
 COPY scripts/sync-overworlds.js scripts/overworld-recolor.mjs scripts/overworld-compose.mjs scripts/overworld-sources.json scripts/plan-trainer-variants.mjs scripts/sprite-ramps.mjs scripts/shipped-recolors.json ./scripts/
 RUN node scripts/sync-overworlds.js
+COPY scripts/sync-tilesets.js ./scripts/
+RUN node scripts/sync-tilesets.js
 COPY --from=build /app/dist/src ./dist/src
 COPY --from=build /app/dist/public ./dist/public
 RUN mkdir -p /data && chown node:node /data

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { moveOrigins, rng, speciesIdByName } from '../../catalog/domain/creatures.js';
-import { REWARD_TIERS, REWARDS_PER_REST, restRewards, stoneEvolution, TIER_ORDER, vitaminRoom, type RestContext } from './rewards.js';
+import { MAX_IV, REWARD_TIERS, REWARDS_PER_REST, restRewards, stoneEvolution, TIER_ORDER, TWIST_REWARDS, vitaminRoom, type RestContext } from './rewards.js';
 
 const NO_EVS = { hp: 0, atk: 0, def: 0, satk: 0, sdef: 0, spd: 0 };
 const target = (uid: string, name: string, known: string[] = [], level = 10, final = name) => ({
@@ -12,6 +12,7 @@ const target = (uid: string, name: string, known: string[] = [], level = 10, fin
   known,
   abilities: [],
   evs: { ...NO_EVS },
+  ivs: { hp: 31, atk: 10, def: 31, satk: 31, sdef: 31, spd: 31 },
 });
 const plain: RestContext = { floor: 3, boss: false, cap: 20, minTier: 'common', recruitable: true };
 
@@ -82,4 +83,23 @@ test('a stone evolves a Pokémon whose next form has no level, once it is near i
   assert.equal(stoneEvolution({ speciesId: speciesIdByName('Kadabra') as number, finalId: speciesIdByName('Alakazam') as number, level: 34 }), speciesIdByName('Alakazam'));
   assert.equal(stoneEvolution({ speciesId: speciesIdByName('Kadabra') as number, finalId: speciesIdByName('Alakazam') as number, level: 12 }), null);
   assert.equal(stoneEvolution({ speciesId: speciesIdByName('Charmander') as number, finalId: speciesIdByName('Charizard') as number, level: 30 }), null, 'a level evolution comes by leveling');
+});
+
+test('a Bottle Cap only fits whoever has that IV below 31, and a Gold one whoever has any', () => {
+  const perfect = { ...target('p', 'Squirtle'), ivs: { hp: MAX_IV, atk: MAX_IV, def: MAX_IV, satk: MAX_IV, sdef: MAX_IV, spd: MAX_IV } };
+  const party = [target('a', 'Charmander'), perfect];
+  for (let seed = 0; seed < 60; seed++)
+    for (const reward of restRewards(party, { ...plain, ...TWIST_REWARDS.caps, minTier: 'rare' }, rng(seed))) {
+      if (reward.kind === 'goldCap') assert.deepEqual(reward.fits, ['a']);
+      if (reward.kind === 'bottleCap') assert.deepEqual(reward.fits, reward.stat === 'atk' ? ['a'] : []);
+    }
+});
+
+test('rumours change the rewards: more of the favoured kinds, one more offer, sweeter candies', () => {
+  const party = [target('a', 'Charmander'), target('b', 'Squirtle')];
+  const count = (context: RestContext, kinds: string[]) => Array.from({ length: 80 }, (_, seed) => restRewards(party, context, rng(seed)).filter((reward) => kinds.includes(reward.kind)).length).reduce((a, b) => a + b, 0);
+  assert.ok(count({ ...plain, ...TWIST_REWARDS.tutors }, ['tm', 'tutor']) > count(plain, ['tm', 'tutor']));
+  assert.equal(restRewards(party, { ...plain, ...TWIST_REWARDS.market }, rng(1)).length, REWARDS_PER_REST + 1);
+  const candy = Array.from({ length: 40 }, (_, seed) => restRewards(party, { ...plain, ...TWIST_REWARDS.sweet }, rng(seed))).flat().find((reward) => reward.kind === 'candy');
+  assert.equal(candy?.levels, 3);
 });

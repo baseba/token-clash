@@ -2,14 +2,16 @@
 // rarities, each telling every Pokémon of the party whether it fits and why. Machines and tutors teach
 // a move, vitamins add EVs, a Mint changes the nature, a Capsule or a Patch unlocks an ability, Rare and
 // Exp. Candies give levels up to the floor's cap, an evolution stone evolves now a Pokémon whose
-// evolution has no level, and a Lucky Egg brings a recruit of your collection.
+// evolution has no level, a Bottle Cap takes one IV to its best (31) and a Gold Bottle Cap all six, and
+// a Lucky Egg brings a recruit of your collection. A climb's rumour can favour some of them.
 import { abilityOptions, moveOrigins, NATURE_KEYS, shuffled, speciesData, type Random } from '../../catalog/domain/creatures.js';
 import type { Ivs } from '../../catalog/domain/roster-entry.js';
+import type { TwistKey } from '../../catalog/domain/tower-cast.js';
 import { moveData } from '../../combat/domain/moves.js';
 import { alwaysDamages } from '../../combat/domain/random-party.js';
 import { evolutionLevel, evolutionPath } from './growth.js';
 
-export const REWARD_KINDS = ['candy', 'expCandy', 'vitamin', 'tm', 'tutor', 'mint', 'capsule', 'patch', 'stone', 'egg'] as const;
+export const REWARD_KINDS = ['candy', 'expCandy', 'vitamin', 'tm', 'tutor', 'mint', 'capsule', 'bottleCap', 'patch', 'stone', 'goldCap', 'egg'] as const;
 export type RewardKind = (typeof REWARD_KINDS)[number];
 export type RewardTier = 'common' | 'rare' | 'epic';
 export type StatKey = keyof Ivs;
@@ -22,7 +24,9 @@ export const REWARD_TIERS: Record<RewardKind, RewardTier> = {
   tutor: 'rare',
   mint: 'rare',
   capsule: 'rare',
+  bottleCap: 'rare',
   patch: 'epic',
+  goldCap: 'epic',
   stone: 'epic',
   egg: 'epic',
 };
@@ -48,6 +52,7 @@ export interface RewardTarget {
   known: readonly string[];
   abilities: readonly string[];
   evs: Ivs;
+  ivs: Ivs;
 }
 
 export interface RestContext {
@@ -60,13 +65,29 @@ export interface RestContext {
   maxTier?: RewardTier;
   recruitable: boolean;
   count?: number;
+  /** Offers on top of the usual count. */
+  extra?: number;
+  /** Kinds that show up more often. */
+  favored?: readonly RewardKind[];
+  /** Levels a candy gives on top of the usual. */
+  candyBonus?: number;
 }
+
+/** How each rumour changes the rewards. */
+export const TWIST_REWARDS: Partial<Record<TwistKey, Partial<RestContext>>> = {
+  market: { extra: 1 },
+  tutors: { favored: ['tm', 'tutor'] },
+  sweet: { favored: ['candy', 'expCandy'], candyBonus: 1 },
+  caps: { favored: ['bottleCap', 'goldCap'] },
+};
+const FAVORED_CHANCE = 0.7;
 
 export const REWARDS_PER_REST = 3;
 export const VITAMIN_EVS = 32;
 export const MAX_STAT_EVS = 252;
 export const MAX_TOTAL_EVS = 510;
 export const STONE_REACH = 6;
+export const MAX_IV = 31;
 const CANDY_LEVELS = 2;
 const BOSS_CANDY_LEVELS = 3;
 const USEFUL_POWER = 60;
@@ -125,13 +146,24 @@ function makeReward(kind: RewardKind, party: readonly RewardTarget[], context: R
   const atCap = () => `Ya está en el tope (Nv ${cap})`;
   switch (kind) {
     case 'candy': {
-      const levels = boss ? BOSS_CANDY_LEVELS : CANDY_LEVELS;
+      const levels = (boss ? BOSS_CANDY_LEVELS : CANDY_LEVELS) + (context.candyBonus ?? 0);
       const judgement = judged(party, (target) => (target.level < cap ? `Nv ${target.level} → ${Math.min(cap, target.level + levels)}` : null), atCap);
       return judgement.fits.length ? { ...base, levels, ...judgement } : null;
     }
     case 'expCandy': {
-      const judgement = judged(party, (target) => (target.level < cap ? `Nv ${target.level} → ${target.level + 1}` : null), atCap);
-      return judgement.fits.length >= 2 ? { ...base, levels: 1, ...judgement } : null;
+      const levels = 1 + (context.candyBonus ?? 0);
+      const judgement = judged(party, (target) => (target.level < cap ? `Nv ${target.level} → ${Math.min(cap, target.level + levels)}` : null), atCap);
+      return judgement.fits.length >= 2 ? { ...base, levels, ...judgement } : null;
+    }
+    case 'bottleCap': {
+      const stat = STATS[Math.floor(random() * STATS.length)];
+      const judgement = judged(party, (target) => (target.ivs[stat] < MAX_IV ? `IV de ${STAT_NAMES[stat]}: ${target.ivs[stat]} → ${MAX_IV}` : null), () => `Su IV de ${STAT_NAMES[stat]} ya es ${MAX_IV}`);
+      return judgement.fits.length ? { ...base, id: `${base.id}:${stat}`, stat, ...judgement } : null;
+    }
+    case 'goldCap': {
+      const below = (target: RewardTarget) => STATS.filter((stat) => target.ivs[stat] < MAX_IV).length;
+      const judgement = judged(party, (target) => (below(target) ? `${below(target) === 1 ? '1 IV sube' : `${below(target)} IVs suben`} a ${MAX_IV}` : null), () => `Todos sus IVs ya son ${MAX_IV}`);
+      return judgement.fits.length ? { ...base, ...judgement } : null;
     }
     case 'vitamin': {
       const stat = STATS[Math.floor(random() * STATS.length)];
@@ -186,7 +218,8 @@ function makeReward(kind: RewardKind, party: readonly RewardTarget[], context: R
 
 /** Three offers by weighted rarity, at least one of `minTier` and none above `maxTier`. */
 export function restRewards(party: readonly RewardTarget[], context: RestContext, random: Random): Reward[] {
-  const count = context.count ?? REWARDS_PER_REST;
+  const count = (context.count ?? REWARDS_PER_REST) + (context.extra ?? 0);
+  const favored = context.favored ?? [];
   const maxIndex = TIER_ORDER.indexOf(context.maxTier ?? 'epic');
   const minIndex = Math.min(TIER_ORDER.indexOf(context.minTier), maxIndex);
   const rewards: Reward[] = [];
@@ -197,10 +230,13 @@ export function restRewards(party: readonly RewardTarget[], context: RestContext
     const tiers = TIER_ORDER.filter((_, i) => i <= maxIndex && (promised || !lastSlot || i >= minIndex));
     const open = tiers.filter((tier) => REWARD_KINDS.some((kind) => REWARD_TIERS[kind] === tier && !tried.has(kind)));
     if (!open.length) break;
-    let roll = random() * open.reduce((sum, tier) => sum + TIER_WEIGHTS[tier], 0);
-    const tier = open.find((option) => (roll -= TIER_WEIGHTS[option]) <= 0) ?? open[0];
+    const weight = (tier: RewardTier) => TIER_WEIGHTS[tier] * (favored.some((kind) => REWARD_TIERS[kind] === tier && !tried.has(kind)) ? 2 : 1);
+    let roll = random() * open.reduce((sum, tier) => sum + weight(tier), 0);
+    const tier = open.find((option) => (roll -= weight(option)) <= 0) ?? open[0];
     const kinds = REWARD_KINDS.filter((kind) => REWARD_TIERS[kind] === tier && !tried.has(kind));
-    const kind = kinds[Math.floor(random() * kinds.length)];
+    const liked = kinds.filter((kind) => favored.includes(kind));
+    const pool = liked.length && random() < FAVORED_CHANCE ? liked : kinds;
+    const kind = pool[Math.floor(random() * pool.length)];
     tried.add(kind);
     const reward = makeReward(kind, party, context, random);
     if (reward) rewards.push(reward);
