@@ -40,12 +40,21 @@ En vivo: **https://clash.mirrordev.xyz**
      entrenadores de ruta usan Pokémon de su tema. Ves cada piso como un mapa visto desde arriba, dibujado según el
      escenario de la pelea, con los sprites de mapa de los entrenadores; caminas hasta el rival, te ve y empieza la
      pelea en nuestros fondos. Los niveles siguen a Emerald Rogue: los rivales de ruta van bajo tu tope (la tranquila al nivel del jefe anterior,
-     la normal a medio camino, la difícil 2 bajo el tope) y los jefes pelean justo en él. Ganas experiencia (curva media-rápida y fórmula escalada de la 5.ª generación), subes
+     la normal a medio camino, la difícil 2 bajo el tope) y los jefes pelean justo en él; ningún rival pasa a tu
+     Pokémon más alto, y la ruta difícil y la guarida no pasan el promedio de tu equipo. El nivel que ves en cada
+     camino es el del equipo que trae. En la Torre se pelea con los IVs reales: los rivales tienen IVs cerca de los
+     de tu equipo y, si vienen entrenados, más o menos tus EVs; desde el piso 3 saben movimientos de MT, y desde el 10
+     de tutor y de huevo, más fuertes mientras más subes. Ganas experiencia (curva media-rápida y fórmula escalada de la 5.ª generación), subes
      de nivel sin pasar el tope del piso siguiente (más rápido mientras más lejos estás de él; los pisos sin pelea
      te entrenan a medio camino), evolucionas hacia la forma que criaste (las que evolucionan por
      piedra o intercambio lo hacen a un nivel justo según su poder) y aprendes movimientos. Entre pisos eliges premios
-     de tres rarezas, cada uno dice a quién le sirve y por qué (MT, tutor, vitaminas, Menta, Cápsula y Parche
-     Habilidad, Caramelos, Piedra Evolutiva y Huevo Suerte), puedes cambiarlos una vez, y cambias movimientos y
+     de tres rarezas, cada uno dice a quién le sirve y por qué. Son 30, en familias: movimientos (MT, MT Poderosa,
+     MT de Apoyo, tutor, movimiento huevo, Seta Memoria, Memorias y Gemas de otro tipo, Garra Rápida con prioridad,
+     Teralito de su tipo), EVs (vitaminas, Plumas para todo el equipo, Brazal Firme, Bolsa de Vitaminas), IVs
+     (Pesas, Chapa y Chapa Dorada), naturaleza (Menta y Menta Ideal), habilidad (Cápsula y Parche), niveles
+     (Caramelos, Repartir Exp. y Tarro de Caramelos), evolución (Piedra Evolutiva y Cordón Unión), reclutas (Huevo
+     Suerte y Huevo Dorado) y el Amuleto Iris, que lo vuelve shiny. Mientras más subes, más raros los premios, y desde el piso 25 hay uno más; tras un
+     jefe eliges dos. Puedes cambiarlos una vez, el juego te pregunta antes de subir si dejas algo sin elegir, y cambias movimientos y
      habilidades. Cada piso se sortea al llegar (sus caminos y rivales no se conocen antes). Cada piso ganado da puntos:
      el piso (ruta 100, gimnasio 300, Alto Mando 450, campeón 800) más el equipo rival (nivel × stats base), por el
      camino (difícil ×1,5, tranquila ×0,6) y la dificultad (de ×0,5 en Fácil a ×3 en Skynet). Si pierdes, la subida

@@ -10,7 +10,7 @@ import { Injectable } from '@nestjs/common';
 import { levelCap, type Floor } from '../domain/floors.js';
 import { evolutionLevel, evolutionPath, expForLevel } from '../domain/growth.js';
 import { natureOf, offerMoves, type Offer } from '../domain/lab.js';
-import { lockedAbilities, stoneEvolution, type Reward } from '../domain/rewards.js';
+import { cordEvolution, lockedAbilities, stoneEvolution, type Reward } from '../domain/rewards.js';
 import type { TowerRun } from '../domain/tower-run.js';
 import type { TowerRecord } from './tower.service.js';
 
@@ -39,6 +39,11 @@ const speciesName = (id: number): string => speciesData(id)?.name ?? `#${id}`;
 const moveInfo = (id: string) => {
   const move = moveData(id);
   return move ? { ...move, key: id } : { key: id, name: id, type: null, power: 0, category: 'status', desc: '' };
+};
+/** The lowest and highest level of a rival's team, as it will fight. */
+const levelRange = (team: readonly RosterEntry[]): { min: number; max: number } => {
+  const levels = team.map((mon) => mon.battleLevel ?? mon.level);
+  return { min: Math.min(...levels), max: Math.max(...levels) };
 };
 const NATURES = NATURE_KEYS.map((key) => natureInfo(key));
 
@@ -70,7 +75,7 @@ export class TowerViews {
       cap: levelCap(run.floor),
       picks: run.picks,
       rerolls: run.rerolls,
-      rooms: run.roomFloors().map((option) => this.room(option)),
+      rooms: run.roomFloors().map((option) => this.room(option, option.foe ? run.foeTeamAt(option) : [])),
       room: run.room,
       challengeId: run.challengeId,
       party: run.party.map((mon, index) => ({
@@ -87,15 +92,13 @@ export class TowerViews {
         line: this.line(team[index], mon.entry.finalID),
         atCap: mon.level >= levelCap(run.floor),
         locked: { capsule: lockedAbilities(mon, false).map((key) => abilityInfo(key)), patch: lockedAbilities(mon, true).map((key) => abilityInfo(key)) },
-        stone: (() => {
-          const next = stoneEvolution({ speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level });
-          return next ? { id: next, name: speciesName(next), sprite: buildFighter({ ...team[index], finalID: next }).sprite } : null;
-        })(),
+        stone: this.evolutionView(team[index], stoneEvolution({ speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level })),
+        cord: this.evolutionView(team[index], cordEvolution({ speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level })),
       })),
       offers: run.offers.map((offer) => this.offer(offer)),
       rewards: run.rewards.map((reward) => this.reward(reward)),
       natures: NATURES,
-      current: { ...floor, foeTeamSize: floor.teamSize },
+      current: { ...floor, foeTeamSize: floor.teamSize, levels: floor.foe ? levelRange(run.foeTeam()) : null },
       trail,
       lastResult: run.lastResult && {
         ...run.lastResult,
@@ -131,9 +134,9 @@ export class TowerViews {
     });
   }
 
-  private room(floor: Floor) {
+  private room(floor: Floor, team: readonly RosterEntry[]) {
     const room = floor.room ?? 'trainer';
-    return { kind: room, ...ROOMS[room], foe: floor.foe, level: floor.level, type: floor.type, types: floor.types, scene: floor.scene, teamSize: floor.teamSize, trained: floor.trained };
+    return { kind: room, ...ROOMS[room], foe: floor.foe, level: floor.level, levels: team.length ? levelRange(team) : null, type: floor.type, types: floor.types, scene: floor.scene, teamSize: floor.teamSize, trained: floor.trained };
   }
 
   /** Its evolution line up to the form it was raised into, with the level each step comes at. */
@@ -145,6 +148,10 @@ export class TowerViews {
     const path = evolutionPath(finalId);
     const next = path[path.indexOf(speciesId) + 1];
     return next ? { id: next, name: speciesName(next), level: evolutionLevel(next), byLevel: !!speciesData(next)?.evolvesAt } : null;
+  }
+
+  private evolutionView(entry: RosterEntry, next: number | null) {
+    return next ? { id: next, name: speciesName(next), sprite: buildFighter({ ...entry, finalID: next }).sprite } : null;
   }
 
   private reward(reward: Reward) {

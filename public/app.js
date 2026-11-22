@@ -2421,6 +2421,12 @@ const TOWER_NOTES = {
 };
 const TIER_LABEL = { common: 'Común', rare: 'Rara', epic: 'Épica' };
 const VITAMINS = { hp: 'hp_up', atk: 'protein', def: 'iron', satk: 'calcium', sdef: 'zinc', spd: 'carbos' };
+const WINGS = { hp: 'health-wing', atk: 'muscle-wing', def: 'resist-wing', satk: 'genius-wing', sdef: 'clever-wing', spd: 'swift-wing' };
+const WING_NAMES = { hp: 'Vigor', atk: 'Músculo', def: 'Aguante', satk: 'Intelecto', sdef: 'Mente', spd: 'Ímpetu' };
+const MOVE_REWARDS = ['tm', 'tutor', 'eggMove', 'powerTm', 'mushroom', 'memory', 'gem', 'supportTm', 'quickClaw', 'teraShard'];
+const PARTY_REWARDS = ['egg', 'goldenEgg', 'feather', 'expShare', 'candyJar'];
+const PARTY_CTA = { egg: 'Abrir el huevo', goldenEgg: 'Abrir el huevo', feather: 'Usarla en todo el equipo', expShare: 'Repartir la experiencia', candyJar: 'Repartir los caramelos' };
+const NATURE_MINTS = { adamant: 'mint_atk', jolly: 'mint_spd', modest: 'mint_spatk', timid: 'mint_spd' };
 const ATTACK_STAT = { physical: ['atk', 'Ataque'], special: ['satk', 'At. Esp.'] };
 const lengthLabel = (length) => (length ? `${length} pisos` : 'Infinita');
 const itemURL = (name) => (name.startsWith('pokeapi:') ? upstreamURLs(UPSTREAM.sprites, `sprites/items/${name.slice(8)}.png`)[0] : upstreamURLs(UPSTREAM.pokerogue, `images/items/${name}.png`)[0]);
@@ -2430,7 +2436,25 @@ const REWARD_INFO = {
   expCandy: { name: (r) => (r.levels > 1 ? `Caramelo Exp. ×${r.levels}` : 'Caramelo Exp.'), icon: () => 'rarer_candy', text: (r) => `Sube ${r.levels > 1 ? `${r.levels} niveles` : '1 nivel'} a quien esté bajo el tope del piso.` },
   vitamin: { name: (r) => `Vitamina · ${STAT_NAME[r.stat] ?? r.stat}`, icon: (r) => VITAMINS[r.stat] ?? 'protein', text: (r) => `Suma 32 EVs de ${STAT_NAME[r.stat] ?? r.stat} (máximo 252 por stat y 510 en total). Cada 4 EVs es +1 en el stat.` },
   tm: { name: (r) => `MT · ${r.moveInfo.name}`, icon: (r) => `tm_${r.moveInfo.type ?? 'normal'}`, text: () => 'Queda en su lista de movimientos; lo equipas cuando quieras.' },
-  tutor: { name: (r) => `Tutor · ${r.moveInfo.name}`, icon: () => 'elixir', text: () => 'Un movimiento de tutor o de huevo. Queda en su lista; lo equipas cuando quieras.' },
+  tutor: { name: (r) => `Tutor · ${r.moveInfo.name}`, icon: () => 'elixir', text: () => 'Un movimiento de tutor. Queda en su lista; lo equipas cuando quieras.' },
+  eggMove: { name: (r) => `Mov. Huevo · ${r.moveInfo.name}`, icon: () => 'rare_egg', text: () => 'Un movimiento que solo se hereda criando. Queda en su lista; lo equipas cuando quieras.' },
+  powerTm: { name: (r) => `MT Poderosa · ${r.moveInfo.name}`, icon: (r) => `tm_${r.moveInfo.type ?? 'normal'}`, text: () => 'Una de las máquinas más fuertes (poder 90 o más). Queda en su lista; la equipas cuando quieras.' },
+  mushroom: { name: (r) => `Seta Memoria · ${r.moveInfo.name}`, icon: () => 'big_mushroom', text: () => 'Aprende ya un movimiento que aprendería por nivel en los próximos 10 niveles.' },
+  memory: { name: (r) => `Memoria ${typeLabel(r.moveInfo.type)} · ${r.moveInfo.name}`, icon: (r) => `${r.moveInfo.type ?? 'normal'}_memory`, text: () => 'Un ataque de otro tipo que el suyo, para cubrir sus debilidades. Queda en su lista; lo equipas cuando quieras.' },
+  gem: { name: (r) => `Gema ${typeLabel(r.moveInfo.type)} · ${r.moveInfo.name}`, icon: (r) => `${r.moveInfo.type ?? 'normal'}_gem`, text: () => 'Un ataque ligero (poder 75 o menos) de otro tipo que el suyo. Queda en su lista; lo equipas cuando quieras.' },
+  supportTm: { name: (r) => `MT de Apoyo · ${r.moveInfo.name}`, icon: (r) => `tm_${r.moveInfo.type ?? 'normal'}`, text: () => 'Un movimiento de estado: sube stats, cura, protege o altera al rival. Queda en su lista; lo equipas cuando quieras.' },
+  quickClaw: { name: (r) => `Garra Rápida · ${r.moveInfo.name}`, icon: () => 'quick_claw', text: () => 'Un ataque con prioridad: golpea antes que el rival. Queda en su lista; lo equipas cuando quieras.' },
+  teraShard: { name: (r) => `Teralito ${typeLabel(r.moveInfo.type)} · ${r.moveInfo.name}`, icon: (r) => `${r.moveInfo.type ?? 'normal'}_tera_shard`, text: () => 'El ataque más fuerte de su propio tipo (poder 80 o más). Queda en su lista; lo equipas cuando quieras.' },
+  weights: { name: () => 'Pesas de Entrenamiento', icon: () => 'muscle_band', text: () => 'Sube 4 puntos cada uno de sus IVs, hasta 31.' },
+  idealMint: { name: () => 'Menta Ideal', icon: (r) => NATURE_MINTS[Object.values(r.natures ?? {})[0]] ?? 'mint_atk', text: () => 'Le da la mejor naturaleza para sus stats: sube su ataque más fuerte o su Velocidad y baja el ataque que no usa.' },
+  expShare: { name: (r) => (r.levels > 1 ? `Repartir Exp. ×${r.levels}` : 'Repartir Exp.'), icon: () => 'exp_share', text: (r) => `Sube ${r.levels > 1 ? `${r.levels} niveles` : '1 nivel'} a todos los que estén bajo el tope del piso.` },
+  candyJar: { name: (r) => `Tarro de Caramelos ×${r.levels}`, icon: () => 'candy_jar', text: (r) => `Sube ${r.levels} niveles a todos los que estén bajo el tope del piso.` },
+  machoBrace: { name: () => 'Brazal Firme', icon: () => 'macho_brace', text: () => 'Suma 16 EVs en cada uno de sus seis stats (máximo 252 por stat y 510 en total).' },
+  vitaminBag: { name: () => 'Bolsa de Vitaminas', icon: () => 'berry_pouch', text: () => 'Suma 32 EVs en su ataque más fuerte y 32 en Velocidad.' },
+  shinyCharm: { name: () => 'Amuleto Iris', icon: () => 'shiny_charm', text: () => 'Lo vuelve shiny por el resto de la subida. Solo cambia cómo se ve.' },
+  linkingCord: { name: () => 'Cordón Unión', icon: () => 'linking_cord', text: () => 'Evoluciona ya a quien evoluciona por nivel y está a 5 niveles o menos de hacerlo.' },
+  goldenEgg: { name: () => 'Huevo Dorado', icon: () => 'golden_egg', text: () => 'Trae a un Pokémon más de tu colección para reclutar, al nivel de tu mejor Pokémon.' },
+  feather: { name: (r) => `Pluma ${WING_NAMES[r.stat] ?? ''}`.trim(), icon: (r) => `pokeapi:${WINGS[r.stat] ?? 'health-wing'}`, text: (r) => `Suma 10 EVs de ${STAT_NAME[r.stat] ?? r.stat} a todo tu equipo.` },
   mint: { name: () => 'Menta', icon: () => 'mint_neutral', text: () => 'Cambia la naturaleza: un stat sube 10 % y otro baja 10 %.' },
   capsule: { name: () => 'Cápsula Habilidad', icon: () => 'ability_capsule', text: () => 'Desbloquea otra habilidad normal de su especie. Luego las alternas entre pisos.' },
   patch: { name: () => 'Parche Habilidad', icon: () => 'ability_charm', text: () => 'Desbloquea la habilidad oculta de su especie.' },
@@ -2722,6 +2746,25 @@ function towerSetup(data) {
     towerStatsCard(data.records)));
 }
 
+/** Asks before a step that throws something away, so a stray tap doesn't cost a reward or a recruit. */
+function towerConfirm(title, text, { stay, go, onGo }) {
+  const dlg = towerDialog(title,
+    h('p', null, text),
+    h('div', { class: 'tw-dlg-actions' },
+      h('button', { class: 'btn', onclick: () => dlg.close() }, stay),
+      h('button', { class: 'btn primary', onclick: (e) => { dlg.close(); onGo(e.currentTarget); } }, go)));
+}
+
+/** What you leave behind if you go up now: rewards you can still take, a Pokémon you could still recruit. */
+function leftBehind(run) {
+  const rewards = run.picks > 0 ? run.rewards.length : 0;
+  const lost = [
+    rewards ? (run.picks > 1 && rewards > 1 ? `${Math.min(run.picks, rewards)} premios por elegir` : 'un premio por elegir') : null,
+    run.offers.length ? 'un Pokémon que quiere unirse a tu equipo' : null,
+  ].filter(Boolean);
+  return lost.length ? joinNames(lost) : null;
+}
+
 function towerAbandon() {
   const dlg = towerDialog('¿Abandonar la subida?',
     h('p', null, 'Tu récord se queda con los pisos que ya superaste. No hay vuelta atrás.'),
@@ -3008,13 +3051,13 @@ const joinNames = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} 
 function rewardSummary(run, reward) {
   const fits = run.party.filter((mon) => reward.fits.includes(mon.uid));
   const names = fits.map((mon) => mon.name);
-  if (reward.kind === 'tm' || reward.kind === 'tutor') {
+  if (MOVE_REWARDS.includes(reward.kind)) {
     const move = reward.moveInfo;
     return `${CATEGORY[move.category]} · ${typeLabel(move.type)}${move.power ? ` · Poder ${move.power}` : ''} · ${move.accuracy ? `${move.accuracy} %` : 'siempre acierta'}. Para ${joinNames(names)}`;
   }
   if (reward.kind === 'vitamin') return `+${Math.min(32, ...fits.map((mon) => 252 - (mon.evs?.[reward.stat] ?? 0)))} EVs de ${STAT_NAME[reward.stat]} para ${joinNames(names)}`;
-  if (['candy', 'expCandy', 'vitamin', 'stone', 'bottleCap', 'goldCap'].includes(reward.kind)) return joinNames(fits.map((mon) => `${mon.name} ${reward.reasons?.[mon.uid] ?? ''}`.trim()));
-  if (reward.kind === 'capsule' || reward.kind === 'patch') return `Para ${joinNames(names)}`;
+  if (['candy', 'expCandy', 'expShare', 'candyJar', 'vitamin', 'feather', 'machoBrace', 'vitaminBag', 'weights', 'idealMint', 'stone', 'linkingCord', 'bottleCap', 'goldCap'].includes(reward.kind)) return joinNames(fits.map((mon) => `${mon.name} ${reward.reasons?.[mon.uid] ?? ''}`.trim()));
+  if (['capsule', 'patch', 'shinyCharm'].includes(reward.kind)) return `Para ${joinNames(names)}`;
   return REWARD_INFO[reward.kind].text(reward);
 }
 
@@ -3062,11 +3105,11 @@ function rewardDetail(run, reward) {
     const res = await towerCall(btn, '/api/tower/reward', { body: { reward: reward.id, ...choice } });
     if (res) dlg.close();
   };
-  const verb = { tm: 'Enseñársela a', tutor: 'Enseñársela a', candy: 'Dárselo a', expCandy: 'Dárselo a', vitamin: 'Dársela a', stone: 'Evolucionar a', capsule: 'Usarla en', patch: 'Usarlo en', mint: 'Usarla en', bottleCap: 'Usarla en', goldCap: 'Usarla en' }[reward.kind];
+  const verb = { tm: 'Enseñársela a', tutor: 'Enseñársela a', eggMove: 'Enseñárselo a', powerTm: 'Enseñársela a', mushroom: 'Dársela a', memory: 'Enseñársela a', gem: 'Enseñársela a', supportTm: 'Enseñársela a', quickClaw: 'Enseñársela a', teraShard: 'Enseñársela a', weights: 'Entrenar a', idealMint: 'Usarla en', machoBrace: 'Dárselo a', vitaminBag: 'Dársela a', shinyCharm: 'Usarlo en', linkingCord: 'Evolucionar a', candy: 'Dárselo a', expCandy: 'Dárselo a', vitamin: 'Dársela a', stone: 'Evolucionar a', capsule: 'Usarla en', patch: 'Usarlo en', mint: 'Usarla en', bottleCap: 'Usarla en', goldCap: 'Usarla en' }[reward.kind];
   const effect = (mon) => {
     if (reward.kind === 'mint') return body.replaceChildren(h('h3', null, `Menta para ${mon.name}`), ...mintStep(run, reward, mon, send));
     if (reward.kind === 'capsule' || reward.kind === 'patch') return body.replaceChildren(h('h3', null, `Habilidad para ${mon.name}`), ...abilityStep(reward, mon, send));
-    if ((reward.kind === 'tm' || reward.kind === 'tutor') && mon.equipped.length >= 4) {
+    if (MOVE_REWARDS.includes(reward.kind) && mon.equipped.length >= 4) {
       return body.replaceChildren(rewardRow(run, reward, { pick: true }), forgetPicker(mon, reward.moveInfo, {
         skipLabel: 'Solo aprenderlo',
         onSkip: (btn) => send(btn, { uid: mon.uid }),
@@ -3076,19 +3119,20 @@ function rewardDetail(run, reward) {
     return send(null, { uid: mon.uid });
   };
   const paint = () => {
-    const cta = reward.kind === 'egg'
-      ? h('button', { class: 'btn primary block', onclick: (e) => send(e.currentTarget, { uid: run.party[0].uid }) }, 'Abrir el huevo')
+    const cta = PARTY_REWARDS.includes(reward.kind)
+      ? h('button', { class: 'btn primary block', onclick: (e) => send(e.currentTarget, { uid: run.party[0].uid }) }, PARTY_CTA[reward.kind])
       : h('button', { class: 'btn primary block', disabled: !target, onclick: () => effect(target) }, target ? `${verb} ${target.name}` : 'Elige a quién');
     body.replaceChildren(...[
       rewardRow(run, reward, { pick: true }),
       h('p', { class: 'small' }, info.text(reward)),
       reward.moveInfo ? moveBlock(reward.moveInfo) : null,
+      reward.kind === 'linkingCord' && target?.cord ? h('div', { class: 'tw-evo-line' }, h('span', { html: creatureHTML(target) }), glyph('arrow'), h('span', { html: creatureHTML({ sprite: target.cord.sprite, rarity: 'common' }) })) : null,
       reward.kind === 'stone' && target?.stone ? h('div', { class: 'tw-evo-line' }, h('span', { html: creatureHTML(target) }), glyph('arrow'), h('span', { html: creatureHTML({ sprite: target.stone.sprite, rarity: 'common' }) })) : null,
-      reward.kind === 'egg' ? null : h('span', { class: 'nb-label' }, reward.kind === 'tm' || reward.kind === 'tutor' ? 'Quién puede aprenderla' : 'A quién le sirve'),
-      reward.kind === 'egg' ? null : h('div', { class: 'tw-fits' }, run.party.map((mon) => {
+      ['egg', 'goldenEgg'].includes(reward.kind) ? null : h('span', { class: 'nb-label' }, MOVE_REWARDS.includes(reward.kind) ? 'Quién puede aprenderla' : PARTY_REWARDS.includes(reward.kind) ? 'A quiénes les sirve' : 'A quién le sirve'),
+      ['egg', 'goldenEgg'].includes(reward.kind) ? null : h('div', { class: 'tw-fits' }, run.party.map((mon) => {
         const fit = reward.fits.includes(mon.uid);
-        const swap = fit && (reward.kind === 'tm' || reward.kind === 'tutor') && mon.equipped.length >= 4 ? suggestedSwap(mon, reward.moveInfo) : null;
-        return h('button', { type: 'button', class: `tw-fit${fit ? '' : ' no'}${mon === target ? ' picked' : ''}`, disabled: !fit, onclick: () => { target = mon; paint(); } },
+        const swap = fit && MOVE_REWARDS.includes(reward.kind) && mon.equipped.length >= 4 ? suggestedSwap(mon, reward.moveInfo) : null;
+        return h('button', { type: 'button', class: `tw-fit${fit ? '' : ' no'}${mon === target ? ' picked' : ''}`, disabled: !fit || PARTY_REWARDS.includes(reward.kind), onclick: () => { target = mon; paint(); } },
           h('span', { html: creatureHTML(mon) }), h('b', null, mon.name), h('small', null, swap ? `Reemplaza a ${swap.name}` : reward.reasons?.[mon.uid] ?? ''));
       })),
       cta].filter(Boolean));
@@ -3145,7 +3189,7 @@ function chooseRoom(run, room) {
   if (room.kind !== 'deal') return takeRoom(run, room, { room: room.kind });
   const dlg = towerDialog('Pacto oscuro',
     h('p', null, 'Una figura en la sombra ofrece premios épicos… a cambio de uno de tu equipo. Se irá para siempre.'),
-    h('div', { class: 'party-row' }, run.party.map((mon) => partyCell(mon, { onclick: () => { dlg.close(); takeRoom(run, room, { room: 'deal', release: mon.uid }); } }))));
+    h('div', { class: 'party-row' }, run.party.map((mon) => partyCell(mon, { onclick: () => { dlg.close(); towerConfirm(`¿Entregar a ${mon.name}?`, `${mon.name} deja tu equipo para siempre a cambio de los premios del pacto.`, { stay: 'Mejor no', go: `Entregar a ${mon.name}`, onGo: () => takeRoom(run, room, { room: 'deal', release: mon.uid }) }); } }))));
   return null;
 }
 
@@ -3154,7 +3198,7 @@ function roomRow(run, room) {
     room.foe ? overworldSprite(room.foe.key, { facing: 'down', scale: 1, cls: 'tw-room-mini' }) : h('span', { class: 'tw-room-icon' }, glyph(room.icon)),
     h('div', null,
       h('b', null, room.label, room.foe ? h('span', { class: 'tw-room-who' }, ` · ${room.foe.title} ${room.foe.name}`) : null),
-      room.foe ? h('span', { class: 'tw-room-meta' }, typeChips(room.types ?? []), ` Nv ${room.level} · ${room.teamSize} Pokémon${room.trained ? ' · entrenados' : ''}`) : null,
+      room.foe ? h('span', { class: 'tw-room-meta' }, typeChips(room.types ?? []), ` ${levelsLabel(room.levels, room.level)} · ${room.teamSize} Pokémon${room.trained ? ' · entrenados' : ''}`) : null,
       h('small', null, room.hint)));
 }
 
@@ -3172,6 +3216,9 @@ function matchupAgainst(run, types) {
     line('bad', 'Sufren', weak, 'por'));
 }
 
+/** A rival team's levels as they will fight: one level, or the lowest to the highest (its ace). */
+const levelsLabel = (levels, fallback) => (!levels || levels.min === levels.max ? `Nv ${levels?.min ?? fallback}` : `Nv ${levels.min} a ${levels.max}`);
+
 function nextBattlePanel(run, cta) {
   const floor = run.current;
   const levels = run.party.map((mon) => mon.level);
@@ -3183,7 +3230,7 @@ function nextBattlePanel(run, cta) {
       h('div', null, h('span', { class: 'tw-kind' }, glyph(FLOOR_KIND[floor.kind].icon), ` ${kind}`), h('h2', null, `${floor.foe.title} ${floor.foe.name}`))),
     h('div', { class: 'tw-facts' },
       h('div', null, h('small', null, 'Tema'), h('span', null, floor.types?.length ? typeChips(floor.types) : 'Variado')),
-      h('div', null, h('small', null, 'Nivel'), h('b', null, `Nv ${floor.level}`)),
+      h('div', null, h('small', null, 'Nivel'), h('b', null, levelsLabel(floor.levels, floor.level))),
       h('div', null, h('small', null, 'Tuyos'), h('b', null, yours), h('small', null, `tope ${run.cap}`)),
       h('div', { 'data-tip': `Al empezar eliges ${BATTLE_SIZE} de tu equipo y el rival ${BATTLE_SIZE} de los suyos.` }, h('small', null, 'Trae'), h('b', null, `${floor.teamSize} Poké.`), floor.trained ? h('small', { class: 'tw-warn' }, 'entrenados') : null)),
     matchupAgainst(run, floor.types),
@@ -3237,8 +3284,14 @@ function floorStage(run, entrance) {
   return cast;
 }
 
-/** You walk off the floor and up to the next one. */
-async function moveOn(btn) {
+/** You walk off the floor and up to the next one, after a confirmation if you'd leave something behind. */
+function moveOn(btn, run) {
+  const lost = leftBehind(run);
+  if (!lost) return walkUp(btn);
+  towerConfirm('¿Subir sin elegir?', `Todavía tienes ${lost}. Si subes ahora, no hay vuelta atrás.`, { stay: 'Volver a elegir', go: 'Subir igual', onGo: () => walkUp(btn) });
+}
+
+async function walkUp(btn) {
   btn.disabled = true;
   if (!reducedMotion()) await towerCast?.leave();
   towerEntrance = 'walk';
@@ -3274,7 +3327,7 @@ function towerClimb(run) {
   else if (resting) {
     const waiting = run.picks > 0 && run.rewards.length;
     main = h('div', { class: 'tw-panel' }, restPanel(run),
-      h('button', { class: `btn ${waiting ? 'ghost' : 'primary'} block tw-cta`, onclick: (e) => moveOn(e.currentTarget) }, glyph('arrow'), waiting ? ' Subir sin premio' : ` Subir al piso ${run.floor}`));
+      h('button', { class: `btn ${waiting ? 'ghost' : 'primary'} block tw-cta`, onclick: (e) => moveOn(e.currentTarget, run) }, glyph('arrow'), waiting ? ' Subir sin premio' : ` Subir al piso ${run.floor}`));
   } else {
     const cta = h('button', { class: 'btn primary block tw-cta' }, glyph('swords'), run.challengeId ? ' Volver a la pelea' : ' ¡A pelear!');
     cta.onclick = () => startFight(run, cast, say, cta);

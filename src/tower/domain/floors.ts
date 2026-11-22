@@ -130,6 +130,20 @@ export function foeLevel(floor: number, kind: FloorKind, difficulty: AiLevel, ro
   return Math.min(MAX_LEVEL, Math.max(2, level + DIFFICULTY_LEVELS[difficulty]));
 }
 
+/**
+ * The floor against the party you bring: no rival above your strongest Pokémon (a boss's ace may be one
+ * over), and the special ways (a tough rival, a villain hideout) not above your party's average. The
+ * curve keeps the party at the cap; this keeps a party that fell behind (a recruit, a dark deal) from
+ * meeting rivals it cannot reach.
+ */
+export function fitToParty(floor: Floor, partyLevels: readonly number[]): Floor {
+  if (!partyLevels.length) return floor;
+  const top = Math.max(...partyLevels);
+  const average = Math.round(partyLevels.reduce((sum, level) => sum + level, 0) / partyLevels.length);
+  const ceiling = isBoss(floor.kind) ? top : floor.room === 'tough' || floor.room === 'hideout' ? average : top;
+  return floor.level > ceiling ? { ...floor, level: Math.max(2, ceiling) } : floor;
+}
+
 /** Always at least the 3 a battle takes; later rivals bring more, so they also choose. A tough rival brings one more, a calm one just 3. */
 export function teamSize(floor: number, kind: FloorKind, room: RoomKind | null = null): number {
   if (kind === 'champion' || kind === 'elite') return 6;
