@@ -20,12 +20,12 @@ import { MAX_LEVEL, PARTY_LIMIT, RECRUIT_LINE, ROOMS, START_LEVEL, STARTERS, TWI
 import type { AiLevel } from '../../combat/domain/ai.js';
 import { MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
-import { floorAt, isBoss, isLastFloor, levelCap, roomsAt, type Floor, type Rolls } from './floors.js';
+import { fitToParty, floorAt, isBoss, isLastFloor, levelCap, roomsAt, type Floor, type Rolls } from './floors.js';
 import { foeTeam } from './foe-team.js';
 import { evolutionPath, expForLevel, expYield, formAtLevel, levelForExp, levelMovesUpTo, movesAtLevel } from './growth.js';
 import { labOffers, lineOf, natureOf, offerMoves, recruitOffers, type Offer } from './lab.js';
 import { floorScore, totalPoints, type FloorScore } from './score.js';
-import { isNature, lockedAbilities, MAX_IV, restRewards, stoneEvolution, TWIST_REWARDS, vitaminRoom, type RestContext, type Reward } from './rewards.js';
+import { cordEvolution, evsAfter, isNature, ivsAfter, lockedAbilities, MOVE_REWARDS, PARTY_REWARDS, restRewards, stoneEvolution, TWIST_REWARDS, type RestContext, type Reward } from './rewards.js';
 
 export type RunStatus = 'drafting' | 'climbing' | 'resting' | 'lost' | 'cleared' | 'abandoned';
 export const OPEN_STATUSES: readonly RunStatus[] = ['drafting', 'climbing', 'resting'];
@@ -126,6 +126,7 @@ export const REROLLS_PER_REST = 1;
 const CATCH_UP_PER_LEVEL = 0.35;
 const DEAL_PICKS = 2;
 const REST_PICKS = 2;
+const BOSS_PICKS = 2;
 
 export class TowerRun implements TowerRunState {
   id!: string;
@@ -218,7 +219,8 @@ export class TowerRun implements TowerRunState {
   }
 
   floorAt(number: number, room: RoomKind | null = null): Floor {
-    return floorAt(number, this.length, this.difficulty, this.seed, room, this.rolls, this.twist);
+    const floor = floorAt(number, this.length, this.difficulty, this.seed, room, this.rolls, this.twist);
+    return number === this.floor ? fitToParty(floor, this.party.map((mon) => mon.level)) : floor;
   }
 
   currentFloor(): Floor {
@@ -267,7 +269,13 @@ export class TowerRun implements TowerRunState {
   }
 
   foeTeam(): RosterEntry[] {
-    return foeTeam(this.currentFloor(), this.difficulty, rng(`${this.seed}:${this.rolls[this.floor] ?? ''}:foe:${this.floor}`));
+    return this.foeTeamAt(this.currentFloor());
+  }
+
+  /** The team a rival of this floor brings against your party as it is now (to show a way before taking it, too). */
+  foeTeamAt(floor: Floor): RosterEntry[] {
+    const party = this.party.map((mon) => ({ ivs: mon.entry.ivs, evs: mon.evs }));
+    return foeTeam(floor, this.difficulty, rng(`${this.seed}:${this.rolls[floor.number] ?? ''}:foe:${floor.number}`), party);
   }
 
   /** The party as the battle takes it: each one at its level, in its form, with its moves, ability and nature. */
@@ -277,6 +285,7 @@ export class TowerRun implements TowerRunState {
       finalID: mon.speciesId,
       level: mon.level,
       battleLevel: mon.level,
+      battleIvs: mon.entry.ivs,
       moveset: mon.moves,
       ...(mon.ability ? { abilityChoice: mon.ability } : {}),
       ...(mon.nature ? { natureChoice: mon.nature } : {}),
@@ -315,7 +324,7 @@ export class TowerRun implements TowerRunState {
     this.floor += 1;
     this.status = 'resting';
     this.rerolls = REROLLS_PER_REST;
-    this.picks = 1;
+    this.picks = isBoss(floor.kind) ? BOSS_PICKS : 1;
     const random = rng(`${this.seed}:rest:${floor.number}`);
     this.rewards = restRewards(this.rewardTargets(), this.restContext(floor), random);
     this.offers = isBoss(floor.kind) ? this.recruits(floor, roster, random) : [];
@@ -324,7 +333,7 @@ export class TowerRun implements TowerRunState {
 
   /** What the party looks like to the rewards: who fits each one, and why. */
   rewardTargets() {
-    return this.party.map((mon) => ({ uid: mon.uid, speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level, known: mon.known, abilities: mon.abilities, evs: mon.evs, ivs: mon.entry.ivs }));
+    return this.party.map((mon) => ({ uid: mon.uid, speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level, known: mon.known, abilities: mon.abilities, evs: mon.evs, ivs: mon.entry.ivs, nature: mon.nature, shiny: mon.entry.shiny }));
   }
 
   private restContext(floor: Floor, overrides: Partial<RestContext> = {}): RestContext {
@@ -402,8 +411,7 @@ export class TowerRun implements TowerRunState {
     mon.ability = ability;
   }
 
-  private evolveNow(mon: TowerMon): Growth {
-    const next = stoneEvolution({ speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level });
+  private evolveNow(mon: TowerMon, next: number | null): Growth {
     if (!next) throw invalid('Ese Pokémon no puede evolucionar con esto ahora.');
     const before = { speciesId: mon.speciesId, known: [...mon.known] };
     mon.speciesId = next;
@@ -414,8 +422,8 @@ export class TowerRun implements TowerRunState {
     return { uid: mon.uid, fromLevel: mon.level, toLevel: mon.level, fromSpecies: before.speciesId, toSpecies: mon.speciesId, learned };
   }
 
-  private recruits(floor: Floor, roster: readonly RosterEntry[], random: Random): Offer[] {
-    const level = Math.max(START_LEVEL, Math.round(this.party.reduce((sum, mon) => sum + mon.level, 0) / this.party.length) - 2);
+  private recruits(floor: Floor, roster: readonly RosterEntry[], random: Random, at: number | null = null): Offer[] {
+    const level = at ?? Math.max(START_LEVEL, Math.round(this.party.reduce((sum, mon) => sum + mon.level, 0) / this.party.length) - 2);
     const guide = floor.foe ? { key: floor.foe.key, title: `${floor.foe.title} ${floor.foe.name}`, line: RECRUIT_LINE, type: floor.type } : { key: 'den', title: 'Madriguera', line: RECRUIT_LINE, type: null };
     return recruitOffers(roster, this.party.map((mon) => lineOf(mon.entry)), guide, level, random);
   }
@@ -430,59 +438,81 @@ export class TowerRun implements TowerRunState {
     if (this.status !== 'climbing' && this.status !== 'resting') throw conflict('Ahora no puedes cambiar tu equipo.');
   }
 
-  /** Uses a reward on a party member. Returns what changed in it (levels or a new form), if anything. */
-  takeReward(rewardId: string, choice: RewardChoice, { at, roster }: { at: number; roster: readonly RosterEntry[] }): Growth | null {
+  /** Uses a reward on a party member, or on the whole party. Returns what changed (levels or a new form). */
+  takeReward(rewardId: string, choice: RewardChoice, { at, roster }: { at: number; roster: readonly RosterEntry[] }): Growth[] {
     if (this.status !== 'resting' || this.picks <= 0) throw conflict('No hay premios que tomar ahora.');
     const reward = this.rewards.find((candidate) => candidate.id === rewardId);
     if (!reward) throw invalid('Ese premio no existe.');
-    if (reward.kind !== 'egg' && !reward.fits.includes(choice.uid)) throw invalid('Ese Pokémon no puede usar este premio.');
+    if (!PARTY_REWARDS.includes(reward.kind) && !reward.fits.includes(choice.uid)) throw invalid('Ese Pokémon no puede usar este premio.');
     const growth = this.applyReward(reward, choice, roster);
     this.picks -= 1;
     this.rewards = this.picks > 0 ? this.rewards.filter((candidate) => candidate.id !== rewardId) : [];
-    this.lastResult = growth && this.lastResult ? { ...this.lastResult, growth: [...this.lastResult.growth.filter((entry) => entry.uid !== growth.uid), growth] } : this.lastResult;
+    const changed = new Set(growth.map((entry) => entry.uid));
+    this.lastResult = growth.length && this.lastResult ? { ...this.lastResult, growth: [...this.lastResult.growth.filter((entry) => !changed.has(entry.uid)), ...growth] } : this.lastResult;
     this.updatedAt = at;
     return growth;
   }
 
-  private applyReward(reward: Reward, choice: RewardChoice, roster: readonly RosterEntry[]): Growth | null {
-    if (reward.kind === 'egg') {
-      this.offers = this.recruits(this.floorAt(this.floor - 1, this.lastResult?.room ?? null), roster, rng(`${this.seed}:egg:${this.floor}`));
-      return null;
+  private applyReward(reward: Reward, choice: RewardChoice, roster: readonly RosterEntry[]): Growth[] {
+    const lastFloor = () => this.floorAt(this.floor - 1, this.lastResult?.room ?? null);
+    const levelUp = (mon: TowerMon) => this.grow(mon, Math.max(mon.exp, expForLevel(Math.min(levelCap(this.floor), mon.level + (reward.levels ?? 1)))));
+    switch (reward.kind) {
+      case 'egg':
+        this.offers = this.recruits(lastFloor(), roster, rng(`${this.seed}:egg:${this.floor}`));
+        return [];
+      case 'goldenEgg':
+        this.offers = this.recruits(lastFloor(), roster, rng(`${this.seed}:egg:${this.floor}`), Math.max(...this.party.map((mon) => mon.level)));
+        return [];
+      case 'feather':
+        for (const member of this.party) member.evs = evsAfter(reward.kind, member.evs, member.speciesId, reward.stat);
+        return [];
+      case 'expShare':
+      case 'candyJar':
+        return this.party.filter((member) => reward.fits.includes(member.uid)).map(levelUp);
     }
     const mon = this.member(choice.uid);
+    if (MOVE_REWARDS.includes(reward.kind)) {
+      this.teach(mon, reward.move as string, choice.replace ?? null);
+      return [];
+    }
     switch (reward.kind) {
-      case 'tm':
-      case 'tutor':
-        this.teach(mon, reward.move as string, choice.replace ?? null);
-        return null;
       case 'candy':
       case 'expCandy':
-        return this.grow(mon, Math.max(mon.exp, expForLevel(Math.min(levelCap(this.floor), mon.level + (reward.levels ?? 1)))));
-      case 'vitamin': {
-        const stat = reward.stat as keyof Ivs;
-        mon.evs = { ...mon.evs, [stat]: (mon.evs[stat] ?? 0) + vitaminRoom(mon.evs, stat) };
-        return null;
-      }
+        return [levelUp(mon)];
+      case 'vitamin':
+      case 'machoBrace':
+      case 'vitaminBag':
+        mon.evs = evsAfter(reward.kind, mon.evs, mon.speciesId, reward.stat);
+        return [];
       case 'capsule':
       case 'patch': {
         const options = lockedAbilities(mon, reward.kind === 'patch');
         if (!choice.ability || !options.includes(choice.ability)) throw invalid('Elige una habilidad que aún no tenga.');
         mon.abilities = [...new Set([...mon.abilities, choice.ability])];
         mon.ability = choice.ability;
-        return null;
+        return [];
       }
       case 'stone':
-        return this.evolveNow(mon);
+        return [this.evolveNow(mon, stoneEvolution({ speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level }))];
+      case 'linkingCord':
+        return [this.evolveNow(mon, cordEvolution({ speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level }))];
       case 'mint':
         if (!choice.nature || !isNature(choice.nature)) throw invalid('Elige una naturaleza.');
         mon.nature = choice.nature;
-        return null;
+        return [];
+      case 'idealMint':
+        mon.nature = reward.natures?.[mon.uid] ?? mon.nature;
+        return [];
       case 'bottleCap':
-        mon.entry = { ...mon.entry, ivs: { ...mon.entry.ivs, [reward.stat as keyof Ivs]: MAX_IV } };
-        return null;
       case 'goldCap':
-        mon.entry = { ...mon.entry, ivs: { hp: MAX_IV, atk: MAX_IV, def: MAX_IV, satk: MAX_IV, sdef: MAX_IV, spd: MAX_IV } };
-        return null;
+      case 'weights':
+        mon.entry = { ...mon.entry, ivs: ivsAfter(reward.kind, mon.entry.ivs, reward.stat) };
+        return [];
+      case 'shinyCharm':
+        mon.entry = { ...mon.entry, shiny: true };
+        return [];
+      default:
+        return [];
     }
   }
 

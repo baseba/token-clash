@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rng, speciesData } from '../../catalog/domain/creatures.js';
+import { moveOrigins, rng, speciesData } from '../../catalog/domain/creatures.js';
+import { moveData } from '../../combat/domain/moves.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { floorAt } from './floors.js';
 import { baseStatTotal } from './growth.js';
@@ -51,4 +52,39 @@ test('a team never brings the same form twice, and a calm rival brings weaker sp
       assert.ok(power(teamOf('tough')) > power(teamOf('calm')), `${seed} ${floor}`);
     }
   }
+});
+
+const partyWith = (iv: number, evs: number) => Array.from({ length: 3 }, () => ({
+  ivs: { hp: iv, atk: iv, def: iv, satk: iv, sdef: iv, spd: iv },
+  evs: { hp: 0, atk: evs / 2, def: 0, satk: 0, sdef: 0, spd: evs / 2 },
+}));
+
+test('a rival has IVs around your party and, trained, about as many EVs as yours', () => {
+  const floor = floorAt(15, 25, 'hard', 's');
+  const total = (evs: object | undefined) => Object.values(evs ?? {}).reduce((sum: number, value: number) => sum + value, 0);
+  for (let seed = 0; seed < 10; seed++) {
+    const team = foeTeam(floor, 'hard', rng(seed), partyWith(12, 64));
+    for (const mon of team) {
+      assert.deepEqual(mon.battleIvs, mon.ivs);
+      assert.ok(Object.values(mon.ivs).every((iv) => iv >= 12 - 3 + 2 && iv <= 12 + 3 + 2), `${seed} ${JSON.stringify(mon.ivs)}`);
+      assert.equal(total(mon.evs), 64);
+    }
+    assert.ok(foeTeam(floor, 'hard', rng(seed), partyWith(12, 0)).every((mon) => total(mon.evs) === 0), 'no EVs of yours, none of theirs');
+  }
+  const easy = foeTeam(floorAt(14, 25, 'easy', 's'), 'easy', rng(1), partyWith(20, 0));
+  assert.ok(easy.every((mon) => Object.values(mon.ivs).every((iv) => iv <= 20 - 6 + 3)));
+});
+
+test('the first floors bring only level moves; later rivals also know taught moves, stronger the higher they are', () => {
+  const taught = (floorNumber: number, seed: number) => {
+    const floor = floorAt(floorNumber, 50, 'hard', 's');
+    return foeTeam(floor, 'hard', rng(seed)).flatMap((mon) => {
+      const origins = moveOrigins({ finalID: mon.finalID });
+      return (mon.moveset ?? []).filter((id) => origins.get(id)?.origin !== 'level').map((id) => ({ id, level: mon.battleLevel ?? 0 }));
+    });
+  };
+  for (let seed = 0; seed < 8; seed++) assert.deepEqual(taught(1, seed), [], `${seed}`);
+  const late = Array.from({ length: 8 }, (_, seed) => taught(30, seed)).flat();
+  assert.ok(late.length > 0);
+  for (const move of [...late, ...Array.from({ length: 8 }, (_, seed) => taught(12, seed)).flat()]) assert.ok((moveData(move.id)?.power ?? 0) <= 45 + move.level * 1.2, move.id);
 });

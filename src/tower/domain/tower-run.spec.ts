@@ -322,3 +322,72 @@ test('a Pokémon far below the cap catches up faster than one near it', () => {
   const [behind, , other] = run.party;
   assert.ok(behind.level - 2 > other.level - 5, `${behind.level} ${other.level}`);
 });
+
+test('your party fights with its own IVs, and the rival is measured against them', () => {
+  const run = climbing();
+  assert.deepEqual(run.battleTeam().map((mon) => mon.battleIvs), run.party.map((mon) => mon.entry.ivs));
+  run.chooseRoom('trainer', { at: 2, roster });
+  assert.ok(run.foeTeam().every((mon) => Object.values(mon.battleIvs ?? {}).every((iv) => iv >= 31 - 3 - 3)));
+});
+
+test('the levels shown for a way are the ones its rival fights at', () => {
+  const run = climbing();
+  for (let floor = 1; floor <= 8; floor++) {
+    for (const way of run.roomFloors()) {
+      const team = run.foeTeamAt(way);
+      if (!way.foe) continue;
+      assert.ok(team.every((mon) => mon.battleLevel === way.level || mon.battleLevel === way.level + 1), `${floor} ${way.room}`);
+    }
+    win(run);
+    run.offers = [];
+    run.moveOn(10 + floor);
+  }
+});
+
+test('after a boss you take two rewards', () => {
+  const run = climbing();
+  for (let floor = 1; floor < 5; floor++) {
+    win(run);
+    run.moveOn(10 + floor);
+  }
+  win(run);
+  assert.equal(run.picks, 2);
+});
+
+test('party rewards work on everyone: an Exp. Share levels up all below the cap, a Wing gives EVs to all', () => {
+  const run = climbing();
+  win(run);
+  for (const mon of run.party) {
+    mon.level = 5;
+    mon.exp = expForLevel(5);
+  }
+  const uids = run.party.map((mon) => mon.uid);
+  run.rewards = [
+    { id: 'x', kind: 'expShare', tier: 'common', levels: 1, fits: uids, reasons: {} },
+    { id: 'w', kind: 'feather', tier: 'common', stat: 'def', fits: uids, reasons: {} },
+  ];
+  run.picks = 2;
+  assert.equal(run.takeReward('x', { uid: uids[0] }, { at: 5, roster }).length, uids.length);
+  assert.ok(run.party.every((mon) => mon.level === 6));
+  run.takeReward('w', { uid: uids[0] }, { at: 6, roster });
+  assert.ok(run.party.every((mon) => mon.evs.def === 10));
+});
+
+test('a Golden Egg brings recruits at your best level, and a Shiny Charm makes the one you choose shiny', () => {
+  const run = TowerRun.start({ id: 'r1', trainerId: 't1', difficulty: 'mid', length: 50, roster, at: 0, random: rng(1) });
+  run.draft(run.offers.slice(0, run.starters).map((offer) => offer.id), 1);
+  win(run);
+  run.floor = 10;
+  const [first] = run.party;
+  first.level = 12;
+  first.exp = expForLevel(12);
+  run.rewards = [{ id: 'g', kind: 'goldenEgg', tier: 'epic', fits: [], reasons: {} }];
+  run.picks = 1;
+  run.takeReward('g', { uid: first.uid }, { at: 5, roster });
+  assert.ok(run.offers.length && run.offers.every((offer) => offer.level === 12));
+  run.rewards = [{ id: 's', kind: 'shinyCharm', tier: 'rare', fits: [first.uid], reasons: {} }];
+  run.picks = 1;
+  run.takeReward('s', { uid: first.uid }, { at: 6, roster });
+  assert.equal(first.entry.shiny, true);
+  assert.equal(run.battleTeam()[0].shiny, true);
+});

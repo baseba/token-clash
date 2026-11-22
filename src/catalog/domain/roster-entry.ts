@@ -45,6 +45,8 @@ export interface RosterEntry {
   active?: boolean;
   /** The level it fights at, when a mode sets one (the Tower); otherwise every battle is at level 100. */
   battleLevel?: number;
+  /** The IVs it fights with, when a mode sets them (the Tower); otherwise every battle is with perfect IVs. */
+  battleIvs?: Ivs;
 }
 
 const variantKey = (entry: Pick<RosterEntry, 'finalID' | 'shiny'>) => `${entry.finalID}:${entry.shiny ? 'shiny' : 'plain'}`;

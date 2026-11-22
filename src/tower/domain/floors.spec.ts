@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
 import { NAMES, START_LEVEL, TYPE_SCENES } from '../../catalog/domain/tower-cast.js';
-import { floorAt, floorKind, foeLevel, levelCap, roomsAt, stretchStart, teamSize } from './floors.js';
+import { fitToParty, floorAt, floorKind, foeLevel, levelCap, roomsAt, stretchStart, teamSize } from './floors.js';
 
 const kinds = (length: number | null, upTo: number) => Array.from({ length: upTo }, (_, i) => floorKind(i + 1, length));
 const baseOf = (floor: number, length: number | null, seed: string) => floorAt(floor, length, 'mid', seed).foe?.base;
@@ -159,4 +159,14 @@ test('rumours: wild routes always offer a tough way, a night climb turns every s
     const scene = floorAt(floor, 25, 'mid', 'n', null, {}, 'night').scene;
     assert.match(scene, /-night$|underwater/, scene);
   }
+});
+
+test('a rival is never above your strongest Pokémon, and a tough rival or a hideout not above your average', () => {
+  const tough = floorAt(14, 25, 'veryhard', 's', 'tough');
+  assert.equal(fitToParty(tough, [20, 20, 26]).level, 22);
+  assert.equal(fitToParty(tough, [40, 40, 40]).level, tough.level, 'a party at the cap meets the curve');
+  const trainer = floorAt(14, 25, 'veryhard', 's');
+  assert.equal(fitToParty(trainer, [18, 20, 21]).level, 21);
+  const gym = floorAt(15, 25, 'veryhard', 's');
+  assert.equal(fitToParty(gym, [20, 25]).level, 25);
 });

@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { moveOrigins, rng, speciesIdByName } from '../../catalog/domain/creatures.js';
-import { MAX_IV, REWARD_TIERS, REWARDS_PER_REST, restRewards, stoneEvolution, TIER_ORDER, TWIST_REWARDS, vitaminRoom, type RestContext } from './rewards.js';
+import { moveOrigins, rng, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
+import { moveData } from '../../combat/domain/moves.js';
+import { levelMovesUpTo } from './growth.js';
+import { BRACE_EVS, cordEvolution, evsAfter, idealNature, ivsAfter, MAX_IV, MOVE_REWARDS, MUSHROOM_REACH, REWARD_KINDS, REWARD_TIERS, WEIGHTS_IVS, REWARDS_PER_REST, restRewards, stoneEvolution, TIER_ORDER, TWIST_REWARDS, vitaminRoom, type RestContext, type Reward } from './rewards.js';
 
 const NO_EVS = { hp: 0, atk: 0, def: 0, satk: 0, sdef: 0, spd: 0 };
 const target = (uid: string, name: string, known: string[] = [], level = 10, final = name) => ({
@@ -13,6 +15,8 @@ const target = (uid: string, name: string, known: string[] = [], level = 10, fin
   abilities: [],
   evs: { ...NO_EVS },
   ivs: { hp: 31, atk: 10, def: 31, satk: 31, sdef: 31, spd: 31 },
+  nature: null as string | null,
+  shiny: false,
 });
 const plain: RestContext = { floor: 3, boss: false, cap: 20, minTier: 'common', recruitable: true };
 
@@ -41,7 +45,7 @@ test('a machine or a tutor only fits the Pokémon that can learn its move, and n
   for (let seed = 0; seed < 30; seed++) {
     const party = [target('a', 'Charmander', ['flamethrower']), target('b', 'Squirtle')];
     for (const reward of restRewards(party, plain, rng(seed))) {
-      if (reward.kind !== 'tm' && reward.kind !== 'tutor') continue;
+      if (!MOVE_REWARDS.includes(reward.kind) || reward.kind === 'mushroom') continue;
       assert.ok(reward.fits.length, `${seed}`);
       for (const uid of reward.fits) {
         const mon = party.find((member) => member.uid === uid)!;
@@ -102,4 +106,88 @@ test('rumours change the rewards: more of the favoured kinds, one more offer, sw
   assert.equal(restRewards(party, { ...plain, ...TWIST_REWARDS.market }, rng(1)).length, REWARDS_PER_REST + 1);
   const candy = Array.from({ length: 40 }, (_, seed) => restRewards(party, { ...plain, ...TWIST_REWARDS.sweet }, rng(seed))).flat().find((reward) => reward.kind === 'candy');
   assert.equal(candy?.levels, 3);
+});
+
+const offered = (party: ReturnType<typeof target>[], context: RestContext, seeds = 120): Reward[] => Array.from({ length: seeds }, (_, seed) => restRewards(party, context, rng(seed))).flat();
+
+test('a powerful machine is epic and 90 power or more; a plain one is under 90 or a status move', () => {
+  const party = [target('a', 'Charmander', [], 30, 'Charizard'), target('b', 'Squirtle', [], 30, 'Blastoise')];
+  const rewards = offered(party, { ...plain, floor: 30, minTier: 'rare' });
+  const powerTms = rewards.filter((reward) => reward.kind === 'powerTm');
+  assert.ok(powerTms.length);
+  assert.ok(powerTms.every((reward) => reward.tier === 'epic' && (moveData(reward.move as string)?.power ?? 0) >= 90));
+  assert.ok(rewards.filter((reward) => reward.kind === 'tm').every((reward) => (moveData(reward.move as string)?.power ?? 0) < 90));
+});
+
+test('a Mushroom teaches a level move it would learn within the next 10 levels', () => {
+  const party = [target('a', 'Bulbasaur', [], 12)];
+  const mushrooms = offered(party, plain).filter((reward) => reward.kind === 'mushroom');
+  assert.ok(mushrooms.length);
+  for (const reward of mushrooms) assert.ok(levelMovesUpTo(party[0].speciesId, 12 + MUSHROOM_REACH).includes(reward.move as string), reward.move);
+});
+
+test('a Wing is for the whole party: it fits everyone with room for its EVs', () => {
+  const full = { ...target('full', 'Squirtle'), evs: { hp: 252, atk: 252, def: 6, satk: 0, sdef: 0, spd: 0 } };
+  const wings = offered([target('a', 'Charmander'), target('b', 'Pikachu'), full], plain).filter((reward) => reward.kind === 'feather');
+  assert.ok(wings.length);
+  for (const reward of wings) assert.deepEqual(reward.fits, ['a', 'b']);
+});
+
+test('higher floors offer rarer rewards, and one more from floor 25', () => {
+  const party = [target('a', 'Charmander', [], 30, 'Charizard'), target('b', 'Abra', [], 30, 'Alakazam')];
+  const epics = (floor: number) => offered(party, { ...plain, floor, cap: 40 }).filter((reward) => reward.tier === 'epic').length;
+  assert.ok(epics(40) > epics(3));
+  assert.equal(restRewards(party, { ...plain, floor: 25 }, rng(1)).length, REWARDS_PER_REST + 1);
+});
+
+test('there are rewards of every family in every tier, and a long climb sees most of them', () => {
+  for (const tier of TIER_ORDER) assert.ok(REWARD_KINDS.filter((kind) => REWARD_TIERS[kind] === tier).length >= 9, tier);
+  const party = [target('a', 'Charmander', [], 18, 'Charizard'), target('b', 'Abra', [], 15, 'Alakazam'), target('c', 'Machop', [], 20, 'Machamp')];
+  const seen = new Set(offered(party, { ...plain, floor: 20, cap: 25 }, 300).map((reward) => reward.kind));
+  assert.ok(seen.size >= REWARD_KINDS.length - 2, `${REWARD_KINDS.filter((kind) => !seen.has(kind))}`);
+});
+
+test('the move families teach what their name says', () => {
+  const party = [target('a', 'Charmander', [], 30, 'Charizard'), target('b', 'Squirtle', [], 30, 'Blastoise'), target('c', 'Pikachu', [], 30)];
+  const rewards = offered(party, { ...plain, floor: 30, cap: 40 }, 300);
+  const typesOf = (uid: string) => speciesData(party.find((member) => member.uid === uid)!.speciesId)?.types ?? [];
+  for (const reward of rewards) {
+    const move = moveData(reward.move as string);
+    if (reward.kind === 'memory' || reward.kind === 'gem') assert.ok(reward.fits.every((uid) => !typesOf(uid).includes(move?.type as string)), `${reward.kind} ${reward.move}`);
+    if (reward.kind === 'gem') assert.ok((move?.power ?? 0) <= 75, reward.move);
+    if (reward.kind === 'teraShard') assert.ok(reward.fits.every((uid) => typesOf(uid).includes(move?.type as string)) && (move?.power ?? 0) >= 80, reward.move);
+    if (reward.kind === 'quickClaw') assert.ok((move?.priority ?? 0) > 0, reward.move);
+    if (reward.kind === 'supportTm') assert.equal(move?.category, 'status', reward.move);
+  }
+});
+
+test('EV and IV rewards stay inside the limits', () => {
+  const brace = evsAfter('machoBrace', { ...NO_EVS, atk: 250 }, speciesIdByName('Machop') as number, undefined);
+  assert.deepEqual(brace, { hp: BRACE_EVS, atk: 252, def: BRACE_EVS, satk: BRACE_EVS, sdef: BRACE_EVS, spd: BRACE_EVS });
+  assert.deepEqual(evsAfter('vitaminBag', { ...NO_EVS }, speciesIdByName('Abra') as number, undefined), { ...NO_EVS, satk: 32, spd: 32 });
+  assert.equal(Object.values(evsAfter('machoBrace', { ...NO_EVS, hp: 252, atk: 252 }, 1, undefined)).reduce((sum, value) => sum + value, 0), 510);
+  assert.deepEqual(ivsAfter('weights', { hp: 29, atk: 0, def: 31, satk: 10, sdef: 31, spd: 31 }, undefined), { hp: 31, atk: WEIGHTS_IVS, def: 31, satk: 10 + WEIGHTS_IVS, sdef: 31, spd: 31 });
+});
+
+test('an ideal Mint gives each one the nature its stats want, and fits only who does not have it', () => {
+  assert.equal(idealNature(speciesIdByName('Machop') as number), 'adamant');
+  assert.equal(idealNature(speciesIdByName('Abra') as number), 'timid');
+  const party = [{ ...target('a', 'Machop'), nature: 'adamant' }, { ...target('b', 'Abra'), nature: 'brave' }];
+  for (const reward of offered(party, plain).filter((offer) => offer.kind === 'idealMint')) {
+    assert.deepEqual(reward.fits, ['b']);
+    assert.equal(reward.natures?.b, 'timid');
+  }
+});
+
+test('a Linking Cord evolves by level only up to 5 levels early', () => {
+  const charmander = speciesIdByName('Charmander') as number;
+  const charizard = speciesIdByName('Charizard') as number;
+  assert.equal(cordEvolution({ speciesId: charmander, finalId: charizard, level: 11 }), speciesIdByName('Charmeleon'));
+  assert.equal(cordEvolution({ speciesId: charmander, finalId: charizard, level: 8 }), null);
+  assert.equal(cordEvolution({ speciesId: speciesIdByName('Kadabra') as number, finalId: speciesIdByName('Alakazam') as number, level: 40 }), null, 'a trade evolution takes a stone');
+});
+
+test('a Shiny Charm only fits who is not shiny yet', () => {
+  const party = [target('a', 'Pikachu'), { ...target('b', 'Eevee'), shiny: true }];
+  for (const reward of offered(party, { ...plain, minTier: 'rare' }).filter((offer) => offer.kind === 'shinyCharm')) assert.deepEqual(reward.fits, ['a']);
 });
