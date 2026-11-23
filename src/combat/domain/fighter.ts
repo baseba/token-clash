@@ -3,6 +3,7 @@
 import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
 import { abilityFor, genderFor, natureFor, PERFECT_IVS, natureInfo, type NatureInfo, learnedMoves, moveEntry, moveOrigins, rng, shuffled, species, statsFor, type EntryLike, type Stats } from '../../catalog/domain/creatures.js';
 import type { Gender, Ivs, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { isHeldItem } from '../../catalog/domain/held-items.js';
 import { moveData, moveFor, type MoveData } from './moves.js';
 
 /** A fighter as the battle and the browser see it. */
@@ -27,6 +28,8 @@ export interface Fighter {
   evs: Ivs;
   speciesBase: Stats;
   ivs: Ivs;
+  /** The item it holds (only the Tower gives them), null once it is used up. Absent with none, so battles without items look as they always did. */
+  item?: string | null;
 }
 
 export const MOVES_PER_FIGHTER = 4;
@@ -96,5 +99,6 @@ export function buildFighter(entry: RosterEntry): Fighter {
     ivs: iv,
     evs,
     speciesBase: sp.stats,
+    ...(isHeldItem(entry.heldItem) ? { item: entry.heldItem } : {}),
   };
 }

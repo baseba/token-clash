@@ -9,9 +9,12 @@ import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import { TournamentRepository } from '../domain/arena.repositories.js';
-import type { Challenge } from '../domain/challenge.js';
+import type { Challenge, Staging } from '../domain/challenge.js';
 import { humanCount, reachedRound, roundName, type Tournament } from '../domain/tournament.js';
 import { Presence, type BattlePhase, type CountdownPlayer } from './presence.js';
+
+/** The look of a staged battle; the AI's planned three stay hidden from the players. */
+const stagingView = ({ aiPicks, ...look }: Staging) => look;
 
 @Injectable()
 export class ArenaViews {
@@ -48,7 +51,7 @@ export class ArenaViews {
       winnerId: challenge.winnerId ?? null,
       turns: challenge.turns ?? null,
       final: challenge.final ?? null,
-      staging: challenge.staging ?? null,
+      staging: challenge.staging ? stagingView(challenge.staging) : null,
     };
   }
 

@@ -38,7 +38,6 @@ const IMMUNE_BY_ABILITY: Record<string, string> = {
 const STATUS_IMMUNE_TYPES: Record<string, string[]> = { par: ['electric'], brn: ['fire'], psn: ['poison', 'steel'], tox: ['poison', 'steel'], frz: ['ice'], slp: [] };
 const STATUS_VALUE: Record<string, number> = { slp: 70, par: 55, tox: 52, psn: 35, brn: 48, frz: 40 };
 
-const lastSwitchTurn = new WeakMap<BattleSide, number>();
 const pickOne = <T>(list: readonly T[], random: Random): T => list[Math.floor(random() * list.length)];
 const bst = (data: { stats: readonly number[] }): number => data.stats.reduce((a, b) => a + b, 0);
 const fullyEvolved = (data: SpeciesData): boolean => data.chainLen == null || data.stage == null || data.stage >= data.chainLen - 1;
@@ -476,7 +475,7 @@ function lookahead(battle: BattleState, sideIndex: number, options: Action[]): A
     });
     // When every line looks the same (say, lost either way), the plain move score breaks the tie.
     const tiebreak = mine.type === 'move' ? scoreMove(battle, sideIndex, mine.move) / 1e5 : 0;
-    const value = 0.6 * Math.min(...outcomes) + 0.4 * (outcomes.reduce((a, x) => a + x, 0) / outcomes.length) + tiebreak;
+    const value = 0.6 * Math.min(...outcomes) + 0.4 * (outcomes.reduce((a, x) => a + x, 0) / outcomes.length) + tiebreak - (mine.type === 'switch' ? LOOKAHEAD_SWITCH_COST : 0);
     if (value > bestValue) [best, bestValue] = [mine, value];
   }
   return best;
@@ -507,12 +506,22 @@ function chooseReplacement(battle: BattleState, sideIndex: number, profile: AiPr
     .sort((x, y) => y.score - x.score)[0].action;
 }
 
+const SWITCH_MARGIN = 0.35;
+/** A switch gives the rival a free hit, and going back and forth reads as nonsense: the search needs a clear gain to make one. */
+const LOOKAHEAD_SWITCH_COST = 0.25;
+
+/**
+ * A Pokémon that came in after the opening turn (as a replacement or by a switch) has not fought yet:
+ * it stays at least one turn instead of being called back right away. The lead may still leave a bad
+ * opening.
+ */
+const justCameIn = (battle: BattleState, me: BattleFighter): boolean => battle.turn > 1 && me.activeTurns < 1;
+
 function shouldSwitch(battle: BattleState, sideIndex: number, profile: AiProfile, best: number, switches: SwitchAction[], random: Random): SwitchAction | null {
   if (!switches.length || !has(profile, 'smartSwitching') || random() < profile.switchFailure) return null;
-  const memory = battle.sides[sideIndex];
-  if (lastSwitchTurn.get(memory) === battle.turn - 1) return null;
   const side = battle.sides[sideIndex];
   const me = side.team[side.active];
+  if (justCameIn(battle, me)) return null;
   const foeSide = battle.sides[1 - sideIndex];
   const foe = foeSide.team[foeSide.active];
   if (!foe || foe.hp <= 0) return null;
@@ -524,8 +533,7 @@ function shouldSwitch(battle: BattleState, sideIndex: number, profile: AiProfile
   const alt = switches
     .map((action) => ({ action, score: matchupScore(battle, side.team[action.to], foe, true) }))
     .sort((x, y) => y.score - x.score)[0];
-  if (alt.score <= here + 0.35) return null;
-  lastSwitchTurn.set(memory, battle.turn);
+  if (alt.score <= here + SWITCH_MARGIN) return null;
   return alt.action;
 }
 
@@ -542,12 +550,10 @@ export function chooseAction(battle: BattleState, sideIndex: number, level: AiLe
   if (!options.some((o) => o.type === 'move')) return chooseReplacement(belief, sideIndex, profile, switches, random);
   const scored = scoreMoves(belief, sideIndex, profile, random, options).sort((x, y) => y.score - x.score);
   if (has(profile, 'lookahead') && belief.phase === 'choose' && foe && foe.hp > 0) {
-    const shortlist = [...scored.map((x) => x.action), ...switches];
+    const me = belief.sides[sideIndex].team[belief.sides[sideIndex].active];
+    const shortlist = [...scored.map((x) => x.action), ...(justCameIn(belief, me) ? [] : switches)];
     const chosen = safeLookahead(belief, sideIndex, shortlist);
-    if (chosen) {
-      if (chosen.type === 'switch') lastSwitchTurn.set(battle.sides[sideIndex], belief.turn);
-      return chosen;
-    }
+    if (chosen) return chosen;
   }
   return shouldSwitch(belief, sideIndex, profile, scored[0].score, switches, random) ?? scored[0].action;
 }

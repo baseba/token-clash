@@ -177,10 +177,15 @@ export class TeamPreviewService {
     const still = () => room.phase === phase && !side.picks;
     const count = picksNeeded(preview, sideIndex);
     const step = this.timings.aiPickMs / (count + 2);
+    const planned = room.challenge.staging?.aiPicks?.filter((index) => index >= 0 && index < side.entries.length).slice(0, count) ?? [];
     let choice: number[] = [];
     setTimeout(
       () => {
         if (!still()) return;
+        if (planned.length === count) {
+          choice = planned;
+          return;
+        }
         if (canReroll(preview, sideIndex)) {
           reroll(preview, sideIndex, aiRerollIndex({ difficulty: level, own: side.entries }), aiRerollCandidates(side.entries));
           broadcast(room, { t: 'preview' });

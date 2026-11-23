@@ -5,7 +5,7 @@
 import type { AiLevel } from '../../combat/domain/ai.js';
 import type { RoomKind, TwistKey } from '../../catalog/domain/tower-cast.js';
 import type { Floor, FloorKind } from './floors.js';
-import { baseStatTotal } from './growth.js';
+import { baseStatTotal, evolutionPath } from './growth.js';
 
 export const DIFFICULTY_MULTIPLIER: Readonly<Record<AiLevel, number>> = { easy: 0.5, mid: 1, hard: 1.5, veryhard: 2, skynet: 3 };
 export const FLOOR_POINTS: Readonly<Record<FloorKind, number>> = { trainer: 100, gym: 300, elite: 450, champion: 800 };
@@ -22,6 +22,8 @@ export interface FloorScore {
   team: number;
   multiplier: number;
   points: number;
+  /** The lines (first forms) of the rival team, so later floors seldom bring them again. Missing in older climbs. */
+  lines?: number[];
 }
 
 /** What the rival team is worth: each Pokémon's level times its base stat total, in hundreds. */
@@ -41,6 +43,7 @@ export function floorScore(floor: Floor, team: readonly { finalID: number; battl
     team: value,
     multiplier,
     points: Math.round((base + value) * multiplier),
+    lines: team.map((mon) => evolutionPath(mon.finalID)[0]),
   };
 }
 

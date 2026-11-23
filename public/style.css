@@ -2691,6 +2691,8 @@ button.tw-reward:hover, button.tw-reward:focus-visible { border-color: var(--acc
 .tw-reward .tw-tier { margin: 0 .4rem 0 0; vertical-align: 2px; }
 .tw-reward b { display: inline; }
 .tw-item { width: 40px; height: 40px; image-rendering: pixelated; object-fit: contain; }
+.tw-held { display: inline-flex; align-items: center; margin-left: auto; }
+.tw-held .tw-item { width: 28px; height: 28px; }
 .tw-tier { display: inline-block; font-size: .62rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; padding: .05rem .45rem; border-radius: 999px; margin-bottom: 2px; }
 .tier-common { background: rgb(166 159 207 / .18); color: var(--muted); }
 .tier-rare { background: rgb(94 200 255 / .16); color: #8fd9ff; }

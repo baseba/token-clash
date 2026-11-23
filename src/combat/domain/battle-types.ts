@@ -328,6 +328,8 @@ export type BattleEvent =
   | { t: 'courtChange' }
   | { t: 'magnitude'; side: number; n: number }
   | (About & { t: 'ability'; ability: string | null; info: AbilityInfo | null; note?: string } & AbilityDetails)
+  /** A held item acted; `usedUp` when it is gone. */
+  | (About & { t: 'item'; item: string; usedUp?: true })
   | { t: 'abilityChange'; side: number; ability: AbilityInfo | null }
   | { t: 'types'; side: number; types: string[] }
   | {

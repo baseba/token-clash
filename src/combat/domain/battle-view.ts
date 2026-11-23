@@ -1,5 +1,6 @@
 // What each client sees of a battle: its own side in full, the rival as revealed so far (HP in percent, moves and
 // ability once used), and every event in those same terms. Pending choices stay hidden: only "ready" shows.
+import { HELD_ITEMS } from '../../catalog/domain/held-items.js';
 import type { BoostKey, NatureInfo, Stats } from '../../catalog/domain/creatures.js';
 import type { MoveData } from './moves.js';
 import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
@@ -147,6 +148,9 @@ export type HiddenFighterView = { uid: string; hidden: true } & { [K in Exclude<
 
 export type FighterView = VisibleFighterView | HiddenFighterView;
 
+/** A held item as the client shows it. */
+const heldItemView = (key: string) => ({ key, name: HELD_ITEMS[key]?.name ?? key, desc: HELD_ITEMS[key]?.desc ?? '' });
+
 export function fighterView(battle: BattleState, sideIndex: number, slot: number, own: boolean, spectator = false): FighterView {
   const side = battle.sides[sideIndex];
   const fighter = side.team[slot];
@@ -174,6 +178,7 @@ export function fighterView(battle: BattleState, sideIndex: number, slot: number
     abilityInfo: abilityKnown ? abilityInfo(fighter.ability) : null,
     moves: publicMoves(fighter, own ? null : fighter.revealedMoves),
     ...(own && !fighter.volatiles.transformed ? { speciesBase: fighter.speciesBase, evs: fighter.evs, natureInfo: fighter.natureInfo } : {}),
+    ...(own && fighter.item ? { itemInfo: heldItemView(fighter.item) } : {}),
     ...(disguise ?? {}),
   };
 }

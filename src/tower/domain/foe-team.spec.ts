@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { moveOrigins, rng, speciesData } from '../../catalog/domain/creatures.js';
 import { moveData } from '../../combat/domain/moves.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { floorAt } from './floors.js';
-import { baseStatTotal } from './growth.js';
-import { foeTeam } from './foe-team.js';
+import { fitToParty, floorAt, levelCap } from './floors.js';
+import { baseStatTotal, evolutionPath } from './growth.js';
+import { foePicks, foeTeam } from './foe-team.js';
 
 test('a floor team has its size and level, the ace on top, every member at the form of its level', () => {
   const floor = floorAt(12, 25, 'mid', 's');
@@ -87,4 +87,55 @@ test('the first floors bring only level moves; later rivals also know taught mov
   const late = Array.from({ length: 8 }, (_, seed) => taught(30, seed)).flat();
   assert.ok(late.length > 0);
   for (const move of [...late, ...Array.from({ length: 8 }, (_, seed) => taught(12, seed)).flat()]) assert.ok((moveData(move.id)?.power ?? 0) <= 45 + move.level * 1.2, move.id);
+});
+
+test('a rival is a draw, not the best of its theme: many species come across seeds, and few of them again once you met them', () => {
+  const floor = floorAt(18, 50, 'hard', 's', 'tough');
+  const lines = Array.from({ length: 20 }, (_, seed) => foeTeam(floor, 'hard', rng(seed)).map((mon) => evolutionPath(mon.finalID)[0]));
+  assert.ok(new Set(lines.flat()).size >= floor.teamSize * 2 + 2, `${new Set(lines.flat()).size}`);
+  const met = lines[0];
+  const again = Array.from({ length: 20 }, (_, seed) => foeTeam(floor, 'hard', rng(seed), [], met)).flat().filter((mon) => met.includes(evolutionPath(mon.finalID)[0])).length;
+  const before = lines.flat().filter((line) => met.includes(line)).length;
+  assert.ok(again < before / 2, `${again} vs ${before}`);
+});
+
+test('a themed class brings at most two of its own species and fills up with others of their types', () => {
+  for (let seed = 0; seed < 10; seed++) {
+    const floor = floorAt(20, 50, 'mid', `g${seed}`, 'hideout');
+    if (!floor.species.length) continue;
+    const own = floor.species.map((id) => evolutionPath(id)[0]);
+    const team = foeTeam(floor, 'mid', rng(seed));
+    assert.ok(team.filter((mon) => own.includes(evolutionPath(mon.finalID)[0])).length <= 2, `${seed}`);
+    assert.equal(team.length, floor.teamSize);
+  }
+});
+
+test('the draw does not narrow with difficulty, but a harder rival picks the best three of it; a leader always brings its ace', () => {
+  const route = floorAt(19, 50, 'mid', 's');
+  const lines = (difficulty: 'easy' | 'skynet') => new Set(Array.from({ length: 20 }, (_, seed) => foeTeam(route, difficulty, rng(seed)).map((mon) => evolutionPath(mon.finalID)[0])).flat()).size;
+  assert.ok(lines('skynet') >= lines('easy') - 3, `${lines('skynet')} vs ${lines('easy')}`);
+  const team = foeTeam(route, 'mid', rng(1));
+  const worth = (index: number) => baseStatTotal(team[index].finalID) * (team[index].battleLevel ?? 0);
+  const strongest = team.map((_, index) => index).sort((a, b) => worth(b) - worth(a)).slice(0, 3).sort().join();
+  const picked = (difficulty: 'easy' | 'skynet') => Array.from({ length: 40 }, (_, seed) => foePicks(route, team, difficulty, rng(seed), 3).sort().join());
+  assert.ok(picked('skynet').filter((three) => three === strongest).length > picked('easy').filter((three) => three === strongest).length);
+  assert.ok(new Set(picked('easy')).size > 2, 'an easy rival mixes its three');
+  const gym = floorAt(25, 50, 'veryhard', 's');
+  const gymTeam = foeTeam(gym, 'veryhard', rng(1));
+  assert.ok(Array.from({ length: 20 }, (_, seed) => foePicks(gym, gymTeam, 'easy', rng(seed), 3)).every((three) => three.length === 3 && new Set(three).size === 3 && three.includes(gymTeam.length - 1)));
+});
+
+test('later rivals hold items: a gym leader\'s ace first, whole teams of the last bosses, and never on easy', () => {
+  assert.ok(foeTeam(floorAt(3, 50, 'hard', 's'), 'hard', rng(1)).every((mon) => !mon.heldItem));
+  const gym = foeTeam(floorAt(10, 50, 'hard', 's'), 'hard', rng(1));
+  assert.ok(gym.at(-1)?.heldItem && gym.slice(0, -1).every((mon) => !mon.heldItem));
+  assert.ok(foeTeam(floorAt(30, 50, 'hard', 's'), 'hard', rng(1)).every((mon) => mon.heldItem));
+  assert.ok(foeTeam(floorAt(30, 50, 'easy', 's'), 'easy', rng(1)).every((mon) => !mon.heldItem));
+});
+
+test('a team always finishes drawing, even when its theme has fewer distinct forms than it wants (Drayden on floor 35 hung the server)', () => {
+  const floor = fitToParty(floorAt(35, 50, 'mid', 's2'), [levelCap(35), levelCap(35), levelCap(35) - 1]);
+  const team = foeTeam(floor, 'mid', rng('s2:35:null'));
+  assert.ok(team.length >= 3 && team.length <= floor.teamSize);
+  assert.equal(new Set(team.map((mon) => mon.finalID)).size, team.length);
 });

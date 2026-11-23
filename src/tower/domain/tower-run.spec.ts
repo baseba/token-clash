@@ -5,6 +5,7 @@ import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { DomainError } from '../../shared/domain/errors.js';
 import { levelCap } from './floors.js';
 import { expForLevel } from './growth.js';
+import { FEATHER_EVS, VITAMIN_EVS } from './rewards.js';
 import { TowerRun } from './tower-run.js';
 
 const entry = (name: string, index: number): RosterEntry => {
@@ -236,8 +237,8 @@ test('a vitamin adds EVs that the battle team carries', () => {
   const mon = run.party[0];
   run.rewards = [{ id: 'v', kind: 'vitamin', tier: 'common', stat: 'spd', fits: [mon.uid], reasons: {} }];
   run.takeReward('v', { uid: mon.uid }, { at: 5, roster });
-  assert.equal(mon.evs.spd, 32);
-  assert.equal(run.battleTeam()[0].evs?.spd, 32);
+  assert.equal(mon.evs.spd, VITAMIN_EVS);
+  assert.equal(run.battleTeam()[0].evs?.spd, VITAMIN_EVS);
 });
 
 test('an evolution stone evolves now a Pokémon whose evolution has no level, and levels never undo it', () => {
@@ -370,7 +371,7 @@ test('party rewards work on everyone: an Exp. Share levels up all below the cap,
   assert.equal(run.takeReward('x', { uid: uids[0] }, { at: 5, roster }).length, uids.length);
   assert.ok(run.party.every((mon) => mon.level === 6));
   run.takeReward('w', { uid: uids[0] }, { at: 6, roster });
-  assert.ok(run.party.every((mon) => mon.evs.def === 10));
+  assert.ok(run.party.every((mon) => mon.evs.def === FEATHER_EVS));
 });
 
 test('a Golden Egg brings recruits at your best level, and a Shiny Charm makes the one you choose shiny', () => {
@@ -390,4 +391,16 @@ test('a Golden Egg brings recruits at your best level, and a Shiny Charm makes t
   run.takeReward('s', { uid: first.uid }, { at: 6, roster });
   assert.equal(first.entry.shiny, true);
   assert.equal(run.battleTeam()[0].shiny, true);
+});
+
+test('a held item goes to the one you choose, replaces the one it had, and goes with it to battle', () => {
+  const run = climbing();
+  win(run);
+  const mon = run.party[0];
+  run.rewards = [{ id: 'i', kind: 'rareItem', tier: 'rare', item: 'leftovers', fits: [mon.uid], reasons: {} }, { id: 'j', kind: 'epicItem', tier: 'epic', item: 'life-orb', fits: [mon.uid], reasons: {} }];
+  run.picks = 2;
+  run.takeReward('i', { uid: mon.uid }, { at: 5, roster });
+  assert.equal(run.battleTeam()[0].heldItem, 'leftovers');
+  run.takeReward('j', { uid: mon.uid }, { at: 6, roster });
+  assert.equal(mon.item, 'life-orb');
 });

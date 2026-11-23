@@ -4,13 +4,14 @@
 // each block of 25 (or of a shorter climb) four of the Elite Four and a champion. Leaders, Elite Four
 // and champions come from every region, never repeated in a climb, each with its type, its scene, its
 // region's music and its own words. Levels follow Emerald Rogue: your Pokémon never outgrow the floor
-// ahead (a level cap), bosses fight right at that cap, and route rivals stay below it: a calm one at
-// the level of the last boss, a plain one halfway, a tough one just under your cap but trained and
-// with one more Pokémon. The challenge is the bosses and how rivals are built, not levels you can't
-// reach. Difficulty moves levels by one at most; it trains more rivals and sharpens the AI.
+// ahead (a level cap) and bosses fight right at that cap. A plain rival is two levels under it and a
+// calm one four; a tough rival and a villain grunt fight at your cap, trained and with one more
+// Pokémon, and a villain leader is fought like a boss. Difficulty moves levels by one at most; it
+// trains more rivals and sharpens the AI. Route trainers are of every class: typed ones (a Hiker, a
+// Swimmer), rookies on calm ways and seasoned ones (an Ace Trainer, your rival) on tough ones.
 import type { AiLevel } from '../../combat/domain/ai.js';
 import { hash, rng, shuffled, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
-import { CLASS_TRAINERS, SIGNATURE } from '../../catalog/domain/trainer-goals.js';
+import { CLASS_TRAINERS, SIGNATURE, STARTER_IDS, type ClassTrainer } from '../../catalog/domain/trainer-goals.js';
 import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, TRAINER_VARIANTS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
 import {
   BOSS_LINES,
@@ -73,8 +74,14 @@ export interface Floor {
 
 const LEVELS_PER_FLOOR = 1.9;
 const BOSS_LEVELS: Record<FloorKind, number> = { trainer: 0, gym: 0, elite: 0, champion: 1 };
-/** A tough rival is this many levels under your cap (Emerald Rogue uses 5 for full parties of 6; battles here are 3 against 3). */
-const TOUGH_BELOW = 2;
+/** How many levels under your cap each way's rival fights: a tough one and a villain right at it. */
+const LEVELS_BELOW: Partial<Record<RoomKind, number>> = { trainer: 2, calm: 4, tough: 0, hideout: 0 };
+/** A villain leader (an admin or a boss) fights one level over a grunt, like a gym leader at its best. */
+const LEADER_LEVELS = 1;
+/** From this floor a villain boss may wait in a hideout; from the next, a legend among them. */
+const LEGENDS_IN_HIDEOUT_FROM = 30;
+/** How often a way's rival is of a class with no type of its own instead of a typed one. */
+const MIXED_CHANCE: Partial<Record<RoomKind, number>> = { trainer: 0.2, calm: 0.4, tough: 0.35 };
 const ROOM_STRENGTH: Partial<Record<RoomKind, Strength>> = { tough: 'strong', calm: 'weak', hideout: 'strong' };
 const DIFFICULTY_LEVELS: Record<AiLevel, number> = { easy: -1, mid: 0, hard: 0, veryhard: 1, skynet: 1 };
 /** From which floor each difficulty trains its plain route rivals (natures and EVs). */
@@ -125,24 +132,24 @@ export function stretchStart(floor: number): number {
 export function foeLevel(floor: number, kind: FloorKind, difficulty: AiLevel, room: RoomKind | null = null): number {
   const cap = levelCap(floor);
   const start = Math.min(stretchStart(floor), cap);
-  const route = room === 'calm' || room === 'hideout' ? start : room === 'tough' ? Math.max(start, cap - TOUGH_BELOW) : Math.round((start + cap) / 2);
+  const route = Math.max(start, cap - (LEVELS_BELOW[room ?? 'trainer'] ?? LEVELS_BELOW.trainer!));
   const level = kind === 'trainer' ? route : cap + BOSS_LEVELS[kind];
   return Math.min(MAX_LEVEL, Math.max(2, level + DIFFICULTY_LEVELS[difficulty]));
 }
 
 /**
- * The floor against the party you bring: no rival above your strongest Pokémon (a boss's ace may be one
- * over), and the special ways (a tough rival, a villain hideout) not above your party's average. The
- * curve keeps the party at the cap; this keeps a party that fell behind (a recruit, a dark deal) from
- * meeting rivals it cannot reach.
+ * The floor against the party you bring: no route rival above your strongest Pokémon, and no boss nor
+ * villain leader more than one over it. The curve keeps the party at the cap; this keeps a party that
+ * fell behind (a dark deal, a climb with few battles) from meeting rivals it cannot reach.
  */
 export function fitToParty(floor: Floor, partyLevels: readonly number[]): Floor {
   if (!partyLevels.length) return floor;
-  const top = Math.max(...partyLevels);
-  const average = Math.round(partyLevels.reduce((sum, level) => sum + level, 0) / partyLevels.length);
-  const ceiling = isBoss(floor.kind) ? top : floor.room === 'tough' || floor.room === 'hideout' ? average : top;
+  const ceiling = Math.max(...partyLevels) + (isLeader(floor) ? LEADER_LEVELS : 0);
   return floor.level > ceiling ? { ...floor, level: Math.max(2, ceiling) } : floor;
 }
+
+/** A boss, or a villain admin or boss waiting in a hideout: it brings its ace and fights like one. */
+export const isLeader = (floor: Pick<Floor, 'kind' | 'room' | 'signature'>): boolean => isBoss(floor.kind) || (floor.room === 'hideout' && floor.signature !== null);
 
 /** Always at least the 3 a battle takes; later rivals bring more, so they also choose. A tough rival brings one more, a calm one just 3. */
 export function teamSize(floor: number, kind: FloorKind, room: RoomKind | null = null): number {
@@ -187,9 +194,24 @@ export function roomsAt(floor: number, length: number | null, seed: string, roll
 }
 
 const typedClasses = Object.entries(CLASS_TRAINERS).filter(([key, cls]) => (cls.goal.kind === 'type' || cls.goal.kind === 'species') && !key.includes('_grunt') && cls.rarity !== 'legendary');
+const ROOKIES = ['youngster', 'school_kid', 'preschooler', 'nursery_aide'];
+const SEASONED = ['ace_trainer', 'veteran', 'rival', 'player', 'nate', 'rosa', 'victor', 'victoria', 'benga'];
+const mixedOf = (bases: readonly string[]) => Object.entries(CLASS_TRAINERS).filter(([key]) => bases.some((base) => key === base || key.startsWith(`${base}_`)));
+/** Classes with no type of their own, by the way they fit: rookies on a calm way, seasoned ones on a tough one, the rest anywhere. */
+const MIXED_CLASSES: Partial<Record<RoomKind, [string, ClassTrainer][]>> = {
+  calm: mixedOf(ROOKIES),
+  tough: mixedOf(SEASONED),
+  trainer: Object.entries(CLASS_TRAINERS).filter(([key, cls]) => (cls.goal.kind === 'total' || cls.goal.kind === 'starter') && !mixedOf([...ROOKIES, ...SEASONED]).some(([other]) => other === key)),
+};
 const villainClasses = Object.entries(CLASS_TRAINERS).filter(([key, cls]) => key.includes('_grunt') && cls.goal.kind !== 'total');
 const speciesOf = (names: readonly string[]): number[] => names.map((name) => speciesIdByName(name)).filter((id): id is number => !!id);
+/** The ace of a villain in its hideout: its signature, or the one it is known for when it has none (Team Star's bosses each their own). */
+const HIDEOUT_ACES: Readonly<Record<string, string>> = {
+  proton: 'Golbat', zinzolin: 'Cryogonal', rood: 'Swoobat', xerosic: 'Crawdaunt', bryony: 'Liepard', aliana: 'Mightyena', celosia: 'Manectric',
+  mable: 'Houndoom', oleana: 'Garbodor', penny: 'Sylveon', giacomo: 'Kingambit', ortega: 'Azumarill', eri: 'Annihilape',
+};
 const signatureOf = (key: string): number | null => (SIGNATURE[key] ? speciesIdByName(SIGNATURE[key]) : null);
+const hideoutAceOf = (key: string): number | null => (HIDEOUT_ACES[key] ? speciesIdByName(HIDEOUT_ACES[key]) : signatureOf(key));
 const typesOfSpecies = (ids: readonly number[]): string[] => [...new Set(ids.flatMap((id) => speciesData(id)?.types ?? []))];
 
 const classBase = (key: string): string => key.replace(/_(m|f)(_\d+)?$|_\d+$/, '');
@@ -244,11 +266,30 @@ function classAt(seed: string, rolls: Rolls, floor: number, room: RoomKind | nul
   return typedClasses[index];
 }
 
+/**
+ * Whether a way's rival is of a class with no type of its own. Never two in a row: not when the plain
+ * route below had one, nor on another way when this floor's plain route has one.
+ */
+function takesMixed(seed: string, rolls: Rolls, floor: number, room: RoomKind | null): boolean {
+  const way = room ?? 'trainer';
+  const rolled = (number: number, option: RoomKind) =>
+    !!MIXED_CLASSES[option]?.length && rng(`${drawOf(seed, rolls, number)}:${number}${option === 'trainer' ? '' : `:${option}`}:mixed`)() < (MIXED_CHANCE[option] ?? 0);
+  if (!rolled(floor, way)) return false;
+  return way === 'trainer' ? floor <= 1 || !rolled(floor - 1, 'trainer') : !rolled(floor, 'trainer');
+}
+
 const routeScene = (floor: number): string => ROUTE_SCENES[Math.floor((floor - 1) / GYM_EVERY) % ROUTE_SCENES.length];
 
-function themedTrainer(key: string, cls: (typeof typedClasses)[number][1], at: string, seed: string, floor: number, room: RoomKind | null) {
-  const species = cls.goal.kind === 'species' ? speciesOf(cls.goal.names) : [];
-  const types = cls.goal.kind === 'type' ? [cls.goal.type] : typesOfSpecies(species);
+/** A rival or a protagonist brings one of the starters of its region (any, when it has none). */
+function starterOf(goal: ClassTrainer['goal'], at: string): number[] {
+  if (goal.kind !== 'starter') return [];
+  const [first] = goal.region ? STARTER_IDS[goal.region] : pick(Object.values(STARTER_IDS), `${at}:region`);
+  return [first + 3 * (hash(`${at}:starter`) % 3)];
+}
+
+function themedTrainer(key: string, cls: ClassTrainer, at: string, seed: string, floor: number, room: RoomKind | null) {
+  const species = cls.goal.kind === 'species' ? speciesOf(cls.goal.names) : starterOf(cls.goal, at);
+  const types = cls.goal.kind === 'type' ? [cls.goal.type] : cls.goal.kind === 'species' ? typesOfSpecies(species) : [];
   const name = nameFor(key, seed, floor, room);
   const title = cls.title === name ? (isFemale(key) ? 'Entrenadora' : 'Entrenador') : cls.title;
   return { foe: { key: variantOf(key, at), base: key, name, title }, species, types };
@@ -277,17 +318,19 @@ function drawFloor(floor: number, length: number | null, difficulty: AiLevel, se
     return { ...base, foe: null, type: null, types: [], species: [], signature: null, scene: routeScene(floor), music: MUSIC.route, lines: { hello: '', lose: '' } };
   if (chosen === 'hideout') {
     if (hash(`${at}:boss`) % 3 === 0) {
-      const key = pick(floor >= LATE_FLOOR ? [...VILLAINS.admin, ...VILLAINS.boss] : VILLAINS.admin, `${at}:villain`);
-      const ace = signatureOf(key);
+      const bosses = [...VILLAINS.boss, ...(floor >= LEGENDS_IN_HIDEOUT_FROM ? VILLAINS.legend : [])];
+      const key = pick([...VILLAINS.admin, ...VILLAINS.star, ...(floor >= LATE_FLOOR ? bosses : [])], `${at}:villain`);
+      const ace = hideoutAceOf(key);
       const types = ace ? [...(speciesData(ace)?.types ?? [])] : ['dark'];
-      return { ...base, foe: { key: variantOf(key, at), base: key, name: displayName(key), title: VILLAINS.boss.includes(key) ? (isFemale(key) ? 'Jefa' : 'Jefe') : 'Comandante' }, type: types[0] ?? null, types, species: [], signature: ace, scene: pick(['path-night', 'cave-night', 'beach-night'], at), music: MUSIC.hideout, lines: linesFor(key, 'dark', at) };
+      const leader = { ...base, level: base.level + LEADER_LEVELS, teamSize: Math.min(6, base.teamSize + 1) };
+      return { ...leader, foe: { key: variantOf(key, at), base: key, name: displayName(key), title: bosses.includes(key) ? (isFemale(key) ? 'Jefa' : 'Jefe') : VILLAINS.star.includes(key) ? 'Jefe de escuadrón' : 'Comandante' }, type: types[0] ?? null, types, species: [], signature: ace, scene: pick(['path-night', 'cave-night', 'beach-night'], at), music: MUSIC.hideout, lines: linesFor(key, 'dark', at) };
     }
     const [key, cls] = pick(villainClasses, `${at}:grunt`);
     const { foe, species, types } = themedTrainer(key, cls, at, seed, floor, chosen);
     return { ...base, foe, type: null, types, species, signature: null, scene: pick(['path-night', 'cave-night'], at), music: MUSIC.hideout, lines: linesFor(key, 'dark', at) };
   }
   if (kind === 'trainer') {
-    const [key, cls] = classAt(seed, rolls, floor, chosen, base.level);
+    const [key, cls] = takesMixed(seed, rolls, floor, chosen) ? pick(MIXED_CLASSES[chosen ?? 'trainer']!, `${at}:mixed-class`) : classAt(seed, rolls, floor, chosen, base.level);
     const { foe, species, types } = themedTrainer(key, cls, at, seed, floor, chosen);
     return { ...base, foe, type: null, types, species, signature: null, scene: sceneFor(types[0] ?? null, at, routeScene(floor)), music: floor >= LATE_FLOOR ? MUSIC.lateRoute : MUSIC.route, lines: linesFor(key, types[0] ?? null, at, chosen) };
   }
