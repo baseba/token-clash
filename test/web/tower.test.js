@@ -43,21 +43,25 @@ test('overworld frames: four groups of four, walking steps between idle frames',
   assert.deepEqual([0, 1, 2, 3].map((step) => frameIndex('right', step, true)), [13, 12, 14, 12]);
 });
 
-test('the map forks into as many lanes as ways, inside the map, between the tree borders', async () => {
-  const { ROWS, exitRows } = await import('../../public/tower-tiles.js');
-  for (const count of [1, 2, 3]) {
-    const exits = exitRows(count);
+test('a crossroads has one exit per way, each on an edge of the map and none twice', async () => {
+  const { COLS, ROWS, PATH_ROW, forkExits } = await import('../../public/tower-tiles.js');
+  for (const count of [1, 2, 3, 4, 5]) {
+    const exits = forkExits(count);
     assert.equal(exits.length, count);
-    assert.equal(new Set(exits).size, count);
-    assert.ok(exits.every((row) => row >= 1 && row < ROWS - 1));
+    assert.equal(new Set(exits.map((exit) => `${exit.side}:${exit.col}`)).size, count);
+    for (const exit of exits) {
+      if (exit.side === 'up') assert.ok(exit.row === 0 && exit.col > 0 && exit.col < COLS - 1);
+      else assert.ok(exit.row === PATH_ROW && exit.col === (exit.side === 'left' ? 0 : COLS - 1));
+    }
+    assert.ok(exits.every((exit) => exit.row >= 0 && exit.row < ROWS));
   }
 });
 
-test('every scene of a floor draws a map from the atlas, with its lanes and the path clear', async () => {
-  const { ATLAS_KEYS, COLS, ROWS, T, exitRows, mapLayout, sceneLook, tintPixels } = await import('../../public/tower-tiles.js');
-  const separators = new Set([...T.ledge, T.rock, T.caveBoulder[1]]);
+test('every scene of a floor draws a map from the atlas, with its path and its openings clear', async () => {
+  const { ATLAS_KEYS, COLS, ROWS, PATH_ROW, T, mapLayout, openingsOf, sceneLook, tintPixels } = await import('../../public/tower-tiles.js');
+  const blocking = new Set([...T.ledge, T.rock, ...T.caveBoulder, ...T.forestTrunks, ...T.forestCanopy, T.sea, T.tall]);
   for (const scene of ['lab', ...backgrounds]) {
-    for (const forks of [0, 1, 2, 3]) {
+    for (const forks of [0, 3, 4, 5]) {
       const grid = mapLayout({ scene, seed: 's', forks });
       assert.equal(grid.length, ROWS);
       for (const row of grid) {
@@ -65,7 +69,10 @@ test('every scene of a floor draws a map from the atlas, with its lanes and the 
         for (const key of row) assert.ok(ATLAS_KEYS.includes(key), `${scene}: ${key}`);
       }
       if (scene === 'lab') continue;
-      for (const lane of exitRows(forks)) assert.ok(!separators.has(grid[lane][COLS - 1]), `${scene} lane ${lane}`);
+      const { up, down } = openingsOf({ forks });
+      for (let col = 0; col < COLS; col++) assert.ok(!blocking.has(grid[PATH_ROW][col]), `${scene} path ${col}`);
+      for (const col of up) for (let row = 0; row < PATH_ROW; row++) assert.ok(!blocking.has(grid[row][col]), `${scene} up ${col}:${row}`);
+      for (const col of down) for (let row = PATH_ROW + 1; row < ROWS; row++) assert.ok(!blocking.has(grid[row][col]), `${scene} down ${col}:${row}`);
     }
     assert.ok(Array.isArray(sceneLook(scene).tints));
   }

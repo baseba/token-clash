@@ -4,13 +4,17 @@
 // public/tiles/tower.png, which is not versioned (like the sprites). Each map is our own layout, built
 // the way the games build a route: a tree border, a path or a strip of sand, tall grass, ledges and
 // rocks, and a scene of the battle background that comes next (grass, a lake, a beach, a cave, snow…).
+// You climb the Tower going up: a floor where the way splits is a crossroads you reach from below, with
+// ways to the left, to the right and one to three up; the path of a floor can also open below (you came
+// up into it) or above (you go up from it).
 // A key is a metatile id of the General tileset, or of Cave or Lab (Building) in the high bits.
 
 export const COLS = 16;
 export const ROWS = 7;
 export const TILE = 16;
 export const PATH_ROW = 3;
-export const FORK_COL = 9;
+/** Where a crossroads meets the way you came up by. */
+export const CROSS_COL = 8;
 
 const CAVE = 0x1000;
 const LAB = 0x2000;
@@ -66,8 +70,26 @@ export const T = {
 export const ATLAS_KEYS = [...new Set(Object.values(T).flatMap((value) => (typeof value === 'number' ? [value] : Object.values(value).flat(2))))];
 export const ATLAS_COLS = 16;
 
-/** Rows of the lanes the path forks into on the right, one per way. */
-export const exitRows = (count) => (count <= 1 ? [PATH_ROW] : count === 2 ? [2, 4] : [1, 3, 5]);
+/** The columns of the ways that leave a crossroads upwards, by how many there are. */
+const UP_COLS = { 1: [CROSS_COL], 2: [5, 11], 3: [4, CROSS_COL, 12] };
+
+/**
+ * Where each way leaves a crossroads, in the order the ways are offered: up the middle first (the
+ * plain route), then left and right, then the other ways up. Every exit is on the map's edge.
+ */
+export function forkExits(count) {
+  const sides = count >= 2 ? [{ side: 'left', col: 0, row: PATH_ROW }, { side: 'right', col: COLS - 1, row: PATH_ROW }] : [];
+  const ups = (UP_COLS[count - sides.length] ?? []).map((col) => ({ side: 'up', col, row: 0 }));
+  const middle = ups.length % 2 ? ups.splice(Math.floor(ups.length / 2), 1) : [];
+  return [...middle, ...sides, ...ups];
+}
+
+/** The openings of a map's path: columns that go down off its bottom edge and up off its top one. */
+export function openingsOf({ forks = 0, from = null, upTo = null }) {
+  const up = forks ? forkExits(forks).filter((exit) => exit.side === 'up').map((exit) => exit.col) : upTo != null ? [upTo] : [];
+  const down = forks ? [CROSS_COL] : from != null ? [from] : [];
+  return { up, down };
+}
 
 /** What a battle background looks like on the map: its layout and the colours it is repainted with. */
 export function sceneLook(scene) {
@@ -91,18 +113,31 @@ function seeded(text) {
   };
 }
 
+/** What you walk on in each kind of scene, where a way is cut through it. */
+const FLOOR = { path: T.dirt.c, cave: T.caveFloor[0], beach: T.sand, ocean: T.sand, desert: T.sand, mountain: T.sand };
+
 /**
- * The map of a floor as rows of keys. `forks` lanes leave on the right (0: the path crosses the map).
- * Lanes, the path and the spots where the trainers stand are always walkable.
+ * The map of a floor as rows of keys. The path crosses it from side to side; `forks` ways also leave
+ * it upwards and you come up into it from below (a crossroads), `from` is a column where you came up
+ * from below and `upTo` one where you go up. The path, its openings and where the trainers stand are
+ * always walkable.
  */
-export function mapLayout({ scene, seed, forks = 0, foeCol = 12 }) {
+export function mapLayout({ scene, seed, forks = 0, foeCol = 12, from = null, upTo = null }) {
   const { family } = sceneLook(scene);
+  const grid = drawScene(family, scene, seed, foeCol, openingsOf({ forks, from, upTo }));
+  if (family === 'lab') return grid;
+  const { up, down } = openingsOf({ forks, from, upTo });
+  const floor = FLOOR[family] ?? T.grass;
+  for (const col of up) for (let row = 0; row < PATH_ROW; row++) grid[row][col] = floor;
+  for (const col of down) for (let row = PATH_ROW + 1; row < ROWS; row++) grid[row][col] = floor;
+  return grid;
+}
+
+function drawScene(family, scene, seed, foeCol, { up, down }) {
   const random = seeded(`${scene}:${seed}`);
   const grid = Array.from({ length: ROWS }, () => Array(COLS).fill(T.grass));
   const set = (row, col, key) => { if (row >= 0 && row < ROWS && col >= 0 && col < COLS) grid[row][col] = key; };
-  const lanes = forks ? exitRows(forks) : [];
-  const fork = (col) => forks && col > FORK_COL;
-  const walk = (row, col) => (fork(col) ? lanes.includes(row) || (col <= FORK_COL + 1 && row >= Math.min(...lanes) && row <= Math.max(...lanes)) : row === PATH_ROW) || (col === FORK_COL && forks && row >= Math.min(...lanes, PATH_ROW) && row <= Math.max(...lanes, PATH_ROW));
+  const walk = (row, col) => row === PATH_ROW || (up.includes(col) && row < PATH_ROW) || (down.includes(col) && row > PATH_ROW);
   const locked = new Set();
   const open = (row, col) => !locked.has(row * COLS + col) && !walk(row, col) && !(col >= foeCol - 1 && col <= foeCol + 1 && row >= PATH_ROW - 1 && row <= PATH_ROW);
   const fill = (key, rows = [0, ROWS - 1]) => { for (let row = rows[0]; row <= rows[1]; row++) for (let col = 0; col < COLS; col++) set(row, col, key); };
@@ -128,14 +163,6 @@ export function mapLayout({ scene, seed, forks = 0, foeCol = 12 }) {
   const sprinkle = (key, chance, rows) => {
     for (const row of rows) for (let col = 0; col < COLS; col++) if (open(row, col) && random() < chance) set(row, col, key);
   };
-  /** Where lanes split off on the right, a ledge, tall grass or rocks keep them apart. */
-  const separators = (key) => {
-    if (!forks) return;
-    for (let row = 1; row < ROWS - 1; row++) {
-      if (lanes.includes(row) || row < Math.min(...lanes) || row > Math.max(...lanes)) continue;
-      for (let col = FORK_COL + 2; col < COLS; col++) set(row, col, Array.isArray(key) ? (col === FORK_COL + 2 ? key[0] : col === COLS - 1 ? key[2] : key[1]) : key);
-    }
-  };
 
   if (family === 'cave') {
     fill(T.caveFloor[0]);
@@ -147,8 +174,7 @@ export function mapLayout({ scene, seed, forks = 0, foeCol = 12 }) {
     sprinkle(T.caveFloor[1], 0.25, [2, 3, 4, 5]);
     sprinkle(T.caveBoulder[0], 0.12, [2, 4, 5]);
     sprinkle(T.caveBoulder[1], 0.08, [2, 4, 5]);
-    if (!forks) { set(1, 14, T.caveHole[0]); set(2, 14, T.caveHole[1]); }
-    separators(T.caveBoulder[1]);
+    if (!up.includes(14)) { set(1, 14, T.caveHole[0]); set(2, 14, T.caveHole[1]); }
     return grid;
   }
   if (family === 'lab') {
@@ -172,7 +198,6 @@ export function mapLayout({ scene, seed, forks = 0, foeCol = 12 }) {
       T.seaRock.forEach((pair, r) => pair.forEach((key, c) => set(row + r, col + c, key)));
     }
     sprinkle(T.rock, 0.08, family === 'ocean' ? [2, 4] : [4, 5, 6]);
-    separators(T.rock);
     return grid;
   }
   if (family === 'desert' || family === 'mountain') {
@@ -183,7 +208,6 @@ export function mapLayout({ scene, seed, forks = 0, foeCol = 12 }) {
       set(ROWS - 1, col, T.moundOnSand[0][col % 3]);
     }
     sprinkle(T.rock, 0.12, [2, 4, 5]);
-    separators(T.rock);
     return grid;
   }
 
@@ -198,8 +222,7 @@ export function mapLayout({ scene, seed, forks = 0, foeCol = 12 }) {
       set(ROWS - 1, col, T.pond.c);
     }
   }
-  const pathEnd = forks ? FORK_COL + 1 : COLS;
-  if (family === 'path') patchRect(T.dirt, PATH_ROW - 1, -1, PATH_ROW + 1, pathEnd);
+  if (family === 'path') patchRect(T.dirt, PATH_ROW - 1, -1, PATH_ROW + 1, COLS);
   if (family === 'tallGrass') {
     clusters(T.tall, 9, [1, 2, 4, 5]);
     sprinkle(T.tall, 0.3, [PATH_ROW]);
@@ -207,8 +230,7 @@ export function mapLayout({ scene, seed, forks = 0, foeCol = 12 }) {
     clusters(T.tall, family === 'snow' ? 2 : 3, family === 'lake' ? [1] : [1, 4, 5]);
     sprinkle(T.flowers, 0.12, family === 'lake' ? [1, 2] : [1, 2, 4, 5]);
   }
-  if (!forks && open(1, 1) && family !== 'tallGrass') set(1, 1, T.sign);
-  separators(family === 'tallGrass' ? T.tall : T.ledge);
+  if (!up.length && open(1, 1) && family !== 'tallGrass') set(1, 1, T.sign);
   return grid;
 }
 

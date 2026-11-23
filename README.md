@@ -32,7 +32,7 @@ En vivo: **https://clash.mirrordev.xyz**
    - **La Torre** (`/torre`): un modo inspirado en PokeRogue y en Emerald Rogue con tu colección. Eliges dificultad
      (la de la IA) y largo (10, 25, 50 pisos o infinita). En el laboratorio, el Profesor Rowan te ofrece Pokémon de tu
      colección (balanceados, con un solo legendario como máximo) y te llevas 3, en nivel 5 y en la primera forma de su
-     línea. En cada piso normal el camino se divide, como en Emerald Rogue: una ruta, una ruta difícil (rival entrenado,
+     línea. En cada piso normal el camino se divide en 3 a 5 caminos, como en Emerald Rogue: una ruta, una ruta difícil (rival entrenado,
      en tu tope, premio raro), una tranquila (más débil, premio común), una parada (dos premios sin pelear), una
      madriguera (reclutas sin pelear), una guarida villana (premio épico) o un pacto oscuro (dejas ir a uno por dos
      premios épicos). Cada 5 pisos hay un líder de gimnasio y, al cierre de cada bloque de 25, cuatro del Alto Mando y
@@ -44,7 +44,10 @@ En vivo: **https://clash.mirrordev.xyz**
      venir, sin importar la dificultad, y casi no se repiten las que ya enfrentaste en la subida. La dificultad se
      nota en cómo elige sus 3 de lo que sacó: al azar en Fácil, lo mejor contra tu equipo en las difíciles. Ves cada piso como un mapa visto desde arriba, dibujado según el
      escenario de la pelea, con los sprites de mapa de los entrenadores; caminas hasta el rival, te ve y empieza la
-     pelea en nuestros fondos. Los niveles siguen a Emerald Rogue: la tranquila va 4 niveles bajo tu tope, la ruta 2, la difícil y los
+     pelea en nuestros fondos. Subes la torre hacia arriba: donde el camino se divide llegas desde abajo a una
+     encrucijada con caminos a la izquierda, a la derecha y de uno a tres hacia arriba, y entras al mapa siguiente
+     por el lado contrario al que saliste (si sales por la izquierda, el rival te espera al otro lado); tras cada
+     descanso vuelves a subir. Los niveles siguen a Emerald Rogue: la tranquila va 4 niveles bajo tu tope, la ruta 2, la difícil y los
      reclutas de la guarida justo en él, y los jefes y líderes villanos en él o uno más; ningún rival de ruta pasa a
      tu Pokémon más alto, ni un jefe más de uno. El nivel que ves en cada
      camino es el del equipo que trae. En la Torre se pelea con los IVs reales: los rivales tienen IVs cerca de los

@@ -1,5 +1,5 @@
 // What waits on each floor of the Tower. Between two bosses you choose your way, like the adventure
-// paths of Emerald Rogue: each plain floor offers two or three rooms (a trainer, a tough or calm one,
+// paths of Emerald Rogue: each plain floor offers three to five rooms (a trainer, a tough or calm one,
 // a rest stop, a den, a villain hideout, a dark deal). Every 5 floors a gym leader, and at the end of
 // each block of 25 (or of a shorter climb) four of the Elite Four and a champion. Leaders, Elite Four
 // and champions come from every region, never repeated in a climb, each with its type, its scene, its
@@ -171,11 +171,17 @@ export function floorKind(floor: number, length: number | null): FloorKind {
   return floor % GYM_EVERY === 0 ? 'gym' : 'trainer';
 }
 
-/** The rooms a plain floor offers: always a trainer, and one or two other ways. */
 /** What a floor's draw is made of: the climb, and the roll made when you reached that floor. */
 export type Rolls = Readonly<Record<number, string>>;
 const drawOf = (seed: string, rolls: Rolls, floor: number): string => (rolls[floor] ? `${seed}:${rolls[floor]}` : seed);
 
+/**
+ * How many ways a plain floor offers besides its trainer: two, three or four (3 to 5 in all). The same
+ * roll the floor always made, so a climb under way keeps the ways it was offered and only gains some.
+ */
+const extraWays = (roll: number): number => (roll < 0.5 ? 2 : roll < 0.8 ? 3 : 4);
+
+/** The rooms a plain floor offers: always a trainer, and two to four other ways. */
 export function roomsAt(floor: number, length: number | null, seed: string, rolls: Rolls = {}, twist: TwistKey | null = null): RoomKind[] {
   if (floorKind(floor, length) !== 'trainer') return [];
   const random = rng(`${drawOf(seed, rolls, floor)}:rooms:${floor}`);
@@ -183,7 +189,7 @@ export function roomsAt(floor: number, length: number | null, seed: string, roll
   const pool = ROOM_WEIGHTS.filter(([room]) => floor > WARM_UP_FLOORS || EARLY_ROOMS.includes(room)).map(([room, weight]): [RoomKind, number] => [room, weight * (boost[room] ?? 1)]);
   const rooms: RoomKind[] = ['trainer'];
   if (twist === 'wild') rooms.push(pool.splice(pool.findIndex(([room]) => room === 'tough'), 1)[0][0]);
-  const extra = random() < 0.5 ? 2 : 1;
+  const extra = extraWays(random());
   while (rooms.length < Math.max(1 + extra, twist === 'wild' ? 2 : 0) && pool.length) {
     const total = pool.reduce((sum, [, weight]) => sum + weight, 0);
     let roll = random() * total;
