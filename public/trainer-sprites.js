@@ -1,4 +1,4 @@
-import { GENERATED_VARIANTS, POKEMON_VARIANT_MAPS, RENAMED_GENERATED, RETIRED_GENERATED, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES } from './trainer-variants.js?v=dev';
+import { GENERATED_VARIANTS, HANDMADE_VARIANT_MAPS, RENAMED_GENERATED, RETIRED_GENERATED, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES } from './trainer-variants.js?v=dev';
 
 export { VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES };
 
@@ -194,9 +194,9 @@ export function originalTier(key) {
 
 export const SHINY_VARIANTS = HANDMADE_VARIANTS.filter((variant) => variant.pokemon).map((variant) => ({ key: `${variant.key}_shiny`, base: variant.base, pokemon: variant.pokemon, shiny: true, original: variant.key, name: `${variant.name} Shiny`, swaps: [] }));
 
-const withPokemonMap = (variant) => (POKEMON_VARIANT_MAPS[variant.key] ? { ...variant, map: POKEMON_VARIANT_MAPS[variant.key] } : variant);
+const withHandmadeMap = (variant) => (HANDMADE_VARIANT_MAPS[variant.key] ? { ...variant, map: HANDMADE_VARIANT_MAPS[variant.key] } : variant);
 
-export const TRAINER_VARIANTS = [...[...HANDMADE_VARIANTS, ...SHINY_VARIANTS].map(withPokemonMap), ...GENERATED_VARIANTS];
+export const TRAINER_VARIANTS = [...[...HANDMADE_VARIANTS, ...SHINY_VARIANTS].map(withHandmadeMap), ...GENERATED_VARIANTS];
 
 export const EARNED_VARIANTS = GENERATED_VARIANTS.filter((variant) => variant.earn);
 

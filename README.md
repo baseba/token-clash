@@ -102,9 +102,12 @@ En vivo: **https://clash.mirrordev.xyz**
      Pokémon piden tenerlo y usan su paleta (Red Charizard, Lance Rayquaza, Maxie Kyogre…); cada uno tiene además
      una versión Shiny con la paleta shiny del Pokémon, que pide lo mismo y tenerlo en shiny. `npm run variants` los
      replanifica (`scripts/plan-trainer-variants.mjs` escribe `public/trainer-variants.js`) y los genera. El
-     planificador lee cada sprite como rampas de sombras (`scripts/sprite-ramps.mjs`): pinta la ropa y, si se ve, el
-     pelo, cada rampa completa y en el mismo orden de luz, sin tocar el contorno ni los brillos que comparten varias
-     partes. Al instalar también se calcula dónde está la cara de cada sprite (`public/trainers/faces.json`) para
+     planificador (`scripts/sprite-rotate.mjs`) separa los colores del sprite en familias, cada una con sus sombras
+     y luces (las rampas de `scripts/sprite-ramps.mjs`), y solo gira el tinte: cada tono conserva su luz. No toca el
+     contorno ni la piel, y deja igual lo que no sabe si es piel o ropa café. Cambia la familia más visible y, si es
+     grande, una segunda; la ropa blanca o gris se tiñe. Las sombras que comparten piel y ropa se deciden pieza a pieza
+     con la luz desde arriba a la izquierda. Los recolores de un Pokémon toman su color vivo primero y después sus
+     negros, grises o blancos. Al instalar también se calcula dónde está la cara de cada sprite (`public/trainers/faces.json`) para
      centrar el ícono de perfil. Al arrancar, el servidor devuelve los tokens de entrenadores que dejaron de venderse y cambia el
      entrenador de quien usaba uno que ya no tiene. Ese sprite, en chico, es tu foto de perfil; en las peleas tu entrenador y el
      rival entran al campo, lanzan sus Pokémon y se retiran, y vuelven al terminar (el tuyo, en espejo y más grande).
@@ -325,7 +328,7 @@ Por tema:
 | Chat | `src/chat/domain/chat.ts`, canales en `arena/application/arena-chat.service.ts` | WebSocket | `public/app.js` |
 | Ranking y stats | `src/trainers/domain/ranking.ts`, `src/stats/application/server-stats.ts` | `GET /api/stats` en `stats/interface/stats.controller.ts`, `GET /api/leaderboard` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
 | Logros y entrenador del perfil | `src/stats/domain/achievements.ts` | `GET /api/me/achievements`, `PUT /api/me/look` en `stats/interface/achievements.controller.ts` | `public/trainer-sprites.js` |
-| Variantes de colores de entrenadores | `public/trainer-sprites.js` (a mano), `public/trainer-variants.js` (lo genera `scripts/plan-trainer-variants.mjs` con las rampas de `scripts/sprite-ramps.mjs`); `scripts/sync-trainers.js` pinta los sprites al instalar | | `public/app.js` |
+| Variantes de colores de entrenadores | `public/trainer-sprites.js` (a mano), `public/trainer-variants.js` (lo genera `scripts/plan-trainer-variants.mjs` con `scripts/sprite-rotate.mjs`, que gira el tinte de las rampas de `scripts/sprite-ramps.mjs`); `scripts/sync-trainers.js` pinta los sprites al instalar | | `public/app.js` |
 | Tienda | artículos y precios en `public/shop.js` (tipados en `src/catalog/domain/shop.ts`); saldo y compra en `src/trainers/domain/trainer.ts`; "pide al original" en `src/stats/domain/achievements.ts` | `GET /api/shop`, `POST /api/shop/buy`, `PUT /api/me/equip` en `stats/interface/achievements.controller.ts`, con los DTOs de `trainers/interface/dto/shop.dto.ts` | `public/shop.js`, `public/app.js` (la tienda está en `/perfil`) |
 | La Torre | `src/tower/domain/tower-run.ts` (la subida y sus estados), `floors.ts` (qué hay en cada piso), `growth.ts` (experiencia, evolución y movimientos), `lab.ts` (ofertas de tu colección), `foe-team.ts` (el equipo rival y cómo elige sus 3), `rewards.ts` (premios y sus rarezas), `score.ts` (puntos de cada piso); los objetos equipados en `src/catalog/domain/held-items.ts` (qué son) y `src/combat/domain/item-effects.ts` (qué hacen en batalla, con los hooks de las habilidades); salas del camino en `floors.ts` (`roomsAt`); personajes, escenarios y música en `public/tower-cast.js` (tipados en `src/catalog/domain/tower-cast.ts`) | `/api/tower/...` en `tower/interface/tower.controller.ts`; cada piso es una sala contra la IA con `staging` (`DuelService.startStaged`) | `public/app.js` (página `/torre`), `public/tower-map.js` (el mapa de cada piso y sus transiciones), `public/tower-tiles.js` (cómo se arma cada mapa y sus tiles), `public/overworld.js` (sprites de mapa) |
 | Tipos y efectividad | `public/types.js` (lo comparten servidor y navegador) | | |

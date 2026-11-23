@@ -1,6 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
 import { recolorTrainer } from '../../scripts/sync-trainers.js';
 import { DOWNLOADED_SPRITES, SHOP_TRAINERS, SPECIALS, TRAINER_SPRITES, TRAINER_VARIANTS } from '../../public/trainer-sprites.js';
 
@@ -70,28 +69,14 @@ test('generated variants use many different colors instead of repeating a few', 
   assert.ok(Math.max(...Object.values(uses)) <= GENERATED_VARIANTS.length * 0.12, JSON.stringify(uses));
 });
 
-const TRAINERS = new URL('../../public/trainers/', import.meta.url);
-test('every generated variant changes its colors visibly instead of landing on a near shade', { skip: existsSync(TRAINERS) ? false : 'needs the trainer sprites in public/trainers: run npm run trainers' }, async () => {
-  const { decodePng } = await import('../../scripts/sync-trainers.js');
+test('every generated variant changes some color and keeps the light of each tone', async () => {
   const { GENERATED_VARIANTS } = await import('../../public/trainer-variants.js');
+  const { oklchOf } = await import('../../scripts/sprite-rotate.mjs');
   const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  const counts = new Map();
   for (const variant of GENERATED_VARIANTS) {
-    if (!counts.has(variant.base)) {
-      const image = decodePng(readFileSync(new URL(`${variant.base}.png`, TRAINERS)));
-      const count = new Map();
-      for (let i = 0; i < image.width * image.height; i++) if (image.rgba[i * 4 + 3]) count.set(image.rgba.readUIntBE(i * 4, 3), (count.get(image.rgba.readUIntBE(i * 4, 3)) ?? 0) + 1);
-      counts.set(variant.base, count);
-    }
-    let weight = 0;
-    let change = 0;
-    for (const [from, to] of variant.map) {
-      const n = counts.get(variant.base).get(parseInt(from.slice(1), 16)) ?? 0;
-      const [a, b] = [rgb(from), rgb(to)];
-      change += n * Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-      weight += n;
-    }
-    assert.ok(change / weight >= 35, `${variant.key}: ${Math.round(change / weight)}`);
+    const whole = variant.map.filter((entry) => entry.length === 2);
+    assert.ok(whole.some(([from, to]) => from !== to), `${variant.key} changes something`);
+    for (const [from, to] of whole) assert.ok(Math.abs(oklchOf(rgb(from))[0] - oklchOf(rgb(to))[0]) <= 0.1, `${variant.key}: ${from} → ${to}`);
   }
 });
 
@@ -124,15 +109,15 @@ test('every legendary and mythical Pokémon of the game unlocks a recolor of a r
 });
 
 test('every recolor themed on a Pokémon has a shiny version painted with that Pokémon\'s shiny colors', async () => {
-  const { POKEMON_VARIANT_MAPS } = await import('../../public/trainer-variants.js');
+  const { HANDMADE_VARIANT_MAPS } = await import('../../public/trainer-variants.js');
   const themed = TRAINER_VARIANTS.filter((variant) => variant.pokemon && !variant.shiny);
   for (const variant of themed) {
     const shiny = TRAINER_VARIANTS.find((other) => other.key === `${variant.key}_shiny`);
     assert.ok(shiny, variant.key);
     assert.equal(shiny.base, variant.base);
     assert.equal(shiny.pokemon, variant.pokemon);
-    assert.ok(POKEMON_VARIANT_MAPS[shiny.key]?.length, `${shiny.key} has a map`);
-    assert.notDeepEqual(POKEMON_VARIANT_MAPS[shiny.key], POKEMON_VARIANT_MAPS[variant.key], shiny.key);
+    assert.ok(HANDMADE_VARIANT_MAPS[shiny.key]?.length, `${shiny.key} has a map`);
+    assert.notDeepEqual(HANDMADE_VARIANT_MAPS[shiny.key], HANDMADE_VARIANT_MAPS[variant.key], shiny.key);
   }
 });
 
@@ -158,26 +143,4 @@ test('only tiny light spots by the face count as eye whites, never a light colla
   paint(2, 11, 18, 14, [240, 240, 240]);
   const kept = eyeWhites({ width, height, rgba }, { x: 0.45, y: 0.45, h: 0.5 });
   assert.deepEqual([...kept].sort((a, b) => a - b), [8 * width + 8, 8 * width + 9]);
-});
-
-test('a head piece is recolored whole: the hair or cap colors that touch recolored ones join the map, with their shine, and skin does not', async () => {
-  const { completeHeadPieces } = await import('../../scripts/plan-trainer-variants.mjs');
-  const width = 12;
-  const height = 24;
-  const rgba = Buffer.alloc(width * height * 4);
-  const paint = (x0, y0, x1, y1, color) => {
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) rgba.set([...color, 255], (y * width + x) * 4);
-  };
-  paint(0, 0, width, 5, [173, 82, 107]);
-  for (let x = 0; x < width; x += 2) paint(x, 1, x + 1, 4, [107, 33, 58]);
-  paint(4, 0, 6, 1, [255, 255, 255]);
-  paint(2, 5, 10, 9, [255, 214, 189]);
-  paint(0, 9, width, height, [107, 33, 58]);
-  const map = completeHeadPieces({ width, height, rgba }, [['#6b213a', '#1a6a50']]);
-  const added = new Map(map.slice(1));
-  assert.ok(added.has('#ad526b'), 'the hair shade beside the recolored strands joins');
-  assert.ok(!added.has('#ffd6bd'), 'skin stays');
-  assert.ok(added.has('#ffffff'), 'the white shine on the hair is its lightest shade and joins it');
-  const brightness = (hexText) => [1, 3, 5].reduce((sum, i) => sum + parseInt(hexText.slice(i, i + 2), 16), 0);
-  assert.ok(brightness(added.get('#ad526b')) > brightness('#1a6a50'), 'the lighter hair shade stays lighter than the recolored dark one');
 });
