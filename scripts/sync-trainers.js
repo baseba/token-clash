@@ -223,14 +223,20 @@ export function eyeWhites(image, face) {
 }
 
 const INK_MAX = 24;
-const LOCAL_LEAD = 2;
+const LIT_WEIGHT = 2;
+const THIN_SHARE = 0.5;
+const MASS_SKIN_SHARE = 0.15;
+const DARK_SHADE_LUMA = 110;
+const MASS_MIN_PIXELS = 20;
 
 export function recolorByMap(image, map, face) {
   const rgba = Buffer.from(image.rgba);
   const colorAt = (i) => image.rgba.readUIntBE(i * 4, 3);
   const toRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   const table = new Map(map.filter((entry) => entry.length === 2).map(([from, to]) => [parseInt(from.slice(1), 16), toRgb(to)]));
-  const local = new Map(map.filter((entry) => entry[2] === NEAR).map(([from, to]) => [parseInt(from.slice(1), 16), toRgb(to)]));
+  const shades = new Map(map.filter((entry) => entry[2] === SHADE).map(([from, to]) => [parseInt(from.slice(1), 16), toRgb(to)]));
+  const skin = new Set(map.filter((entry) => entry[2] === SKIN).map(([from]) => parseInt(from.slice(1), 16)));
+  const lumaOf = (color) => 0.299 * (color >> 16) + 0.587 * ((color >> 8) & 255) + 0.114 * (color & 255);
   const eyes = face ? eyeWhites(image, face) : new Set();
   const paint = (i, to) => to.forEach((value, c) => (rgba[i * 4 + c] = value));
   for (let i = 0; i < image.width * image.height; i++) {
@@ -240,16 +246,20 @@ export function recolorByMap(image, map, face) {
   }
   const seen = new Uint8Array(image.width * image.height);
   for (let start = 0; start < image.width * image.height; start++) {
-    if (seen[start] || !image.rgba[start * 4 + 3] || !local.has(colorAt(start))) continue;
+    if (seen[start] || !image.rgba[start * 4 + 3] || !shades.has(colorAt(start))) continue;
     const color = colorAt(start);
     const piece = [start];
     seen[start] = 1;
-    let painted = 0;
-    let other = 0;
+    let litPainted = 0;
+    let litOther = 0;
+    let clothScore = 0;
+    let skinScore = 0;
+    let edgePixels = 0;
     for (let k = 0; k < piece.length; k++) {
       const i = piece[k];
+      let touchesCloth = false;
       const [x, y] = [i % image.width, Math.floor(i / image.width)];
-      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      for (const [nx, ny, lit] of [[x + 1, y, false], [x - 1, y, true], [x, y + 1, false], [x, y - 1, true]]) {
         if (nx < 0 || ny < 0 || nx >= image.width || ny >= image.height) continue;
         const j = ny * image.width + nx;
         if (!image.rgba[j * 4 + 3]) continue;
@@ -259,16 +269,28 @@ export function recolorByMap(image, map, face) {
             seen[j] = 1;
             piece.push(j);
           }
-        } else if (table.has(neighbor)) painted += 1;
-        else if (!isInk(image, j)) other += 1;
+          continue;
+        }
+        const weight = lit ? LIT_WEIGHT : 1;
+        if (skin.has(neighbor) && lumaOf(neighbor) > lumaOf(color)) skinScore += weight;
+        if (table.has(neighbor)) {
+          clothScore += weight;
+          touchesCloth = true;
+          if (lit) litPainted += 1;
+        } else if (!isInk(image, j) && lit) litOther += 1;
       }
+      if (touchesCloth) edgePixels += 1;
     }
-    if (painted >= other * LOCAL_LEAD && painted > 0) for (const i of piece) if (!eyes.has(i)) paint(i, local.get(color));
+    const dark = lumaOf(color) < DARK_SHADE_LUMA;
+    const thin = dark && edgePixels >= piece.length * THIN_SHARE;
+    const mass = skinScore <= clothScore * MASS_SKIN_SHARE && (dark || piece.length >= MASS_MIN_PIXELS);
+    if ((thin || mass) && clothScore > skinScore && litPainted >= litOther) for (const i of piece) if (!eyes.has(i)) paint(i, shades.get(color));
   }
   return { width: image.width, height: image.height, rgba };
 }
 
-export const NEAR = 'near';
+export const SHADE = 'shade';
+export const SKIN = 'skin';
 
 function isInk(image, i) {
   const [r, g, b] = image.rgba.subarray(i * 4, i * 4 + 3);
@@ -456,7 +478,7 @@ export function generateVariants() {
   for (const variant of TRAINER_VARIANTS) {
     try {
       const base = decodePng(readFileSync(new URL(`${variant.base}.png`, OUT)));
-      writeFileSync(new URL(`${variant.key}.png`, OUT), encodePng(variant.map ? recolorByMap(base, variant.map, faceOf(base)) : recolorTrainer(base, variant.swaps)));
+      writeFileSync(new URL(`${variant.key}.png`, OUT), encodePng(recolorByMap(base, variant.map, faceOf(base))));
     } catch (err) {
       failed.push(`${variant.key} (${err.message})`);
     }

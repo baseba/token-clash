@@ -1,4 +1,3 @@
-const NEAR = 'near';
 const OUTLINE_LIGHT = 0.08;
 const NEUTRAL_CHROMA = 0.1;
 const WHITE_LIGHT = 0.85;
@@ -15,11 +14,6 @@ const SHARED_CONTACT = 0.2;
 const MIN_STEP = 0.035;
 const LIGHT_FLOOR = 0.05;
 const LIGHT_CEIL = 0.94;
-const SHADOW_HUE = 235;
-const LIGHT_HUE = 55;
-const SHADOW_SHIFT = 14;
-const LIGHT_SHIFT = 9;
-const KEEP_HUE_SPREAD = 0.3;
 const CHROMA_STEP = 0.3;
 const MUTED_CHROMA = 0.2;
 const FACE_MIN_LIGHT = 0.4;
@@ -29,10 +23,6 @@ const SKIN_TONE_HUE = 12;
 const SKIN_TONE_LIGHT = 0.35;
 const FACE_HEAD_SHARE = 0.5;
 const FACE_MIN_SAT = 0.3;
-const SHADOW_SAT = 0.25;
-const WASH_FROM = 0.88;
-const WASH = 2;
-const TINT_SHARE = 0.6;
 const HIGHLIGHT_MIN_LIGHT = 0.6;
 const HIGHLIGHT_CHROMA = 0.3;
 const HIGHLIGHT_CONTACT = 0.25;
@@ -41,12 +31,8 @@ const LOOSE_SIZE = 2;
 const SHADE_MAX_LIGHT = 0.35;
 const RIM_SHARE = 0.35;
 const MATERIAL_SHARE = 0.08;
-const DOMINANT_SHARE = 0.4;
-const DOMINANT_CEIL = 0.8;
 const SKIN_LINE_LIGHT = 0.45;
 const SKIN_LINE_SAT = 0.35;
-const PALE_LIGHT = 0.68;
-const LIGHTER_EASE = 0.5;
 const TONE_SPREAD = 1.3;
 const TONE_MAX_LIFT = 0.08;
 const TONE_MAX_SAT = 0.7;
@@ -54,18 +40,8 @@ const TONE_WASH_FROM = 0.55;
 const TONE_WASH = 0.8;
 const TONE_MIN_SPAN = 0.14;
 const TONE_MAX_SCALE = 3;
-const PASTEL_LIGHT = 0.9;
-const PASTEL_SAT = 0.38;
-const PASTEL_MAX_SAT = 0.45;
-const PALE_CHROMA_FLOOR = 0.05;
 const CONTRAST_CONTACT = 0.08;
 const CONTRAST_KEEP = 0.6;
-const LIFT_STEP = 0.02;
-const LIFT_CEIL = 0.85;
-const DARK_RAMP = 0.35;
-const DARK_LIFT = 0.06;
-const DARK_GAIN = 1.2;
-const NEUTRAL_TINT = 0.55;
 
 export const chromaOf = ([, s, l]) => (1 - Math.abs(2 * l - 1)) * s;
 export const isNeutral = (entry) => chromaOf(entry.hsl) < NEUTRAL_CHROMA;
@@ -245,23 +221,6 @@ function touchesWith(colors, entries, key) {
   return entries.reduce((sum, e) => sum + (e.neighbors.get(key) ?? 0), 0);
 }
 
-export function paintAround(ramp, painted, skip) {
-  const to = new Map(painted.map(([from, color]) => [from, color]));
-  const shades = ramp.colors.map((entry) => ({ entry, rgb: rgbOfHex(to.get(hexOf(entry.rgb))) }));
-  const [darkest, lightest] = [shades[0], shades.at(-1)];
-  const extra = [];
-  for (const { key, entry, touches } of ramp.around ?? []) {
-    if (skip.has(key) || entry.skinTone || entry.hsl[2] < OUTLINE_LIGHT || touches < ramp.contacts * CONTRAST_CONTACT) continue;
-    const dark = entry.luma < darkest.entry.luma;
-    const anchor = dark ? darkest : lightest;
-    const [h, s, l] = hslOf(anchor.rgb);
-    const light = dark ? l * clamp(entry.hsl[2] / Math.max(anchor.entry.hsl[2], 0.05), 0.2, 0.95) : l + (1 - l) * clamp((entry.hsl[2] - anchor.entry.hsl[2]) / Math.max(1 - anchor.entry.hsl[2], 0.05), 0.1, 0.9);
-    const sat = dark ? Math.min(0.9, s * 1.1) : s * clamp(1 - (entry.hsl[2] - anchor.entry.hsl[2]), 0.3, 1);
-    extra.push([hexOf(entry.rgb), hexOf(rgbOfHsl(dark ? leanToward(h, SHADOW_HUE, 6) : h, sat, light)), NEAR]);
-  }
-  return extra;
-}
-
 function absorbEdges(colors, groups, rampOf, shared, anchors) {
   const isSkinGroup = (i) => groups[i].some((key) => anchors.has(key));
   for (const [key, entry] of colors) {
@@ -318,53 +277,6 @@ export function meanHue(entries) {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
-function leanToward(hue, toward, amount) {
-  const gap = signed(toward, hue);
-  return hue + Math.sign(gap) * Math.min(Math.abs(gap), amount);
-}
-
-export function paintRamp(ramp, target) {
-  const entries = ramp.colors;
-  const weight = entries.reduce((sum, e) => sum + e.count, 0) || 1;
-  const meanL = entries.reduce((sum, e) => sum + e.hsl[2] * e.count, 0) / weight;
-  const meanS = entries.reduce((sum, e) => sum + e.hsl[1] * e.count, 0) / weight;
-  const lights = entries.map((e) => e.hsl[2]);
-  const meanChroma = entries.reduce((sum, e) => sum + chromaOf(e.hsl) * e.count, 0) / weight;
-  const muted = meanChroma < MUTED_CHROMA;
-  const pale = muted && meanL >= PALE_LIGHT && !target.absolute;
-  const lifted = ramp.neutral && meanL < DARK_RAMP ? DARK_LIFT + meanL * DARK_GAIN : meanL;
-  const scale = target.light > 1 ? 1 + (target.light - 1) * LIGHTER_EASE : target.light;
-  const start = clamp(target.absolute ? target.light : lifted * scale, 0.12, 0.8);
-  const up = Math.max(...lights) - meanL;
-  const down = meanL - Math.min(...lights);
-  const fit = Math.min(down > 0 ? (start - LIGHT_FLOOR) / down : Infinity, 1.25);
-  const spread = (base) => Math.max(Math.min(fit, up > 0 ? (LIGHT_CEIL - base) / up : Infinity), 0.6);
-  const paintAt = (base) => keepOrder(entries.map((entry) => {
-    const [h, s, l] = entry.hsl;
-    if (pale) {
-      const softLight = clamp(l * PASTEL_LIGHT, LIGHT_FLOOR, LIGHT_CEIL);
-      const softHue = softLight < meanL ? leanToward(target.hue, SHADOW_HUE, ((meanL - softLight) / 0.3) * SHADOW_SHIFT * 0.5) : target.hue;
-      const share = clamp((chromaOf(entry.hsl) + PALE_CHROMA_FLOOR) / (meanChroma + PALE_CHROMA_FLOOR), 0.6, 1.4);
-      return { entry, hue: softHue, sat: clamp(Math.max(target.sat, 0.5) * PASTEL_SAT * share, 0.06, PASTEL_MAX_SAT), light: softLight };
-    }
-    const dominant = entry.count >= weight * DOMINANT_SHARE;
-    const light = Math.min(clamp(base + (l - meanL) * spread(base), LIGHT_FLOOR, LIGHT_CEIL), dominant ? DOMINANT_CEIL : LIGHT_CEIL);
-    const offset = ramp.hue === null || isNeutral(entry) ? 0 : clamp(signed(h, ramp.hue), -40, 40) * KEEP_HUE_SPREAD;
-    const lean = light < base ? leanToward(target.hue + offset, SHADOW_HUE, ((base - light) / 0.3) * SHADOW_SHIFT) : leanToward(target.hue + offset, LIGHT_HUE, ((light - base) / 0.3) * LIGHT_SHIFT);
-    const tone = target.absolute ? target.sat : (muted ? Math.max(s, NEUTRAL_TINT) * Math.max(target.sat, 0.5) : Math.max(s, meanS * TINT_SHARE) * target.sat);
-    const relative = muted || meanS === 0 ? 1 : clamp(Math.max(s, meanS * TINT_SHARE) / meanS, 0.45, 1.3);
-    const sat = clamp((target.absolute ? tone * relative : tone) * (1 + (base - light) * SHADOW_SAT) * (light > WASH_FROM && !dominant ? 1 - (light - WASH_FROM) * WASH : 1), 0.06, 0.92);
-    return { entry, hue: lean, sat, light };
-  }));
-  const floor = target.free ? 0 : ramp.floor ?? 0;
-  let base = start;
-  let painted = paintAt(base);
-  while (Math.min(...painted.map((shade) => lumaOf(shade.rgb))) < floor && base < LIFT_CEIL) {
-    base += LIFT_STEP;
-    painted = paintAt(base);
-  }
-  return painted.map(({ entry, rgb }) => [hexOf(entry.rgb), hexOf(rgb)]);
-}
 
 export function paintRampWithTones(ramp, tones, wanted) {
   const weight = ramp.colors.reduce((sum, e) => sum + e.count, 0) || 1;
