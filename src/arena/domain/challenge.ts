@@ -33,6 +33,8 @@ export interface Staging {
   returnTo: string;
   /** What the battle screen says it is part of, like "Torre · Piso 12". */
   label?: string;
+  /** The AI's three, when the mode chose them (the Tower varies them like a roguelike rival). */
+  aiPicks?: number[];
 }
 
 /** What we keep of a finished battle: its public state (who fought, who won). */

@@ -2434,7 +2434,7 @@ const itemImg = (name) => h('img', { class: 'tw-item', src: itemURL(name), alt: 
 const REWARD_INFO = {
   candy: { name: (r) => `Caramelo Raro ×${r.levels}`, icon: () => 'rare_candy', text: (r) => `Sube ${r.levels} niveles, sin pasar el tope del piso. Puede evolucionar y aprender movimientos.` },
   expCandy: { name: (r) => (r.levels > 1 ? `Caramelo Exp. ×${r.levels}` : 'Caramelo Exp.'), icon: () => 'rarer_candy', text: (r) => `Sube ${r.levels > 1 ? `${r.levels} niveles` : '1 nivel'} a quien esté bajo el tope del piso.` },
-  vitamin: { name: (r) => `Vitamina · ${STAT_NAME[r.stat] ?? r.stat}`, icon: (r) => VITAMINS[r.stat] ?? 'protein', text: (r) => `Suma 32 EVs de ${STAT_NAME[r.stat] ?? r.stat} (máximo 252 por stat y 510 en total). Cada 4 EVs es +1 en el stat.` },
+  vitamin: { name: (r) => `Vitamina · ${STAT_NAME[r.stat] ?? r.stat}`, icon: (r) => VITAMINS[r.stat] ?? 'protein', text: (r) => `Suma 64 EVs de ${STAT_NAME[r.stat] ?? r.stat} (máximo 252 por stat y 510 en total). Cada 4 EVs es +1 en el stat a nivel 100.` },
   tm: { name: (r) => `MT · ${r.moveInfo.name}`, icon: (r) => `tm_${r.moveInfo.type ?? 'normal'}`, text: () => 'Queda en su lista de movimientos; lo equipas cuando quieras.' },
   tutor: { name: (r) => `Tutor · ${r.moveInfo.name}`, icon: () => 'elixir', text: () => 'Un movimiento de tutor. Queda en su lista; lo equipas cuando quieras.' },
   eggMove: { name: (r) => `Mov. Huevo · ${r.moveInfo.name}`, icon: () => 'rare_egg', text: () => 'Un movimiento que solo se hereda criando. Queda en su lista; lo equipas cuando quieras.' },
@@ -2445,16 +2445,19 @@ const REWARD_INFO = {
   supportTm: { name: (r) => `MT de Apoyo · ${r.moveInfo.name}`, icon: (r) => `tm_${r.moveInfo.type ?? 'normal'}`, text: () => 'Un movimiento de estado: sube stats, cura, protege o altera al rival. Queda en su lista; lo equipas cuando quieras.' },
   quickClaw: { name: (r) => `Garra Rápida · ${r.moveInfo.name}`, icon: () => 'quick_claw', text: () => 'Un ataque con prioridad: golpea antes que el rival. Queda en su lista; lo equipas cuando quieras.' },
   teraShard: { name: (r) => `Teralito ${typeLabel(r.moveInfo.type)} · ${r.moveInfo.name}`, icon: (r) => `${r.moveInfo.type ?? 'normal'}_tera_shard`, text: () => 'El ataque más fuerte de su propio tipo (poder 80 o más). Queda en su lista; lo equipas cuando quieras.' },
-  weights: { name: () => 'Pesas de Entrenamiento', icon: () => 'muscle_band', text: () => 'Sube 4 puntos cada uno de sus IVs, hasta 31.' },
+  weights: { name: () => 'Pesas de Entrenamiento', icon: () => 'muscle_band', text: () => 'Sube 8 puntos cada uno de sus IVs, hasta 31.' },
   idealMint: { name: () => 'Menta Ideal', icon: (r) => NATURE_MINTS[Object.values(r.natures ?? {})[0]] ?? 'mint_atk', text: () => 'Le da la mejor naturaleza para sus stats: sube su ataque más fuerte o su Velocidad y baja el ataque que no usa.' },
   expShare: { name: (r) => (r.levels > 1 ? `Repartir Exp. ×${r.levels}` : 'Repartir Exp.'), icon: () => 'exp_share', text: (r) => `Sube ${r.levels > 1 ? `${r.levels} niveles` : '1 nivel'} a todos los que estén bajo el tope del piso.` },
   candyJar: { name: (r) => `Tarro de Caramelos ×${r.levels}`, icon: () => 'candy_jar', text: (r) => `Sube ${r.levels} niveles a todos los que estén bajo el tope del piso.` },
-  machoBrace: { name: () => 'Brazal Firme', icon: () => 'macho_brace', text: () => 'Suma 16 EVs en cada uno de sus seis stats (máximo 252 por stat y 510 en total).' },
-  vitaminBag: { name: () => 'Bolsa de Vitaminas', icon: () => 'berry_pouch', text: () => 'Suma 32 EVs en su ataque más fuerte y 32 en Velocidad.' },
+  machoBrace: { name: () => 'Brazal Firme', icon: () => 'macho_brace', text: () => 'Suma 32 EVs en cada uno de sus seis stats (máximo 252 por stat y 510 en total).' },
+  vitaminBag: { name: () => 'Bolsa de Vitaminas', icon: () => 'berry_pouch', text: () => 'Suma 64 EVs en su ataque más fuerte y 64 en Velocidad.' },
+  commonItem: { name: (r) => r.itemInfo?.name ?? 'Objeto', icon: (r) => `pokeapi:${r.item}`, text: (r) => `${r.itemInfo?.desc ?? ''} Se equipa: un Pokémon lleva un objeto a la vez.` },
+  rareItem: { name: (r) => r.itemInfo?.name ?? 'Objeto', icon: (r) => `pokeapi:${r.item}`, text: (r) => `${r.itemInfo?.desc ?? ''} Se equipa: un Pokémon lleva un objeto a la vez.` },
+  epicItem: { name: (r) => r.itemInfo?.name ?? 'Objeto', icon: (r) => `pokeapi:${r.item}`, text: (r) => `${r.itemInfo?.desc ?? ''} Se equipa: un Pokémon lleva un objeto a la vez.` },
   shinyCharm: { name: () => 'Amuleto Iris', icon: () => 'shiny_charm', text: () => 'Lo vuelve shiny por el resto de la subida. Solo cambia cómo se ve.' },
   linkingCord: { name: () => 'Cordón Unión', icon: () => 'linking_cord', text: () => 'Evoluciona ya a quien evoluciona por nivel y está a 5 niveles o menos de hacerlo.' },
   goldenEgg: { name: () => 'Huevo Dorado', icon: () => 'golden_egg', text: () => 'Trae a un Pokémon más de tu colección para reclutar, al nivel de tu mejor Pokémon.' },
-  feather: { name: (r) => `Pluma ${WING_NAMES[r.stat] ?? ''}`.trim(), icon: (r) => `pokeapi:${WINGS[r.stat] ?? 'health-wing'}`, text: (r) => `Suma 10 EVs de ${STAT_NAME[r.stat] ?? r.stat} a todo tu equipo.` },
+  feather: { name: (r) => `Pluma ${WING_NAMES[r.stat] ?? ''}`.trim(), icon: (r) => `pokeapi:${WINGS[r.stat] ?? 'health-wing'}`, text: (r) => `Suma 24 EVs de ${STAT_NAME[r.stat] ?? r.stat} a todo tu equipo.` },
   mint: { name: () => 'Menta', icon: () => 'mint_neutral', text: () => 'Cambia la naturaleza: un stat sube 10 % y otro baja 10 %.' },
   capsule: { name: () => 'Cápsula Habilidad', icon: () => 'ability_capsule', text: () => 'Desbloquea otra habilidad normal de su especie. Luego las alternas entre pisos.' },
   patch: { name: () => 'Parche Habilidad', icon: () => 'ability_charm', text: () => 'Desbloquea la habilidad oculta de su especie.' },
@@ -2665,6 +2668,7 @@ function teamRows(run, { growth = null } = {}) {
     return h('button', { type: 'button', class: 'tw-row', onclick: () => monEditor(run, mon) },
       h('span', { html: creatureHTML(mon) }),
       h('span', { class: 'tw-row-text' }, h('b', null, mon.name, ' ', h('small', null, g && gained ? `Nv ${g.fromLevel} → ${g.toLevel}` : `Nv ${mon.level}`)), expBar(mon)),
+      mon.item ? h('span', { class: 'tw-held', 'data-tip': `${mon.item.name}: ${mon.item.desc}` }, itemImg(`pokeapi:${mon.item.key}`)) : null,
       g ? h('small', { class: mon.atCap ? 'tw-up cap' : 'tw-up' }, mon.atCap ? 'Tope' : gained ? `+${gained}` : '') : glyph('pencil'));
   }));
 }
@@ -3055,8 +3059,7 @@ function rewardSummary(run, reward) {
     const move = reward.moveInfo;
     return `${CATEGORY[move.category]} · ${typeLabel(move.type)}${move.power ? ` · Poder ${move.power}` : ''} · ${move.accuracy ? `${move.accuracy} %` : 'siempre acierta'}. Para ${joinNames(names)}`;
   }
-  if (reward.kind === 'vitamin') return `+${Math.min(32, ...fits.map((mon) => 252 - (mon.evs?.[reward.stat] ?? 0)))} EVs de ${STAT_NAME[reward.stat]} para ${joinNames(names)}`;
-  if (['candy', 'expCandy', 'expShare', 'candyJar', 'vitamin', 'feather', 'machoBrace', 'vitaminBag', 'weights', 'idealMint', 'stone', 'linkingCord', 'bottleCap', 'goldCap'].includes(reward.kind)) return joinNames(fits.map((mon) => `${mon.name} ${reward.reasons?.[mon.uid] ?? ''}`.trim()));
+  if (['candy', 'expCandy', 'expShare', 'candyJar', 'vitamin', 'feather', 'machoBrace', 'vitaminBag', 'weights', 'idealMint', 'stone', 'linkingCord', 'bottleCap', 'goldCap', 'commonItem', 'rareItem', 'epicItem'].includes(reward.kind)) return joinNames(fits.map((mon) => `${mon.name} ${reward.reasons?.[mon.uid] ?? ''}`.trim()));
   if (['capsule', 'patch', 'shinyCharm'].includes(reward.kind)) return `Para ${joinNames(names)}`;
   return REWARD_INFO[reward.kind].text(reward);
 }
@@ -3105,7 +3108,7 @@ function rewardDetail(run, reward) {
     const res = await towerCall(btn, '/api/tower/reward', { body: { reward: reward.id, ...choice } });
     if (res) dlg.close();
   };
-  const verb = { tm: 'Enseñársela a', tutor: 'Enseñársela a', eggMove: 'Enseñárselo a', powerTm: 'Enseñársela a', mushroom: 'Dársela a', memory: 'Enseñársela a', gem: 'Enseñársela a', supportTm: 'Enseñársela a', quickClaw: 'Enseñársela a', teraShard: 'Enseñársela a', weights: 'Entrenar a', idealMint: 'Usarla en', machoBrace: 'Dárselo a', vitaminBag: 'Dársela a', shinyCharm: 'Usarlo en', linkingCord: 'Evolucionar a', candy: 'Dárselo a', expCandy: 'Dárselo a', vitamin: 'Dársela a', stone: 'Evolucionar a', capsule: 'Usarla en', patch: 'Usarlo en', mint: 'Usarla en', bottleCap: 'Usarla en', goldCap: 'Usarla en' }[reward.kind];
+  const verb = { tm: 'Enseñársela a', tutor: 'Enseñársela a', eggMove: 'Enseñárselo a', powerTm: 'Enseñársela a', mushroom: 'Dársela a', memory: 'Enseñársela a', gem: 'Enseñársela a', supportTm: 'Enseñársela a', quickClaw: 'Enseñársela a', teraShard: 'Enseñársela a', weights: 'Entrenar a', idealMint: 'Usarla en', machoBrace: 'Dárselo a', vitaminBag: 'Dársela a', shinyCharm: 'Usarlo en', linkingCord: 'Evolucionar a', candy: 'Dárselo a', expCandy: 'Dárselo a', vitamin: 'Dársela a', stone: 'Evolucionar a', capsule: 'Usarla en', patch: 'Usarlo en', mint: 'Usarla en', bottleCap: 'Usarla en', goldCap: 'Usarla en', commonItem: 'Equipárselo a', rareItem: 'Equipárselo a', epicItem: 'Equipárselo a' }[reward.kind];
   const effect = (mon) => {
     if (reward.kind === 'mint') return body.replaceChildren(h('h3', null, `Menta para ${mon.name}`), ...mintStep(run, reward, mon, send));
     if (reward.kind === 'capsule' || reward.kind === 'patch') return body.replaceChildren(h('h3', null, `Habilidad para ${mon.name}`), ...abilityStep(reward, mon, send));
@@ -3126,6 +3129,7 @@ function rewardDetail(run, reward) {
       rewardRow(run, reward, { pick: true }),
       h('p', { class: 'small' }, info.text(reward)),
       reward.moveInfo ? moveBlock(reward.moveInfo) : null,
+      target && reward.statsAfter?.[target.uid] ? h('div', { class: 'info-card tw-info-card' }, h('div', { class: 'stats-head' }, h('h3', null, `Así quedan los stats de ${target.name}`)), infoStats(target, { stats: reward.statsAfter[target.uid], natureInfo: run.natures.find((option) => option.key === reward.natures?.[target.uid]) ?? target.natureInfo })) : null,
       reward.kind === 'linkingCord' && target?.cord ? h('div', { class: 'tw-evo-line' }, h('span', { html: creatureHTML(target) }), glyph('arrow'), h('span', { html: creatureHTML({ sprite: target.cord.sprite, rarity: 'common' }) })) : null,
       reward.kind === 'stone' && target?.stone ? h('div', { class: 'tw-evo-line' }, h('span', { html: creatureHTML(target) }), glyph('arrow'), h('span', { html: creatureHTML({ sprite: target.stone.sprite, rarity: 'common' }) })) : null,
       ['egg', 'goldenEgg'].includes(reward.kind) ? null : h('span', { class: 'nb-label' }, MOVE_REWARDS.includes(reward.kind) ? 'Quién puede aprenderla' : PARTY_REWARDS.includes(reward.kind) ? 'A quiénes les sirve' : 'A quién le sirve'),
@@ -6800,6 +6804,10 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
         const note = ev.note && ABILITY_NOTE[ev.note] ? ` ${ABILITY_NOTE[ev.note](ev)}` : '';
         tell([h('span', { class: 'ab-tag' }, ev.ability), ' de ', ...mon(ev.side, ev.name), note ? `:${note}` : '.'], { side: ev.side, sub: true });
         return note ? 1400 : 1200;
+      }
+      case 'item': {
+        tell([...mon(ev.side, ev.name), ev.usedUp ? ' usó su ' : ': ', h('span', { class: 'ab-tag' }, ev.item), ev.usedUp ? ' y se le acabó.' : '.'], { side: ev.side, sub: true });
+        return 900;
       }
       case 'abilityChange': {
         const f = activeOf(ev.side);

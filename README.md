@@ -33,27 +33,37 @@ En vivo: **https://clash.mirrordev.xyz**
      (la de la IA) y largo (10, 25, 50 pisos o infinita). En el laboratorio, el Profesor Rowan te ofrece Pokémon de tu
      colección (balanceados, con un solo legendario como máximo) y te llevas 3, en nivel 5 y en la primera forma de su
      línea. En cada piso normal el camino se divide, como en Emerald Rogue: una ruta, una ruta difícil (rival entrenado,
-     2 niveles más, premio raro), una tranquila (más débil, premio común), una parada (dos premios sin pelear), una
+     en tu tope, premio raro), una tranquila (más débil, premio común), una parada (dos premios sin pelear), una
      madriguera (reclutas sin pelear), una guarida villana (premio épico) o un pacto oscuro (dejas ir a uno por dos
      premios épicos). Cada 5 pisos hay un líder de gimnasio y, al cierre de cada bloque de 25, cuatro del Alto Mando y
      un campeón, de todas las regiones y sin repetirse, con su tipo, su escenario, la música de su región y su as. Los
-     entrenadores de ruta usan Pokémon de su tema. Ves cada piso como un mapa visto desde arriba, dibujado según el
+     entrenadores de ruta son de todas las clases: con tema (un Montañero trae Roca o Tierra), principiantes en la
+     tranquila y veteranos (Entrenador Guay, tu Rival con su inicial) en la difícil. En la guarida esperan reclutas
+     de cada equipo villano o, a veces, un comandante, un jefe del Team Star o (más arriba) un jefe con su as, que
+     pelea como un líder. Cada equipo rival es un sorteo, no lo mejor de su tema: cualquier especie que calce puede
+     venir, sin importar la dificultad, y casi no se repiten las que ya enfrentaste en la subida. La dificultad se
+     nota en cómo elige sus 3 de lo que sacó: al azar en Fácil, lo mejor contra tu equipo en las difíciles. Ves cada piso como un mapa visto desde arriba, dibujado según el
      escenario de la pelea, con los sprites de mapa de los entrenadores; caminas hasta el rival, te ve y empieza la
-     pelea en nuestros fondos. Los niveles siguen a Emerald Rogue: los rivales de ruta van bajo tu tope (la tranquila al nivel del jefe anterior,
-     la normal a medio camino, la difícil 2 bajo el tope) y los jefes pelean justo en él; ningún rival pasa a tu
-     Pokémon más alto, y la ruta difícil y la guarida no pasan el promedio de tu equipo. El nivel que ves en cada
+     pelea en nuestros fondos. Los niveles siguen a Emerald Rogue: la tranquila va 4 niveles bajo tu tope, la ruta 2, la difícil y los
+     reclutas de la guarida justo en él, y los jefes y líderes villanos en él o uno más; ningún rival de ruta pasa a
+     tu Pokémon más alto, ni un jefe más de uno. El nivel que ves en cada
      camino es el del equipo que trae. En la Torre se pelea con los IVs reales: los rivales tienen IVs cerca de los
      de tu equipo y, si vienen entrenados, más o menos tus EVs; desde el piso 3 saben movimientos de MT, y desde el 10
      de tutor y de huevo, más fuertes mientras más subes. Ganas experiencia (curva media-rápida y fórmula escalada de la 5.ª generación), subes
      de nivel sin pasar el tope del piso siguiente (más rápido mientras más lejos estás de él; los pisos sin pelea
      te entrenan a medio camino), evolucionas hacia la forma que criaste (las que evolucionan por
      piedra o intercambio lo hacen a un nivel justo según su poder) y aprendes movimientos. Entre pisos eliges premios
-     de tres rarezas, cada uno dice a quién le sirve y por qué. Son 30, en familias: movimientos (MT, MT Poderosa,
+     de tres rarezas, cada uno dice a quién le sirve y por qué, en términos de la pelea (cómo quedan sus stats, si
+     el caramelo lo hace evolucionar, si el movimiento es de su tipo o cobertura nueva). Son 33, en familias: movimientos (MT, MT Poderosa,
      MT de Apoyo, tutor, movimiento huevo, Seta Memoria, Memorias y Gemas de otro tipo, Garra Rápida con prioridad,
      Teralito de su tipo), EVs (vitaminas, Plumas para todo el equipo, Brazal Firme, Bolsa de Vitaminas), IVs
      (Pesas, Chapa y Chapa Dorada), naturaleza (Menta y Menta Ideal), habilidad (Cápsula y Parche), niveles
      (Caramelos, Repartir Exp. y Tarro de Caramelos), evolución (Piedra Evolutiva y Cordón Unión), reclutas (Huevo
-     Suerte y Huevo Dorado) y el Amuleto Iris, que lo vuelve shiny. Mientras más subes, más raros los premios, y desde el piso 25 hay uno más; tras un
+     Suerte y Huevo Dorado), el Amuleto Iris, que lo vuelve shiny, y objetos equipados como los de PokeRogue y
+     Emerald Rogue, uno por Pokémon: potenciadores de tipo, Cinta Fuerte, Periscopio y Lupa (comunes), Restos,
+     Campana Concha, Bayas Zidra y Ziuela, Cinta Focus, Casco Dentado y Mineral Evolutivo (raros), y Vidasfera,
+     Cinta Experto y Banda Focus (épicos). Los rivales más arriba también llevan objetos: primero el as de los
+     líderes, después el de los rivales fuertes y al final equipos completos. Mientras más subes, más raros los premios, y desde el piso 25 hay uno más; tras un
      jefe eliges dos. Puedes cambiarlos una vez, el juego te pregunta antes de subir si dejas algo sin elegir, y cambias movimientos y
      habilidades. Cada piso se sortea al llegar (sus caminos y rivales no se conocen antes). Cada piso ganado da puntos:
      el piso (ruta 100, gimnasio 300, Alto Mando 450, campeón 800) más el equipo rival (nivel × stats base), por el
@@ -242,7 +252,8 @@ GAME FREAK inc.
   Creatures y GAME FREAK; `bug_type_superfan` es de Chani von Karpa y `aliana`, `celosia` y `mable` de Red, con
   CC BY-NC-SA 4.0). Se descargan al instalar y no se versionan.
 - La Torre: íconos de objetos de [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (CC BY-NC-SA 4.0
-  salvo lo que marcan como material de Nintendo); sprites de mapa de los entrenadores de
+  salvo lo que marcan como material de Nintendo) y de [PokeAPI/sprites](https://github.com/PokeAPI/sprites) (los
+  objetos equipados), que el navegador carga de jsDelivr; sprites de mapa de los entrenadores de
   [Pokabbie/pokeemerald-rogue](https://github.com/Pokabbie/pokeemerald-rogue) y de los decompilados
   [pret/pokeemerald](https://github.com/pret/pokeemerald), [pret/pokefirered](https://github.com/pret/pokefirered) y
   [pret/pokeplatinum](https://github.com/pret/pokeplatinum) (material de Nintendo, Creatures y GAME FREAK). Se
@@ -313,7 +324,7 @@ Por tema:
 | Logros y entrenador del perfil | `src/stats/domain/achievements.ts` | `GET /api/me/achievements`, `PUT /api/me/look` en `stats/interface/achievements.controller.ts` | `public/trainer-sprites.js` |
 | Variantes de colores de entrenadores | `public/trainer-sprites.js` (a mano), `public/trainer-variants.js` (lo genera `scripts/plan-trainer-variants.mjs` con las rampas de `scripts/sprite-ramps.mjs`); `scripts/sync-trainers.js` pinta los sprites al instalar | | `public/app.js` |
 | Tienda | artículos y precios en `public/shop.js` (tipados en `src/catalog/domain/shop.ts`); saldo y compra en `src/trainers/domain/trainer.ts`; "pide al original" en `src/stats/domain/achievements.ts` | `GET /api/shop`, `POST /api/shop/buy`, `PUT /api/me/equip` en `stats/interface/achievements.controller.ts`, con los DTOs de `trainers/interface/dto/shop.dto.ts` | `public/shop.js`, `public/app.js` (la tienda está en `/perfil`) |
-| La Torre | `src/tower/domain/tower-run.ts` (la subida y sus estados), `floors.ts` (qué hay en cada piso), `growth.ts` (experiencia, evolución y movimientos), `lab.ts` (ofertas de tu colección), `foe-team.ts` (el equipo rival), `rewards.ts` (premios y sus rarezas), `score.ts` (puntos de cada piso); salas del camino en `floors.ts` (`roomsAt`); personajes, escenarios y música en `public/tower-cast.js` (tipados en `src/catalog/domain/tower-cast.ts`) | `/api/tower/...` en `tower/interface/tower.controller.ts`; cada piso es una sala contra la IA con `staging` (`DuelService.startStaged`) | `public/app.js` (página `/torre`), `public/tower-map.js` (el mapa de cada piso y sus transiciones), `public/tower-tiles.js` (cómo se arma cada mapa y sus tiles), `public/overworld.js` (sprites de mapa) |
+| La Torre | `src/tower/domain/tower-run.ts` (la subida y sus estados), `floors.ts` (qué hay en cada piso), `growth.ts` (experiencia, evolución y movimientos), `lab.ts` (ofertas de tu colección), `foe-team.ts` (el equipo rival y cómo elige sus 3), `rewards.ts` (premios y sus rarezas), `score.ts` (puntos de cada piso); los objetos equipados en `src/catalog/domain/held-items.ts` (qué son) y `src/combat/domain/item-effects.ts` (qué hacen en batalla, con los hooks de las habilidades); salas del camino en `floors.ts` (`roomsAt`); personajes, escenarios y música en `public/tower-cast.js` (tipados en `src/catalog/domain/tower-cast.ts`) | `/api/tower/...` en `tower/interface/tower.controller.ts`; cada piso es una sala contra la IA con `staging` (`DuelService.startStaged`) | `public/app.js` (página `/torre`), `public/tower-map.js` (el mapa de cada piso y sus transiciones), `public/tower-tiles.js` (cómo se arma cada mapa y sus tiles), `public/overworld.js` (sprites de mapa) |
 | Tipos y efectividad | `public/types.js` (lo comparten servidor y navegador) | | |
 | Escenario de batalla y sprites de Pokémon | | | `public/backgrounds.js`, `public/creature.js` (URL de cada sprite según `public/upstream/sprites.json`) |
 | Archivos externos (jsDelivr y respaldo en GitHub) | | | `public/upstream.js` (commits fijados, URLs y respaldo), `public/upstream/*.json`; la CSP que los permite está en `src/shared/http/security-headers.middleware.ts` |

@@ -3,6 +3,7 @@ import { buildFighter, type Fighter } from '../../combat/domain/fighter.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { abilityOptions, natureInfo, NATURE_KEYS, speciesData } from '../../catalog/domain/creatures.js';
 import { ROOMS } from '../../catalog/domain/tower-cast.js';
+import { HELD_ITEMS } from '../../catalog/domain/held-items.js';
 import { abilityInfo } from '../../catalog/domain/abilities.js';
 import { moveData } from '../../combat/domain/moves.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
@@ -10,7 +11,7 @@ import { Injectable } from '@nestjs/common';
 import { levelCap, type Floor } from '../domain/floors.js';
 import { evolutionLevel, evolutionPath, expForLevel } from '../domain/growth.js';
 import { natureOf, offerMoves, type Offer } from '../domain/lab.js';
-import { cordEvolution, lockedAbilities, stoneEvolution, type Reward } from '../domain/rewards.js';
+import { cordEvolution, lockedAbilities, statsWith, stoneEvolution, trainingAfter, type Reward } from '../domain/rewards.js';
 import type { TowerRun } from '../domain/tower-run.js';
 import type { TowerRecord } from './tower.service.js';
 
@@ -46,6 +47,7 @@ const levelRange = (team: readonly RosterEntry[]): { min: number; max: number } 
   return { min: Math.min(...levels), max: Math.max(...levels) };
 };
 const NATURES = NATURE_KEYS.map((key) => natureInfo(key));
+const heldItemView = (key: string) => ({ key, name: HELD_ITEMS[key]?.name ?? key, desc: HELD_ITEMS[key]?.desc ?? '', tier: HELD_ITEMS[key]?.tier ?? 'common' });
 
 @Injectable()
 export class TowerViews {
@@ -83,6 +85,7 @@ export class TowerViews {
         exp: { now: mon.exp, from: expForLevel(mon.level), to: expForLevel(mon.level + 1) },
         known: mon.known.map(moveInfo),
         equipped: mon.moves,
+        item: mon.item ? heldItemView(mon.item) : null,
         ability: mon.ability,
         abilities: mon.abilities.map((key) => abilityInfo(key)),
         abilityOptions: abilityOptions({ finalID: mon.speciesId }).map((option) => ({ ...abilityInfo(option.key), hidden: option.hidden })),
@@ -96,7 +99,7 @@ export class TowerViews {
         cord: this.evolutionView(team[index], cordEvolution({ speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level })),
       })),
       offers: run.offers.map((offer) => this.offer(offer)),
-      rewards: run.rewards.map((reward) => this.reward(reward)),
+      rewards: run.rewards.map((reward) => this.reward(run, reward)),
       natures: NATURES,
       current: { ...floor, foeTeamSize: floor.teamSize, levels: floor.foe ? levelRange(run.foeTeam()) : null },
       trail,
@@ -154,8 +157,15 @@ export class TowerViews {
     return next ? { id: next, name: speciesName(next), sprite: buildFighter({ ...entry, finalID: next }).sprite } : null;
   }
 
-  private reward(reward: Reward) {
-    return { ...reward, ...(reward.move ? { moveInfo: moveInfo(reward.move) } : {}) };
+  /** A reward, with the stats each Pokémon it fits would end up with when it changes them. */
+  private reward(run: TowerRun, reward: Reward) {
+    const statsAfter: Record<string, ReturnType<typeof statsWith>> = {};
+    for (const mon of run.party.filter((member) => reward.fits.includes(member.uid))) {
+      const target = { uid: mon.uid, speciesId: mon.speciesId, level: mon.level, ivs: mon.entry.ivs, evs: mon.evs, nature: mon.nature };
+      const after = trainingAfter(reward, target);
+      if (after) statsAfter[mon.uid] = statsWith(target, after);
+    }
+    return { ...reward, ...(reward.move ? { moveInfo: moveInfo(reward.move) } : {}), ...(reward.item ? { itemInfo: heldItemView(reward.item) } : {}), ...(Object.keys(statsAfter).length ? { statsAfter } : {}) };
   }
 
   private offer(offer: Offer) {

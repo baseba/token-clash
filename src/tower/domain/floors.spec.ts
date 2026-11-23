@@ -111,7 +111,8 @@ test('each way of a floor is its own rival: a tough one stronger, trained and wi
     assert.notEqual(tough.foe?.base, plain.foe?.base, seed);
     assert.notEqual(calm.foe?.base, plain.foe?.base, seed);
     assert.ok(calm.level < plain.level && plain.level < tough.level, seed);
-    assert.equal(calm.level, stretchStart(9));
+    assert.equal(calm.level, Math.max(stretchStart(9), levelCap(9) - 4));
+    assert.equal(tough.level, levelCap(9), 'a tough rival fights at your cap');
     assert.ok(tough.trained && !calm.trained);
     assert.equal(tough.teamSize, plain.teamSize + 1);
     assert.equal(calm.teamSize, 3);
@@ -161,12 +162,25 @@ test('rumours: wild routes always offer a tough way, a night climb turns every s
   }
 });
 
-test('a rival is never above your strongest Pokémon, and a tough rival or a hideout not above your average', () => {
+test('a rival is never above your strongest Pokémon, and a boss or a villain leader at most one over', () => {
   const tough = floorAt(14, 25, 'veryhard', 's', 'tough');
-  assert.equal(fitToParty(tough, [20, 20, 26]).level, 22);
+  assert.equal(fitToParty(tough, [20, 20, 26]).level, 26);
   assert.equal(fitToParty(tough, [40, 40, 40]).level, tough.level, 'a party at the cap meets the curve');
   const trainer = floorAt(14, 25, 'veryhard', 's');
   assert.equal(fitToParty(trainer, [18, 20, 21]).level, 21);
   const gym = floorAt(15, 25, 'veryhard', 's');
-  assert.equal(fitToParty(gym, [20, 25]).level, 25);
+  assert.equal(fitToParty(gym, [20, 25]).level, 26);
+});
+
+test('a villain leader fights a level over its grunts with one more Pokémon, and seasoned or rookie trainers show up on their ways', () => {
+  const hideouts = Array.from({ length: 40 }, (_, seed) => floorAt(18, 50, 'mid', `h${seed}`, 'hideout'));
+  const leader = hideouts.find((floor) => floor.signature !== null);
+  const grunt = hideouts.find((floor) => floor.signature === null);
+  assert.ok(leader && grunt);
+  assert.equal(grunt.level, levelCap(18));
+  assert.equal(leader.level, levelCap(18) + 1);
+  assert.equal(leader.teamSize, Math.min(6, grunt.teamSize + 1));
+  const bases = (room: 'tough' | 'calm') => new Set(Array.from({ length: 60 }, (_, seed) => floorAt(12, 50, 'mid', `m${seed}`, room).foe?.base));
+  assert.ok(['ace_trainer', 'veteran', 'rival', 'player'].some((base) => [...bases('tough')].some((key) => key?.startsWith(base))));
+  assert.ok(['youngster', 'school_kid', 'preschooler', 'nursery_aide'].some((base) => [...bases('calm')].some((key) => key?.startsWith(base))));
 });

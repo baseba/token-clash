@@ -57,7 +57,7 @@ export const FEMALE_CLASSES = ['parasol_lady', 'jacinthe_holo', 'hex_maniac', 'a
 /** Classes of two trainers, by who they are: two men, two women, or a man and a woman. */
 export const PAIR_CLASSES = { twins: 'ff', mysterious_sisters: 'ff', young_couple: 'mf', hooligans: 'mm', interviewers: 'mf', sis_and_bro: 'fm' };
 /** Classes that are one character with a name of their own. */
-export const NAMED_CLASSES = { jacinthe_holo: 'Jacinthe', vicky: 'Vicky', vito: 'Vito', vivi: 'Vivi' };
+export const NAMED_CLASSES = { jacinthe_holo: 'Jacinthe', vicky: 'Vicky', vito: 'Vito', vivi: 'Vivi', nate: 'Nate', rosa: 'Rosa', victor: 'Victor', victoria: 'Victoria', benga: 'Benga' };
 
 // Lines are [when it sees you, when it loses]. "{o}" agrees with who says it: "cansado" or "cansada".
 
@@ -131,6 +131,17 @@ export const CLASS_LINES = {
   striker: [['¡Gol de media cancha, así gano yo!', 'Penal en contra…']],
   hoopster: [['¡Encesto todos mis ataques!', 'Me bloqueaste el tiro.']],
   smasher: [['¡Saque directo! ¿Lo devuelves?', 'Doble falta…']],
+  ace_trainer: [['Entreno todos los días para subir esta torre. No me vas a frenar.', 'Necesito entrenar más…'], ['Un Entrenador Guay no pierde dos veces. ¡Esta es la primera!', 'Bueno, esta fue la primera.']],
+  veteran: [['He visto mil batallas. Muéstrame si la tuya vale la pena.', 'Hace años que nadie me ganaba así.'], ['La experiencia gana a la juventud. ¿O no?', 'Me jubilo… otra vez.']],
+  rival: [['¡Por fin te alcanzo! Esta vez gano yo.', '¡¿Otra vez?! Ya verás en el próximo piso.'], ['Mi equipo creció tanto como el tuyo. ¡Vamos!', 'Sigues un paso adelante…']],
+  player: [['Yo también vengo subiendo. Veamos quién llega más alto.', 'Te dejo pasar… por ahora.']],
+  youngster: [['¡Mis Pokémon son los mejores! ¡Te lo voy a demostrar!', '¡No es justo! ¡Me faltaba un turno!'], ['¿Tú también subes la torre? ¡Pelea conmigo!', 'Voy a ir a contarle a mi mamá…']],
+  school_kid: [['¡Estudié todas las tablas de tipos! ¡Examen sorpresa!', 'Me faltó estudiar un capítulo…']],
+  preschooler: [['¡Mira mi Pokémon! ¡Es el más lindo!', '¡Buaaa! ¡Pero igual es el más lindo!']],
+  breeder: [['Cada uno de mis Pokémon salió de un huevo que cuidé yo.', 'Les voy a dar una baya a todos.']],
+  expert_pokemon_breeder: [['Crié a estos Pokémon con IVs perfectos. Bueno, casi.', 'Tendré que cruzar otra generación.']],
+  nursery_aide: [['¡Estos pequeños se portan muy bien conmigo!', '¡Tranquilos, a la siesta todos!']],
+  ranger: [['Protejo esta zona y a sus Pokémon. Demuéstrame que eres de confianza.', 'Pasa, se nota que los cuidas.']],
 };
 
 /** Two trainers who fight together speak as one. */

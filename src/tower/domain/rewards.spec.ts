@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { moveOrigins, rng, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
 import { moveData } from '../../combat/domain/moves.js';
 import { levelMovesUpTo } from './growth.js';
-import { BRACE_EVS, cordEvolution, evsAfter, idealNature, ivsAfter, MAX_IV, MOVE_REWARDS, MUSHROOM_REACH, REWARD_KINDS, REWARD_TIERS, WEIGHTS_IVS, REWARDS_PER_REST, restRewards, stoneEvolution, TIER_ORDER, TWIST_REWARDS, vitaminRoom, type RestContext, type Reward } from './rewards.js';
+import { BRACE_EVS, cordEvolution, statShift, trainingAfter, evsAfter, idealNature, ivsAfter, MAX_IV, MOVE_REWARDS, MUSHROOM_REACH, REWARD_KINDS, REWARD_TIERS, WEIGHTS_IVS, REWARDS_PER_REST, restRewards, stoneEvolution, TIER_ORDER, TWIST_REWARDS, VITAMIN_EVS, vitaminRoom, type RestContext, type Reward } from './rewards.js';
 
 const NO_EVS = { hp: 0, atk: 0, def: 0, satk: 0, sdef: 0, spd: 0 };
 const target = (uid: string, name: string, known: string[] = [], level = 10, final = name) => ({
@@ -76,8 +76,8 @@ test('candies only go to the Pokémon below the level cap, and none are offered 
   }
 });
 
-test('a vitamin adds 32 EVs, never past 252 in a stat or 510 in all', () => {
-  assert.equal(vitaminRoom({ ...NO_EVS }, 'atk'), 32);
+test('a vitamin adds 64 EVs, never past 252 in a stat or 510 in all', () => {
+  assert.equal(vitaminRoom({ ...NO_EVS }, 'atk'), VITAMIN_EVS);
   assert.equal(vitaminRoom({ ...NO_EVS, atk: 240 }, 'atk'), 12);
   assert.equal(vitaminRoom({ ...NO_EVS, atk: 252, spd: 252, hp: 4 }, 'def'), 2);
   assert.equal(vitaminRoom({ ...NO_EVS, atk: 252, spd: 252, hp: 6 }, 'def'), 0);
@@ -164,7 +164,7 @@ test('the move families teach what their name says', () => {
 test('EV and IV rewards stay inside the limits', () => {
   const brace = evsAfter('machoBrace', { ...NO_EVS, atk: 250 }, speciesIdByName('Machop') as number, undefined);
   assert.deepEqual(brace, { hp: BRACE_EVS, atk: 252, def: BRACE_EVS, satk: BRACE_EVS, sdef: BRACE_EVS, spd: BRACE_EVS });
-  assert.deepEqual(evsAfter('vitaminBag', { ...NO_EVS }, speciesIdByName('Abra') as number, undefined), { ...NO_EVS, satk: 32, spd: 32 });
+  assert.deepEqual(evsAfter('vitaminBag', { ...NO_EVS }, speciesIdByName('Abra') as number, undefined), { ...NO_EVS, satk: VITAMIN_EVS, spd: VITAMIN_EVS });
   assert.equal(Object.values(evsAfter('machoBrace', { ...NO_EVS, hp: 252, atk: 252 }, 1, undefined)).reduce((sum, value) => sum + value, 0), 510);
   assert.deepEqual(ivsAfter('weights', { hp: 29, atk: 0, def: 31, satk: 10, sdef: 31, spd: 31 }, undefined), { hp: 31, atk: WEIGHTS_IVS, def: 31, satk: 10 + WEIGHTS_IVS, sdef: 31, spd: 31 });
 });
@@ -190,4 +190,24 @@ test('a Linking Cord evolves by level only up to 5 levels early', () => {
 test('a Shiny Charm only fits who is not shiny yet', () => {
   const party = [target('a', 'Pikachu'), { ...target('b', 'Eevee'), shiny: true }];
   for (const reward of offered(party, { ...plain, minTier: 'rare' }).filter((offer) => offer.kind === 'shinyCharm')) assert.deepEqual(reward.fits, ['a']);
+});
+
+test('a stat reward says how the stats end up in battle, and a candy says when it brings an evolution', () => {
+  const machop = target('a', 'Machop');
+  const after = trainingAfter({ kind: 'vitamin', stat: 'atk' }, machop)!;
+  assert.equal(after.evs.atk, VITAMIN_EVS);
+  assert.match(statShift(machop, after) ?? '', /^Ataque \d+ → \d+$/);
+  assert.equal(trainingAfter({ kind: 'candy' }, machop), null);
+  const candy = offered([target('b', 'Bulbasaur', [], 15, 'Venusaur')], { ...plain, cap: 20 }).find((offer) => offer.kind === 'candy');
+  assert.match(candy?.reasons.b ?? '', /^Nv 15 → 1\d · ¡evoluciona en Ivysaur!$/);
+});
+
+test('a held item reward suits the party: a type booster only for who attacks with that type, and it says what it replaces', () => {
+  const party = [{ ...target('a', 'Charmander', ['ember']), item: 'leftovers' }, target('b', 'Squirtle', ['tackle'])];
+  const items = offered(party, { ...plain, floor: 30 }, 300).filter((offer) => offer.item);
+  assert.ok(items.length > 0);
+  for (const offer of items.filter((reward) => reward.item === 'charcoal')) assert.deepEqual(offer.fits, ['a']);
+  const sash = items.find((reward) => reward.item === 'focus-sash');
+  if (sash) assert.match(sash.reasons.a, /deja Restos/);
+  assert.ok(items.every((reward) => !['mystic-water', 'magnet'].includes(reward.item!)));
 });

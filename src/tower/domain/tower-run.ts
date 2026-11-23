@@ -21,11 +21,12 @@ import type { AiLevel } from '../../combat/domain/ai.js';
 import { MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
 import { fitToParty, floorAt, isBoss, isLastFloor, levelCap, roomsAt, type Floor, type Rolls } from './floors.js';
-import { foeTeam } from './foe-team.js';
+import { foePicks, foeTeam } from './foe-team.js';
+import { BATTLE_SIZE } from '../../combat/domain/battle.js';
 import { evolutionPath, expForLevel, expYield, formAtLevel, levelForExp, levelMovesUpTo, movesAtLevel } from './growth.js';
 import { labOffers, lineOf, natureOf, offerMoves, recruitOffers, type Offer } from './lab.js';
 import { floorScore, totalPoints, type FloorScore } from './score.js';
-import { cordEvolution, evsAfter, isNature, ivsAfter, lockedAbilities, MOVE_REWARDS, PARTY_REWARDS, restRewards, stoneEvolution, TWIST_REWARDS, type RestContext, type Reward } from './rewards.js';
+import { cordEvolution, isNature, lockedAbilities, MOVE_REWARDS, PARTY_REWARDS, restRewards, STAT_REWARDS, stoneEvolution, trainingAfter, TWIST_REWARDS, type RestContext, type Reward } from './rewards.js';
 
 export type RunStatus = 'drafting' | 'climbing' | 'resting' | 'lost' | 'cleared' | 'abandoned';
 export const OPEN_STATUSES: readonly RunStatus[] = ['drafting', 'climbing', 'resting'];
@@ -47,6 +48,8 @@ export interface TowerMon {
   evs: Ivs;
   /** The level at which you stopped its evolution: it keeps its form until it levels up again. */
   heldAt?: number | null;
+  /** The item it holds in battle (a reward). Battles never use it up for good: a berry is back in the next one. */
+  item?: string | null;
 }
 
 export interface Growth {
@@ -275,7 +278,15 @@ export class TowerRun implements TowerRunState {
   /** The team a rival of this floor brings against your party as it is now (to show a way before taking it, too). */
   foeTeamAt(floor: Floor): RosterEntry[] {
     const party = this.party.map((mon) => ({ ivs: mon.entry.ivs, evs: mon.evs }));
-    return foeTeam(floor, this.difficulty, rng(`${this.seed}:${this.rolls[floor.number] ?? ''}:foe:${floor.number}`), party);
+    const met = this.log.filter((entry) => entry.floor < floor.number).flatMap((entry) => entry.lines ?? []);
+    return foeTeam(floor, this.difficulty, rng(`${this.seed}:${this.rolls[floor.number] ?? ''}:foe:${floor.number}`), party, met);
+  }
+
+  /** Which of its team the rival of this floor takes to the battle against your party (indexes into `foeTeam()`). */
+  foePicks(): number[] {
+    const floor = this.currentFloor();
+    const random = rng(`${this.seed}:${this.rolls[floor.number] ?? ''}:picks:${floor.number}:${this.log.length}`);
+    return foePicks(floor, this.foeTeam(), this.difficulty, random, BATTLE_SIZE, this.party.map((mon) => mon.speciesId));
   }
 
   /** The party as the battle takes it: each one at its level, in its form, with its moves, ability and nature. */
@@ -289,6 +300,7 @@ export class TowerRun implements TowerRunState {
       moveset: mon.moves,
       ...(mon.ability ? { abilityChoice: mon.ability } : {}),
       ...(mon.nature ? { natureChoice: mon.nature } : {}),
+      ...(mon.item ? { heldItem: mon.item } : {}),
       evs: mon.evs,
     }));
   }
@@ -333,7 +345,7 @@ export class TowerRun implements TowerRunState {
 
   /** What the party looks like to the rewards: who fits each one, and why. */
   rewardTargets() {
-    return this.party.map((mon) => ({ uid: mon.uid, speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level, known: mon.known, abilities: mon.abilities, evs: mon.evs, ivs: mon.entry.ivs, nature: mon.nature, shiny: mon.entry.shiny }));
+    return this.party.map((mon) => ({ uid: mon.uid, speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level, known: mon.known, abilities: mon.abilities, evs: mon.evs, ivs: mon.entry.ivs, nature: mon.nature, shiny: mon.entry.shiny, item: mon.item ?? null }));
   }
 
   private restContext(floor: Floor, overrides: Partial<RestContext> = {}): RestContext {
@@ -464,7 +476,7 @@ export class TowerRun implements TowerRunState {
         this.offers = this.recruits(lastFloor(), roster, rng(`${this.seed}:egg:${this.floor}`), Math.max(...this.party.map((mon) => mon.level)));
         return [];
       case 'feather':
-        for (const member of this.party) member.evs = evsAfter(reward.kind, member.evs, member.speciesId, reward.stat);
+        for (const member of this.party) this.applyTraining(member, reward);
         return [];
       case 'expShare':
       case 'candyJar':
@@ -475,15 +487,14 @@ export class TowerRun implements TowerRunState {
       this.teach(mon, reward.move as string, choice.replace ?? null);
       return [];
     }
+    if (STAT_REWARDS.includes(reward.kind)) {
+      this.applyTraining(mon, reward);
+      return [];
+    }
     switch (reward.kind) {
       case 'candy':
       case 'expCandy':
         return [levelUp(mon)];
-      case 'vitamin':
-      case 'machoBrace':
-      case 'vitaminBag':
-        mon.evs = evsAfter(reward.kind, mon.evs, mon.speciesId, reward.stat);
-        return [];
       case 'capsule':
       case 'patch': {
         const options = lockedAbilities(mon, reward.kind === 'patch');
@@ -500,20 +511,26 @@ export class TowerRun implements TowerRunState {
         if (!choice.nature || !isNature(choice.nature)) throw invalid('Elige una naturaleza.');
         mon.nature = choice.nature;
         return [];
-      case 'idealMint':
-        mon.nature = reward.natures?.[mon.uid] ?? mon.nature;
-        return [];
-      case 'bottleCap':
-      case 'goldCap':
-      case 'weights':
-        mon.entry = { ...mon.entry, ivs: ivsAfter(reward.kind, mon.entry.ivs, reward.stat) };
-        return [];
       case 'shinyCharm':
         mon.entry = { ...mon.entry, shiny: true };
+        return [];
+      case 'commonItem':
+      case 'rareItem':
+      case 'epicItem':
+        mon.item = reward.item ?? mon.item ?? null;
         return [];
       default:
         return [];
     }
+  }
+
+  /** Its IVs, EVs and nature after a stat reward. */
+  private applyTraining(mon: TowerMon, reward: Reward): void {
+    const after = trainingAfter(reward, { uid: mon.uid, speciesId: mon.speciesId, ivs: mon.entry.ivs, evs: mon.evs, nature: mon.nature });
+    if (!after) return;
+    mon.entry = { ...mon.entry, ivs: after.ivs };
+    mon.evs = after.evs;
+    mon.nature = after.nature;
   }
 
   private teach(mon: TowerMon, move: string, replace: string | null): void {
