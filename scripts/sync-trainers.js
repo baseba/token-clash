@@ -225,6 +225,9 @@ export function eyeWhites(image, face) {
 const INK_MAX = 24;
 const LIT_WEIGHT = 2;
 const THIN_SHARE = 0.5;
+const MASS_SKIN_SHARE = 0.15;
+const DARK_SHADE_LUMA = 110;
+const MASS_MIN_PIXELS = 20;
 
 export function recolorByMap(image, map, face) {
   const rgba = Buffer.from(image.rgba);
@@ -278,8 +281,10 @@ export function recolorByMap(image, map, face) {
       }
       if (touchesCloth) edgePixels += 1;
     }
-    const thin = edgePixels >= piece.length * THIN_SHARE;
-    if (thin && clothScore > skinScore && litPainted >= litOther) for (const i of piece) if (!eyes.has(i)) paint(i, shades.get(color));
+    const dark = lumaOf(color) < DARK_SHADE_LUMA;
+    const thin = dark && edgePixels >= piece.length * THIN_SHARE;
+    const mass = skinScore <= clothScore * MASS_SKIN_SHARE && (dark || piece.length >= MASS_MIN_PIXELS);
+    if ((thin || mass) && clothScore > skinScore && litPainted >= litOther) for (const i of piece) if (!eyes.has(i)) paint(i, shades.get(color));
   }
   return { width: image.width, height: image.height, rgba };
 }

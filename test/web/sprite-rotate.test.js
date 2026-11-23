@@ -97,3 +97,35 @@ test('a skin shadow strip under a recolored cap follows the cap, while the same 
   assert.deepEqual(at(1, 2), rgb('#42427b'), 'the strip under the cap is the cap shadow');
   assert.deepEqual(at(5, 5), rgb(SHADE), 'the shadow on the face stays');
 });
+
+test('brown hair that only brushes the face is not skin, so it turns with its own family', () => {
+  const HAIR_LIGHT = '#bd6b52';
+  const HAIR_DARK = '#844a29';
+  const image = sprite(24, 48, [
+    [0, 0, 24, 48, BLACK],
+    [4, 1, 20, 10, HAIR_LIGHT],
+    [4, 6, 20, 10, HAIR_DARK],
+    [8, 10, 16, 18, SKIN],
+    [8, 16, 16, 18, SKIN_SHADOW],
+    [3, 18, 21, 46, JACKET],
+  ]);
+  const { kept, families } = familiesOf(paletteOf(image));
+  const skin = kept.skin.map((tone) => tone.hex);
+  assert.ok(skin.includes(SKIN) && skin.includes(SKIN_SHADOW), `the face is skin: ${skin}`);
+  assert.ok(!skin.includes(HAIR_LIGHT) && !skin.includes(HAIR_DARK), `the hair is not skin: ${skin}`);
+  const hair = families.find((family) => family.colors.some((color) => color.hex === HAIR_LIGHT));
+  assert.equal(hair.unsure, false, 'the hair can be recolored');
+});
+
+test('a block of skin shadow tone inside a recolored piece of clothing follows the clothing', () => {
+  const CAP = '#c54242';
+  const SHADE = '#7b4242';
+  const image = sprite(12, 12, [
+    [0, 0, 12, 8, CAP],
+    [3, 2, 9, 6, SHADE],
+    [0, 8, 12, 12, SKIN],
+  ]);
+  const out = recolorByMap(image, [[CAP, '#4262c5'], [SHADE, '#42427b', 'shade'], [SKIN, SKIN, 'skin']]);
+  const at = (x, y) => [...out.rgba.subarray((y * 12 + x) * 4, (y * 12 + x) * 4 + 3)];
+  assert.deepEqual(at(5, 4), rgb('#42427b'), 'the block inside the cap is painted');
+});

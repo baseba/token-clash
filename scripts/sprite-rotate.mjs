@@ -11,17 +11,33 @@ const SKIN_TOUCH = 0.12;
 const MIN_ROTATION = 60;
 const REGION_SHARE = 0.04;
 const SKIN_MAX_CHROMA = 0.12;
-const SKIN_MIN_CHROMA = 0.055;
-const SKIN_MAX_TONES = 6;
+const SKIN_RICHER = 0.02;
+const SKIN_MAX_TONES = 10;
 const SKIN_MIN_STEP = 0.06;
 const SKIN_MAX_STEP = 0.22;
 const SKIN_TWIN_HUE = 12;
 const SKIN_TWIN_CHROMA = 0.025;
 const SKIN_HUE_STEP = 45;
 const SKIN_CHROMA_STEP = 0.045;
-const SKIN_WEIGHT = 2;
-const SKIN_NEIGHBOR = 0.2;
-const SKIN_LIKE_HUE = 35;
+const SKIN_CONTACT = [0.08, 0.15, 0.2];
+const SKIN_CLASSIC_CONTACT = 0.05;
+const SKIN_CLASSIC_NEAR = 0.012;
+const SKIN_FULL_CONTACT = 0.3;
+const SKIN_FULL_TONES = 3;
+const SKIN_SHADOW_HUE = 5;
+const SKIN_SHADOW_SPREAD = 35;
+const SKIN_UNSURE_CONTACT = 0.25;
+const SKIN_SEED_LIGHT = 0.6;
+const SKIN_SEED_DARK = 0.4;
+const SKIN_SEED_HUE = 50;
+const SKIN_SEED_SPREAD = 12;
+const SKIN_SEED_CHROMA = 0.035;
+const SKIN_SEED_FACE = 4;
+const SKIN_SEED_ENOUGH = 2;
+const SKIN_CANON_HUE_STEP = 65;
+const SKIN_SEED_FLOOR = 0.25;
+const SKIN_SEED_NEAR = 0.035;
+const SKIN_LIKE_HUE = 25;
 const SKIN_LIKE_SHARE = 0.4;
 const SKIN_SHADOW_CHROMA = 0.01;
 const SKIN_SHADOW_LIGHT = 0.5;
@@ -32,11 +48,13 @@ const HAIR_VISIBILITY = 0.5;
 const ACCENT_GAP = 60;
 const TINT_MIN_LIGHT = 0.3;
 const TINT_CEIL = 0.96;
-const TINT_CHROMA = 0.06;
+const TINT_CHROMA = 0.085;
+const PALE_CHROMA = 0.1;
+const PALE_BOOST = 1.6;
 const TINT_SHARE = 0.08;
 const WHITE_FROM = 0.75;
 const WHITE_CEIL = 0.92;
-const WHITE_CHROMA = 0.1;
+const WHITE_CHROMA = 0.125;
 const WHITE_VISIBILITY = 0.07;
 const GRAY_VISIBILITY = 0.04;
 const SKIN_SHADOW_TOUCH = 0.12;
@@ -107,6 +125,8 @@ export function rgbOfOklch(lightness, chroma, hue) {
   return linearRgbOf(lightness, fitting, hue).map((value) => Math.round(clamp(fromLinear(clamp(value, 0, 1)), 0, 255)));
 }
 
+const CLASSIC_SKIN = [[255, 214, 189], [222, 165, 123], [189, 123, 99]].map(oklchOf);
+
 export const isOutlineColor = ([lightness, chroma]) => lightness < OUTLINE_LIGHT && chroma < OUTLINE_CHROMA;
 
 function circularMean(items) {
@@ -121,43 +141,66 @@ function circularMean(items) {
 
 const plausibleSkin = (color) => color.oklch[1] <= SKIN_MAX_CHROMA;
 
+const labOf = ([lightness, chroma, hue]) => [lightness, chroma * Math.cos((hue * Math.PI) / 180), chroma * Math.sin((hue * Math.PI) / 180)];
+const labGap = (a, b) => Math.hypot(...labOf(a).map((value, i) => value - labOf(b)[i]));
+const sharedShadow = (color) => color.entry.canonSkin && color.oklch[0] < SKIN_SEED_LIGHT;
+
+const nearClassic = (color) => CLASSIC_SKIN.some((classic) => labGap(classic, color.oklch) <= SKIN_CLASSIC_NEAR);
+
 function skinSeeds(colors) {
-  const canon = colors.filter((color) => color.entry.canonSkin && plausibleSkin(color));
-  if (canon.length) return canon;
-  const facial = (pick) => colors.filter(pick).reduce((best, color) => (!best || (color.entry.face ?? 0) > (best.entry.face ?? 0) ? color : best), null);
-  const seed = facial((color) => plausibleSkin(color) && color.oklch[1] >= SKIN_MIN_CHROMA) ?? facial(plausibleSkin);
-  return seed ? [seed] : [];
+  const canon = colors.filter((color) => color.entry.canonSkin && plausibleSkin(color) && color.oklch[0] >= SKIN_SEED_LIGHT && color.count >= SKIN_SEED_FACE);
+  const score = (color) => {
+    const likeness = Math.max(SKIN_SEED_FLOOR, ...CLASSIC_SKIN.map((classic) => Math.exp(-((labGap(classic, color.oklch) / SKIN_SEED_NEAR) ** 2))));
+    return (color.entry.face ?? 0) * likeness * Math.exp(-(hueGap(color.oklch[2], SKIN_SEED_HUE) ** 2) / (2 * SKIN_SEED_SPREAD ** 2));
+  };
+  const seed = colors
+    .filter((color) => plausibleSkin(color) && color.oklch[1] >= SKIN_SEED_CHROMA && color.oklch[0] >= SKIN_SEED_DARK && (color.entry.face ?? 0) >= SKIN_SEED_FACE)
+    .reduce((best, color) => (!best || score(color) > score(best) ? color : best), null);
+  return seed && canon.length < SKIN_SEED_ENOUGH && !canon.includes(seed) ? [seed, ...canon] : canon;
+}
+
+const rgbOfKey = (key) => [key >> 16, (key >> 8) & 255, key & 255];
+
+function skinContact(skin, color) {
+  const keys = new Set(skin.filter((tone) => !sharedShadow(tone)).map((tone) => tone.key));
+  let all = 0;
+  let near = 0;
+  for (const [other, touches] of color.entry.neighbors) {
+    if (isOutlineColor(oklchOf(rgbOfKey(other)))) continue;
+    all += touches;
+    if (keys.has(other)) near += touches;
+  }
+  return all ? near / all : 0;
 }
 
 function fillsSkinGap(skin, color) {
-  if (!plausibleSkin(color)) return false;
   const nearest = skin.reduce((best, tone) => (Math.abs(tone.oklch[0] - color.oklch[0]) < Math.abs(best.oklch[0] - color.oklch[0]) ? tone : best));
+  if (color.oklch[1] > Math.max(SKIN_MAX_CHROMA, nearest.oklch[1] + SKIN_RICHER)) return false;
   const step = Math.abs(nearest.oklch[0] - color.oklch[0]);
-  const heaviest = Math.max(...skin.map((tone) => tone.count));
   const darkest = Math.min(...skin.map((tone) => tone.oklch[0]));
   const richerShadow = color.oklch[0] < darkest && color.oklch[0] < SKIN_SHADOW_LIGHT && color.oklch[1] > nearest.oklch[1] + SKIN_SHADOW_CHROMA;
   const hueStep = hueGap(nearest.oklch[2], color.oklch[2]);
   const chromaStep = Math.abs(nearest.oklch[1] - color.oklch[1]);
   const twin = hueStep <= SKIN_TWIN_HUE && chromaStep <= SKIN_TWIN_CHROMA;
-  const fillsGap = step >= SKIN_MIN_STEP && hueStep <= SKIN_HUE_STEP && chromaStep <= SKIN_CHROMA_STEP;
-  return !richerShadow && step <= SKIN_MAX_STEP && (twin || fillsGap) && color.count <= heaviest * SKIN_WEIGHT;
-}
-
-function touchesSkinShare(skin, color) {
-  const keys = new Set(skin.map((tone) => tone.key));
-  const all = [...color.entry.neighbors.values()].reduce((sum, touches) => sum + touches, 0);
-  const near = [...color.entry.neighbors].filter(([other]) => keys.has(other)).reduce((sum, [, touches]) => sum + touches, 0);
-  return all ? near / all : 0;
+  const fillsGap = step >= SKIN_MIN_STEP && hueStep <= (color.entry.canonSkin ? SKIN_CANON_HUE_STEP : SKIN_HUE_STEP) && chromaStep <= SKIN_CHROMA_STEP;
+  return !richerShadow && step <= SKIN_MAX_STEP && (twin || fillsGap);
 }
 
 export function skinOf(colors, nearby = []) {
-  const skin = skinSeeds(colors);
+  const pool = [...colors, ...nearby];
+  const skin = colors.length ? skinSeeds(colors) : skinSeeds(nearby);
   if (!skin.length) return { skin, clothes: colors };
-  const candidate = (color) => !skin.includes(color) && fillsSkinGap(skin, color) && (colors.includes(color) || touchesSkinShare(skin, color) >= SKIN_NEIGHBOR);
+  const needed = (color) => {
+    if (skin.length >= SKIN_FULL_TONES && skin.some((tone) => tone.oklch[0] < color.oklch[0])) return SKIN_FULL_CONTACT;
+    const lightest = skin.every((tone) => tone.oklch[0] < color.oklch[0]);
+    return lightest ? SKIN_CONTACT.at(-1) : SKIN_CONTACT[Math.min(skin.length, SKIN_CONTACT.length) - 1];
+  };
+  const classic = skin.filter((tone) => tone.entry.canonSkin).length >= SKIN_FULL_TONES;
+  const classicShadow = (color) => skin.every((tone) => tone.oklch[0] > color.oklch[0]) && hueGap(color.oklch[2], SKIN_SHADOW_HUE) <= SKIN_SHADOW_SPREAD;
+  const candidate = (color) => !skin.includes(color) && fillsSkinGap(skin, color) && (!classic || classicShadow(color)) && skinContact(skin, color) >= (nearClassic(color) ? SKIN_CLASSIC_CONTACT : needed(color));
+  const gap = (color) => Math.min(...skin.map((tone) => Math.abs(tone.oklch[0] - color.oklch[0])));
   while (skin.length < SKIN_MAX_TONES) {
-    const next = [...colors, ...nearby]
-      .filter(candidate)
-      .sort((a, b) => Math.min(...skin.map((tone) => Math.abs(tone.oklch[0] - a.oklch[0]))) - Math.min(...skin.map((tone) => Math.abs(tone.oklch[0] - b.oklch[0]))))[0];
+    const next = pool.filter(candidate).sort((a, b) => gap(a) - gap(b))[0];
     if (!next) break;
     skin.push(next);
   }
@@ -165,9 +208,12 @@ export function skinOf(colors, nearby = []) {
 }
 
 function looksLikeSkin(family, skin, skinHue) {
-  if (!family.touchesSkin || !skin.length || skinHue === null) return false;
-  const lineLight = Math.min(...skin.map((tone) => tone.oklch[0]));
-  const skinLike = (color) => plausibleSkin(color) && color.oklch[1] >= NEUTRAL_CHROMA && hueGap(color.oklch[2], skinHue) <= SKIN_LIKE_HUE && color.oklch[0] > lineLight + SKIN_MIN_STEP;
+  const bare = (color) => plausibleSkin(color) && color.oklch[1] >= SKIN_SEED_CHROMA && color.oklch[0] >= SKIN_SEED_DARK && hueGap(color.oklch[2], SKIN_SEED_HUE) <= SKIN_LIKE_HUE;
+  if (skin.length && !family.touchesSkin) return false;
+  const close = (color) => Math.min(...skin.map((tone) => Math.abs(tone.oklch[0] - color.oklch[0]))) <= SKIN_MAX_STEP;
+  const darkest = Math.min(...skin.map((tone) => tone.oklch[0]));
+  const near = (color) => close(color) && color.oklch[0] >= darkest && plausibleSkin(color) && hueGap(color.oklch[2], skinHue) <= SKIN_LIKE_HUE && skinContact(skin, color) >= SKIN_UNSURE_CONTACT;
+  const skinLike = skin.length ? near : bare;
   const pixels = family.colors.filter(skinLike).reduce((sum, color) => sum + color.count, 0);
   return pixels >= family.weight * SKIN_LIKE_SHARE;
 }
@@ -238,13 +284,15 @@ function awayFromSkin(hue, skinHue) {
   return wrap(skinHue + Math.sign(signedGap(hue, skinHue) || 1) * SKIN_GAP);
 }
 
+const paleBoost = (family) => (family.neutral || family.chroma >= PALE_CHROMA ? 1 : Math.min(PALE_CHROMA / family.chroma, PALE_BOOST));
+
 export function rotateFamily(family, hue, minChroma = 0) {
   const rotation = family.neutral ? 0 : signedGap(hue, family.hue);
   return family.colors
     .filter((color) => color.oklch[1] >= NEUTRAL_CHROMA && hueGap(color.oklch[2], family.hue) <= ACCENT_GAP)
     .map((color) => {
       const [lightness, chroma, sourceHue] = color.oklch;
-      return [color.hex, hexOf(rgbOfOklch(lightness, Math.max(chroma, minChroma), wrap(sourceHue + rotation)))];
+      return [color.hex, hexOf(rgbOfOklch(lightness, Math.max(chroma * paleBoost(family), minChroma), wrap(sourceHue + rotation)))];
     });
 }
 
@@ -365,7 +413,7 @@ function paintPlans(plans, analysis, notes) {
     if (hue >= YELLOW_HUES[0] && hue <= YELLOW_HUES[1] && family.light < DARK_YELLOW_LIGHT) notes.push('amarillo sobre oscuro: se ve oliva');
     whole.push(...rotateFamily(family, hue, vivid * POKEMON_SATURATION));
     const rotation = signedGap(hue, family.hue);
-    near.push(...skinShadows(family, ([lightness, chroma, toneHue]) => hexOf(rgbOfOklch(lightness, chroma, wrap(toneHue + rotation))), kept.skin));
+    near.push(...skinShadows(family, ([lightness, chroma, toneHue]) => hexOf(rgbOfOklch(lightness, chroma * paleBoost(family), wrap(toneHue + rotation))), kept.skin));
   }
   const painted = new Set(whole.map(([from]) => from));
   const local = near.filter(([from], i) => !painted.has(from) && near.findIndex(([other]) => other === from) === i);
