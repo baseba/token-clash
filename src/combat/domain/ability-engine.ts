@@ -1,9 +1,12 @@
 // When an ability acts. The engine calls its hooks (run, mul, chain) and reads its flags (flag) unless something
 // suppresses it (Gastro Acid, Neutralizing Gas, Mold Breaker). The hooks get an AbilityEngine: the only way the
-// rules of ability-effects.ts touch a battle.
+// rules of ability-effects.ts touch a battle. A held item (item-effects.ts) has the same hooks and runs right
+// after the ability: multipliers multiply, chains pass the value on.
 import type { Boosts, MajorStatus, Weather } from '../../catalog/domain/creatures.js';
 import { abilityInfo } from '../../catalog/domain/abilities.js';
 import { ABILITIES, type AbilityEffect, type AbilityHook } from './ability-effects.js';
+import { HELD_ITEMS } from '../../catalog/domain/held-items.js';
+import { ITEMS } from './item-effects.js';
 import type { AbilityDetails, AnyMove, BattleFighter, BattleState } from './battle-types.js';
 import { typeEffectiveness } from './damage.js';
 import { activeFighters, addToxicSpikes, addVolatile, asleep, boost, type BoostOptions, breakIllusion, changeForm, clearScreens, cure, currentWeather, emit, foeOf, grounded, hasBench, heal, hurt, lookOf, nameOf, setStatus, setTerrain, setTypes, setWeather, sideIndexOf, transform } from './effects.js';
@@ -33,17 +36,34 @@ type ChainArgs<H extends ChainHook> = HookArgs<H> extends [...infer Args, number
  * can't call a hook picked by a generic key, so the call inside is loose; the signature is what callers get.
  */
 export function run<H extends AbilityHook>(battle: BattleState, fighter: BattleFighter, hook: H, ...args: HookArgs<H>): ReturnType<Hook<H>> | undefined {
+  const own = call(battle, abilityDef(battle, fighter), fighter, hook, args);
+  const held = call(battle, itemDef(fighter), fighter, hook, args);
+  return own ?? held;
+}
+
+/** The rules of the item a fighter holds, if it still has one. */
+const itemDef = (fighter: BattleFighter): Partial<AbilityEffect> | null => (fighter.item ? ITEMS[fighter.item] ?? null : null);
+
+function call<H extends AbilityHook>(battle: BattleState, def: Partial<AbilityEffect> | null, fighter: BattleFighter, hook: H, args: HookArgs<H>): ReturnType<Hook<H>> | undefined {
   type AnyHook = (engine: AbilityEngine, me: BattleFighter, ...args: unknown[]) => unknown;
-  return (abilityDef(battle, fighter)?.[hook] as AnyHook | undefined)?.(engine(battle), fighter, ...args) as ReturnType<Hook<H>> | undefined;
+  return (def?.[hook] as AnyHook | undefined)?.(engine(battle), fighter, ...args) as ReturnType<Hook<H>> | undefined;
 }
 
 export function mul<H extends MultiplierHook>(battle: BattleState, fighter: BattleFighter, hook: H, ...args: HookArgs<H>): number {
-  return run(battle, fighter, hook, ...args) ?? 1;
+  return (call(battle, abilityDef(battle, fighter), fighter, hook, args) ?? 1) * (call(battle, itemDef(fighter), fighter, hook, args) ?? 1);
 }
 
-/** Passes `value` through the hook, which gets it as its last argument and returns the new one. */
+/** Passes `value` through the hook, which gets it as its last argument and returns the new one: the ability's, then the item's. */
 export function chain<H extends ChainHook>(battle: BattleState, fighter: BattleFighter, hook: H, value: number, ...args: ChainArgs<H>): number {
-  return run(battle, fighter, hook, ...([...args, value] as HookArgs<H>)) ?? value;
+  const byAbility = call(battle, abilityDef(battle, fighter), fighter, hook, [...args, value] as HookArgs<H>) ?? value;
+  return call(battle, itemDef(fighter), fighter, hook, [...args, byAbility] as HookArgs<H>) ?? byAbility;
+}
+
+/** A held item shows it acted; `usedUp` when it is gone after (a berry, a Focus Sash). */
+function showItem(battle: BattleState, fighter: BattleFighter, usedUp = false): void {
+  if (!fighter.item) return;
+  emit(battle, { t: 'item', side: sideIndexOf(battle, fighter), name: nameOf(fighter), item: HELD_ITEMS[fighter.item]?.name ?? fighter.item, ...(usedUp ? { usedUp: true as const } : {}) });
+  if (usedUp) fighter.item = null;
 }
 
 export const anyActiveHas = (battle: BattleState, key: string): boolean => activeFighters(battle).some((f) => abilityKey(battle, f) === key);
@@ -103,6 +123,8 @@ function makeEngine(battle: BattleState) {
     changeForm: (fighter: BattleFighter, form: string | null, opts?: { permanent?: boolean }) => changeForm(battle, fighter, form, opts),
     breakIllusion: (fighter: BattleFighter) => breakIllusion(fighter),
     look: (fighter: BattleFighter) => lookOf(fighter),
+    showItem: (fighter: BattleFighter) => showItem(battle, fighter),
+    useUpItem: (fighter: BattleFighter) => showItem(battle, fighter, true),
   };
 }
 
