@@ -5,6 +5,14 @@ Batallas por turnos entre jugadores con los Pokémon que cada uno crió en
 
 En vivo: **https://clash.mirrordev.xyz**
 
+> **Un proyecto personal, solo para jugar entre compañeros de pega.** Token Clash no es un juego para el público ni
+> lo va a ser: no se publica, no se promociona, no se vende y no tiene ni va a tener ningún uso comercial. El código
+> está a la vista y el sitio existe para que un grupo chico de compañeros de trabajo juegue entre sí, nada más. No
+> tiene relación con Nintendo, Creatures, GAME FREAK ni The Pokémon Company, ni con los fan games y proyectos cuyos
+> datos y recursos usamos (PokeAPI, Pokémon Showdown, PokeRogue, Pokémon Reborn, pokeemerald-rogue, los decompilados
+> de pret y otros): sus autores no lo respaldan ni participan en él. Cada recurso lleva su crédito en
+> [Créditos](#créditos). Si eres autor de alguno y prefieres que no lo usemos, abre un issue y lo sacamos.
+
 **Índice:** [Cómo se juega](#cómo-se-juega) · [Combate](#combate) · [Pokémon (PokeAPI)](#pokémon-pokeapi) ·
 [Créditos](#créditos) · [Desarrollo](#desarrollo) · [Dónde está cada cosa](#dónde-está-cada-cosa) ·
 [Datos](#datos) · [Deploy](#deploy-podman--cloudflare-tunnel)
@@ -243,8 +251,9 @@ evolutiva exacta.
 
 ## Créditos
 
-Proyecto sin fines comerciales, para jugar entre amigos. Pokémon y sus nombres son de Nintendo, Creatures Inc. y
-GAME FREAK inc.
+Proyecto personal sin fines comerciales, que no se publica para el público: existe solo para jugar entre
+compañeros de pega (ver la nota del inicio). Pokémon y sus nombres son de Nintendo, Creatures Inc. y GAME FREAK inc.
+Los datos y recursos de terceros son de sus autores, con sus licencias; aquí solo se usan para ese fin.
 
 - Datos y sprites: [PokeAPI](https://pokeapi.co/); gritos: [PokeAPI/cries](https://github.com/PokeAPI/cries).
 - Movimientos y su texto: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) (MIT).
