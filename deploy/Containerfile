@@ -27,7 +27,7 @@ RUN node scripts/sync-trainers.js
 COPY src/catalog/data ./src/catalog/data
 COPY drizzle ./drizzle
 COPY public ./public
-COPY scripts/sync-overworlds.js scripts/overworld-recolor.mjs scripts/overworld-compose.mjs scripts/overworld-sources.json scripts/plan-trainer-variants.mjs scripts/sprite-ramps.mjs scripts/shipped-recolors.json ./scripts/
+COPY scripts/sync-overworlds.js scripts/overworld-recolor.mjs scripts/overworld-compose.mjs scripts/overworld-sources.json scripts/plan-trainer-variants.mjs scripts/sprite-ramps.mjs scripts/sprite-rotate.mjs scripts/shipped-recolors.json ./scripts/
 RUN node scripts/sync-overworlds.js
 COPY scripts/sync-tilesets.js ./scripts/
 RUN node scripts/sync-tilesets.js
