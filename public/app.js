@@ -3,7 +3,7 @@ import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor, sceneNamed } from './backgrounds.js?v=dev';
 import { overworldSprite } from './overworld.js?v=dev';
 import { PARTY_LIMIT, PROFESSOR, PROFESSOR_LINES, RECRUIT_LINE, ROOMS, sceneMusic, STOP_PEOPLE, TOWER_LENGTHS, TWISTS } from './tower-cast.js?v=dev';
-import { exitRows, preloadTiles, towerMap } from './tower-map.js?v=dev';
+import { forkExits, preloadTiles, towerMap } from './tower-map.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
 import { createFx, moveShape } from './fx.js?v=dev';
 import { ballFxBare, ballFxNote, ballSounds } from './ball-fx.js?v=dev';
@@ -3181,8 +3181,9 @@ let towerCast = null;
 /** You walk to the way you chose on the map, then the floor goes on from there. */
 async function takeRoom(run, room, body) {
   document.querySelectorAll('.tw-room, .tw-sign').forEach((button) => { button.disabled = true; });
-  if (!reducedMotion()) await towerCast?.takeExit(run.rooms.findIndex((option) => option.kind === room.kind));
-  towerEntrance = 'walk';
+  const index = run.rooms.findIndex((option) => option.kind === room.kind);
+  if (!reducedMotion()) await towerCast?.takeExit(index);
+  towerEntrance = towerCast?.entranceAfter(index) ?? 'walk';
   const res = await towerCall(null, '/api/tower/room', { body });
   if (!res) towerEntrance = null;
   if (!res) document.querySelectorAll('.tw-room, .tw-sign').forEach((button) => { button.disabled = false; });
@@ -3282,7 +3283,7 @@ function floorStage(run, entrance) {
     entrance,
   });
   cast.id = id;
-  if (choosing) cast.el.append(...exitRows(run.rooms.length).map((row, i) => h('button', { type: 'button', class: `tw-sign room-${run.rooms[i].kind}`, style: { '--y': String(row) }, 'data-tip': run.rooms[i].label, 'aria-label': run.rooms[i].label, onclick: () => chooseRoom(run, run.rooms[i]) }, glyph(run.rooms[i].icon))));
+  if (choosing) cast.el.append(...forkExits(run.rooms.length).map((exit, i) => h('button', { type: 'button', class: `tw-sign tw-sign-${exit.side} room-${run.rooms[i].kind}`, style: { '--x': String(exit.col), '--y': String(exit.row) }, 'data-tip': run.rooms[i].label, 'aria-label': run.rooms[i].label, onclick: () => chooseRoom(run, run.rooms[i]) }, glyph(run.rooms[i].icon))));
   towerCast = cast;
   cast.arrive();
   return cast;
@@ -3298,7 +3299,7 @@ function moveOn(btn, run) {
 async function walkUp(btn) {
   btn.disabled = true;
   if (!reducedMotion()) await towerCast?.leave();
-  towerEntrance = 'walk';
+  towerEntrance = 'fromBelow';
   if (!(await towerCall(btn, '/api/tower/move-on'))) towerEntrance = null;
 }
 

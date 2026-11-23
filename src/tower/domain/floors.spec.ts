@@ -58,7 +58,7 @@ test('plain floors offer a trainer and one or two other ways; bosses offer none'
     if (floorKind(floor, 25) !== 'trainer') assert.deepEqual(rooms, []);
     else {
       assert.equal(rooms[0], 'trainer');
-      assert.ok(rooms.length >= 2 && rooms.length <= 3 && new Set(rooms).size === rooms.length);
+      assert.ok(rooms.length >= 3 && rooms.length <= 5 && new Set(rooms).size === rooms.length);
       if (floor <= 2) assert.ok(!rooms.includes('hideout') && !rooms.includes('deal'), 'no hideouts while warming up');
     }
   }
@@ -183,4 +183,10 @@ test('a villain leader fights a level over its grunts with one more Pokémon, an
   const bases = (room: 'tough' | 'calm') => new Set(Array.from({ length: 60 }, (_, seed) => floorAt(12, 50, 'mid', `m${seed}`, room).foe?.base));
   assert.ok(['ace_trainer', 'veteran', 'rival', 'player'].some((base) => [...bases('tough')].some((key) => key?.startsWith(base))));
   assert.ok(['youngster', 'school_kid', 'preschooler', 'nursery_aide'].some((base) => [...bases('calm')].some((key) => key?.startsWith(base))));
+});
+
+test('a plain floor offers three to five ways, and every count shows up', () => {
+  const counts = new Set<number>();
+  for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) for (let floor = 1; floor < 25; floor++) if (floorKind(floor, 25) === 'trainer') counts.add(roomsAt(floor, 25, seed).length);
+  assert.deepEqual([...counts].sort(), [3, 4, 5]);
 });
