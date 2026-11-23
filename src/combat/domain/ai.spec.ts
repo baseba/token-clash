@@ -126,6 +126,24 @@ test('the very hard AI switches out of a fight it cannot win', () => {
   assert.deepEqual(action, { type: 'switch', to: 1 });
 });
 
+test('a Pokémon that just came in mid-battle fights at least one turn before the AI calls it back', () => {
+  const venusaur = mon('v', 3, ['vine-whip']);
+  const blastoise = mon('b', 9, ['surf']);
+  const charizard = mon('c', 6, ['flamethrower'], { level: 70 });
+  for (const difficulty of ['hard', 'veryhard'] as const) {
+    for (let seed = 0; seed < 10; seed++) {
+      const b = duel([venusaur, blastoise], [charizard]);
+      b.turn = 4;
+      b.sides[0].team[0].activeTurns = 0;
+      assert.equal(chooseAction(b, 0, difficulty, rng(seed))?.type, 'move', `${difficulty} ${seed}`);
+    }
+  }
+  const settled = duel([venusaur, blastoise], [charizard]);
+  settled.turn = 4;
+  settled.sides[0].team[0].activeTurns = 2;
+  assert.deepEqual(chooseAction(settled, 0, 'veryhard', rng(1)), { type: 'switch', to: 1 });
+});
+
 function aiVsAi(levelA, levelB, seed) {
   const random = rng(`fight:${seed}`);
   const a = buildAiTeam({ difficulty: levelA, random }).slice(0, 3);
