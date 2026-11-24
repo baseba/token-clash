@@ -2596,7 +2596,7 @@ button.tw-floor-pill:hover { background: var(--card-2); }
 .tw-map-canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .tw-map.compact { --shown: 5; --shift: 1; aspect-ratio: var(--cols) / 5; }
 .tw-map.compact .tw-map-canvas { object-fit: cover; }
-.tw-actor { position: absolute; width: calc(100% * 2 / var(--cols)); aspect-ratio: 1; left: calc(100% * (var(--x) - .5) / var(--cols)); top: calc(100% * (var(--y) - 1 - var(--shift, 0)) / var(--shown, var(--rows))); transition: left var(--walk, 0s) linear, top var(--walk, 0s) linear; filter: drop-shadow(0 2px 0 rgb(0 0 0 / .25)); }
+.tw-actor { position: absolute; width: calc(100% * 2 / var(--cols)); aspect-ratio: 1; left: calc(100% * (var(--x) - .5) / var(--cols)); top: calc(100% * (var(--y) - 1 - var(--shift, 0)) / var(--shown, var(--rows))); filter: drop-shadow(0 2px 0 rgb(0 0 0 / .25)); }
 .tw-actor .ow-sprite { width: 100%; height: 100%; }
 .tw-actor.inside, .tw-actor.vanish { opacity: 0; transition: opacity .3s steps(3); }
 .tw-actor.vanish { transition-duration: .7s; }

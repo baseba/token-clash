@@ -47,3 +47,27 @@ test('a dressed piece keeps the light steps between its tones', () => {
   assert.ok(Math.abs(gap - (colors[1].oklch[0] - colors[0].oklch[0])) < 0.03);
   assert.ok(oklchOf(rgb(dark))[1] <= 0.03, 'a grey target leaves it grey');
 });
+
+test('a cap and a uniform of one colour are dressed as one garment, and what the trainer holds dresses nothing', () => {
+  const battle = sprite(64, 64, [
+    [20, 0, 44, 8, '#29633a'],
+    [22, 2, 42, 6, '#5a9c4a'],
+    [22, 8, 42, 16, SKIN],
+    [16, 16, 48, 64, '#29633a'],
+    [20, 20, 44, 60, '#5a9c4a'],
+    [16, 16, 20, 24, '#313152'],
+    [44, 16, 48, 24, '#5a5a63'],
+    [0, 30, 6, 44, '#217384'],
+    [1, 32, 5, 42, '#84ded6'],
+  ]);
+  const overworld = sprite(32, 32, [
+    [10, 0, 22, 6, '#6a52bd'],
+    [11, 6, 21, 11, SKIN],
+    [11, 11, 21, 12, SKIN_SHADE],
+    [9, 12, 23, 32, '#413962'],
+    [12, 14, 20, 30, '#a48bee'],
+  ]);
+  const map = new Map(dressMap(battle, overworld, new Set([key(SKIN), key(SKIN_SHADE)])));
+  const green = oklchOf(rgb('#5a9c4a'))[2];
+  for (const hex of ['#6a52bd', '#413962', '#a48bee']) assert.ok(Math.abs(oklchOf(rgb(map.get(hex)))[2] - green) < 25, `${hex} turns green`);
+});
