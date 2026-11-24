@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { assetName, compactAnim, compactFrame, missingAssets, resourcesOf } from '../../scripts/sync-battle-anims.js';
-import { animLength, causeAnim, sheetColumns, hpTweenMs, chargeAnim, conditionAnim, moveLands, pickVariant, placeEntry, statusAnim, TARGET_GRAPHIC, TARGET_TARGET, TARGET_USER, terrainAnim, weatherAnim } from '../../public/battle-anims.js';
+import { animLength, causeAnim, sheetColumns, hpTweenMs, chargeAnim, conditionAnim, moveLands, pickVariant, placeEntry, statusAnim, TARGET_GRAPHIC, TARGET_TARGET, TARGET_USER, terrainAnim, toneMatrix, weatherAnim } from '../../public/battle-anims.js';
 import { animSoundFor, moveSfxCues, sampleFor, SOUNDS } from '../../public/music.js';
 
 const sound = (frameIndex, resourceName, volume = 100, pitch = 100) => ({ frameIndex, resourceName, volume, pitch, eventType: 'AnimTimedSoundEvent' });
@@ -159,4 +159,16 @@ test('a type-shifting move tints its white sheet with the type color, keeping a 
   assert.ok(b > 60, 'the brightest pixels keep a light core');
   assert.ok(pixels[4] > pixels[6] && pixels[4] < 200, 'a mid pixel takes the color without the core');
   assert.deepEqual([...pixels.slice(8)], [0, 0, 0, 0], 'transparent pixels stay untouched');
+});
+
+test('a tone adds its color to every channel and mixes towards gray by its fourth value, as PokeRogue does', () => {
+  assert.equal(toneMatrix(0), null);
+  assert.equal(toneMatrix([0, 0, 0, 0]), null);
+  const purple = toneMatrix([120, -50, 120, 0]);
+  assert.deepEqual(purple.slice(0, 5), [1, 0, 0, 0, +(120 / 255).toFixed(4)]);
+  assert.deepEqual(purple.slice(5, 10), [0, 1, 0, 0, +(-50 / 255).toFixed(4)]);
+  assert.deepEqual(purple.slice(15), [0, 0, 0, 1, 0]);
+  const gray = toneMatrix([0, 0, 0, 255]);
+  assert.deepEqual(gray.slice(0, 3), [0.299, 0.587, 0.114]);
+  assert.deepEqual(gray.slice(5, 8), [0.299, 0.587, 0.114]);
 });

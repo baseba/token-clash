@@ -105,11 +105,48 @@ export function animLength(config) {
 
 const BLEND = ['normal', 'plus-lighter', 'difference'];
 
+const GRAY_WEIGHTS = [0.299, 0.587, 0.114];
+
+export function toneMatrix(tone) {
+  if (!Array.isArray(tone) || tone.every((value) => !value)) return null;
+  const [r, g, b, gray = 0] = tone;
+  const share = Math.min(1, Math.max(0, gray / 255));
+  return [r, g, b].flatMap((offset, row) => [
+    ...GRAY_WEIGHTS.map((weight, column) => +((column === row ? 1 - share : 0) + share * weight).toFixed(4)),
+    0,
+    +(offset / 255).toFixed(4),
+  ]).concat([0, 0, 0, 1, 0]);
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const toneFilters = new Map();
+
 function toneFilter(tone) {
-  if (!tone) return '';
-  const [r, g, b, gray] = tone;
-  const light = 1 + (r + g + b) / (3 * 255);
-  return `brightness(${Math.max(0, light).toFixed(2)}) grayscale(${Math.min(1, Math.max(0, gray / 255)).toFixed(2)})`;
+  const matrix = toneMatrix(tone);
+  if (!matrix) return '';
+  const id = `anim-tone-${matrix.join('_').replace(/[.-]/g, (c) => (c === '.' ? 'p' : 'm'))}`;
+  if (!toneFilters.has(id)) {
+    let defs = document.getElementById('anim-tones');
+    if (!defs) {
+      const svg = document.createElementNS(SVG_NS, 'svg');
+      Object.assign(svg.style, { position: 'absolute', width: '0', height: '0', overflow: 'hidden' });
+      svg.setAttribute('aria-hidden', 'true');
+      defs = document.createElementNS(SVG_NS, 'defs');
+      defs.id = 'anim-tones';
+      svg.append(defs);
+      document.body.append(svg);
+    }
+    const filter = document.createElementNS(SVG_NS, 'filter');
+    filter.id = id;
+    filter.setAttribute('color-interpolation-filters', 'sRGB');
+    const colors = document.createElementNS(SVG_NS, 'feColorMatrix');
+    colors.setAttribute('type', 'matrix');
+    colors.setAttribute('values', matrix.join(' '));
+    filter.append(colors);
+    defs.append(filter);
+    toneFilters.set(id, `url(#${id})`);
+  }
+  return toneFilters.get(id);
 }
 
 export function createAnimPlayer(field) {
@@ -258,8 +295,29 @@ export function createAnimPlayer(field) {
     const sheetSrc = sheet ? (tint && (await withTimeout(tintedSheet(sheet, tint)))) || sheet.src : null;
     const columns = sheet ? sheetColumns(sheet.naturalWidth) : 1;
     const mons = [userEl, targetEl].map(shownSprite);
+    const fieldBox = field.getBoundingClientRect();
+    const fieldScale = fieldBox.width / FIELD.width || 1;
+    const restBox = (img) => {
+      if (!img) return null;
+      const r = img.getBoundingClientRect();
+      return { left: (r.left - fieldBox.left) / fieldScale, top: (r.top - fieldBox.top) / fieldScale, width: r.width / fieldScale, height: r.height / fieldScale };
+    };
+    const rests = mons.map(restBox);
     const graphics = [];
+    const copies = [];
     let bg = null;
+
+    const monStyle = (img, entry) => {
+      const rest = img === mons[0] ? geo.user : geo.target;
+      const p = placeEntry(entry, geo);
+      return {
+        visibility: entry[7] ? 'visible' : 'hidden',
+        opacity: String(entry[10] / 255),
+        transform: `translate(${p.x - rest.x}px, ${p.y - rest.y}px) rotate(${p.angle}deg) scale(${p.scaleX}, ${p.scaleY})`,
+        filter: toneFilter(entry[13]),
+        mixBlendMode: BLEND[entry[8]] ?? 'normal',
+      };
+    };
 
     const styleMon = (img, entry) => {
       if (!img) return;
@@ -267,14 +325,29 @@ export function createAnimPlayer(field) {
         img.style.visibility = 'hidden';
         return;
       }
-      const rest = img === mons[0] ? geo.user : geo.target;
-      const p = placeEntry(entry, geo);
-      Object.assign(img.style, {
-        visibility: entry[7] ? 'visible' : 'hidden',
-        opacity: String(entry[10] / 255),
-        transform: `translate(${p.x - rest.x}px, ${p.y - rest.y}px) rotate(${p.angle}deg) scale(${p.scaleX}, ${p.scaleY})`,
-        filter: toneFilter(entry[13]),
-        mixBlendMode: BLEND[entry[8]] ?? 'normal',
+      Object.assign(img.style, monStyle(img, entry));
+    };
+
+    const copyOf = (img) => {
+      const box = rests[mons.indexOf(img)];
+      const el = document.createElement('img');
+      el.className = 'anim-sprite anim-copy';
+      el.alt = '';
+      el.src = img.currentSrc || img.src;
+      Object.assign(el.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
+      field.append(el);
+      return el;
+    };
+
+    const styleCopies = (pairs) => {
+      while (copies.length > pairs.length) copies.pop().remove();
+      pairs.forEach(([img, entry], i) => {
+        if (copies[i] && copies[i].owner !== img) copies.splice(i, 1)[0].remove();
+        if (!copies[i]) {
+          copies.splice(i, 0, copyOf(img));
+          copies[i].owner = img;
+        }
+        Object.assign(copies[i].style, { ...monStyle(img, entry), zIndex: entry[11] === 2 ? '0' : '1' });
       });
     };
 
@@ -292,7 +365,6 @@ export function createAnimPlayer(field) {
         opacity: String(entry[10] / 255),
         visibility: entry[7] ? 'visible' : 'hidden',
         mixBlendMode: BLEND[entry[8]] ?? 'normal',
-        filter: toneFilter(entry[13]),
       });
     };
 
@@ -302,13 +374,15 @@ export function createAnimPlayer(field) {
       while (graphics.length < graphicEntries.length) graphics.push(sprite({}));
       graphics.splice(graphicEntries.length).forEach((el) => el.remove());
       graphicEntries.forEach((entry, i) => styleGraphic(graphics[i], entry));
-      const userEntry = entries.find((e) => e[0] === TARGET_USER);
-      const targetEntry = entries.find((e) => e[0] === TARGET_TARGET);
+      const [userEntry, ...userCopies] = entries.filter((e) => e[0] === TARGET_USER);
+      const [targetEntry, ...targetCopies] = entries.filter((e) => e[0] === TARGET_TARGET);
       if (same) styleMon(mons[1], targetEntry ?? userEntry);
       else {
         styleMon(mons[0], userEntry);
         styleMon(mons[1], targetEntry);
       }
+      const extra = same ? (targetEntry ? targetCopies : userCopies).map((entry) => [mons[1], entry]) : [...userCopies.map((entry) => [mons[0], entry]), ...targetCopies.map((entry) => [mons[1], entry])];
+      styleCopies(extra.filter(([img]) => img && rests[mons.indexOf(img)]));
     };
 
     const showBg = (f) => {
@@ -322,6 +396,7 @@ export function createAnimPlayer(field) {
 
     const cleanup = () => {
       graphics.forEach((el) => el.remove());
+      copies.splice(0).forEach((el) => el.remove());
       bg?.remove();
       for (const img of mons) {
         if (img) Object.assign(img.style, { visibility: '', opacity: '', transform: '', filter: '', mixBlendMode: '' });
@@ -336,6 +411,7 @@ export function createAnimPlayer(field) {
         if (f < config.frames.length) showFrame(f);
         else if (f === config.frames.length) {
           graphics.splice(0).forEach((el) => el.remove());
+          copies.splice(0).forEach((el) => el.remove());
           for (const img of mons) if (img) Object.assign(img.style, { visibility: '', opacity: '', transform: '', filter: '', mixBlendMode: '' });
         }
         if (++f >= total) {
