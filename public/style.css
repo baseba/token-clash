@@ -2805,3 +2805,24 @@ button.tw-reward:hover, button.tw-reward:focus-visible { border-color: var(--acc
 
 .tw-twist { cursor: pointer; }
 @media (max-width: 520px) { .tw-twist-name { display: none; } }
+
+/* Another trainer's public profile (/entrenador/:id). */
+.trainer-link { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 3px; }
+.trainer-link:hover, .trainer-link:focus-visible { text-decoration-color: currentColor; }
+.trainer-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem; }
+.trainer-head .profile-identity { gap: 1.4rem; }
+.recent .recent-meta { text-decoration: none; }
+.result-chip.good { color: var(--good); } .result-chip.bad { color: var(--bad); }
+.using-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: .8rem; }
+.using-slot { display: grid; justify-items: center; align-content: start; gap: .25rem; text-align: center; padding: .7rem; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.using-preview { display: flex; align-items: center; justify-content: center; min-height: 92px; width: 100%; }
+.using-slot b { overflow-wrap: anywhere; }
+.trainer-search { display: grid; gap: .55rem; }
+.trainer-search label { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem; }
+.trainer-search input { width: 100%; }
+.trainer-results { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.trainer-result { display: flex; align-items: center; gap: .6rem; padding: .45rem .6rem; border-radius: 10px; color: inherit; text-decoration: none; border: 1px solid var(--line); min-width: 0; }
+.trainer-result b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.trainer-result .record { margin-left: auto; }
+.trainer-result:hover, .trainer-result:focus-visible { border-color: var(--accent); outline: none; }
+.trainer-none { padding: .4rem .2rem; }

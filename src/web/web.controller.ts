@@ -6,7 +6,7 @@ import { WebAssets } from './web-assets.js';
 
 /** Pages of the single-page app: they all serve index.html and the app routes in the browser. */
 const APP_PAGES = new Set(['/', '/equipo', '/coleccion', '/pokedex', '/stats', '/perfil', '/tienda', '/reciclaje', '/torre']);
-const SHARE_LINK = /^\/[bt]\/[A-Za-z0-9_-]{4,20}$/;
+const SHARE_LINK = /^\/([bt]|entrenador)\/[A-Za-z0-9_-]{4,20}$/;
 
 @Controller()
 export class HealthController {

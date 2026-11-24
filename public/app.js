@@ -693,6 +693,7 @@ function loadingScreen(text = 'Cargando…', { compact = false } = {}) {
 function loadingTextFor(path) {
   if (path.startsWith('/b/')) return 'Preparando la batalla…';
   if (path.startsWith('/t/')) return 'Cargando el torneo…';
+  if (path.startsWith('/entrenador/')) return 'Buscando al entrenador…';
   return {
     '/coleccion': 'Abriendo tu colección…',
     '/equipo': 'Abriendo tu colección…',
@@ -1050,6 +1051,7 @@ function route() {
   if (TAB_MUSIC[location.pathname]) music.play(TAB_MUSIC[location.pathname]);
   else if (location.pathname.startsWith('/t/')) music.play('tab:home');
   else if (location.pathname.startsWith('/b/')) music.play('prep');
+  else if (location.pathname.startsWith('/entrenador/')) music.play('tab:stats');
   closeRoomsFeed();
   cleanup?.();
   cleanup = null;
@@ -1081,6 +1083,8 @@ function route() {
   if (location.pathname === '/torre') return towerPage(seq);
   const t = /^\/t\/([A-Za-z0-9_-]{4,20})$/.exec(location.pathname);
   if (t) return tournamentPage(t[1], seq);
+  const trainer = /^\/entrenador\/([A-Za-z0-9_-]{4,20})$/.exec(location.pathname);
+  if (trainer) return trainerPage(trainer[1], seq);
   return homePage(seq);
 }
 
@@ -3561,6 +3565,8 @@ function ago(ts) {
 }
 
 const isMe = (t) => !!me && t.id === me.id;
+/** A trainer's name that opens their public profile. */
+const trainerLink = (id, name) => (id ? h('a', { class: 'trainer-link', href: `/entrenador/${encodeURIComponent(id)}`, 'data-link': true }, name) : name);
 const record = (t) => h('span', { class: 'record' }, h('span', { class: 'w' }, `${t.wins}V`), ' ', h('span', { class: 'l' }, `${t.losses}D`));
 const rateBar = (t) => h('span', { class: 'rate', 'data-tip': t.games ? `${t.wins} de ${t.games} batallas ganadas` : 'Sin batallas todavía' }, h('span', { class: 'rate-bar' }, h('i', { style: { width: percent(t.winRate ?? 0) } })), h('span', { class: 'rate-num' }, percent(t.winRate)));
 const trainerMeta = (t) => `${t.rosterSize} Pokémon · ${t.shinies} shiny · ${compact(t.totalTokens)} tokens`;
@@ -3575,7 +3581,7 @@ function podium(top) {
         'div',
         { class: `podium-card place-${i + 1}${isMe(t) ? ' is-me' : ''}` },
         h('span', { class: 'podium-medal', 'aria-label': `Puesto ${i + 1}` }, glyph(medals[i])),
-        h('b', { class: 'podium-name' }, t.name, isMe(t) ? h('span', { class: 'muted small' }, ' (tú)') : null),
+        h('b', { class: 'podium-name' }, trainerLink(t.id, t.name), isMe(t) ? h('span', { class: 'muted small' }, ' (tú)') : null),
         record(t),
         rateBar(t),
         h('small', { class: 'muted' }, trainerMeta(t)),
@@ -3597,7 +3603,7 @@ function rankingCard(ranking) {
                 h(
                   'div',
                   { class: `item${isMe(t) ? ' is-me' : ''}` },
-                  h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 4}`), h('span', { class: 'rank-who' }, h('strong', null, t.name, isMe(t) ? h('span', { class: 'muted small' }, ' (tú)') : null), h('small', { class: 'muted' }, trainerMeta(t)))),
+                  h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 4}`), h('span', { class: 'rank-who' }, h('strong', null, trainerLink(t.id, t.name), isMe(t) ? h('span', { class: 'muted small' }, ' (tú)') : null), h('small', { class: 'muted' }, trainerMeta(t)))),
                   h('span', { class: 'row rank-right' }, rateBar(t), record(t)),
                 ),
               ),
@@ -3645,7 +3651,7 @@ function tournamentStatsSection({ totals, ranking, recent }) {
     'div',
     { class: 'list rank-list' },
     ranking.slice(0, 10).map((t, i) =>
-      h('div', { class: `item${me && t.id === me.id ? ' is-me' : ''}` }, h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 1}`), h('span', { class: 'rank-who' }, h('strong', null, t.name), h('small', { class: 'muted' }, `${plural(t.played, 'torneo', 'torneos')} · ${plural(t.finals, 'final', 'finales')}`))), h('span', { class: 'row rank-right' }, h('span', { class: 'chip' }, glyph('trophy'), ` ${t.titles}`), record(t))),
+      h('div', { class: `item${me && t.id === me.id ? ' is-me' : ''}` }, h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 1}`), h('span', { class: 'rank-who' }, h('strong', null, trainerLink(t.id, t.name)), h('small', { class: 'muted' }, `${plural(t.played, 'torneo', 'torneos')} · ${plural(t.finals, 'final', 'finales')}`))), h('span', { class: 'row rank-right' }, h('span', { class: 'chip' }, glyph('trophy'), ` ${t.titles}`), record(t))),
     ),
   );
   const last = h(
@@ -3755,6 +3761,7 @@ async function statsPage(seq) {
         ),
       ),
     ),
+    h('section', null, trainerSearch()),
     me ? h('section', null, myChallengesCard()) : '',
     h('section', null, rankingCard(ranking)),
     h('section', { class: 'grid2' }, recentCard(recent), numbersCard(totals)),
@@ -3764,6 +3771,154 @@ async function statsPage(seq) {
     h('section', null, h('p', { class: 'muted small center' }, `Versión ${live.version} · servidor encendido ${ago(live.startedAt)}`)),
   );
   foldSections($app, STATS_OPEN);
+}
+
+const RESULT_CHIP = { won: ['good', 'Ganó'], lost: ['bad', 'Perdió'], draw: ['', 'Empate'] };
+const SEARCH_RESULTS = 8;
+const searchable = (text) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
+/** A search box that finds any trainer by name and opens their profile. The list of names loads on first use. */
+function trainerSearch() {
+  let trainers = null;
+  const results = h('ul', { class: 'trainer-results', id: 'trainer-search-results', hidden: true });
+  const input = h('input', { id: 'trainer-search', type: 'search', placeholder: 'Escribe un nombre', autocomplete: 'off', 'aria-controls': 'trainer-search-results' });
+  const load = () => (trainers ??= api('/api/stats/trainers').then((res) => res.trainers).catch(() => { trainers = null; return []; }));
+  const matches = (list, query) => {
+    const wanted = searchable(query);
+    return list
+      .map((trainer) => ({ trainer, at: searchable(trainer.name).indexOf(wanted) }))
+      .filter(({ at }) => at >= 0)
+      .sort((a, b) => (a.at !== 0) - (b.at !== 0) || a.trainer.name.localeCompare(b.trainer.name, 'es'))
+      .slice(0, SEARCH_RESULTS)
+      .map(({ trainer }) => trainer);
+  };
+  const paint = async () => {
+    const query = input.value;
+    if (!searchable(query)) {
+      results.hidden = true;
+      return;
+    }
+    const found = matches(await load(), query);
+    if (input.value !== query) return;
+    results.replaceChildren(...(found.length
+      ? found.map((trainer) => h('li', null, h('a', { class: 'trainer-result', href: `/entrenador/${encodeURIComponent(trainer.id)}`, 'data-link': true },
+          avatarPic(trainer.avatar, 'sm', trainer.frame), h('b', null, trainer.name), isMe(trainer) ? h('span', { class: 'chip match-you' }, 'Tú') : null, record(trainer))))
+      : [h('li', { class: 'muted trainer-none' }, `Nadie se llama «${query.trim()}».`)]));
+    results.hidden = false;
+  };
+  input.addEventListener('focus', load, { once: true });
+  input.addEventListener('input', paint);
+  input.addEventListener('keydown', (e) => {
+    const first = results.querySelector('a');
+    if (e.key === 'Enter' && first) {
+      e.preventDefault();
+      first.click();
+    } else if (e.key === 'ArrowDown' && first) {
+      e.preventDefault();
+      first.focus();
+    } else if (e.key === 'Escape') {
+      input.value = '';
+      results.hidden = true;
+    }
+  });
+  results.addEventListener('keydown', (e) => {
+    const links = [...results.querySelectorAll('a')];
+    const at = links.indexOf(document.activeElement);
+    if (at < 0 || !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
+    e.preventDefault();
+    (e.key === 'ArrowDown' ? links[at + 1] : links[at - 1] ?? input)?.focus();
+  });
+  return h('div', { class: 'card trainer-search' },
+    h('label', { for: 'trainer-search' }, glyph('cap'), h('b', null, ' Buscar entrenador'), h('small', { class: 'muted' }, ' Abre el perfil de cualquier jugador')),
+    input, results);
+}
+
+/** What another trainer uses from the shop, shown as it looks in a battle. */
+function usingCard(profile) {
+  const { using } = profile;
+  const rarityTag = (item, free) => (item?.rarity ? h('span', { class: `rarity-tag rarity-${item.rarity}` }, RARITIES[item.rarity]?.label ?? item.rarity) : free ? h('span', { class: 'rarity-tag' }, RARITIES.free.label) : null);
+  const slot = (title, preview, item, fallback, free = true) =>
+    h('div', { class: 'using-slot' }, h('div', { class: 'using-preview' }, preview), h('small', { class: 'muted' }, title), h('b', null, item?.name ?? fallback), rarityTag(item, free));
+  const ball = using.ball?.key ?? 'pb';
+  return h('div', { class: 'card' },
+    h('h2', null, glyph('star'), ' Lo que usa de la tienda'),
+    h('div', { class: 'using-grid' },
+      slot('Entrenador', h('span', { class: 'trainer-frame' }, trainerImg(profile.avatar)), using.trainer, trainerLabel(profile.avatar), false),
+      slot('Poké Ball', h('span', { class: 'shop-ball' }, h('img', { src: `/anims/ui/${ball}.png?v=dev`, alt: '', draggable: 'false' }), h('img', { src: `/anims/ui/${ball}_open.png?v=dev`, alt: '', draggable: 'false' })), using.ball, 'Poké Ball'),
+      slot('Ventana', h('span', { class: `say-sample${using.window ? ` win-theme win-${using.window.key}` : ''}` }, h('b', null, '¿Qué hará tu Pokémon?'), h('small', null, `${profile.name} entra en combate.`)), using.window, 'Ventana normal'),
+      slot('Marco de perfil', avatarPic(profile.avatar, 'lg', using.frame?.key ?? null), using.frame, 'Sin marco'),
+    ));
+}
+
+/** Another trainer's public profile: record, the Pokémon they bring, their battles and what they use from the shop. */
+async function trainerPage(id, seq) {
+  document.title = 'Entrenador · Token Clash';
+  await loadMe();
+  if (stale(seq)) return;
+  renderWho();
+  let profile;
+  let climbs = [];
+  try {
+    [profile, climbs] = await Promise.all([api(`/api/stats/trainers/${encodeURIComponent(id)}`).then((res) => res.trainer), api('/api/tower/records').then((res) => res.records).catch(() => [])]);
+  } catch (e) {
+    if (stale(seq)) return;
+    $app.replaceChildren(h('div', { class: 'card banner' }, h('h2', null, 'No encontré a ese entrenador'), h('p', { class: 'muted' }, e.message), h('a', { class: 'btn', href: '/stats', 'data-link': true }, glyph('trophy'), ' Ver el ranking')));
+    return;
+  }
+  if (stale(seq)) return;
+  document.title = `${profile.name} · Token Clash`;
+  const mine = !!me && me.id === profile.id;
+  const { record: rec, collection, vsAi, tournaments } = profile;
+  const towerBest = Object.keys(AI_LABEL)
+    .map((level) => climbs.filter((climb) => climb.trainerId === profile.id && climb.difficulty === level).sort((a, b) => b.points - a.points)[0])
+    .filter(Boolean);
+  const rows = [
+    ['swords', 'Batallas entre jugadores', rec.games, rec.games ? `ganó ${percent(rec.winRate)}` : null],
+    ['robot', 'Peleas contra la IA', vsAi.wins + vsAi.losses, vsAi.wins + vsAi.losses ? `${vsAi.wins} ganadas · ${vsAi.losses} perdidas` : null],
+    ['trophy', 'Torneos', tournaments?.played ?? 0, tournaments ? `${plural(tournaments.titles, 'título', 'títulos')} · ${plural(tournaments.finals, 'final', 'finales')}` : null],
+    ['ball', 'Pokémon en su colección', collection.pokemon, `${plural(collection.species, 'especie', 'especies')}`],
+    ['sparkle', 'Shinies', collection.shinies],
+    ['coin', 'Tokens', compact(collection.tokens), 'según PokeTokenBar'],
+    ...(profile.lastSeen ? [['clock', 'Última vez en Token Clash', ago(profile.lastSeen)]] : []),
+  ];
+  const favorites = profile.favorites.length
+    ? h('div', { class: 'mons' }, profile.favorites.map((m) => h('div', { class: 'mon top-mon' },
+        h('div', { html: creatureHTML({ sprite: m.sprite }) }),
+        h('div', { class: 'nm' }, m.name),
+        h('div', { class: 'meta' }, typeChips(m.types ?? [])),
+        h('div', { class: 'top-mon-line' }, h('b', null, plural(m.uses, 'batalla', 'batallas')), h('span', { class: 'muted' }, ` · ganó ${percent(m.wins / m.uses)}`)))))
+    : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aparecen cuando pelee contra otros jugadores.'));
+  const battles = profile.recent.length
+    ? h('div', { class: 'list' }, profile.recent.map((battle) => {
+        const [tone, text] = RESULT_CHIP[battle.result];
+        return h('div', { class: 'item recent' },
+          h('span', { class: 'recent-vs' }, h('span', { class: `chip result-chip ${tone}` }, text), h('span', { class: 'muted' }, ' vs '), trainerLink(battle.rival.id, battle.rival.name)),
+          h('a', { class: 'muted small recent-meta', href: `/b/${battle.id}`, 'data-link': true }, modeGlyph(battle.mode), `${battle.turns ? ` · ${battle.turns} turnos` : ''} · ${ago(battle.finishedAt)}`));
+      }))
+    : h('p', { class: 'muted' }, 'Todavía no pelea contra otros jugadores.');
+  $app.replaceChildren(
+    h('section', { class: 'card shop-head trainer-head' },
+      h('div', { class: 'profile-identity' },
+        avatarPic(profile.avatar, 'lg', profile.using.frame?.key ?? null),
+        h('div', { class: 'profile-who' },
+          h('div', { class: 'profile-name-line' }, h('h1', null, profile.name), mine ? h('span', { class: 'chip match-you' }, 'Tú') : null),
+          h('div', { class: 'row profile-meta' },
+            skinTitle(profile.avatar, 'span'),
+            rec.rank ? h('span', { class: 'chip', 'data-tip': 'Su puesto en el ranking de batallas entre jugadores' }, glyph('trophy'), ` #${rec.rank}`) : null,
+            h('span', { class: 'chip' }, h('span', { class: 'w' }, `${rec.wins}V`), ' · ', h('span', { class: 'l' }, `${rec.losses}D`))))),
+      mine ? h('a', { class: 'btn sm ghost', href: '/perfil', 'data-link': true }, glyph('gear'), ' Editar tu perfil') : null),
+    h('section', { class: 'grid2' },
+      h('div', { class: 'card' }, h('h2', null, glyph('trend'), ' Sus stats'), h('div', { class: 'list' }, rows.map(([icon, label, value, note]) => h('div', { class: 'item' }, h('span', { class: 'num-label' }, glyph(icon), ` ${label}`, note ? h('small', { class: 'muted' }, note) : null), h('strong', { class: 'num-value' }, value))))),
+      h('div', { class: 'card' }, h('h2', null, glyph('clock'), ' Sus batallas'), battles)),
+    h('section', null, usingCard(profile)),
+    towerBest.length
+      ? h('section', null, h('div', { class: 'card' }, h('h2', null, glyph('flag'), ' La Torre'),
+          h('div', { class: 'list' }, towerBest.map((climb) => h('div', { class: 'item' },
+            h('span', { class: 'num-label' }, `${AI_LABEL[climb.difficulty]}`, h('small', { class: 'muted' }, climb.finished ? `completó ${lengthLabel(climb.length)}` : plural(climb.cleared, 'piso superado', 'pisos superados'))),
+            h('strong', { class: 'num-value' }, pointsText(climb.points)))))))
+      : '',
+    h('section', null, h('div', { class: 'row between' }, h('h2', null, glyph('fire'), ' Sus Pokémon más usados'), h('span', { class: 'muted small' }, 'Los que sacó a pelear contra otros jugadores')), favorites),
+  );
 }
 
 const STATS_OPEN = new Set(['Ranking', 'Tus batallas']);
