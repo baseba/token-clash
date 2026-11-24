@@ -116,7 +116,7 @@ export function pickMoveset(entry: RosterEntry, difficulty: AiLevel, random: Ran
   return chosen.map((x) => x.id);
 }
 
-function canAttack(id: number): boolean {
+export function canAttack(id: number): boolean {
   return usableMovepool({ id: 'probe', finalID: id, level: BATTLE_LEVEL, learned: [] }).filter(alwaysDamages).length >= GUARANTEED_ATTACKS;
 }
 

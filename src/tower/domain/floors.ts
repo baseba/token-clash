@@ -12,6 +12,7 @@
 import type { AiLevel } from '../../combat/domain/ai.js';
 import { hash, rng, shuffled, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
 import { CLASS_TRAINERS, SIGNATURE, STARTER_IDS, type ClassTrainer } from '../../catalog/domain/trainer-goals.js';
+import { inDex, standInFor } from './species-pool.js';
 import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, TRAINER_VARIANTS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
 import {
   BOSS_LINES,
@@ -216,8 +217,12 @@ const HIDEOUT_ACES: Readonly<Record<string, string>> = {
   proton: 'Golbat', zinzolin: 'Cryogonal', rood: 'Swoobat', xerosic: 'Crawdaunt', bryony: 'Liepard', aliana: 'Mightyena', celosia: 'Manectric',
   mable: 'Houndoom', oleana: 'Garbodor', penny: 'Sylveon', giacomo: 'Kingambit', ortega: 'Azumarill', eri: 'Annihilape',
 };
-const signatureOf = (key: string): number | null => (SIGNATURE[key] ? speciesIdByName(SIGNATURE[key]) : null);
-const hideoutAceOf = (key: string): number | null => (HIDEOUT_ACES[key] ? speciesIdByName(HIDEOUT_ACES[key]) : signatureOf(key));
+const aceNamed = (name: string | undefined, at: string, type: string | null = null): number | null => {
+  const id = name ? speciesIdByName(name) : null;
+  return id ? standInFor(id, `${at}:ace`, type) : null;
+};
+const signatureOf = (key: string, at: string, type: string | null): number | null => aceNamed(SIGNATURE[key], at, type);
+const hideoutAceOf = (key: string, at: string): number | null => aceNamed(HIDEOUT_ACES[key] ?? SIGNATURE[key], at);
 const typesOfSpecies = (ids: readonly number[]): string[] => [...new Set(ids.flatMap((id) => speciesData(id)?.types ?? []))];
 
 const classBase = (key: string): string => key.replace(/_(m|f)(_\d+)?$|_\d+$/, '');
@@ -289,13 +294,15 @@ const routeScene = (floor: number): string => ROUTE_SCENES[Math.floor((floor - 1
 /** A rival or a protagonist brings one of the starters of its region (any, when it has none). */
 function starterOf(goal: ClassTrainer['goal'], at: string): number[] {
   if (goal.kind !== 'starter') return [];
-  const [first] = goal.region ? STARTER_IDS[goal.region] : pick(Object.values(STARTER_IDS), `${at}:region`);
+  const own = goal.region ? STARTER_IDS[goal.region] : null;
+  const [first] = own && inDex(own[0]) ? own : pick(Object.values(STARTER_IDS).filter(([id]) => inDex(id)), `${at}:region`);
   return [first + 3 * (hash(`${at}:starter`) % 3)];
 }
 
 function themedTrainer(key: string, cls: ClassTrainer, at: string, seed: string, floor: number, room: RoomKind | null) {
-  const species = cls.goal.kind === 'species' ? speciesOf(cls.goal.names) : starterOf(cls.goal, at);
-  const types = cls.goal.kind === 'type' ? [cls.goal.type] : cls.goal.kind === 'species' ? typesOfSpecies(species) : [];
+  const named = cls.goal.kind === 'species' ? speciesOf(cls.goal.names) : starterOf(cls.goal, at);
+  const species = named.filter(inDex);
+  const types = cls.goal.kind === 'type' ? [cls.goal.type] : cls.goal.kind === 'species' ? typesOfSpecies(named) : [];
   const name = nameFor(key, seed, floor, room);
   const title = cls.title === name ? (isFemale(key) ? 'Entrenadora' : 'Entrenador') : cls.title;
   return { foe: { key: variantOf(key, at), base: key, name, title }, species, types };
@@ -326,7 +333,7 @@ function drawFloor(floor: number, length: number | null, difficulty: AiLevel, se
     if (hash(`${at}:boss`) % 3 === 0) {
       const bosses = [...VILLAINS.boss, ...(floor >= LEGENDS_IN_HIDEOUT_FROM ? VILLAINS.legend : [])];
       const key = pick([...VILLAINS.admin, ...VILLAINS.star, ...(floor >= LATE_FLOOR ? bosses : [])], `${at}:villain`);
-      const ace = hideoutAceOf(key);
+      const ace = hideoutAceOf(key, at);
       const types = ace ? [...(speciesData(ace)?.types ?? [])] : ['dark'];
       const leader = { ...base, level: base.level + LEADER_LEVELS, teamSize: Math.min(6, base.teamSize + 1) };
       return { ...leader, foe: { key: variantOf(key, at), base: key, name: displayName(key), title: bosses.includes(key) ? (isFemale(key) ? 'Jefa' : 'Jefe') : VILLAINS.star.includes(key) ? 'Jefe de escuadrón' : 'Comandante' }, type: types[0] ?? null, types, species: [], signature: ace, scene: pick(['path-night', 'cave-night', 'beach-night'], at), music: MUSIC.hideout, lines: linesFor(key, 'dark', at) };
@@ -357,7 +364,7 @@ function drawFloor(floor: number, length: number | null, difficulty: AiLevel, se
     type,
     types: type ? [type] : [],
     species: [],
-    signature: signatureOf(key),
+    signature: signatureOf(key, at, type),
     scene: kind === 'champion' ? pick(['snow-night', 'cave-2', 'mountain-night'], at) : sceneFor(type, at, 'path'),
     music: MUSIC[kind][regionOf(key)],
     lines: linesFor(key, type, at),

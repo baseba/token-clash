@@ -1,15 +1,17 @@
 // The team of the trainer on a floor: species of its types, in the form they have at that level,
 // moves learned by level, and its strongest Pokémon (the ace) a level above the rest when the rival is
 // strong. The Tower is a roguelike, so a team is a draw, not the best of its theme: every species that
-// fits may come, harder difficulties and tough rivals lean towards the stronger ones, calm rivals bring
-// the weakest, and a species you already met in the climb seldom comes back. A themed class brings a
-// couple of its own species (a Rocket grunt its Zubat or Koffing) and fills up with others of its types.
+// fits may come, all of generations 1 to 5. Tough rivals and leaders lean a little towards the stronger
+// ones, calm rivals bring the weakest, and a species you already met in the climb seldom comes back. A
+// themed class brings one or two of its own species (a Rocket grunt its Zubat or Koffing) and fills up
+// with others of its types; a species of several final forms comes as any of them.
 // Later rivals hold items too, like yours: a leader's ace first, then a tough rival's, then whole teams. Rivals are measured against your party, not against perfect
 // Pokémon: their IVs are around yours, and a trained rival has about as many EVs as yours. Later on
 // they also know moves from machines, and then from tutors and eggs, stronger the higher you climb.
 import { effectiveness, finalForms, moveOrigins, shuffled, speciesData, type Random } from '../../catalog/domain/creatures.js';
 import type { Ivs, RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { aiTeamPool, type AiLevel } from '../../combat/domain/ai.js';
+import type { AiLevel } from '../../combat/domain/ai.js';
+import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';
 import { MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import { isLeader, type Floor, type Strength } from './floors.js';
 import { moveData } from '../../combat/domain/moves.js';
@@ -17,16 +19,17 @@ import { alwaysDamages } from '../../combat/domain/random-party.js';
 import { baseStatTotal, evolutionPath, formAtLevel, movesAtLevel } from './growth.js';
 import { attackStat, idealNature, MAX_IV, MAX_STAT_EVS, MAX_TOTAL_EVS, STATS } from './rewards.js';
 import { boosterOf } from '../../catalog/domain/held-items.js';
+import { towerSpecies } from './species-pool.js';
 
 const LEGENDARY_TOTAL = 580;
 /**
  * How much a team leans to the stronger species that fit, by who brings it: a calm rival none, a leader
- * the most (it still brings a different team each climb). Difficulty does not narrow the draw (that is
+ * the most, and still gently, so each climb brings different teams. Difficulty does not narrow the draw (that is
  * for the arena's 1v1 and tournaments): it shows in how well the rival picks its three from what it drew.
  */
-const LEAN: Record<Strength | 'leader', number> = { weak: 0, normal: 0.6, strong: 0.8, leader: 2 };
+const LEAN: Record<Strength | 'leader', number> = { weak: 0, normal: 0.25, strong: 0.4, leader: 1 };
 /** A species (any form of its line) you already met in this climb is this much less likely to come back. */
-const MET_AGAIN = 0.15;
+const MET_AGAIN = 0.1;
 /** At most this many of a themed class's own species in one team. */
 const OWN_SPECIES = 2;
 /** How much a rival's pick of its three weighs how good each one is: 0 picks at random, and the hardest take the best. */
@@ -34,7 +37,7 @@ const PICK_SKILL: Record<AiLevel, number> = { easy: 0, mid: 1, hard: 3, veryhard
 /** How much the type matchup against your party counts next to raw power when picking. */
 const MATCHUP_WEIGHT = 0.35;
 const LEGENDS_FROM_FLOOR = 40;
-const FEWEST_CHOICES = 6;
+const FEWEST_CHOICES = 12;
 /** How far a rival's IVs sit from your party's average, by difficulty; a boss two more. */
 const IV_EDGE: Record<AiLevel, number> = { easy: -6, mid: -3, hard: 0, veryhard: 2, skynet: 4 };
 const BOSS_IV_EDGE = 2;
@@ -80,7 +83,7 @@ const GHOSTS_FROM_LEVEL = 15;
 /** The trainer's theme first: a Hiker only brings Rock or Ground, a leader only its type. Strongest first. */
 function candidates(floor: Floor): number[] {
   const legends = floor.kind === 'champion' || floor.number >= LEGENDS_FROM_FLOOR;
-  const all = aiTeamPool('easy').filter((id) => legends || baseStatTotal(id) < LEGENDARY_TOTAL);
+  const all = towerSpecies().filter((id) => legends || baseStatTotal(id) < LEGENDARY_TOTAL);
   const themed = floor.types.length ? all.filter((id) => speciesData(id)?.types.some((type) => floor.types.includes(type))) : all;
   const strength = (id: number) => baseStatTotal(formAtLevel(id, floor.level));
   const beatable = themed.filter((id) => floor.level >= GHOSTS_FROM_LEVEL || !speciesData(formAtLevel(id, floor.level))?.types.includes('ghost'));
@@ -186,8 +189,8 @@ export function foeTeam(floor: Floor, difficulty: AiLevel, random: Random, party
     forms.add(form);
     finals.push(id);
   };
-  const themed = floor.species.map((id) => finalForms(id)[0] ?? id).filter((id) => speciesData(id));
-  for (const id of shuffled(themed, random).slice(0, OWN_SPECIES)) add(id);
+  const themed = floor.species.map((id) => shuffled(finalForms(id, DEX_LIMIT), random)[0] ?? id).filter((id) => speciesData(id));
+  for (const id of shuffled(themed, random).slice(0, 1 + Math.floor(random() * OWN_SPECIES))) add(id);
   const options = candidates(floor);
   const lean = LEAN[isLeader(floor) ? 'leader' : floor.strength];
   const met = new Set(metLines);

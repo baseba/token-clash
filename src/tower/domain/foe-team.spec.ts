@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { moveOrigins, rng, speciesData } from '../../catalog/domain/creatures.js';
 import { moveData } from '../../combat/domain/moves.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { fitToParty, floorAt, levelCap } from './floors.js';
+import { fitToParty, floorAt, levelCap, roomsAt } from './floors.js';
+import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';
 import { baseStatTotal, evolutionPath } from './growth.js';
 import { foePicks, foeTeam } from './foe-team.js';
 
@@ -138,4 +139,23 @@ test('a team always finishes drawing, even when its theme has fewer distinct for
   const team = foeTeam(floor, 'mid', rng('s2:35:null'));
   assert.ok(team.length >= 3 && team.length <= floor.teamSize);
   assert.equal(new Set(team.map((mon) => mon.finalID)).size, team.length);
+});
+
+test('every rival of a climb brings Pokémon of generations 1 to 5, aces included', () => {
+  for (let run = 0; run < 12; run++) {
+    const seed = `gen-${run}`;
+    for (let floorNumber = 1; floorNumber <= 50; floorNumber++) {
+      for (const room of roomsAt(floorNumber, 50, seed)) {
+        const floor = floorAt(floorNumber, 50, 'hard', seed, room);
+        const team = foeTeam(floor, 'hard', rng(`${seed}:${floorNumber}:${room}`));
+        assert.ok(team.every((mon) => mon.finalID <= DEX_LIMIT && mon.baseID <= DEX_LIMIT), `${seed} ${floorNumber} ${room}: ${team.map((mon) => mon.finalID)}`);
+      }
+    }
+  }
+});
+
+test('the same rival on the same floor brings different teams from one climb to the next', () => {
+  const floor = floorAt(30, 50, 'mid', 'same');
+  const teams = new Set(Array.from({ length: 30 }, (_, seed) => foeTeam(floor, 'mid', rng(seed)).map((mon) => mon.finalID).sort().join()));
+  assert.ok(teams.size >= 27, `${teams.size} distinct teams of 30`);
 });
