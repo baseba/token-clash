@@ -334,7 +334,6 @@ input[type=text]:focus, input[type=password]:focus, .btn:focus-visible, .mon:foc
 .hud .cond.psn, .hud .cond.tox { background: #a24ec8; }
 .hud .cond.slp { background: #6b7a8f; }
 .hud .cond.frz { background: #3fb6c9; }
-.status-line .field { color: var(--muted); font-size: .85rem; text-align: center; flex: 1; }
 
 .spot { cursor: pointer; }
 .hud .nm-end { display: inline-flex; align-items: center; gap: .4rem; }
@@ -966,7 +965,6 @@ a.party-cell, a.party-cell.empty { cursor: pointer; }
 .room-bar[hidden] { display: none; }
 .room-bar.is-battle { max-width: 1480px; }
 .room-bar .vs-line { white-space: nowrap; }
-.room-bar .field { color: var(--muted); font-size: .85rem; }
 .room-bar .timer { margin-left: auto; }
 .menu-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 1px solid var(--line); background: var(--card-2); font-size: 1.1rem; cursor: pointer; }
 .menu-btn:hover, .menu-btn[aria-expanded="true"] { border-color: var(--accent); }
@@ -2114,8 +2112,6 @@ body.signed-out .hero { margin-top: 0; }
   .room-bar-turn { flex: 1; min-width: 0; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .room-bar .vs-line { order: 5; flex: 1 1 calc(100% - 3.5rem); min-width: 0; justify-content: flex-start; display: flex; align-items: center; gap: .3rem; font-size: .85rem; }
   .room-bar .vs-line > :not(.muted) { min-width: 0; overflow: hidden; }
-  .room-bar .field { order: 6; flex-basis: 100%; font-size: .78rem; }
-  .room-bar .field:empty { display: none; }
   .room-bar .forfeit-btn { padding: .3rem .55rem; }
   .room-bar .watch-control { order: 5; margin-left: 0; }
   .room-bar .watch-btn, .room-bar .watch-on { padding: .3rem .55rem; }
@@ -2826,3 +2822,17 @@ button.tw-reward:hover, button.tw-reward:focus-visible { border-color: var(--acc
 .trainer-result .record { margin-left: auto; }
 .trainer-result:hover, .trainer-result:focus-visible { border-color: var(--accent); outline: none; }
 .trainer-none { padding: .4rem .2rem; }
+
+/* The field's states in one pill: its icons, and a tap opens the detail. */
+.field-pill { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .6rem; border-radius: 999px; border: 1px solid var(--line); background: var(--card-2); color: var(--text); font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.field-pill:hover, .field-pill:focus-visible { border-color: var(--accent); outline: none; }
+.field-pill .field-more { font-size: .75rem; color: var(--muted); }
+.field-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+.field-row { display: grid; grid-template-columns: 2rem 1fr; gap: .6rem; align-items: start; padding: .5rem .6rem; border: 1px solid var(--line); border-radius: 12px; background: var(--card-2); }
+.field-row-icon { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--card); }
+.field-row p { margin: .15rem 0 0; font-size: .85rem; }
+@media (max-width: 520px) {
+  .field-pill { gap: .2rem; padding: .2rem .45rem; font-size: .8rem; }
+  .room-bar .room-bar-turn { flex: 0 0 auto; }
+  .room-bar .forfeit-label { display: none; }
+}
