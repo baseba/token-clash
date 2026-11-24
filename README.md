@@ -172,7 +172,10 @@ En vivo: **https://clash.mirrordev.xyz**
    sin importar el nivel que tengan en el save: gana la estrategia, no quién quemó más tokens.
 5. **Stats** (`/stats`) muestra el ranking (solo quienes han peleado contra otro jugador), las batallas
    recientes, los Pokémon más usados y los totales del servidor. Quien importó el mismo save en varias cuentas
-   cuenta como un solo entrenador, y sus Pokémon y tokens se suman una sola vez.
+   cuenta como un solo entrenador, y sus Pokémon y tokens se suman una sola vez. Cada nombre del ranking abre el
+   perfil público de ese entrenador (`/entrenador/:id`): su récord y puesto, sus peleas contra la IA y torneos, el
+   tamaño de su colección, sus batallas contra jugadores, sus Pokémon más usados, su mejor subida a la Torre y lo
+   que usa de la tienda (entrenador, Poké Ball, ventana y marco). Su colección no se muestra, solo cuántos tiene.
 
 ## Combate
 
@@ -339,6 +342,7 @@ Por tema:
 | Torneos | `src/arena/domain/tournament.ts`, `arena/application/tournaments.service.ts` | `arena/interface/tournaments.controller.ts` | `public/app.js` |
 | Chat | `src/chat/domain/chat.ts`, canales en `arena/application/arena-chat.service.ts` | WebSocket | `public/app.js` |
 | Ranking y stats | `src/trainers/domain/ranking.ts`, `src/stats/application/server-stats.ts` | `GET /api/stats` en `stats/interface/stats.controller.ts`, `GET /api/leaderboard` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
+| Perfil de otro entrenador | `src/stats/application/trainer-profile.ts` | `GET /api/stats/trainers/:id` en `stats/interface/stats.controller.ts` | `public/app.js` (página `/entrenador/:id`) |
 | Logros y entrenador del perfil | `src/stats/domain/achievements.ts` | `GET /api/me/achievements`, `PUT /api/me/look` en `stats/interface/achievements.controller.ts` | `public/trainer-sprites.js` |
 | Variantes de colores de entrenadores | `public/trainer-sprites.js` (a mano), `public/trainer-variants.js` (lo genera `scripts/plan-trainer-variants.mjs` con `scripts/sprite-rotate.mjs`, que gira el tinte de las rampas de `scripts/sprite-ramps.mjs`); `scripts/sync-trainers.js` pinta los sprites al instalar | | `public/app.js` |
 | Tienda | artículos y precios en `public/shop.js` (tipados en `src/catalog/domain/shop.ts`); saldo y compra en `src/trainers/domain/trainer.ts`; "pide al original" en `src/stats/domain/achievements.ts` | `GET /api/shop`, `POST /api/shop/buy`, `PUT /api/me/equip` en `stats/interface/achievements.controller.ts`, con los DTOs de `trainers/interface/dto/shop.dto.ts` | `public/shop.js`, `public/app.js` (la tienda está en `/perfil`) |

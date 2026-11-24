@@ -156,6 +156,18 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   assert.ok(stats.data.topMons.length >= 1);
   assert.equal(typeof stats.data.live.battles, 'number');
   assert.equal(stats.data.totals.activeNow, 1);
+  const profile = (await call(`/api/stats/trainers/${a.data.me.id}`)).data.trainer;
+  assert.equal(profile.name, 'Ana');
+  assert.equal(profile.record.games, 1);
+  assert.equal(profile.recent[0].id, id);
+  assert.equal(profile.recent[0].rival.name, 'Beto <b>');
+  assert.equal(profile.using.ball.key, 'pb');
+  assert.ok(!('roster' in profile), 'the collection stays private');
+  assert.equal((await call('/api/stats/trainers/nadie')).status, 404);
+  const directory = (await call('/api/stats/trainers')).data.trainers;
+  assert.deepEqual(directory.map((row) => row.name), ['Ana', 'Beto <b>']);
+  assert.ok(directory.every((row) => !('roster' in row) && !('balance' in row)));
+  assert.equal((await fetch(`${base}/entrenador/${a.data.me.id}`)).status, 200);
 });
 
 test('random battle rolls a party from each collection', async () => {
