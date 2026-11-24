@@ -2792,7 +2792,7 @@ function towerLab(run) {
       await wait(1100);
       await cast.leave();
     }
-    towerEntrance = 'walk';
+    towerEntrance = 'fromBelow';
     if (!(await towerCall(btn, '/api/tower/draft', { body: { offers: picked } }))) towerEntrance = null;
   } });
   const offerOf = (id) => run.offers.find((offer) => offer.id === id);
@@ -3183,7 +3183,7 @@ async function takeRoom(run, room, body) {
   document.querySelectorAll('.tw-room, .tw-sign').forEach((button) => { button.disabled = true; });
   const index = run.rooms.findIndex((option) => option.kind === room.kind);
   if (!reducedMotion()) await towerCast?.takeExit(index);
-  towerEntrance = towerCast?.entranceAfter(index) ?? 'walk';
+  towerEntrance = 'fromBelow';
   const res = await towerCall(null, '/api/tower/room', { body });
   if (!res) towerEntrance = null;
   if (!res) document.querySelectorAll('.tw-room, .tw-sign').forEach((button) => { button.disabled = false; });
