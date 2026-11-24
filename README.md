@@ -375,7 +375,9 @@ Datos externos:
   `npm install` y en la imagen; no se versiona.
 - `scripts/sync-overworlds.js` (`npm run overworlds`): arma `public/overworlds/<clave>.png`, el sprite de mapa de
   cada entrenador y variante, en una hoja común de 16 cuadros de 32×32. Toma el oficial de la tabla
-  `scripts/overworld-sources.json`. A quien no tiene oficial lo arma `scripts/overworld-compose.mjs` con piezas
+  `scripts/overworld-sources.json`. Un oficial que solo viene de pie (la mayoría de los líderes y el Alto Mando)
+  recibe pasos aprendidos de los oficiales que caminan (`scripts/overworld-steps.mjs`): el cuerpo baja un píxel y
+  las piernas y manos cambian como en los oficiales de piernas más parecidas, con sus propios colores. A quien no tiene oficial lo arma `scripts/overworld-compose.mjs` con piezas
   oficiales de su género (cuerpo y cabeza) repintadas con los colores de su sprite de batalla. Una clase que camina con el
   sprite de otra (un oficial genérico) se viste con los colores de su entrenador (`scripts/overworld-dress.mjs`):
   cada pieza (pelo, polera, pantalón) toma el tono, la saturación y la luz de la pieza del sprite de batalla a la

@@ -1,7 +1,7 @@
 import { creatureHTML, loadSprites, preloadSprites, spritesLoaded, spriteURL } from './creature.js?v=dev';
 import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor, sceneNamed } from './backgrounds.js?v=dev';
-import { overworldSprite } from './overworld.js?v=dev';
+import { overworldSprite, preloadOverworlds } from './overworld.js?v=dev';
 import { PARTY_LIMIT, PROFESSOR, PROFESSOR_LINES, RECRUIT_LINE, ROOMS, sceneMusic, STOP_PEOPLE, TOWER_LENGTHS, TWISTS } from './tower-cast.js?v=dev';
 import { forkExits, preloadTiles, towerMap, ZONES } from './tower-map.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
@@ -3377,6 +3377,7 @@ function towerClimb(run) {
   const choosing = run.status === 'climbing' && run.rooms.length > 0;
   const resting = run.status === 'resting';
   const cast = floorStage(run, takeEntrance());
+  preloadOverworlds([playerOverworld(), ...run.rooms.map((room) => room.foe?.key), ...run.trail.map((step) => step.foe?.key)]);
   const say = h('div', { class: 'tw-say-slot' });
   let main;
   if (choosing) main = h('div', { class: 'tw-panel' }, h('h2', null, 'El camino se divide'), h('p', { class: 'nb-note' }, 'Cada camino trae un rival o un premio distinto. Lo que no tomes no vuelve.'), run.rooms.map((room) => roomRow(run, room)));
