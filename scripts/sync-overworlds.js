@@ -3,9 +3,9 @@
 // four groups (up, down, left, right), each group idle, step, step, idle.
 //
 // Sources, all in the GBA style so they share scale and walk: Emerald Rogue (every region's leaders,
-// rivals and teams), Emerald and FireRed. A sheet without walking frames gets steps made from its
-// standing frame. A colour variant
-// repaints its base with the same functions as the battle recolour (scripts/overworld-recolor.mjs). A trainer with no
+// rivals and teams), Emerald and FireRed. A sheet without walking frames gets steps learned from the
+// official sheets that walk (scripts/overworld-steps.mjs). A colour variant repaints its base with the
+// same functions as the battle recolour (scripts/overworld-recolor.mjs). A trainer with no
 // official overworld gets one composed from officials of its gender and painted with its own colours
 // (scripts/overworld-compose.mjs), or, if that fails, the official one that looks most like it. One
 // whose colours are far from its battle sprite's (a class drawn with another class's sprite) is
@@ -70,11 +70,16 @@ export function frameWidth(sheet) {
   return firstEnd > 0 && firstEnd <= 16 && columns.slice(16).some(Boolean) && !columns[15] ? 16 : 32;
 }
 
+/** How many frames a GBA sheet has: 9 or 10 when it walks, 3 or 4 when it only stands. */
+export const framesOf = (sheet) => Math.floor(sheet.width / frameWidth(sheet));
+const WALKING_FRAMES = 9;
+
+/** A GBA sheet laid out in our 16 frames. One that only stands repeats its standing frames as steps, until scripts/overworld-steps.mjs makes them. */
 export function normalizeGba(sheet) {
   const width = frameWidth(sheet);
   const h = sheet.height;
-  const frames = Math.floor(sheet.width / width);
-  const count = frames >= 9 ? frames : 3;
+  const frames = framesOf(sheet);
+  const count = frames >= WALKING_FRAMES ? frames : 3;
   const key = [...sheet.rgba.subarray(0, 3)];
   const out = blank();
   const groups = [GBA_GROUPS.up, GBA_GROUPS.down, GBA_GROUPS.left, GBA_GROUPS.left];
@@ -84,31 +89,7 @@ export function normalizeGba(sheet) {
       place(out, sheet, index * width, 0, width, Math.min(h, FRAME), group * 4 + i, { key, mirror: group === 3 });
     }),
   );
-  if (count < 9) for (let group = 0; group < 4; group++) makeSteps(out, group, group >= 2);
   return out;
-}
-
-const LEG_ROWS = 6;
-
-/** Steps for a sheet that only stands: the body bobs a pixel and the legs swap (facing you or away) or swing (from the side). */
-function makeSteps(out, group, sideways) {
-  const frameStart = (slot) => slot * FRAME * FRAME * 4;
-  const idle = out.rgba.subarray(frameStart(group * 4), frameStart(group * 4 + 1));
-  let bottom = FRAME - 1;
-  while (bottom > 0 && ![...Array(FRAME).keys()].some((x) => idle[(bottom * FRAME + x) * 4 + 3])) bottom -= 1;
-  [1, 2].forEach((step) => {
-    const frame = Buffer.alloc(FRAME * FRAME * 4);
-    for (let y = 0; y < FRAME; y++)
-      for (let x = 0; x < FRAME; x++) {
-        const legs = y > bottom - LEG_ROWS;
-        let fromX = x;
-        let fromY = legs ? y : y + 1;
-        if (legs) fromX = sideways ? x + (step === 1 ? 1 : -1) * (y > bottom - 3 ? 1 : 0) : step === 1 ? x : FRAME - 1 - x;
-        if (fromX < 0 || fromX >= FRAME || fromY >= FRAME) continue;
-        idle.copy(frame, (y * FRAME + x) * 4, (fromY * FRAME + fromX) * 4, (fromY * FRAME + fromX) * 4 + 4);
-      }
-    frame.copy(out.rgba, frameStart(group * 4 + step));
-  });
 }
 
 async function fetchSheet(source) {
@@ -117,7 +98,7 @@ async function fetchSheet(source) {
   const res = await fetchUpstream(upstream, `${dir}${path}.png`);
   if (!res.ok) throw new Error(`${source}: ${res.status}`);
   const sheet = decodePng(Buffer.from(await res.arrayBuffer()));
-  return normalizeGba(sheet);
+  return { image: normalizeGba(sheet), walks: framesOf(sheet) >= WALKING_FRAMES };
 }
 
 /** Its most common saturated colours by hue and light, to compare a battle sprite with overworlds. */
@@ -184,17 +165,28 @@ function closestOfficial(key, official) {
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
-  const official = new Map();
-  const counts = { official: 0, composed: 0, closest: 0, dressed: 0, variants: 0, unchanged: 0, failed: 0 };
+  const fetched = new Map();
+  const counts = { official: 0, stepped: 0, composed: 0, closest: 0, dressed: 0, variants: 0, unchanged: 0, failed: 0 };
   await mapLimit(Object.entries(SOURCES), async ([key, source]) => {
     try {
-      official.set(key, { image: await fetchSheet(source) });
+      fetched.set(key, await fetchSheet(source));
       counts.official += 1;
     } catch (err) {
       counts.failed += 1;
       console.log(`  ${key}: ${err.message}`);
     }
   });
+  // In the order of overworld-sources.json, not in the order the downloads finish: composing a mini
+  // breaks ties by this order, so the same sources always make the same sprites.
+  const official = new Map(Object.keys(SOURCES).filter((key) => fetched.has(key)).map((key) => [key, fetched.get(key)]));
+  const { walkersOf, withSteps } = await import('./overworld-steps.mjs');
+  const walkers = walkersOf([...official.values()].filter((sheet) => sheet.walks).map((sheet) => sheet.image));
+  const memo = new Map();
+  for (const [key, sheet] of official)
+    if (!sheet.walks) {
+      official.set(key, { image: withSteps(sheet.image, walkers, memo), walks: true });
+      counts.stepped += 1;
+    }
   const sheets = new Map(official);
   const { composeMini } = await import('./overworld-compose.mjs');
   for (const key of DOWNLOADED_SPRITES) {
@@ -252,7 +244,7 @@ async function main() {
   }
   for (const [key, sheet] of sheets) writeFileSync(new URL(`${key}.png`, OUT), encodePng(sheet.image));
   for (const file of readdirSync(OUT)) if (file.endsWith('.png') && !sheets.has(file.slice(0, -4))) rmSync(new URL(file, OUT));
-  console.log(`Sprites de mapa listos en public/overworlds/: ${counts.official} oficiales, ${counts.composed} armados con piezas oficiales, ${counts.closest} con el oficial más parecido, ${counts.dressed} vestidos con los colores de su entrenador, ${counts.variants} variantes de color (${counts.unchanged} sin repintar), ${counts.failed} con error.`);
+  console.log(`Sprites de mapa listos en public/overworlds/: ${counts.official} oficiales (${counts.stepped} con pasos aprendidos de los que caminan), ${counts.composed} armados con piezas oficiales, ${counts.closest} con el oficial más parecido, ${counts.dressed} vestidos con los colores de su entrenador, ${counts.variants} variantes de color (${counts.unchanged} sin repintar), ${counts.failed} con error.`);
   if (counts.failed) process.exitCode = 1;
 }
 

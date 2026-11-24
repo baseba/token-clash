@@ -168,3 +168,14 @@ test('the lab is the ground floor: in by the door mat below, out up the stairs i
   assert.ok(grid[PATH_ROW][0] !== T.labFloor && grid[PATH_ROW][COLS - 1] !== T.labFloor, 'no way out by the sides');
   assert.ok(LAB_SPOTS.stairs.col >= 3 && LAB_SPOTS.stairs.col <= COLS - 4, 'the first floor can start below the stairs');
 });
+
+test('a walker moves a map pixel at a time and takes one step per tile, the feet alternating across walks', async () => {
+  const { walkPose } = await import('../../public/overworld.js');
+  const opts = { tileMs: 200, pixels: 16 };
+  assert.deepEqual(walkPose(0, 2, 0, opts), { along: 0, stride: 1, done: false });
+  assert.equal(walkPose(150, 2, 0, opts).stride, 0, 'it stands for the second half of a tile');
+  assert.equal(walkPose(250, 2, 0, opts).stride, 2, 'the next tile is the other foot');
+  assert.equal(walkPose(25, 2, 0, opts).along, 2 / 16, 'snapped to the map’s pixels');
+  assert.equal(walkPose(0, 1, 1, opts).stride, 2, 'a new walk carries on with the foot it left');
+  assert.deepEqual(walkPose(999, 2, 0, opts), { along: 2, stride: 0, done: true });
+});

@@ -8,7 +8,7 @@
 // you left the one before (up from below at the same column, or in by a side after a crossroads), and a
 // floor where the way splits is a crossroads with ways up, left and right. The ways with no battle
 // have a map of their own: a Pokémon Center to rest in, a burrow in the tall grass, a dark pool.
-import { overworldSprite } from './overworld.js?v=dev';
+import { overworldSprite, walkPose } from './overworld.js?v=dev';
 import { ATLAS_COLS, ATLAS_KEYS, COLS, CROSS_COL, floorWays, forkExits, LAB_SPOTS, mapLayout, PATH_ROW, ROWS, sceneLook, TILE, tintPixels, ZONES, zoneWays } from './tower-tiles.js?v=dev';
 
 export { COLS, ROWS, forkExits, ZONES };
@@ -86,26 +86,45 @@ function actor(key, { col, row, facing }) {
   const place = (nextCol, nextRow) => {
     holder.style.setProperty('--x', String(nextCol));
     holder.style.setProperty('--y', String(nextRow));
-    holder.style.zIndex = String(10 + nextRow);
+    holder.style.zIndex = String(10 + Math.round(nextRow));
   };
   place(col, row);
   const self = { el: holder, sprite, col, row };
-  /** Walks in a straight line to a tile; resolves on arrival. */
+  let steps = 0;
+  /**
+   * Walks in a straight line to a tile, frame by frame: it moves a map pixel at a time and takes one
+   * step per tile, the feet alternating from the walk before. Resolves on arrival (at once in a hidden
+   * tab, where frames don't run).
+   */
   self.walk = (toCol, toRow = self.row) => {
     const tiles = Math.abs(toCol - self.col) + Math.abs(toRow - self.row);
     if (!tiles) return Promise.resolve();
     const facing = toCol > self.col ? 'right' : toCol < self.col ? 'left' : toRow < self.row ? 'up' : 'down';
-    sprite.set({ facing, walking: true });
-    holder.style.setProperty('--walk', `${tiles * TILE_MS}ms`);
-    place(toCol, toRow);
+    const [fromCol, fromRow] = [self.col, self.row];
+    const [dx, dy] = [Math.sign(toCol - fromCol), Math.sign(toRow - fromRow)];
+    const firstFoot = steps;
+    steps += tiles;
     self.col = toCol;
     self.row = toRow;
-    return new Promise((resolve) => setTimeout(() => {
-      sprite.set({ walking: false });
-      resolve();
-    }, tiles * TILE_MS));
+    return new Promise((resolve) => {
+      const arrive = () => {
+        place(toCol, toRow);
+        sprite.set({ facing, stride: 0 });
+        resolve();
+      };
+      if (document.hidden) return arrive();
+      const started = performance.now();
+      const frame = (now) => {
+        const pose = walkPose(now - started, tiles, firstFoot, { tileMs: TILE_MS, pixels: TILE });
+        if (pose.done || document.hidden) return arrive();
+        place(fromCol + dx * pose.along, fromRow + dy * pose.along);
+        sprite.set({ facing, stride: pose.stride });
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
   };
-  self.face = (facing) => sprite.set({ facing, walking: false });
+  self.face = (facing) => sprite.set({ facing, stride: 0 });
   /** Walks to a tile along a row: first to that row, then across it, then up or down to the tile. */
   self.goTo = async (toCol, toRow, alongRow = PATH_ROW) => {
     if (self.col !== toCol) {
