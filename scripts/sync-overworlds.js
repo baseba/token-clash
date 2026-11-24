@@ -165,17 +165,20 @@ function closestOfficial(key, official) {
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
-  const official = new Map();
+  const fetched = new Map();
   const counts = { official: 0, stepped: 0, composed: 0, closest: 0, dressed: 0, variants: 0, unchanged: 0, failed: 0 };
   await mapLimit(Object.entries(SOURCES), async ([key, source]) => {
     try {
-      official.set(key, await fetchSheet(source));
+      fetched.set(key, await fetchSheet(source));
       counts.official += 1;
     } catch (err) {
       counts.failed += 1;
       console.log(`  ${key}: ${err.message}`);
     }
   });
+  // In the order of overworld-sources.json, not in the order the downloads finish: composing a mini
+  // breaks ties by this order, so the same sources always make the same sprites.
+  const official = new Map(Object.keys(SOURCES).filter((key) => fetched.has(key)).map((key) => [key, fetched.get(key)]));
   const { walkersOf, withSteps } = await import('./overworld-steps.mjs');
   const walkers = walkersOf([...official.values()].filter((sheet) => sheet.walks).map((sheet) => sheet.image));
   const memo = new Map();
