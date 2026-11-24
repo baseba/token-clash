@@ -372,9 +372,15 @@ Datos externos:
 - `scripts/sync-overworlds.js` (`npm run overworlds`): arma `public/overworlds/<clave>.png`, el sprite de mapa de
   cada entrenador y variante, en una hoja común de 16 cuadros de 32×32. Toma el oficial de la tabla
   `scripts/overworld-sources.json`. A quien no tiene oficial lo arma `scripts/overworld-compose.mjs` con piezas
-  oficiales de su género (cuerpo y cabeza) repintadas con los colores de su sprite de batalla. Las variantes
-  repintan sus rampas con las reglas del sprite de batalla (`scripts/overworld-recolor.mjs`): el reemplazo se decide
-  en el cuadro de frente y se copia color por color a la espalda y los costados. Corre en `npm install` y en la
+  oficiales de su género (cuerpo y cabeza) repintadas con los colores de su sprite de batalla. Una clase que camina con el
+  sprite de otra (un oficial genérico) se viste con los colores de su entrenador (`scripts/overworld-dress.mjs`):
+  cada pieza (pelo, polera, pantalón) toma el tono, la saturación y la luz de la pieza del sprite de batalla a la
+  misma altura. Las variantes
+  usan las mismas funciones que el sprite de batalla (`scripts/overworld-recolor.mjs`): `familiesOf` arma las
+  familias, `skinOf` encuentra la piel desde los tonos de piel que comparten los sprites oficiales, cada familia que
+  la variante cambió en batalla se busca en el sprite de mapa por sus tonos con color, `paintPlans` gira solo su tinte
+  en OKLCH y `recolorByMap` decide las sombras compartidas. El reemplazo se decide en el cuadro de frente y se copia
+  color por color a la espalda y los costados. Corre en `npm install` y en la
   imagen.
 - `scripts/sync-radio.js` (`npm run radio`): baja cada canción de la radio del commit fijado de pokerogue-assets, mide su duración leyendo los frames del mp3 y escribe `src/catalog/data/radio-durations.json`. Córrelo si cambia el commit o la lista de `public/radio.js`: el servidor no arranca si a una canción le falta su duración.
 - `scripts/upstream-files.js`: lo que comparten esos scripts para leer los repos externos en el commit fijado (reintentos, HEAD, manifiestos con una entrada por línea).
