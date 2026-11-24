@@ -228,6 +228,36 @@ const SCREEN_END = {
   cleaner: (name, team) => `Antibarrera elimina ${name} del equipo de ${team}.`,
 };
 const TERRAIN = { electric: { icon: 'bolt', name: 'Campo Eléctrico' }, grassy: { icon: 'leaf', name: 'Campo de Hierba' }, misty: { icon: 'fog', name: 'Campo de Niebla' }, psychic: { icon: 'orb', name: 'Campo Psíquico' } };
+/** How many icons the field's pill shows before it counts the rest: fewer on a phone, where the bar is tight. */
+const FIELD_ICONS = 4;
+const FIELD_ICONS_NARROW = 2;
+const narrowScreen = () => matchMedia('(max-width: 520px)').matches;
+/** What each weather and terrain does, for the field's detail. A terrain only reaches who touches the ground. */
+const WEATHER_DESC = {
+  sun: 'Los ataques de Fuego pegan más fuerte y los de Agua más débil.',
+  rain: 'Los ataques de Agua pegan más fuerte y los de Fuego más débil.',
+  sand: 'Daña cada turno a quien no sea Roca, Tierra ni Acero. Sube la Defensa Especial de los Roca.',
+  snow: 'Sube la Defensa de los Hielo, y Ventisca nunca falla.',
+  hail: 'Daña cada turno a quien no sea Hielo, y Ventisca nunca falla.',
+  harshsun: 'Como el sol, y además los ataques de Agua se evaporan.',
+  heavyrain: 'Como la lluvia, y además los ataques de Fuego se apagan.',
+  winds: 'Los ataques muy eficaces contra Volador le pegan normal.',
+};
+/** What each room does while it lasts: its start line tells it began, this tells what changes. */
+const ROOM_DESC = {
+  gravity: 'Todos tocan el suelo: los Volador y los que levitan reciben ataques de Tierra. Los ataques aciertan más y no se puede volar ni saltar.',
+  trickroom: 'Los más lentos atacan primero.',
+  wonderroom: 'Se intercambian la Defensa y la Defensa Especial de todos.',
+  mudsport: 'Los ataques Eléctricos pegan un tercio.',
+  watersport: 'Los ataques de Fuego pegan un tercio.',
+  fairylock: 'Nadie puede cambiar de Pokémon durante el próximo turno.',
+};
+const TERRAIN_DESC = {
+  electric: 'Nadie en el suelo puede dormirse, y sus ataques Eléctricos pegan 30 % más.',
+  grassy: 'Quien toca el suelo recupera 1/16 de sus PS cada turno, y sus ataques Planta pegan 30 % más.',
+  misty: 'Quien toca el suelo no sufre problemas de estado ni confusión, y los ataques Dragón contra él pegan la mitad.',
+  psychic: 'Quien toca el suelo no recibe ataques con prioridad, y sus ataques Psíquicos pegan 30 % más.',
+};
 const STAT = { atk: ['ATQ', 'ataque'], def: ['DEF', 'defensa'], satk: ['AT.E', 'ataque especial'], sdef: ['DF.E', 'defensa especial'], spd: ['VEL', 'velocidad'], acc: ['PRE', 'precisión'], eva: ['EVA', 'evasión'] };
 const CANT = {
   recharge: 'necesita recargarse.', slp: 'está dormido.', frz: 'está congelado.', par: 'está paralizado: no puede moverse.', flinch: '¡retrocede y no puede moverse!', attract: 'está enamorado y no ataca.',
@@ -6263,7 +6293,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     turn: h('span', { class: 'room-bar-turn' }, ''),
     vs: h('span', { class: 'vs-line' }),
     timer: h('span', { class: 'timer' }, ''),
-    field: h('span', { class: 'field' }),
+    field: h('button', { type: 'button', class: 'field-pill', hidden: true, onclick: () => openFieldInfo() }),
     sky: h('div', { class: 'sky', 'aria-hidden': 'true' }),
     ground: h('div', { class: 'terrain-glow', 'aria-hidden': 'true' }),
     spot: { foe: h('div', { class: 'spot foe', onclick: () => openInfo(sideAt('foe')) }), me: h('div', { class: 'spot me', onclick: () => openInfo(sideAt('me')) }) },
@@ -6274,7 +6304,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     say: h('div', { class: 'say', 'aria-live': 'polite' }),
     controls: h('div', { class: 'card battle-controls' }),
     log: h('div', { class: 'card log' }),
-    forfeit: h('button', { class: 'btn sm ghost danger forfeit-btn', type: 'button', hidden: true, 'data-tip': 'Abandonar esta pelea', onclick: () => askForfeit() }, glyph('flag'), ' Rendirse'),
+    forfeit: h('button', { class: 'btn sm ghost danger forfeit-btn', type: 'button', hidden: true, 'aria-label': 'Rendirse', 'data-tip': 'Abandonar esta pelea', onclick: () => askForfeit() }, glyph('flag'), h('span', { class: 'forfeit-label' }, ' Rendirse')),
     forfeitDlg: h('dialog', { class: 'info-dlg confirm-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() }),
   };
   function askForfeit() {
@@ -6592,14 +6622,34 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     return chips;
   }
 
-  function paintField() {
+  /** Weather, terrain and rooms: what reaches both sides. */
+  function fieldStates() {
     const fl = view.field || {};
-    const parts = [
-      fl.weather ? [glyph(WEATHER[fl.weather]?.icon ?? 'sun'), ` ${WEATHER[fl.weather]?.name ?? fl.weather}${fl.weatherSuppressed ? ' (sin efecto)' : ''}`] : null,
-      fl.terrain ? [glyph(TERRAIN[fl.terrain]?.icon ?? 'leaf'), ` ${TERRAIN[fl.terrain]?.name ?? fl.terrain}`] : null,
-      ...Object.keys(fl.rooms || {}).filter((k) => ROOM[k]).map((k) => [glyph(ROOM[k].icon), ` ${ROOM[k].name}`]),
+    return [
+      fl.weather ? { icon: WEATHER[fl.weather]?.icon ?? 'sun', name: `${WEATHER[fl.weather]?.name ?? fl.weather}${fl.weatherSuppressed ? ' (sin efecto)' : ''}`, detail: fl.weatherSuppressed ? 'Una habilidad anula los efectos del clima.' : WEATHER_DESC[fl.weather] ?? null } : null,
+      fl.terrain ? { icon: TERRAIN[fl.terrain]?.icon ?? 'leaf', name: TERRAIN[fl.terrain]?.name ?? fl.terrain, detail: TERRAIN_DESC[fl.terrain] ?? null } : null,
+      ...Object.keys(fl.rooms || {}).filter((key) => ROOM[key]).map((key) => ({ icon: ROOM[key].icon, name: ROOM[key].name, detail: ROOM_DESC[key] ?? ROOM[key].start })),
     ].filter(Boolean);
-    els.field.replaceChildren(...parts.flatMap((part, i) => (i ? [' · ', ...part] : part)));
+  }
+
+  /** The field in detail: what each weather, terrain or room in play does. Each team's traps and screens stay on its card. */
+  function openFieldInfo() {
+    const row = (state) => h('li', { class: 'field-row' }, h('span', { class: 'field-row-icon' }, glyph(state.icon)),
+      h('div', null, h('b', null, state.name), state.detail ? h('p', { class: 'muted' }, state.detail) : null));
+    towerDialog('Estado del campo', h('ul', { class: 'field-list' }, fieldStates().map(row)), h('p', { class: 'nb-note' }, 'Afecta a los dos equipos. Las trampas y pantallas de cada equipo se ven en la tarjeta de su Pokémon.'));
+  }
+
+  function paintField() {
+    if (!view) return;
+    const fl = view.field || {};
+    const states = fieldStates();
+    const icons = [...new Set(states.map((state) => state.icon))];
+    const names = states.map((state) => state.name);
+    els.field.hidden = !states.length;
+    els.field.setAttribute('aria-label', `Estado del campo: ${names.join(', ')}. Toca para ver el detalle.`);
+    els.field.dataset.tip = names.join(' · ');
+    const room = narrowScreen() ? FIELD_ICONS_NARROW : FIELD_ICONS;
+    els.field.replaceChildren(...icons.slice(0, room).map((icon) => glyph(icon)), ...(icons.length > room ? [h('span', { class: 'field-more' }, `+${icons.length - room}`)] : []));
     els.sky.className = `sky${fl.weather ? ` ${fl.weather}` : ''}${fl.weatherSuppressed ? ' suppressed' : ''}`;
     els.ground.className = `terrain-glow${fl.terrain ? ` ${fl.terrain}` : ''}`;
   }
