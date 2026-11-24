@@ -2826,6 +2826,7 @@ function towerLab(run) {
       await wait(1100);
       await cast.leave();
     }
+    for (const map of ['fork', 'floor']) rememberEntry(run.id, `1:${map}`, cast.ways.upTo);
     towerEntrance = 'fromBelow';
     if (!(await towerCall(btn, '/api/tower/draft', { body: { offers: picked } }))) towerEntrance = null;
   } });
@@ -2859,7 +2860,7 @@ function towerLab(run) {
     goBtn.replaceChildren(picked.length === run.starters ? '¡Vamos!' : `Elige ${run.starters - picked.length} más`);
   }
   paint();
-  const cast = towerMap({ scene: 'lab', seed: run.id, hero: playerOverworld(), foe: PROFESSOR.key, label: 'Laboratorio del Profesor Rowan', place: { name: 'Laboratorio', detail: PROFESSOR.name }, entrance: takeEntrance() ?? 'walk' });
+  const cast = towerMap({ scene: 'lab', seed: run.id, hero: playerOverworld(), foe: PROFESSOR.key, label: `Laboratorio del ${PROFESSOR.name}`, place: { name: 'Laboratorio', detail: PROFESSOR.name }, entrance: takeEntrance() ?? 'walk' });
   towerCast = cast;
   const twist = TWISTS[run.twist];
   const talk = sayBox(PROFESSOR.name, twist ? `${PROFESSOR_LINES.hello} ${PROFESSOR_LINES.twist} «${twist.name}». ${twist.text}` : PROFESSOR_LINES.hello);
@@ -2867,9 +2868,10 @@ function towerLab(run) {
   const pick = h('div', { class: 'card tw-main tw-pick', hidden: true },
     h('div', { class: 'tw-panel-head' }, h('h2', null, `Elige ${run.starters}`), h('button', { class: 'btn ghost sm', onclick: towerAbandon }, 'Cancelar')),
     h('p', { class: 'nb-note' }, 'Toca uno para ver su ficha y elegirlo. Empiezan en nivel 5 y evolucionan hacia la forma que criaste.'),
+    twist ? h('div', { class: 'tw-rumor', role: 'note' }, h('span', { class: 'chip tw-rumor-chip' }, glyph(twist.icon), ` Rumor: ${twist.name}`), h('small', null, twist.text)) : null,
     cells,
     h('div', { class: 'tw-pick-bar' }, chosen, goBtn));
-  const page = h('section', { class: 'tw-page' }, h('div', { class: 'tw-top' }, h('span', { class: 'tw-floor-pill' }, glyph('flag'), 'Laboratorio')), cast.el, talk, hint, pick);
+  const page = h('section', { class: 'tw-page' }, h('div', { class: 'tw-top' }, h('span', { class: 'tw-floor-pill' }, glyph('flag'), 'Laboratorio'), twistChip(run)), cast.el, talk, hint, pick);
   const toPick = () => {
     pick.hidden = false;
     hint.remove();
