@@ -105,3 +105,53 @@ test('a floor is crossed from the bottom edge to the top one, and the beaten riv
   assert.ok(seen.size >= 20, `${seen.size} ways`);
   assert.deepEqual(floorWays('same'), floorWays('same'));
 });
+
+test('a map starts where you left the one before: the same column below, or the side opposite to the one you left a crossroads by', async () => {
+  const { COLS, PATH_ROW, T, floorWays, mapLayout } = await import('../../public/tower-tiles.js');
+  const blocking = new Set([T.rock, ...T.forestTrunks, ...T.forestCanopy, ...T.treeBottom, ...T.smallTree, T.sea, ...T.caveBoulder]);
+  for (let i = 0; i < 40; i++) {
+    for (const from of [4, 8, 11]) {
+      const ways = floorWays(`floor-${i}`, from);
+      assert.equal(ways.from, from);
+      assert.ok(ways.upTo >= 3 && ways.upTo <= COLS - 4);
+    }
+    for (const from of ['left', 'right']) {
+      const ways = floorWays(`floor-${i}`, from);
+      assert.ok(from === 'left' ? ways.upTo > 8 : ways.upTo < 8, `${from} ${ways.upTo}`);
+      for (const scene of ['path', 'lake', 'beach', 'ocean', 'cave', 'desert', 'tall-grass']) {
+        const grid = mapLayout({ scene, seed: `s${i}`, from, upTo: ways.upTo });
+        const open = from === 'left' ? 0 : COLS - 1;
+        const closed = from === 'left' ? COLS - 1 : 0;
+        assert.ok(!blocking.has(grid[PATH_ROW][open]), `${scene} open on the ${from}`);
+        assert.ok(blocking.has(grid[PATH_ROW][closed]), `${scene} closed on the other side`);
+      }
+    }
+  }
+  assert.deepEqual(floorWays('same'), floorWays('same', null));
+});
+
+test('each way with no battle has a map of its own, crossed from where you came in to its way out', async () => {
+  const { ATLAS_KEYS, COLS, PATH_ROW, ROWS, T, ZONES, mapLayout, sceneLook, zoneWays } = await import('../../public/tower-tiles.js');
+  for (const zone of ZONES) {
+    assert.equal(sceneLook(`zone-${zone}`).zone, zone);
+    for (const from of [null, 3, 8, 12, 'left', 'right']) {
+      const ways = zoneWays(zone, `seed-${zone}`, from);
+      if (from != null) assert.equal(ways.from, from);
+      const grid = mapLayout({ scene: `zone-${zone}`, seed: `seed-${zone}`, from });
+      assert.equal(grid.length, ROWS);
+      for (const keys of grid) for (const key of keys) assert.ok(ATLAS_KEYS.includes(key), `${zone}: ${key}`);
+      const shown = grid.flat();
+      if (zone === 'rest') {
+        assert.ok(shown.includes(T.pokeCenter[3][1]));
+        assert.equal(grid[ways.door.row][ways.door.col], T.pokeCenter[3][1]);
+      }
+      if (zone === 'den') assert.equal(grid[ways.door.row][ways.door.col], T.burrow);
+      if (zone === 'deal') assert.ok(shown.includes(T.fence.l) && shown.includes(T.pond.tl));
+      if (zone !== 'hideout') {
+        assert.ok(ways.spot.col >= 0 && ways.spot.col < COLS);
+        assert.ok(ways.upTo >= 2 && ways.upTo <= COLS - 3);
+      }
+      assert.ok(grid[PATH_ROW].length === COLS);
+    }
+  }
+});

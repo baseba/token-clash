@@ -2602,6 +2602,12 @@ button.tw-floor-pill:hover { background: var(--card-2); }
 .tw-map.compact .tw-map-canvas { object-fit: cover; }
 .tw-actor { position: absolute; width: calc(100% * 2 / var(--cols)); aspect-ratio: 1; left: calc(100% * (var(--x) - .5) / var(--cols)); top: calc(100% * (var(--y) - 1 - var(--shift, 0)) / var(--shown, var(--rows))); transition: left var(--walk, 0s) linear, top var(--walk, 0s) linear; filter: drop-shadow(0 2px 0 rgb(0 0 0 / .25)); }
 .tw-actor .ow-sprite { width: 100%; height: 100%; }
+.tw-actor.inside, .tw-actor.vanish { opacity: 0; transition: opacity .3s steps(3); }
+.tw-actor.vanish { transition-duration: .7s; }
+.tw-map.healing .tw-map-canvas { animation: tw-heal 1.1s steps(6); }
+.tw-map.dealing .tw-map-canvas { animation: tw-deal .9s steps(6); }
+@keyframes tw-heal { 30%, 70% { filter: brightness(1.12) sepia(.2) hue-rotate(-20deg); } }
+@keyframes tw-deal { 40%, 70% { filter: brightness(.55) saturate(1.6) hue-rotate(40deg); } }
 .tw-exclaim { position: absolute; left: 50%; bottom: 92%; translate: -50% 0; display: grid; place-items: center; width: 1.4em; height: 1.4em; border-radius: 6px; background: #fff; color: #d03030; font-weight: 900; border: 2px solid #303030; animation: tw-pop .2s ease-out; }
 .tw-sign { position: absolute; left: calc(100% * (var(--x) + .5) / var(--cols)); top: calc(100% * (var(--y) + .5) / var(--rows)); translate: -50% -50%; z-index: 30; display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 10px; background: var(--card); color: var(--accent); border: 1px solid var(--accent); box-shadow: var(--shadow); cursor: pointer; }
 .tw-sign-left { translate: -10% -50%; }
@@ -2776,7 +2782,7 @@ button.tw-reward:hover, button.tw-reward:focus-visible { border-color: var(--acc
 .tw-record.mine { border-color: var(--accent); }
 .tw-rank { text-align: center; color: var(--muted); }
 .tw-record .ow-sprite { width: 32px; height: 32px; }
-@media (prefers-reduced-motion: reduce) { .tw-exclaim, .tw-evo-stage.glowing .creature { animation: none; } .tw-actor, .tw-map::before, .tw-map::after { transition: none; } .tw-place, .tw-vs, .tw-vs b { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tw-exclaim, .tw-evo-stage.glowing .creature, .tw-map.healing .tw-map-canvas, .tw-map.dealing .tw-map-canvas { animation: none; } .tw-actor, .tw-map::before, .tw-map::after { transition: none; } .tw-place, .tw-vs, .tw-vs b { animation: none; } }
 
 .tw-strip { width: 100%; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .3rem; padding: .45rem; border-radius: 14px; background: var(--card); border: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer; }
 .tw-strip-slot { display: grid; justify-items: center; gap: .1rem; }
