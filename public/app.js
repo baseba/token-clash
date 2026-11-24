@@ -3,7 +3,7 @@ import { TYPES, typeLabel, effectiveness } from './types.js?v=dev';
 import { sceneFor, sceneNamed } from './backgrounds.js?v=dev';
 import { overworldSprite } from './overworld.js?v=dev';
 import { PARTY_LIMIT, PROFESSOR, PROFESSOR_LINES, RECRUIT_LINE, ROOMS, sceneMusic, STOP_PEOPLE, TOWER_LENGTHS, TWISTS } from './tower-cast.js?v=dev';
-import { forkExits, preloadTiles, towerMap } from './tower-map.js?v=dev';
+import { forkExits, preloadTiles, towerMap, ZONES } from './tower-map.js?v=dev';
 import { createPlayer } from './music.js?v=dev';
 import { createFx, moveShape } from './fx.js?v=dev';
 import { ballFxBare, ballFxNote, ballSounds } from './ball-fx.js?v=dev';
@@ -3182,6 +3182,8 @@ let towerCast = null;
 async function takeRoom(run, room, body) {
   document.querySelectorAll('.tw-room, .tw-sign').forEach((button) => { button.disabled = true; });
   const index = run.rooms.findIndex((option) => option.kind === room.kind);
+  const exit = forkExits(run.rooms.length)[index];
+  if (exit) rememberEntry(run.id, `${run.floor}:floor`, exit.side === 'up' ? exit.col : exit.side === 'left' ? 'right' : 'left');
   if (!reducedMotion()) await towerCast?.takeExit(index);
   towerEntrance = 'fromBelow';
   const res = await towerCall(null, '/api/tower/room', { body });
@@ -3250,6 +3252,15 @@ const takeEntrance = () => {
   return entrance;
 };
 
+/** Where you left each map of a climb, so the next one starts there: by floor and map ('fork' or 'floor'). Kept so a reload draws the same maps. */
+const TOWER_ENTRIES = 'tower-entries';
+const entriesOf = (runId) => {
+  let saved = null;
+  try { saved = JSON.parse(ls.get(TOWER_ENTRIES) ?? 'null'); } catch { saved = null; }
+  return saved?.run === runId ? saved.entries : {};
+};
+const rememberEntry = (runId, key, from) => ls.set(TOWER_ENTRIES, JSON.stringify({ run: runId, entries: { ...entriesOf(runId), [key]: from } }));
+
 /** Puts a Tower screen on the page. Between two Tower screens the map stays and the rest slides, like one game. */
 function towerSwap(page) {
   const apply = () => $app.replaceChildren(page);
@@ -3267,19 +3278,23 @@ function floorStage(run, entrance) {
   const number = resting ? run.floor - 1 : run.floor;
   const id = `${run.id}:${number}:${stage}:${run.rooms.length}`;
   if (towerCast?.id === id && !entrance) return towerCast;
-  const foe = choosing ? null : resting ? lastStep?.foe ?? null : floor.foe;
+  const room = choosing ? null : resting ? (run.lastResult?.floor === number ? run.lastResult.room : null) : floor.room;
+  const zone = ZONES.includes(room) ? room : null;
+  const foe = choosing || (zone && zone !== 'hideout') ? null : resting ? lastStep?.foe ?? null : floor.foe;
   const kind = floor.room && floor.room !== 'trainer' ? ROOMS[floor.room].label : FLOOR_KIND[floor.kind].label;
+  const restPlace = zone && zone !== 'hideout' ? { name: ROOMS[zone].label, detail: `Piso ${number}` } : { name: 'Descanso', detail: `Piso ${number} superado` };
   const cast = towerMap({
-    scene: resting ? (lastStep?.scene ?? floor.scene) : floor.scene,
+    scene: zone ? `zone-${zone}` : resting ? (lastStep?.scene ?? floor.scene) : floor.scene,
     seed: `${run.id}:${number}`,
+    from: entriesOf(run.id)[`${number}:${choosing ? 'fork' : 'floor'}`] ?? null,
     hero: playerOverworld(),
     foe: foe?.key ?? null,
     boss: stage === 'arrive' && floor.kind !== 'trainer',
     stage,
     forks: run.rooms.length,
-    label: choosing ? 'El camino se divide' : foe ? `${foe.title} ${foe.name}` : 'Descanso',
-    place: resting ? { name: 'Descanso', detail: `Piso ${number} superado` } : { name: `Piso ${number}`, detail: choosing ? 'El camino se divide' : kind },
-    compact: resting,
+    label: choosing ? 'El camino se divide' : foe ? `${foe.title} ${foe.name}` : resting ? restPlace.name : kind,
+    place: resting ? restPlace : { name: `Piso ${number}`, detail: choosing ? 'El camino se divide' : kind },
+    compact: resting && !zone,
     entrance,
   });
   cast.id = id;
@@ -3292,12 +3307,14 @@ function floorStage(run, entrance) {
 /** You walk off the floor and up to the next one, after a confirmation if you'd leave something behind. */
 function moveOn(btn, run) {
   const lost = leftBehind(run);
-  if (!lost) return walkUp(btn);
-  towerConfirm('¿Subir sin elegir?', `Todavía tienes ${lost}. Si subes ahora, no hay vuelta atrás.`, { stay: 'Volver a elegir', go: 'Subir igual', onGo: () => walkUp(btn) });
+  if (!lost) return walkUp(btn, run);
+  towerConfirm('¿Subir sin elegir?', `Todavía tienes ${lost}. Si subes ahora, no hay vuelta atrás.`, { stay: 'Volver a elegir', go: 'Subir igual', onGo: () => walkUp(btn, run) });
 }
 
-async function walkUp(btn) {
+async function walkUp(btn, run) {
   btn.disabled = true;
+  const exit = towerCast?.ways?.upTo;
+  if (exit != null) for (const map of ['fork', 'floor']) rememberEntry(run.id, `${run.floor}:${map}`, exit);
   if (!reducedMotion()) await towerCast?.leave();
   towerEntrance = 'fromBelow';
   if (!(await towerCall(btn, '/api/tower/move-on'))) towerEntrance = null;

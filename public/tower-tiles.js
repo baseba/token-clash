@@ -67,6 +67,9 @@ export const T = {
   labPlant: [LAB | 0x226, LAB | 0x22e],
   labShelf: [[0x224, 0x225], [0x22c, 0x22d], [0x234, 0x235]].map((row) => row.map((id) => LAB | id)),
   labMat: [LAB | 0x206, LAB | 0x207],
+  pokeCenter: [[0x048, 0x049, 0x04a, 0x04b], [0x050, 0x051, 0x052, 0x053], [0x058, 0x059, 0x05a, 0x05b], [0x060, 0x061, 0x062, 0x063]],
+  fence: patch([0x138, 0x139, 0x13a, 0x140, 0x141, 0x142, 0x148, 0x149, 0x14a]),
+  burrow: 0x0a7,
 };
 
 /** Every key a map can use: the atlas holds these, in this order. */
@@ -89,32 +92,99 @@ export function forkExits(count) {
   return [...middle, ...sides, ...ups];
 }
 
+const fromSide = (from) => typeof from === 'string';
+/** Whether you come into a map on its left half: up from a column left of the middle, or in by the left edge. */
+export const comesFromLeft = (from) => (fromSide(from) ? from === 'left' : from <= CROSS_COL);
+
 /**
- * How a floor's map is crossed: you come up into it from below at `from` and go up out of it at
- * `upTo`, where the rival waits; once beaten it steps aside to `aside`, off the way up.
+ * How a floor's map is crossed: you come into it where you left the map before, `from` (a column of
+ * its bottom edge, or 'left' or 'right' after leaving a crossroads by a side), and go up out of it at
+ * `upTo`, where the rival waits; once beaten it steps aside to `aside`, off the way up. With no `from`
+ * (the first floor, a reload) the seed picks a column below.
  */
-export function floorWays(seed) {
+export function floorWays(seed, from = null) {
   const random = seeded(`${seed}:ways`);
   const low = 3 + Math.floor(random() * 4);
   const high = 9 + Math.floor(random() * 4);
   const straight = random() < 0.3;
   const leftFirst = random() < 0.5;
-  const from = leftFirst ? low : high;
-  const upTo = straight ? from : leftFirst ? high : low;
-  return { from, upTo, aside: upTo + (upTo <= CROSS_COL ? 1 : -1) };
+  const start = from ?? (leftFirst ? low : high);
+  const upTo = straight && !fromSide(start) ? start : comesFromLeft(start) ? high : low;
+  return { from: start, upTo, aside: upTo + (upTo <= CROSS_COL ? 1 : -1) };
 }
 
-/** The openings of a map's path: columns that go down off its bottom edge and up off its top one, and the sides it leaves by. */
+/** The openings of a map's path: columns that go down off its bottom edge and up off its top one, and the sides it opens to. */
 export function openingsOf({ forks = 0, from = null, upTo = null }) {
   const exits = forks ? forkExits(forks) : [];
   const up = forks ? exits.filter((exit) => exit.side === 'up').map((exit) => exit.col) : upTo != null ? [upTo] : [];
-  const down = forks ? [CROSS_COL] : from != null ? [from] : [];
-  return { up, down, left: exits.some((exit) => exit.side === 'left'), right: exits.some((exit) => exit.side === 'right') };
+  const down = from == null ? (forks ? [CROSS_COL] : []) : fromSide(from) ? [] : [from];
+  return { up, down, left: from === 'left' || exits.some((exit) => exit.side === 'left'), right: from === 'right' || exits.some((exit) => exit.side === 'right') };
+}
+
+/** The ways with no battle of a floor, and the villains' hideout, each with a map of its own. */
+export const ZONES = ['rest', 'den', 'deal', 'hideout'];
+const ZONE_LOOKS = { rest: { family: 'path', tints: [] }, den: { family: 'tallGrass', tints: [] }, deal: { family: 'path', tints: ['gloom'] }, hideout: { family: 'cave', tints: ['lair'] } };
+const POOL = { col: 6, width: 4 };
+
+/**
+ * How a zone's map is crossed, by its theme. At the stop you go into a Pokémon Center (`door`) and
+ * out up the path; at the den you find the burrow in the tall grass and leave down it; at the dark
+ * deal a figure waits in front of a black pool (`spot` is where you meet it); the hideout is guarded
+ * like a floor, its rival in front of the door in the rock.
+ */
+export function zoneWays(zone, seed, from = null) {
+  const ways = floorWays(seed, from);
+  const left = comesFromLeft(ways.from);
+  if (zone === 'rest') {
+    const center = left ? 10 : 2;
+    return { ...ways, upTo: CROSS_COL, aside: CROSS_COL, center, door: { col: center + 1, row: PATH_ROW }, spot: { col: center + 1, row: PATH_ROW + 1 } };
+  }
+  if (zone === 'den') {
+    const upTo = left ? 11 : 4;
+    return { ...ways, upTo, aside: upTo, door: { col: upTo, row: PATH_ROW - 1 }, spot: { col: left ? upTo - 3 : upTo + 3, row: PATH_ROW } };
+  }
+  if (zone === 'deal') {
+    const upTo = left ? 12 : 3;
+    return { ...ways, upTo, aside: upTo, figure: { col: CROSS_COL, row: PATH_ROW - 1 }, spot: { col: CROSS_COL, row: PATH_ROW } };
+  }
+  return ways;
+}
+
+/** The pieces that make a zone what it is, laid over its ground: the Center, the burrow, the pool and its fence, the door's guards. */
+function zoneMarks(zone, ways) {
+  const marks = [];
+  const put = (row, col, key) => marks.push({ row, col, key });
+  if (zone === 'rest') T.pokeCenter.forEach((keys, row) => keys.forEach((key, i) => put(row, ways.center + i, key)));
+  if (zone === 'den') T.moundOnGrass.forEach((keys, row) => keys.forEach((key, i) => put(row, ways.upTo - 1 + i, row === 2 && i === 1 ? T.burrow : key)));
+  if (zone === 'deal') {
+    for (let i = 0; i < POOL.width; i++) {
+      const edge = i === 0 ? 'l' : i === POOL.width - 1 ? 'r' : '';
+      put(0, POOL.col + i, T.pond[`t${edge}`] ?? T.pond.t);
+      put(1, POOL.col + i, T.pond[`b${edge}`] ?? T.pond.b);
+    }
+    for (const row of [0, 1]) {
+      put(row, POOL.col - 1, T.fence.l);
+      put(row, POOL.col + POOL.width, T.fence.r);
+    }
+  }
+  if (zone === 'hideout') for (const col of [ways.upTo - 2, ways.upTo + 2]) put(PATH_ROW - 1, col, T.caveBoulder[0]);
+  return marks;
+}
+
+function drawZone(zone, scene, seed, from) {
+  const ways = zoneWays(zone, seed, from);
+  const marks = zoneMarks(zone, ways);
+  const openings = openingsOf({ from: ways.from, upTo: ways.upTo });
+  if (ways.door && zone === 'rest') openings.up = [ways.upTo, ways.door.col];
+  const grid = drawScene(ZONE_LOOKS[zone].family, scene, seed, openings, new Set(marks.map((mark) => mark.row * COLS + mark.col)));
+  for (const mark of marks) grid[mark.row][mark.col] = mark.key;
+  return grid;
 }
 
 /** What a battle background looks like on the map: its layout and the colours it is repainted with. */
 export function sceneLook(scene) {
   const name = String(scene ?? 'path');
+  if (name.startsWith('zone-')) return { ...ZONE_LOOKS[name.slice(5)], zone: name.slice(5) };
   const night = name.endsWith('-night');
   const base = name.replace(/-(2|night)$/, '');
   const second = name.endsWith('-2');
@@ -158,7 +228,8 @@ function wayCells({ up, down, left, right }) {
  * has the edges of the ground it is laid on.
  */
 export function mapLayout({ scene, seed, forks = 0, from = null, upTo = null }) {
-  const { family } = sceneLook(scene);
+  const { family, zone } = sceneLook(scene);
+  if (zone) return drawZone(zone, scene, seed, from);
   const openings = openingsOf({ forks, from, upTo });
   if (family === 'lab') return drawLab();
   return drawScene(family, scene, seed, openings);
@@ -183,7 +254,7 @@ function patchKey(piece, inside, row, col) {
   return piece[`${v}${h}`] ?? piece[v || h] ?? piece.c;
 }
 
-function drawScene(family, scene, seed, openings) {
+function drawScene(family, scene, seed, openings, reserved = new Set()) {
   const { up, down, left, right } = openings;
   const random = seeded(`${scene}:${seed}`);
   const grid = Array.from({ length: ROWS }, () => Array(COLS).fill(T.grass));
@@ -191,7 +262,7 @@ function drawScene(family, scene, seed, openings) {
   const set = (row, col, key) => { if (inMap(row, col)) grid[row][col] = key; };
   const way = wayCells(openings);
   const onWay = (row, col) => way.has(Math.max(0, Math.min(ROWS - 1, row)) * COLS + Math.max(0, Math.min(COLS - 1, col)));
-  const taken = new Set(way);
+  const taken = new Set([...way, ...reserved]);
   const free = (row, col) => inMap(row, col) && !taken.has(row * COLS + col);
   const take = (row, col, key) => { if (!free(row, col)) return false; set(row, col, key); taken.add(row * COLS + col); return true; };
   const paintWay = (piece) => { for (const cell of way) set(Math.floor(cell / COLS), cell % COLS, patchKey(piece, onWay, Math.floor(cell / COLS), cell % COLS)); };
@@ -277,7 +348,7 @@ function drawScene(family, scene, seed, openings) {
       clusters(T.tall, 2, [bottom + 1, bottom + 2]);
       sprinkle(T.flowers, 0.15, [bottom + 1, bottom + 2]);
       const signCol = down[0] + WAY_HALF + 1;
-      if (free(bottom + 1, signCol)) take(bottom + 1, signCol, T.sign);
+      if (down.length && free(bottom + 1, signCol)) take(bottom + 1, signCol, T.sign);
     }
     for (const col of [left ? null : 0, right ? null : COLS - 1]) if (col !== null) for (let row = top; row <= bottom; row++) take(row, col, T.rock);
     return grid;
@@ -294,9 +365,9 @@ function drawScene(family, scene, seed, openings) {
 
   if (family === 'path') paintWay(T.dirt);
   if (family === 'lake') {
-    const span = [...down].flatMap((col) => [col - WAY_HALF - 1, col + WAY_HALF + 1]);
-    const toRight = down[0] <= CROSS_COL;
-    const [start, end] = toRight ? [span[1] + 1, right ? COLS - 1 : COLS - 3] : [left ? 0 : 2, span[0] - 1];
+    const entry = down[0] ?? (left ? 0 : COLS - 1);
+    const toRight = entry <= CROSS_COL;
+    const [start, end] = toRight ? [down.length ? entry + WAY_HALF + 2 : CROSS_COL, right ? COLS - 1 : COLS - 3] : [left ? 0 : 2, down.length ? entry - WAY_HALF - 2 : CROSS_COL - 1];
     if (end - start >= 2) {
       for (let col = start; col <= end; col++) {
         take(ROWS - 2, col, col === start ? T.pond.tl : col === end ? T.pond.tr : T.pond.t);
@@ -316,7 +387,7 @@ function drawScene(family, scene, seed, openings) {
     sprinkle(T.flowers, 0.1, family === 'lake' ? [1, 2] : [1, 2, 4, 5]);
   }
   const signCol = down[0] + WAY_HALF + 1;
-  if (family !== 'tallGrass' && free(ROWS - 2, signCol)) take(ROWS - 2, signCol, T.sign);
+  if (family !== 'tallGrass' && down.length && free(ROWS - 2, signCol)) take(ROWS - 2, signCol, T.sign);
   return grid;
 }
 
@@ -366,6 +437,8 @@ const TINTS = {
     const [hue, sat, light] = hsl(r, g, b);
     return (hue < 60 || hue > 330) && sat > 0.1 ? rgb(220, 0.1, light * 0.95) : [r, g, b];
   },
+  gloom: (r, g, b) => [r * 0.36 + 30, g * 0.34 + 18, b * 0.5 + 54],
+  lair: (r, g, b) => [r * 0.92 + 26, g * 0.6 + 4, b * 0.58],
   blue: (r, g, b) => {
     const [hue, sat, light] = hsl(r, g, b);
     return hue < 60 && sat > 0.05 ? rgb(225, sat * 0.6, light) : [r, g, b];

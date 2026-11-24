@@ -51,11 +51,14 @@ En vivo: **https://clash.mirrordev.xyz**
      pelea como un líder. Cada equipo rival es un sorteo, no lo mejor de su tema: cualquier especie que calce puede
      venir, sin importar la dificultad, y casi no se repiten las que ya enfrentaste en la subida. La dificultad se
      nota en cómo elige sus 3 de lo que sacó: al azar en Fácil, lo mejor contra tu equipo en las difíciles. Ves cada piso como un mapa visto desde arriba, dibujado según el
-     escenario de la pelea, con los sprites de mapa de los entrenadores. Subes la torre hacia arriba: a cada mapa
-     entras desde abajo, el rival te espera frente a la salida de arriba, te ve, baja a tu encuentro y empieza la
+     escenario de la pelea, con los sprites de mapa de los entrenadores. Subes la torre hacia arriba: cada mapa
+     empieza donde saliste del anterior (abajo en la misma columna, o por el lado contrario si dejaste un cruce por un
+     lado), el rival te espera frente a la salida de arriba, te ve, baja a tu encuentro y empieza la
      pelea en nuestros fondos; derrotado, se hace a un lado y sigues subiendo por el mismo mapa. Donde el camino se
      divide llegas a una encrucijada con caminos a la izquierda, a la derecha y de uno a tres hacia arriba; un lado
-     sin camino queda cerrado con árboles, rocas o agua. Los niveles siguen a Emerald Rogue: la tranquila va 4 niveles bajo tu tope, la ruta 2, la difícil y los
+     sin camino queda cerrado con árboles, rocas o agua. La Parada, la Madriguera, el Pacto oscuro y la Guarida tienen
+     un mapa propio: un Centro Pokémon donde descansas, una madriguera en el pasto alto, un pozo negro con una figura
+     que se esfuma y una cueva roja con la puerta de la guarida. Los niveles siguen a Emerald Rogue: la tranquila va 4 niveles bajo tu tope, la ruta 2, la difícil y los
      reclutas de la guarida justo en él, y los jefes y líderes villanos en él o uno más; ningún rival de ruta pasa a
      tu Pokémon más alto, ni un jefe más de uno. El nivel que ves en cada
      camino es el del equipo que trae. En la Torre se pelea con los IVs reales: los rivales tienen IVs cerca de los
