@@ -155,3 +155,16 @@ test('each way with no battle has a map of its own, crossed from where you came 
     }
   }
 });
+
+test('the lab is the ground floor: in by the door mat below, out up the stairs in the back wall, its sides closed', async () => {
+  const { COLS, LAB_SPOTS, PATH_ROW, ROWS, T, mapLayout } = await import('../../public/tower-tiles.js');
+  const grid = mapLayout({ scene: 'lab', seed: 's' });
+  assert.equal(LAB_SPOTS.door.row, ROWS - 1);
+  assert.equal(grid[LAB_SPOTS.door.row][LAB_SPOTS.door.col], T.labMat[0]);
+  assert.equal(grid[LAB_SPOTS.stairs.row][LAB_SPOTS.stairs.col], T.labStairs[1][1]);
+  for (const spot of [LAB_SPOTS.hero, LAB_SPOTS.professor]) assert.equal(grid[spot.row][spot.col], T.labFloor);
+  for (let row = LAB_SPOTS.hero.row + 1; row < ROWS - 1; row++) assert.equal(grid[row][LAB_SPOTS.door.col], T.labFloor, 'the way in from the door is clear');
+  for (let row = LAB_SPOTS.stairs.row + 1; row <= LAB_SPOTS.hero.row + 1; row++) assert.equal(grid[row][LAB_SPOTS.stairs.col], T.labFloor, 'the way to the stairs is clear');
+  assert.ok(grid[PATH_ROW][0] !== T.labFloor && grid[PATH_ROW][COLS - 1] !== T.labFloor, 'no way out by the sides');
+  assert.ok(LAB_SPOTS.stairs.col >= 3 && LAB_SPOTS.stairs.col <= COLS - 4, 'the first floor can start below the stairs');
+});

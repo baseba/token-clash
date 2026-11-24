@@ -38,9 +38,9 @@ En vivo: **https://clash.mirrordev.xyz**
      registrada. Cada una tiene un switch para verla shiny si la tienes shiny.
    - **Stats:** tus batallas y torneos, el ranking y las stats del servidor.
    - **La Torre** (`/torre`): un modo inspirado en PokeRogue y en Emerald Rogue con tu colección. Eliges dificultad
-     (la de la IA) y largo (10, 25, 50 pisos o infinita). En el laboratorio, el Profesor Rowan te ofrece Pokémon de tu
-     colección (balanceados, con un solo legendario como máximo) y te llevas 3, en nivel 5 y en la primera forma de su
-     línea. En cada piso normal el camino se divide en 3 a 5 caminos, como en Emerald Rogue: una ruta, una ruta difícil (rival entrenado,
+     (la de la IA) y largo (10, 25, 50 pisos o infinita). En el laboratorio, la planta baja de la torre, entras por la
+     puerta, el Profesor Oak te ofrece Pokémon de tu colección (balanceados, con un solo legendario como máximo) y te
+     llevas 3, en nivel 5 y en la primera forma de su línea; subes por la escalera del fondo al primer piso. En cada piso normal el camino se divide en 3 a 5 caminos, como en Emerald Rogue: una ruta, una ruta difícil (rival entrenado,
      en tu tope, premio raro), una tranquila (más débil, premio común), una parada (dos premios sin pelear), una
      madriguera (reclutas sin pelear), una guarida villana (premio épico) o un pacto oscuro (dejas ir a uno por dos
      premios épicos). Cada 5 pisos hay un líder de gimnasio y, al cierre de cada bloque de 25, cuatro del Alto Mando y

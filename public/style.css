@@ -2826,3 +2826,5 @@ button.tw-reward:hover, button.tw-reward:focus-visible { border-color: var(--acc
 .trainer-result .record { margin-left: auto; }
 .trainer-result:hover, .trainer-result:focus-visible { border-color: var(--accent); outline: none; }
 .trainer-none { padding: .4rem .2rem; }
+.tw-rumor { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; padding: .55rem .7rem; border: 1px dashed var(--line); border-radius: 12px; }
+.tw-rumor small { color: var(--muted); flex: 1 1 16rem; min-width: 0; }

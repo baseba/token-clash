@@ -65,8 +65,11 @@ export const T = {
   labFloor: LAB | 0x202,
   labMachine: [[0x214, 0x215, 0x216], [0x21c, 0x21d, 0x21e]].map((row) => row.map((id) => LAB | id)),
   labPlant: [LAB | 0x226, LAB | 0x22e],
-  labShelf: [[0x224, 0x225], [0x22c, 0x22d], [0x234, 0x235]].map((row) => row.map((id) => LAB | id)),
+  labBookcase: [[0x210, 0x211], [0x218, 0x219], [0x220, 0x221]].map((row) => row.map((id) => LAB | id)),
   labMat: [LAB | 0x206, LAB | 0x207],
+  labStairs: [[0x27c, 0x27d, 0x27e], [0x284, 0x285, 0x286]].map((row) => row.map((id) => LAB | id)),
+  labTable: [[0x253, 0x254], [0x25b, 0x25c]].map((row) => row.map((id) => LAB | id)),
+  labBall: LAB | 0x24c,
   pokeCenter: [[0x048, 0x049, 0x04a, 0x04b], [0x050, 0x051, 0x052, 0x053], [0x058, 0x059, 0x05a, 0x05b], [0x060, 0x061, 0x062, 0x063]],
   fence: patch([0x138, 0x139, 0x13a, 0x140, 0x141, 0x142, 0x148, 0x149, 0x14a]),
   burrow: 0x0a7,
@@ -235,15 +238,30 @@ export function mapLayout({ scene, seed, forks = 0, from = null, upTo = null }) 
   return drawScene(family, scene, seed, openings);
 }
 
+/**
+ * The professor's lab, the ground floor of the Tower: you come in by the mat of its door, below; the
+ * professor waits across the table, by the Poké Ball; you go up the stairs in the back wall to the
+ * first floor. Bookcases and the healing machine close its sides.
+ */
+export const LAB_SPOTS = {
+  door: { col: 6, row: ROWS - 1 },
+  hero: { col: 6, row: PATH_ROW + 1 },
+  professor: { col: 10, row: PATH_ROW + 1 },
+  stairs: { col: 12, row: PATH_ROW - 1 },
+};
+
 function drawLab() {
   const grid = Array.from({ length: ROWS }, () => Array(COLS).fill(T.labFloor));
-  T.labWall.forEach((row, r) => row.forEach((key, col) => { grid[r][col] = key; }));
-  T.labMachine.forEach((row, r) => row.forEach((key, c) => { grid[4 + r][13 + c] = key; }));
-  T.labShelf.forEach((row, r) => row.forEach((key, c) => { grid[4 + r][c] = key; }));
-  grid[5][6] = T.labPlant[0];
-  grid[6][6] = T.labPlant[1];
-  grid[6][8] = T.labMat[0];
-  grid[6][9] = T.labMat[1];
+  const put = (pieces, row, col) => pieces.forEach((keys, r) => keys.forEach((key, c) => { grid[row + r][col + c] = key; }));
+  put(T.labWall, 0, 0);
+  put(T.labStairs, LAB_SPOTS.stairs.row - 1, LAB_SPOTS.stairs.col - 1);
+  put(T.labBookcase, PATH_ROW, 0);
+  put([[T.labPlant[0]], [T.labPlant[1]]], PATH_ROW + 2, 3);
+  put(T.labMachine, PATH_ROW, COLS - 3);
+  put([[T.labPlant[0]], [T.labPlant[1]]], PATH_ROW + 2, COLS - 1);
+  put(T.labTable, PATH_ROW, LAB_SPOTS.hero.col + 1);
+  grid[PATH_ROW][LAB_SPOTS.hero.col + 3] = T.labBall;
+  put([T.labMat], LAB_SPOTS.door.row, LAB_SPOTS.door.col);
   return grid;
 }
 

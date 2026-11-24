@@ -14,7 +14,7 @@ export const MAX_LEVEL = 100;
 export const LAB_OFFERS = 6;
 export const STARTERS = 3;
 export const LAB_SCENE = 'path';
-export const PROFESSOR = { key: 'prof_rowan', name: 'Profesor Rowan' };
+export const PROFESSOR = { key: 'prof_oak', name: 'Profesor Oak' };
 
 /** Where a team of each type fights. */
 export const TYPE_SCENES = {

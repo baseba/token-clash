@@ -9,7 +9,7 @@
 // floor where the way splits is a crossroads with ways up, left and right. The ways with no battle
 // have a map of their own: a Pokémon Center to rest in, a burrow in the tall grass, a dark pool.
 import { overworldSprite } from './overworld.js?v=dev';
-import { ATLAS_COLS, ATLAS_KEYS, COLS, CROSS_COL, floorWays, forkExits, mapLayout, PATH_ROW, ROWS, sceneLook, TILE, tintPixels, ZONES, zoneWays } from './tower-tiles.js?v=dev';
+import { ATLAS_COLS, ATLAS_KEYS, COLS, CROSS_COL, floorWays, forkExits, LAB_SPOTS, mapLayout, PATH_ROW, ROWS, sceneLook, TILE, tintPixels, ZONES, zoneWays } from './tower-tiles.js?v=dev';
 
 export { COLS, ROWS, forkExits, ZONES };
 
@@ -19,9 +19,6 @@ const MEET_ROW = PATH_ROW - 1;
 
 /** Who offers the dark deal. */
 const DEAL_FIGURE = 'hex_maniac';
-/** Where the lab's door mat is: you leave the lab through it. */
-const LAB_DOOR = 8;
-
 const TILE_MS = 200;
 const SIGN_MS = 2400;
 const ATLAS_INDEX = new Map(ATLAS_KEYS.map((key, i) => [key, i]));
@@ -130,7 +127,7 @@ const motion = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
  * no battle), 'fork' (no rival, a crossroads of `forks` ways) or 'lab'. A `zone-…` scene is a way with a
  * map of its own (public/tower-tiles.js). `from` is where you left the map before: a column of the
  * bottom edge, or 'left' or 'right'. `entrance` is how you get there, under the name of the place:
- * 'fromBelow' (in from where you left the map before), 'walk' (into the lab from the left), 'battle'
+ * 'fromBelow' (in from where you left the map before), 'walk' (into the lab by its door, below), 'battle'
  * (the bars of the battle open) or none, and then you stand where you came in. A `compact` map shows
  * only the rows around the path.
  */
@@ -144,11 +141,11 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
   const fork = stage === 'fork';
   const zone = look.zone ?? null;
   const visit = zone && zone !== 'hideout';
-  const ways = zone ? zoneWays(zone, seed, from) : fork ? { from: from ?? CROSS_COL, upTo: CROSS_COL, aside: CROSS_COL } : floorWays(seed, from);
+  const ways = lab ? { from: LAB_SPOTS.door.col, upTo: LAB_SPOTS.stairs.col, aside: LAB_SPOTS.stairs.col } : zone ? zoneWays(zone, seed, from) : fork ? { from: from ?? CROSS_COL, upTo: CROSS_COL, aside: CROSS_COL } : floorWays(seed, from);
   const meet = { col: ways.upTo, row: MEET_ROW };
   const side = typeof ways.from === 'string';
   const cameIn = side ? { col: ways.from === 'left' ? 1 : COLS - 2, row: PATH_ROW } : { col: ways.from, row: ROWS - 1 };
-  const heroStart = lab ? { col: 1, row: PATH_ROW } : visit ? (entrance ? cameIn : ways.spot) : stage === 'rest' ? { col: ways.upTo, row: PATH_ROW } : cameIn;
+  const heroStart = lab ? LAB_SPOTS.hero : visit ? (entrance ? cameIn : ways.spot) : stage === 'rest' ? { col: ways.upTo, row: PATH_ROW } : cameIn;
   drawInto(canvas, { scene, seed, forks: fork ? forks : 0, from: lab ? null : ways.from, upTo: lab || fork ? null : ways.upTo });
   const el = document.createElement('div');
   el.className = `tw-map${boss ? ' boss' : ''}${compact ? ' compact' : ''}${entrance === 'battle' && motion() ? ' closing' : ''}`;
@@ -159,15 +156,15 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
   el.append(canvas);
   const cast = { el, hero: null, foe: null };
   const walkIn = (entrance === 'fromBelow' || (lab && entrance === 'walk')) && motion();
-  const inFrom = lab ? { col: -1, row: PATH_ROW } : side ? { col: ways.from === 'left' ? -2 : COLS + 1, row: PATH_ROW } : { col: heroStart.col, row: ROWS + 1 };
-  const facing = lab || ways.from === 'left' ? 'right' : ways.from === 'right' ? 'left' : 'up';
+  const inFrom = lab ? { col: LAB_SPOTS.door.col, row: ROWS + 1 } : side ? { col: ways.from === 'left' ? -2 : COLS + 1, row: PATH_ROW } : { col: heroStart.col, row: ROWS + 1 };
+  const facing = lab ? 'right' : ways.from === 'left' ? 'right' : ways.from === 'right' ? 'left' : 'up';
   cast.hero = actor(hero, { ...(walkIn ? inFrom : heroStart), facing: visit && !walkIn ? 'down' : facing });
   cast.ways = ways;
   const stepsAside = stage === 'rest' && entrance === 'battle' && motion();
   if (zone === 'deal' && walkIn) cast.foe = actor(DEAL_FIGURE, { ...ways.figure, facing: 'down' });
   else if (visit) cast.foe = null;
   else if (foe && stage === 'rest') cast.foe = actor(foe, { col: stepsAside ? ways.upTo : ways.aside, row: MEET_ROW, facing: 'down' });
-  else if (foe && lab) cast.foe = actor(foe, { col: 12, row: PATH_ROW, facing: 'left' });
+  else if (foe && lab) cast.foe = actor(foe, { ...LAB_SPOTS.professor, facing: 'left' });
   else if (foe) cast.foe = actor(foe, { col: ways.upTo, row: WAIT_ROW, facing: 'down' });
   for (const member of [cast.foe, cast.hero]) if (member) el.append(member.el);
 
@@ -235,7 +232,7 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
     }
   };
 
-  /** You arrive: up from the bottom edge (into the lab, from the left), or as the battle's bars open and the beaten rival steps aside. */
+  /** You arrive: up from the bottom edge (into the lab by its door), or as the battle's bars open and the beaten rival steps aside. */
   cast.arrive = async () => {
     if (entrance === 'battle' && motion()) {
       await pause(80);
@@ -256,7 +253,8 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
   cast.approach = async () => {
     if (!cast.foe) return;
     if (lab) {
-      await cast.hero.walk(10, PATH_ROW);
+      await cast.hero.walk(LAB_SPOTS.hero.col, LAB_SPOTS.hero.row);
+      cast.hero.face('right');
       await mark(cast.foe, '!', 520);
       return;
     }
@@ -277,11 +275,13 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
       await cast.hero.walk(exit.col, -2);
     } else await cast.hero.walk(exit.side === 'left' ? -2 : COLS + 1, PATH_ROW);
   };
-  /** You leave and the map fades out behind you: up past the beaten rival after a rest, down the burrow of a den, out the lab's door. */
+  /** You leave and the map fades out behind you: up past the beaten rival after a rest, down the burrow of a den, up the lab's stairs to the first floor. */
   cast.leave = async () => {
     if (lab) {
-      await cast.hero.walk(LAB_DOOR, cast.hero.row);
-      await cast.hero.walk(LAB_DOOR, ROWS + 1);
+      await cast.hero.goTo(LAB_SPOTS.stairs.col, LAB_SPOTS.stairs.row, LAB_SPOTS.hero.row + 1);
+      cast.foe?.face('up');
+      cast.hero.hide(true);
+      await pause(TILE_MS * 2);
     } else if (zone === 'den') {
       await cast.hero.goTo(ways.upTo, PATH_ROW);
       await cast.hero.walk(ways.door.col, ways.door.row);
