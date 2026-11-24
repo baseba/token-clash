@@ -57,26 +57,51 @@ test('a crossroads has one exit per way, each on an edge of the map and none twi
   }
 });
 
-test('every scene of a floor draws a map from the atlas, with its path and its openings clear', async () => {
-  const { ATLAS_KEYS, COLS, ROWS, PATH_ROW, T, mapLayout, openingsOf, sceneLook, tintPixels } = await import('../../public/tower-tiles.js');
-  const blocking = new Set([...T.ledge, T.rock, ...T.caveBoulder, ...T.forestTrunks, ...T.forestCanopy, T.sea, T.tall]);
+test('every scene of a floor draws a map from the atlas, its way clear from the bottom edge to the exits and its other sides closed', async () => {
+  const { ATLAS_KEYS, COLS, ROWS, PATH_ROW, T, floorWays, forkExits, mapLayout, sceneLook, tintPixels } = await import('../../public/tower-tiles.js');
+  const blocking = new Set([...T.ledge, T.rock, ...T.caveBoulder, ...T.forestTrunks, ...T.forestCanopy, ...T.treeBottom, ...T.smallTree, T.sea, T.tall]);
+  const clear = (grid, scene, cells) => { for (const [row, col] of cells) assert.ok(!blocking.has(grid[row][col]), `${scene} ${row}:${col}`); };
+  const column = (col, from, to) => Array.from({ length: to - from + 1 }, (_, i) => [from + i, col]);
+  const row = (at, from, to) => Array.from({ length: to - from + 1 }, (_, i) => [at, from + i]);
   for (const scene of ['lab', ...backgrounds]) {
-    for (const forks of [0, 3, 4, 5]) {
-      const grid = mapLayout({ scene, seed: 's', forks });
+    const layouts = [...[1, 2, 3, 4, 5].map((forks) => ({ forks })), ...Array.from({ length: 12 }, (_, i) => floorWays(`seed-${i}`))];
+    for (const layout of layouts) {
+      const grid = mapLayout({ scene, seed: 's', ...layout });
       assert.equal(grid.length, ROWS);
-      for (const row of grid) {
-        assert.equal(row.length, COLS);
-        for (const key of row) assert.ok(ATLAS_KEYS.includes(key), `${scene}: ${key}`);
+      for (const keys of grid) {
+        assert.equal(keys.length, COLS);
+        for (const key of keys) assert.ok(ATLAS_KEYS.includes(key), `${scene}: ${key}`);
       }
       if (scene === 'lab') continue;
-      const { up, down } = openingsOf({ forks });
-      for (let col = 0; col < COLS; col++) assert.ok(!blocking.has(grid[PATH_ROW][col]), `${scene} path ${col}`);
-      for (const col of up) for (let row = 0; row < PATH_ROW; row++) assert.ok(!blocking.has(grid[row][col]), `${scene} up ${col}:${row}`);
-      for (const col of down) for (let row = PATH_ROW + 1; row < ROWS; row++) assert.ok(!blocking.has(grid[row][col]), `${scene} down ${col}:${row}`);
+      if (layout.forks) {
+        const exits = forkExits(layout.forks);
+        const cols = exits.map((exit) => exit.col);
+        clear(grid, scene, [...column(8, PATH_ROW, ROWS - 1), ...row(PATH_ROW, Math.min(8, ...cols), Math.max(8, ...cols))]);
+        for (const exit of exits.filter((exit) => exit.side === 'up')) clear(grid, scene, column(exit.col, 0, PATH_ROW));
+        if (!exits.some((exit) => exit.side === 'left')) assert.ok(blocking.has(grid[PATH_ROW][0]), `${scene} ${layout.forks} closed on the left`);
+        if (!exits.some((exit) => exit.side === 'right')) assert.ok(blocking.has(grid[PATH_ROW][COLS - 1]), `${scene} ${layout.forks} closed on the right`);
+      } else {
+        const { from, upTo } = layout;
+        clear(grid, scene, [...column(from, PATH_ROW, ROWS - 1), ...row(PATH_ROW, Math.min(from, upTo), Math.max(from, upTo)), ...column(upTo, 0, PATH_ROW), [PATH_ROW - 1, layout.aside]]);
+        assert.ok(blocking.has(grid[PATH_ROW][0]) && blocking.has(grid[PATH_ROW][COLS - 1]), `${scene} closed on both sides`);
+      }
     }
     assert.ok(Array.isArray(sceneLook(scene).tints));
   }
   const pixel = new Uint8ClampedArray([100, 200, 100, 255]);
   tintPixels(pixel, ['night']);
   assert.ok(pixel[2] > pixel[0], 'night is bluish');
+});
+
+test('a floor is crossed from the bottom edge to the top one, and the beaten rival steps aside onto the way', async () => {
+  const { COLS, floorWays } = await import('../../public/tower-tiles.js');
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) {
+    const { from, upTo, aside } = floorWays(`floor-${i}`);
+    assert.ok(from >= 3 && from <= COLS - 4 && upTo >= 3 && upTo <= COLS - 4, `${from} ${upTo}`);
+    assert.equal(Math.abs(aside - upTo), 1);
+    seen.add(`${from}>${upTo}`);
+  }
+  assert.ok(seen.size >= 20, `${seen.size} ways`);
+  assert.deepEqual(floorWays('same'), floorWays('same'));
 });

@@ -38,12 +38,15 @@ export const T = {
   sign: 0x003,
   forestTrunks: [0x1e4, 0x1e5],
   forestCanopy: [0x1d4, 0x1d5],
+  treeBottom: [0x1dc, 0x1dd],
+  smallTree: [0x00e, 0x016],
   ledge: [0x0d5, 0x087, 0x0d6],
   dirt: patch([0x118, 0x119, 0x11a, 0x120, 0x121, 0x122, 0x128, 0x129, 0x12a]),
   sand: 0x121,
   sea: 0x170,
   shore: patch([0x11b, 0x11c, 0x11d, 0x123, 0x124, 0x125, 0x12b, 0x12c, 0x12d]),
   seaRock: [[0x175, 0x176], [0x17d, 0x17e]],
+  seaBush: 0x193,
   pond: patch([0x0c8, 0x0c9, 0x0ca, 0x0d0, 0x0d1, 0x0d2, 0x0d8, 0x0d9, 0x0da]),
   rock: 0x0e2,
   moundOnSand: [[0x080, 0x081, 0x082], [0x088, 0x089, 0x08a], [0x090, 0x091, 0x092]],
@@ -72,6 +75,8 @@ export const ATLAS_COLS = 16;
 
 /** The columns of the ways that leave a crossroads upwards, by how many there are. */
 const UP_COLS = { 1: [CROSS_COL], 2: [5, 11], 3: [4, CROSS_COL, 12] };
+/** Half the width of a way that leaves the map up or down: three tiles, like the band it meets. */
+const WAY_HALF = 1;
 
 /**
  * Where each way leaves a crossroads, in the order the ways are offered: up the middle first (the
@@ -84,11 +89,27 @@ export function forkExits(count) {
   return [...middle, ...sides, ...ups];
 }
 
-/** The openings of a map's path: columns that go down off its bottom edge and up off its top one. */
+/**
+ * How a floor's map is crossed: you come up into it from below at `from` and go up out of it at
+ * `upTo`, where the rival waits; once beaten it steps aside to `aside`, off the way up.
+ */
+export function floorWays(seed) {
+  const random = seeded(`${seed}:ways`);
+  const low = 3 + Math.floor(random() * 4);
+  const high = 9 + Math.floor(random() * 4);
+  const straight = random() < 0.3;
+  const leftFirst = random() < 0.5;
+  const from = leftFirst ? low : high;
+  const upTo = straight ? from : leftFirst ? high : low;
+  return { from, upTo, aside: upTo + (upTo <= CROSS_COL ? 1 : -1) };
+}
+
+/** The openings of a map's path: columns that go down off its bottom edge and up off its top one, and the sides it leaves by. */
 export function openingsOf({ forks = 0, from = null, upTo = null }) {
-  const up = forks ? forkExits(forks).filter((exit) => exit.side === 'up').map((exit) => exit.col) : upTo != null ? [upTo] : [];
+  const exits = forks ? forkExits(forks) : [];
+  const up = forks ? exits.filter((exit) => exit.side === 'up').map((exit) => exit.col) : upTo != null ? [upTo] : [];
   const down = forks ? [CROSS_COL] : from != null ? [from] : [];
-  return { up, down };
+  return { up, down, left: exits.some((exit) => exit.side === 'left'), right: exits.some((exit) => exit.side === 'right') };
 }
 
 /** What a battle background looks like on the map: its layout and the colours it is repainted with. */
@@ -113,124 +134,189 @@ function seeded(text) {
   };
 }
 
-/** What you walk on in each kind of scene, where a way is cut through it. */
-const FLOOR = { path: T.dirt.c, cave: T.caveFloor[0], beach: T.sand, ocean: T.sand, desert: T.sand, mountain: T.sand };
+/**
+ * The cells you can walk on: a band three tiles tall along the path, from the first way to the last
+ * (or to the edge where a way leaves by a side), and a strip three tiles wide from the band to each
+ * opening above and below.
+ */
+function wayCells({ up, down, left, right }) {
+  const cells = new Set();
+  const add = (row, col) => { if (row >= 0 && row < ROWS && col >= 0 && col < COLS) cells.add(row * COLS + col); };
+  const cols = [...up, ...down];
+  const first = left ? 0 : Math.min(...cols) - WAY_HALF;
+  const last = right ? COLS - 1 : Math.max(...cols) + WAY_HALF;
+  for (let row = PATH_ROW - 1; row <= PATH_ROW + 1; row++) for (let col = first; col <= last; col++) add(row, col);
+  for (const col of up) for (let row = 0; row < PATH_ROW; row++) for (let c = col - WAY_HALF; c <= col + WAY_HALF; c++) add(row, c);
+  for (const col of down) for (let row = PATH_ROW + 1; row < ROWS; row++) for (let c = col - WAY_HALF; c <= col + WAY_HALF; c++) add(row, c);
+  return cells;
+}
 
 /**
- * The map of a floor as rows of keys. The path crosses it from side to side; `forks` ways also leave
- * it upwards and you come up into it from below (a crossroads), `from` is a column where you came up
- * from below and `upTo` one where you go up. The path, its openings and where the trainers stand are
- * always walkable.
+ * The map of a floor as rows of keys. The way runs from where you come in to where you leave: up
+ * from below at `from` and out the top at `upTo` on a floor, or at a crossroads from below to `forks`
+ * ways (up, left and right). A side with no way out is closed with trees, rocks or water, and the way
+ * has the edges of the ground it is laid on.
  */
-export function mapLayout({ scene, seed, forks = 0, foeCol = 12, from = null, upTo = null }) {
+export function mapLayout({ scene, seed, forks = 0, from = null, upTo = null }) {
   const { family } = sceneLook(scene);
-  const grid = drawScene(family, scene, seed, foeCol, openingsOf({ forks, from, upTo }));
-  if (family === 'lab') return grid;
-  const { up, down } = openingsOf({ forks, from, upTo });
-  const floor = FLOOR[family] ?? T.grass;
-  for (const col of up) for (let row = 0; row < PATH_ROW; row++) grid[row][col] = floor;
-  for (const col of down) for (let row = PATH_ROW + 1; row < ROWS; row++) grid[row][col] = floor;
+  const openings = openingsOf({ forks, from, upTo });
+  if (family === 'lab') return drawLab();
+  return drawScene(family, scene, seed, openings);
+}
+
+function drawLab() {
+  const grid = Array.from({ length: ROWS }, () => Array(COLS).fill(T.labFloor));
+  T.labWall.forEach((row, r) => row.forEach((key, col) => { grid[r][col] = key; }));
+  T.labMachine.forEach((row, r) => row.forEach((key, c) => { grid[4 + r][13 + c] = key; }));
+  T.labShelf.forEach((row, r) => row.forEach((key, c) => { grid[4 + r][c] = key; }));
+  grid[5][6] = T.labPlant[0];
+  grid[6][6] = T.labPlant[1];
+  grid[6][8] = T.labMat[0];
+  grid[6][9] = T.labMat[1];
   return grid;
 }
 
-function drawScene(family, scene, seed, foeCol, { up, down }) {
+/** The key of a patch for a cell of a region, by which of its four neighbours are in it. */
+function patchKey(piece, inside, row, col) {
+  const v = !inside(row - 1, col) ? 't' : !inside(row + 1, col) ? 'b' : '';
+  const h = !inside(row, col - 1) ? 'l' : !inside(row, col + 1) ? 'r' : '';
+  return piece[`${v}${h}`] ?? piece[v || h] ?? piece.c;
+}
+
+function drawScene(family, scene, seed, openings) {
+  const { up, down, left, right } = openings;
   const random = seeded(`${scene}:${seed}`);
   const grid = Array.from({ length: ROWS }, () => Array(COLS).fill(T.grass));
-  const set = (row, col, key) => { if (row >= 0 && row < ROWS && col >= 0 && col < COLS) grid[row][col] = key; };
-  const walk = (row, col) => row === PATH_ROW || (up.includes(col) && row < PATH_ROW) || (down.includes(col) && row > PATH_ROW);
-  const locked = new Set();
-  const open = (row, col) => !locked.has(row * COLS + col) && !walk(row, col) && !(col >= foeCol - 1 && col <= foeCol + 1 && row >= PATH_ROW - 1 && row <= PATH_ROW);
-  const fill = (key, rows = [0, ROWS - 1]) => { for (let row = rows[0]; row <= rows[1]; row++) for (let col = 0; col < COLS; col++) set(row, col, key); };
-  const patchRect = (piece, top, left, bottom, right) => {
-    for (let row = top; row <= bottom; row++)
-      for (let col = left; col <= right; col++) {
-        locked.add(row * COLS + col);
-        const v = row === top ? 't' : row === bottom ? 'b' : '';
-        const h = col === left ? 'l' : col === right ? 'r' : '';
-        set(row, col, piece[`${v}${h}`] ?? piece[v || h] ?? piece.c);
-      }
-  };
-  /** Patches of a key, a few tiles wide, like tall grass is laid in the games. */
+  const inMap = (row, col) => row >= 0 && row < ROWS && col >= 0 && col < COLS;
+  const set = (row, col, key) => { if (inMap(row, col)) grid[row][col] = key; };
+  const way = wayCells(openings);
+  const onWay = (row, col) => way.has(Math.max(0, Math.min(ROWS - 1, row)) * COLS + Math.max(0, Math.min(COLS - 1, col)));
+  const taken = new Set(way);
+  const free = (row, col) => inMap(row, col) && !taken.has(row * COLS + col);
+  const take = (row, col, key) => { if (!free(row, col)) return false; set(row, col, key); taken.add(row * COLS + col); return true; };
+  const paintWay = (piece) => { for (const cell of way) set(Math.floor(cell / COLS), cell % COLS, patchKey(piece, onWay, Math.floor(cell / COLS), cell % COLS)); };
+  const sprinkle = (key, chance, rows) => { for (const row of rows) for (let col = 0; col < COLS; col++) if (free(row, col) && random() < chance) take(row, col, key); };
   const clusters = (key, count, rows) => {
     for (let n = 0; n < count; n++) {
       const row = rows[Math.floor(random() * rows.length)];
       const col = Math.floor(random() * COLS);
       const width = 2 + Math.floor(random() * 4);
       const height = 1 + Math.floor(random() * 2);
-      for (let r = row; r < row + height; r++) for (let c = col; c < col + width; c++) if (rows.includes(r) && open(r, c)) set(r, c, key);
+      for (let r = row; r < row + height; r++) for (let c = col; c < col + width; c++) if (rows.includes(r)) take(r, c, key);
     }
   };
-  const sprinkle = (key, chance, rows) => {
-    for (const row of rows) for (let col = 0; col < COLS; col++) if (open(row, col) && random() < chance) set(row, col, key);
+  /** Whole objects of `width` tiles along a row, restarted after each gap so none is cut in half; a lone tile left over gets `single`. */
+  const rowOfWhole = (row, width, pieceAt, single) => {
+    for (let col = 0; col < COLS; ) {
+      if (!free(row, col)) { col++; continue; }
+      let span = 0;
+      while (free(row, col + span)) span++;
+      const whole = span - (span % width);
+      for (let at = 0; at < span; at++) set(row, col + at, at < whole ? pieceAt(at % width) : single);
+      for (let at = 0; at < span; at++) taken.add(row * COLS + col + at);
+      col += span;
+    }
   };
+  const sideCols = [...(left ? [] : [0, 1]), ...(right ? [] : [COLS - 2, COLS - 1])];
 
   if (family === 'cave') {
-    fill(T.caveFloor[0]);
+    grid.forEach((row) => row.fill(T.caveFloor[0]));
+    for (const col of up) { set(0, col, T.caveHole[0]); set(1, col, T.caveHole[1]); }
+    for (const cell of [...way]) if (Math.floor(cell / COLS) < 2 && !up.includes(cell % COLS)) { way.delete(cell); taken.delete(cell); }
+    for (const col of up) for (const row of [0, 1]) taken.add(row * COLS + col);
     for (let col = 0; col < COLS; col++) {
-      set(0, col, T.caveWall[1][col % 4]);
-      set(1, col, T.caveEdge);
-      set(ROWS - 1, col, T.caveBottom[col % 4]);
+      take(0, col, T.caveWall[1][col % 4]);
+      take(1, col, T.caveEdge);
+      take(ROWS - 1, col, T.caveBottom[col % 4]);
     }
+    for (const col of sideCols) for (let row = 2; row < ROWS - 1; row++) take(row, col, T.caveBoulder[(row + col) % 2]);
     sprinkle(T.caveFloor[1], 0.25, [2, 3, 4, 5]);
-    sprinkle(T.caveBoulder[0], 0.12, [2, 4, 5]);
-    sprinkle(T.caveBoulder[1], 0.08, [2, 4, 5]);
-    if (!up.includes(14)) { set(1, 14, T.caveHole[0]); set(2, 14, T.caveHole[1]); }
-    return grid;
-  }
-  if (family === 'lab') {
-    fill(T.labFloor);
-    T.labWall.forEach((row, r) => row.forEach((key, col) => set(r, col, key)));
-    T.labMachine.forEach((row, r) => row.forEach((key, c) => set(4 + r, 13 + c, key)));
-    T.labShelf.forEach((row, r) => row.forEach((key, c) => set(4 + r, c, key)));
-    set(5, 6, T.labPlant[0]); set(6, 6, T.labPlant[1]);
-    set(6, 8, T.labMat[0]); set(6, 9, T.labMat[1]);
+    sprinkle(T.caveBoulder[0], 0.1, [2, 4, 5]);
+    sprinkle(T.caveBoulder[1], 0.06, [2, 4, 5]);
     return grid;
   }
   if (family === 'beach' || family === 'ocean') {
-    const top = family === 'ocean' ? 1 : 2;
-    const bottom = family === 'ocean' ? ROWS - 2 : ROWS;
-    fill(T.sea);
-    patchRect(T.shore, top, -1, bottom, COLS);
-    for (let col = 0; col < COLS - 1; col += 3 + Math.floor(random() * 4)) {
-      const row = family === 'ocean' && random() < 0.5 ? ROWS - 1 : 0;
-      if (row === 0 && top < 2) continue;
-      if (row + 1 >= ROWS) { set(row, col, T.sea); continue; }
-      T.seaRock.forEach((pair, r) => pair.forEach((key, c) => set(row + r, col + c, key)));
+    const [top, bottom] = family === 'ocean' ? [PATH_ROW - 1, PATH_ROW + 1] : [PATH_ROW - 1, PATH_ROW];
+    grid.forEach((cells, row) => cells.fill(family === 'beach' && row > bottom ? T.grass : T.sea));
+    const sand = new Set();
+    for (let row = top; row <= bottom; row++) for (let col = 0; col < COLS; col++) sand.add(row * COLS + col);
+    const onDownWay = (col) => down.some((way) => Math.abs(way - col) <= WAY_HALF);
+    for (const cell of way) if (family === 'ocean' || Math.floor(cell / COLS) <= bottom || onDownWay(cell % COLS)) sand.add(cell);
+    const kind = (row, col) => {
+      if (!inMap(row, col)) return 'edge';
+      if (sand.has(row * COLS + col)) return 'sand';
+      return grid[row][col] === T.sea ? 'sea' : 'land';
+    };
+    const isSand = (row, col) => {
+      const at = kind(row, col);
+      return at === 'sand' || (at === 'edge' && kind(Math.max(0, Math.min(ROWS - 1, row)), Math.max(0, Math.min(COLS - 1, col))) === 'sand');
+    };
+    for (const cell of sand) {
+      const row = Math.floor(cell / COLS);
+      const col = cell % COLS;
+      const sides = [[row - 1, col, 't'], [row + 1, col, 'b'], [row, col - 1, 'l'], [row, col + 1, 'r']].filter(([r, c]) => !isSand(r, c));
+      const wet = sides.some(([r, c]) => kind(r, c) === 'sea');
+      const piece = wet ? T.shore : T.dirt;
+      set(row, col, patchKey(piece, isSand, row, col));
     }
-    sprinkle(T.rock, 0.08, family === 'ocean' ? [2, 4] : [4, 5, 6]);
+    const seaRows = family === 'ocean' ? [[0, 1], [ROWS - 2, ROWS - 1]] : [[0, 1]];
+    for (const [first, second] of seaRows)
+      for (let col = Math.floor(random() * 3); col < COLS - 1; col += 3 + Math.floor(random() * 3)) {
+        if (![first, second].every((row) => free(row, col) && free(row, col + 1))) continue;
+        if (random() < 0.7) T.seaRock.forEach((pair, r) => pair.forEach((key, c) => take(first + r, col + c, key)));
+        else take(random() < 0.5 ? first : second, col, T.seaBush);
+      }
+    sprinkle(T.seaBush, 0.05, family === 'ocean' ? [0, 1, ROWS - 2, ROWS - 1] : [0, 1]);
+    sprinkle(T.rock, 0.12, [top, bottom]);
+    if (family === 'beach') {
+      for (const col of sideCols) {
+        const half = col === 0 || col === COLS - 2 ? 0 : 1;
+        for (let row = bottom + 1; row < ROWS; row++) take(row, col, (row - bottom) % 2 ? T.forestCanopy[half] : T.treeBottom[half]);
+      }
+      rowOfWhole(ROWS - 1, 2, (at) => T.forestCanopy[at], T.smallTree[0]);
+      clusters(T.tall, 2, [bottom + 1, bottom + 2]);
+      sprinkle(T.flowers, 0.15, [bottom + 1, bottom + 2]);
+      const signCol = down[0] + WAY_HALF + 1;
+      if (free(bottom + 1, signCol)) take(bottom + 1, signCol, T.sign);
+    }
+    for (const col of [left ? null : 0, right ? null : COLS - 1]) if (col !== null) for (let row = top; row <= bottom; row++) take(row, col, T.rock);
     return grid;
   }
   if (family === 'desert' || family === 'mountain') {
-    fill(T.sand);
-    for (let col = 0; col < COLS; col++) {
-      set(0, col, T.moundOnSand[1][col % 3]);
-      set(1, col, T.moundOnSand[2][col % 3]);
-      set(ROWS - 1, col, T.moundOnSand[0][col % 3]);
-    }
-    sprinkle(T.rock, 0.12, [2, 4, 5]);
+    grid.forEach((row) => row.fill(T.sand));
+    for (const col of sideCols) for (let row = 2; row < ROWS - 1; row++) take(row, col, T.rock);
+    rowOfWhole(0, 3, (at) => T.moundOnSand[1][at], T.rock);
+    rowOfWhole(1, 3, (at) => T.moundOnSand[2][at], T.sand);
+    rowOfWhole(ROWS - 1, 3, (at) => T.moundOnSand[0][at], T.rock);
+    sprinkle(T.rock, 0.1, [2, 4, 5]);
     return grid;
   }
 
-  // Grass: a tree border above and below, like the routes of the games.
-  for (let col = 0; col < COLS; col++) {
-    set(0, col, T.forestTrunks[col % 2]);
-    set(ROWS - 1, col, T.forestCanopy[col % 2]);
-  }
+  if (family === 'path') paintWay(T.dirt);
   if (family === 'lake') {
-    for (let col = 0; col < COLS; col++) {
-      set(ROWS - 2, col, T.pond.t);
-      set(ROWS - 1, col, T.pond.c);
+    const span = [...down].flatMap((col) => [col - WAY_HALF - 1, col + WAY_HALF + 1]);
+    const toRight = down[0] <= CROSS_COL;
+    const [start, end] = toRight ? [span[1] + 1, right ? COLS - 1 : COLS - 3] : [left ? 0 : 2, span[0] - 1];
+    if (end - start >= 2) {
+      for (let col = start; col <= end; col++) {
+        take(ROWS - 2, col, col === start ? T.pond.tl : col === end ? T.pond.tr : T.pond.t);
+        take(ROWS - 1, col, col === start ? T.pond.l : col === end ? T.pond.r : T.pond.c);
+      }
     }
   }
-  if (family === 'path') patchRect(T.dirt, PATH_ROW - 1, -1, PATH_ROW + 1, COLS);
-  if (family === 'tallGrass') {
-    clusters(T.tall, 9, [1, 2, 4, 5]);
-    sprinkle(T.tall, 0.3, [PATH_ROW]);
-  } else {
-    clusters(T.tall, family === 'snow' ? 2 : 3, family === 'lake' ? [1] : [1, 4, 5]);
-    sprinkle(T.flowers, 0.12, family === 'lake' ? [1, 2] : [1, 2, 4, 5]);
+  for (const col of sideCols) {
+    const half = col === 0 || col === COLS - 2 ? 0 : 1;
+    for (let row = 1; row < ROWS; row++) take(row, col, row % 2 ? T.forestCanopy[half] : T.treeBottom[half]);
   }
-  if (!up.length && open(1, 1) && family !== 'tallGrass') set(1, 1, T.sign);
+  rowOfWhole(0, 2, (at) => T.forestTrunks[at], T.smallTree[1]);
+  rowOfWhole(ROWS - 1, 2, (at) => T.forestCanopy[at], T.smallTree[0]);
+  if (family === 'tallGrass') clusters(T.tall, 9, [1, 2, 4, 5]);
+  else {
+    clusters(T.tall, family === 'snow' ? 2 : 3, family === 'lake' ? [1] : [1, 4, 5]);
+    sprinkle(T.flowers, 0.1, family === 'lake' ? [1, 2] : [1, 2, 4, 5]);
+  }
+  const signCol = down[0] + WAY_HALF + 1;
+  if (family !== 'tallGrass' && free(ROWS - 2, signCol)) take(ROWS - 2, signCol, T.sign);
   return grid;
 }
 
