@@ -6,11 +6,15 @@
 //
 // A step is made like this: the body drops a pixel; the official walkers whose standing legs look most
 // like these vote, pixel by pixel, on how the legs and hands change; each changed pixel takes its colour
-// from this sprite's own standing frame, at the place the walker's pixel moved from.
+// from this sprite's own standing frame, at the place the walker's pixel moved from; a walker's outline
+// becomes this sprite's darkest colour around that place (black for most, dark blue jeans or a dark red
+// cap for Red, who has no black outline), and above the feet nothing is erased, so the hands never thin out.
 
 const FRAME = 32;
 /** Rows above the feet that a step changes: legs and hands. */
 const STEP_ROWS = 10;
+/** Rows above the feet where a step may also take pixels away (the feet lifting); above them, hands only move, never vanish. */
+const LEG_ROWS = 5;
 /** Rows above the feet compared to find walkers with legs like these. */
 const MATCH_ROWS = 12;
 /** Walkers that vote on each pixel. */
@@ -51,6 +55,22 @@ function boundsOf(frame) {
   return { top, bottom, middle: Math.round((left + right) / 2), height: bottom - top + 1 };
 }
 
+/**
+ * The colour a sprite outlines itself with: the commonest one on the edge of its silhouette. Black for
+ * most, dark red or dark blue for some (Red); a walker's outline becomes this sprite's own, never another colour.
+ */
+export function outlineOf(frame) {
+  const tally = new Map();
+  for (let y = 0; y < FRAME; y++)
+    for (let x = 0; x < FRAME; x++) {
+      const colour = colourAt(frame, x, y);
+      if (colour < 0) continue;
+      const onEdge = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]].some(([nx, ny]) => colourAt(frame, nx, ny) < 0);
+      if (onEdge) tally.set(colour, (tally.get(colour) ?? 0) + 1);
+    }
+  return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? -1;
+}
+
 /** The frame one pixel lower: the body of every step. */
 export function dropped(frame) {
   const out = Buffer.alloc(FRAME * FRAME * 4);
@@ -89,7 +109,7 @@ export function walkersOf(sheets) {
   return [0, 1, LEFT].map((group) =>
     sheets.map((sheet) => {
       const idle = frameOf(sheet, group * 4);
-      return { idle, bounds: boundsOf(idle), dropped: dropped(idle), steps: [frameOf(sheet, group * 4 + 1), frameOf(sheet, group * 4 + 2)] };
+      return { idle, bounds: boundsOf(idle), outline: outlineOf(idle), dropped: dropped(idle), steps: [frameOf(sheet, group * 4 + 1), frameOf(sheet, group * 4 + 2)] };
     }),
   );
 }
@@ -97,6 +117,7 @@ export function walkersOf(sheets) {
 /** The two steps of a standing frame facing one way (0 up, 1 down, 2 left), from the walkers of that direction. */
 export function stepsOf(idle, walkers) {
   const bounds = boundsOf(idle);
+  const outline = outlineOf(idle);
   const body = dropped(idle);
   const voters = walkers
     .filter((walker) => Math.abs(walker.bounds.height - bounds.height) <= HEIGHT_GAP && !walker.idle.equals(idle))
@@ -112,7 +133,16 @@ export function stepsOf(idle, walkers) {
           if (Math.max(Math.abs(ox), Math.abs(oy)) === reach && colourAt(walker.dropped, x + ox, y + oy) === colour) return [ox, oy];
     return null;
   };
-  const own = [...new Set(Array.from({ length: FRAME * FRAME }, (_, i) => colourAt(idle, i % FRAME, Math.floor(i / FRAME))).filter((colour) => colour >= 0))];
+  const own = [...new Set(Array.from({ length: FRAME * FRAME }, (_, i) => colourAt(idle, i % FRAME, Math.floor(i / FRAME))).filter((colour) => colour >= 0 && colour !== outline))];
+  const darkestNear = (x, y) => {
+    let best = -1;
+    for (let oy = -MOVE_REACH; oy <= MOVE_REACH; oy++)
+      for (let ox = -MOVE_REACH; ox <= MOVE_REACH; ox++) {
+        const colour = colourAt(body, x + ox, y + oy);
+        if (colour >= 0 && (best < 0 || luma(colour) < luma(best))) best = colour;
+      }
+    return best >= 0 && luma(best) <= luma(outline) + LUMA_SPAN / 2 ? best : outline;
+  };
   const closest = (colour) => own.reduce((best, mine) => (Math.abs(luma(mine) - luma(colour)) < Math.abs(luma(best) - luma(colour)) ? mine : best), own[0]);
   return [0, 1].map((step) => {
     const out = Buffer.from(body);
@@ -126,13 +156,14 @@ export function stepsOf(idle, walkers) {
           const after = colourAt(walker.steps[step], sx, sy);
           let vote = here;
           if (before !== after) {
-            const from = after < 0 ? null : movedFrom(walker, sx, sy, after);
+            const from = after < 0 || after === walker.outline ? null : movedFrom(walker, sx, sy, after);
             const mine = from ? colourAt(body, x + from[0], y + from[1]) : -1;
-            vote = after < 0 ? -1 : mine >= 0 ? mine : closest(after);
+            vote = after < 0 ? -1 : after === walker.outline ? darkestNear(x, y) : mine >= 0 && mine !== outline ? mine : closest(after);
           }
           votes.set(vote, (votes.get(vote) ?? 0) + 1);
         }
-        const [winner] = [...votes].sort((a, b) => b[1] - a[1] || (a[0] === here ? -1 : b[0] === here ? 1 : 0))[0];
+        let [winner] = [...votes].sort((a, b) => b[1] - a[1] || (a[0] === here ? -1 : b[0] === here ? 1 : 0))[0];
+        if (winner < 0 && here >= 0 && y <= bounds.bottom - LEG_ROWS) winner = here;
         if (winner !== here) paint(out, x, y, winner);
       }
     return out;
