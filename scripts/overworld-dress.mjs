@@ -22,6 +22,12 @@ const HEAD_SHARE = 0.5;
 const NEUTRAL = 0.035;
 /** A part already this close to the battle sprite's is left as it is. */
 const CLOSE = { hue: 25, light: 0.08, chroma: 0.04 };
+/** Hue gap (degrees) under which two coloured pieces of the overworld are one garment: a cap and a uniform of one violet. */
+const SAME_GARMENT = 12;
+/** How far from the body's axis (as a share of the sprite's width) a battle piece sits on average to be something held, like a lantern. */
+const HELD_REACH = 0.4;
+/** What a piece left without a pair costs, as a gap: more than any pair, so a piece is left undressed only when no battle piece sits at its height. */
+const UNPAIRED = 1;
 const LIGHT_RANGE = [0.14, 0.97];
 const MAX_CHROMA = 0.3;
 
@@ -77,20 +83,68 @@ function piecesOf(analysis) {
 }
 
 /**
+ * The overworld's pieces with the ones of the same hue merged: at 32×32 one garment (a uniform and its
+ * cap) can fall into two families of colour, while the battle sprite paints it as one.
+ */
+function garmentsOf(pieces) {
+  const garments = [];
+  for (const piece of pieces) {
+    const hue = lookOf(piece.colors).hue;
+    const same = hue === null ? null : garments.find((garment) => garment.hue !== null && hueGap(garment.hue, hue) <= SAME_GARMENT);
+    if (!same) {
+      garments.push({ ...piece, hue });
+      continue;
+    }
+    const share = same.share + piece.share;
+    same.height = (same.height * same.share + piece.height * piece.share) / share;
+    same.share = share;
+    same.colors = [...same.colors, ...piece.colors];
+  }
+  return garments;
+}
+
+/** A battle piece held away from the body (a lantern, a bag in the hand) dresses nothing. */
+const isHeld = (piece) => piece.colors.reduce((sum, color) => sum + (color.entry.offAxis ?? 0), 0) / piece.colors.reduce((sum, color) => sum + color.count, 0) > HELD_REACH;
+
+/** How far apart two pieces are: their height on the figure and, half as much, their share of it. */
+const gapOf = (piece, other) => Math.abs(other.height - piece.height) + Math.abs(other.share - piece.share) / 2;
+
+/**
+ * The pairing of the pieces with the battle pieces at the same height of the figure that pairs them
+ * best overall, each battle piece once; and how badly: each gap weighed by the piece's share, and a
+ * piece left without a pair as the worst gap. Searched whole, as a figure has only a handful of
+ * pieces: taking the biggest first lets a suit take the hair's colour and leave the hair without one.
+ */
+function pairPieces(pieces, battle) {
+  let best = { pairs: [], cost: Infinity };
+  const search = (index, pairs, cost) => {
+    if (cost >= best.cost) return;
+    if (index === pieces.length) {
+      best = { pairs, cost };
+      return;
+    }
+    const piece = pieces[index];
+    for (const other of battle)
+      if (!pairs.some((pair) => pair.to === other.colors) && Math.abs(other.height - piece.height) <= MAX_HEIGHT_GAP)
+        search(index + 1, [...pairs, { from: piece.colors, to: other.colors }], cost + piece.share * gapOf(piece, other));
+    search(index + 1, pairs, cost + piece.share * UNPAIRED);
+  };
+  search(0, [], 0);
+  return best;
+}
+
+/**
  * Each piece of the overworld (hair, clothes) paired with the piece of the battle sprite at the same
- * height of the figure, the biggest first, each piece once.
+ * height of the figure. The pieces of one hue are tried as one garment too, and the closer pairing wins:
+ * a violet cap and uniform are one garment when the battle sprite paints them as one, while red hair
+ * over a red suit stays two pieces when the battle sprite gives them different colours.
  */
 export function pairsOf(battleAnalysis, overworldAnalysis) {
-  const battle = piecesOf(battleAnalysis);
-  const pairs = [];
-  for (const piece of piecesOf(overworldAnalysis).sort((a, b) => b.share - a.share)) {
-    const best = battle
-      .filter((other) => !pairs.some((pair) => pair.to === other.colors))
-      .map((other) => ({ other, gap: Math.abs(other.height - piece.height) + Math.abs(other.share - piece.share) / 2 }))
-      .sort((a, b) => a.gap - b.gap)[0];
-    if (best && Math.abs(best.other.height - piece.height) <= MAX_HEIGHT_GAP) pairs.push({ from: piece.colors, to: best.other.colors });
-  }
-  return pairs;
+  const battle = piecesOf(battleAnalysis).filter((piece) => !isHeld(piece));
+  const pieces = piecesOf(overworldAnalysis);
+  const apart = pairPieces(pieces, battle);
+  const merged = pairPieces(garmentsOf(pieces), battle);
+  return (merged.cost < apart.cost ? merged : apart).pairs;
 }
 
 const isClose = (a, b) =>
