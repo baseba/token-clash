@@ -387,7 +387,7 @@ export function tintFamily(family, hue, minChroma = 0) {
     });
 }
 
-function paintPlans(plans, analysis, notes) {
+export function paintPlans(plans, analysis, notes = []) {
   const { skinHue, kept } = analysis;
   const placed = plans.map((plan) => {
     if (tintable(plan.family) || plan.gray !== undefined) return plan;
@@ -444,7 +444,7 @@ export function pokemonVariant(analysis, pokemonColors) {
   return { map: paintPlans(plans, analysis, notes), notes: [...new Set(notes)] };
 }
 
-const tintable = (family) => family.neutral || family.chroma < MUTED_CHROMA;
+export const tintable = (family) => family.neutral || family.chroma < MUTED_CHROMA;
 
 function visibility(family) {
   const color = tintable(family) ? (family.light >= WHITE_FROM ? WHITE_VISIBILITY : GRAY_VISIBILITY) : family.chroma;

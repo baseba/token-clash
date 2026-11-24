@@ -5,13 +5,15 @@
 // Sources, all in the GBA style so they share scale and walk: Emerald Rogue (every region's leaders,
 // rivals and teams), Emerald and FireRed. A sheet without walking frames gets steps made from its
 // standing frame. A colour variant
-// repaints its base the way the battle sprite was repainted (same ramps and rules). A trainer with no
+// repaints its base with the same functions as the battle recolour (scripts/overworld-recolor.mjs). A trainer with no
 // official overworld gets one composed from officials of its gender and painted with its own colours
-// (scripts/overworld-compose.mjs), or, if that fails, the official one that looks most like it.
+// (scripts/overworld-compose.mjs), or, if that fails, the official one that looks most like it. One
+// whose colours are far from its battle sprite's (a class drawn with another class's sprite) is
+// dressed in its trainer's colours (scripts/overworld-dress.mjs).
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { DOWNLOADED_SPRITES, TRAINER_VARIANTS } from '../public/trainer-sprites.js';
 import { UPSTREAM } from '../public/upstream.js';
-import { decodePng, encodePng, recolorTrainer } from './sync-trainers.js';
+import { decodePng, encodePng, recolorByMap, recolorTrainer } from './sync-trainers.js';
 import { fetchUpstream, mapLimit } from './upstream-files.js';
 
 const OUT = new URL('../public/overworlds/', import.meta.url);
@@ -158,11 +160,16 @@ const likeness = (a, b) => [...a].reduce((sum, [bucket, share]) => sum + Math.mi
 
 /** The height of a grown-up standing on the map in GBA sprites: the pieces of a composed sprite come from these. */
 const ADULT_HEIGHTS = [19, 22];
+/** A map sprite whose colours look less like its battle sprite than this is dressed in its trainer's clothes (scripts/overworld-dress.mjs). */
+const DRESS_BELOW = 0.35;
 /** How tall the figure standing in front is: children and swimmers are shorter than the rest. */
 function figureHeight(image) {
   const rows = [...Array(FRAME).keys()].filter((y) => [...Array(FRAME).keys()].some((x) => image.rgba[((4 * FRAME + y) * FRAME + x) * 4 + 3]));
   return rows.length ? rows.at(-1) - rows[0] + 1 : 0;
 }
+
+/** Whether the trainer walks as its own official sprite (not another class's): that one keeps its colours, as a composed one keeps the ones it was painted with. */
+const drawnFor = (key) => SOURCES[key]?.toLowerCase().includes(key.replace(/_[mf]$/, '').replace(/_\d+$/, '')) ?? false;
 
 const isFemale = (key) => key.endsWith('_f') || FEMALE.includes(key);
 
@@ -178,7 +185,7 @@ function closestOfficial(key, official) {
 async function main() {
   mkdirSync(OUT, { recursive: true });
   const official = new Map();
-  const counts = { official: 0, composed: 0, closest: 0, variants: 0, unchanged: 0, failed: 0 };
+  const counts = { official: 0, composed: 0, closest: 0, dressed: 0, variants: 0, unchanged: 0, failed: 0 };
   await mapLimit(Object.entries(SOURCES), async ([key, source]) => {
     try {
       official.set(key, { image: await fetchSheet(source) });
@@ -206,7 +213,19 @@ async function main() {
       counts.closest += 1;
     }
   }
-  const { overworldVariant, applyMap, extendFrontMap, frontFrame, withoutSkin } = await import('./overworld-recolor.mjs');
+  const { overworldVariant, extendFrontMap, frontFrame, sharedSkinTones } = await import('./overworld-recolor.mjs');
+  const { dressMap } = await import('./overworld-dress.mjs');
+  const skinTones = sharedSkinTones([...official.values()].map((sheet) => sheet.image));
+  for (const [key, sheet] of sheets) {
+    const battlePath = new URL(`${key}.png`, TRAINERS);
+    if (!SOURCES[key] || drawnFor(key) || !existsSync(battlePath)) continue;
+    const battle = decodePng(readFileSync(battlePath));
+    if (likeness(colourPrint(battle), colourPrint(sheet.image, { top: 4 * FRAME, height: FRAME })) >= DRESS_BELOW) continue;
+    const map = dressMap(battle, frontFrame(sheet.image), skinTones);
+    if (!map.length) continue;
+    sheets.set(key, { image: recolorByMap(sheet.image, extendFrontMap(sheet.image, map), null) });
+    counts.dressed += 1;
+  }
   for (const variant of TRAINER_VARIANTS) {
     const base = sheets.get(variant.base);
     if (!base) continue;
@@ -216,8 +235,12 @@ async function main() {
       const variantBattle = new URL(`${variant.key}.png`, TRAINERS);
       const map = variant.map ?? (existsSync(baseBattle) && existsSync(variantBattle) ? battleRepaint(decodePng(readFileSync(baseBattle)), decodePng(readFileSync(variantBattle))) : null);
       if (map?.length && existsSync(baseBattle)) {
-        const result = overworldVariant(decodePng(readFileSync(baseBattle)), frontFrame(base.image), map);
-        if (!result.problems.length && result.map.length) image = applyMap(base.image, withoutSkin(extendFrontMap(base.image, result.map)));
+        const result = overworldVariant(decodePng(readFileSync(baseBattle)), frontFrame(base.image), map, skinTones);
+        if (!result.problems.length && result.map.length) {
+          const whole = result.map.filter((entry) => entry.length === 2);
+          const extended = extendFrontMap(base.image, whole).filter(([from], i) => i < whole.length || !result.skin.includes(from.toLowerCase()));
+          image = recolorByMap(base.image, [...extended, ...result.map.filter((entry) => entry.length === 3)], null);
+        }
       }
       if (image === base.image && variant.swaps) image = recolorTrainer(base.image, variant.swaps);
     } catch (err) {
@@ -229,7 +252,7 @@ async function main() {
   }
   for (const [key, sheet] of sheets) writeFileSync(new URL(`${key}.png`, OUT), encodePng(sheet.image));
   for (const file of readdirSync(OUT)) if (file.endsWith('.png') && !sheets.has(file.slice(0, -4))) rmSync(new URL(file, OUT));
-  console.log(`Sprites de mapa listos en public/overworlds/: ${counts.official} oficiales, ${counts.composed} armados con piezas oficiales, ${counts.closest} con el oficial más parecido, ${counts.variants} variantes de color (${counts.unchanged} sin repintar), ${counts.failed} con error.`);
+  console.log(`Sprites de mapa listos en public/overworlds/: ${counts.official} oficiales, ${counts.composed} armados con piezas oficiales, ${counts.closest} con el oficial más parecido, ${counts.dressed} vestidos con los colores de su entrenador, ${counts.variants} variantes de color (${counts.unchanged} sin repintar), ${counts.failed} con error.`);
   if (counts.failed) process.exitCode = 1;
 }
 
