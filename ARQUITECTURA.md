@@ -210,7 +210,11 @@ la sala, o el del torneo, que comparten todas sus salas), si habla como jugador 
 `chat` solo guarda los mensajes de cada canal y no sabe qué es una sala.
 
 El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection`
-(`arena/application/connection.ts`) y el gateway envuelve cada socket en uno.
+(`arena/application/connection.ts`) y el gateway envuelve cada socket en uno. Cada página abre su socket y entra a
+un solo lugar (el lobby, una sala o un torneo). El puerto deja leer quién es y dónde está la conexión, y la arena lo
+cambia solo con métodos (`signIn`, `enterRoom`, `follow`). Lo que lee un solo servicio vive en ese servicio: el
+último turno que vio cada espectador, en `LiveBattleService`, y cuándo habló cada uno por última vez, en
+`ArenaChatService`.
 
 ## 6. Persistencia
 

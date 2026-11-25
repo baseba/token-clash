@@ -70,7 +70,7 @@ export class LobbyService {
   }
 
   subscribe(ws: ClientConnection, token: string | undefined): void {
-    ws.trainerId = this.trainers.peekToken(token)?.id ?? null;
+    ws.signIn(this.trainers.peekToken(token));
     this.subscribers.add(ws);
     this.send(ws, true);
   }

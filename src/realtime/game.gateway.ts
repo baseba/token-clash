@@ -8,8 +8,11 @@ import { LiveBattleService } from '../arena/application/live-battle.service.js';
 import { LobbyService } from '../arena/application/lobby.service.js';
 import { TeamPreviewService } from '../arena/application/team-preview.service.js';
 import { TournamentsService } from '../arena/application/tournaments.service.js';
+import type { Challenge } from '../arena/domain/challenge.js';
+import type { Tournament } from '../arena/domain/tournament.js';
 import type { RadioListener } from '../radio/application/radio-listeners.js';
 import { RadioService } from '../radio/application/radio.service.js';
+import type { Trainer } from '../trainers/domain/trainer.js';
 import type { ClientMessageOf } from './client-messages.js';
 import { ConnectionLimits } from './connection-limits.js';
 
@@ -33,6 +36,18 @@ class WsConnection implements ClientConnection, RadioListener {
 
   send(frame: object | string): void {
     this.socket.send(typeof frame === 'string' ? frame : JSON.stringify(frame));
+  }
+
+  signIn(trainer: Trainer | undefined): void {
+    this.trainerId = trainer?.id ?? null;
+  }
+
+  enterRoom(challenge: Challenge): void {
+    this.roomId = challenge.id;
+  }
+
+  follow(tournament: Tournament): void {
+    this.tourId = tournament.id;
   }
 
   get idle(): boolean {

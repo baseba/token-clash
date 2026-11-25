@@ -21,7 +21,7 @@ const tournamentMatch = (id: string, tournamentId: string) =>
     at: 1,
   });
 
-const connection = (trainerId: string): ClientConnection => ({ trainerId, roomId: null, tourId: null, open: true, send: () => {} });
+const connection = (trainerId: string): ClientConnection => ({ trainerId, roomId: null, tourId: null, open: true, send: () => {}, signIn: () => {}, enterRoom: () => {}, follow: () => {} });
 
 function inBattle(room: Room, startedAt: number): BattlePhase {
   const entries = buildAiTeam({ difficulty: 'easy', random: rng(room.challenge.id) }).slice(0, 3);
