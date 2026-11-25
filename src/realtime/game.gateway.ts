@@ -73,7 +73,7 @@ class WsConnection implements ClientConnection, RadioListener {
     return true;
   }
 
-  heartbeat(): void {
+  beat(): void {
     if (this.alive) {
       this.alive = false;
       this.socket.ping();
@@ -99,7 +99,7 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
 
   afterInit(server: WebSocketServer): void {
     this.heartbeat = setInterval(() => {
-      for (const socket of server.clients) this.connections.get(socket)?.heartbeat();
+      for (const socket of server.clients) this.connections.get(socket)?.beat();
     }, 30_000).unref();
     server.on('close', () => clearInterval(this.heartbeat));
   }
