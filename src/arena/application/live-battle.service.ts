@@ -199,8 +199,6 @@ export class LiveBattleService {
     this.challenges.save(challenge);
     this.lobby.notify();
     this.events.matchFinished({ challenge, winnerSide: battle.winner });
-    setTimeout(() => {
-      if (this.presence.rooms.get(challenge.id) === room && room.sockets.size === 0) this.presence.rooms.delete(challenge.id);
-    }, FINISHED_ROOM_MS).unref();
+    setTimeout(() => this.presence.dropIfEmpty(room), FINISHED_ROOM_MS).unref();
   }
 }

@@ -87,7 +87,7 @@ export class DuelService {
   }
 
   close(challenge: Challenge, byTrainerId: string | undefined): void {
-    const room = this.presence.rooms.get(challenge.id);
+    const room = this.presence.findRoom(challenge.id);
     challenge.cancel(byTrainerId, { readyCheck: room?.phase.kind === 'readyCheck' });
     if (room) room.phase = { kind: 'waiting' };
     this.challenges.save(challenge);
@@ -97,11 +97,11 @@ export class DuelService {
 
   expireStale(at: number): void {
     const expired = this.challenges.all().filter((challenge) => {
-      const room = this.presence.rooms.get(challenge.id);
+      const room = this.presence.findRoom(challenge.id);
       return challenge.expire(at, { readyCheck: room?.phase.kind === 'readyCheck' });
     });
     for (const challenge of expired) {
-      const room = this.presence.rooms.get(challenge.id);
+      const room = this.presence.findRoom(challenge.id);
       if (room) {
         clearTimeout(room.timer ?? undefined);
         room.phase = { kind: 'waiting' };
@@ -144,7 +144,7 @@ export class DuelService {
       }, this.timings.seatGraceMs).unref();
     }
     if (phase.kind === 'battle' || phase.kind === 'preview') broadcast(room, { t: 'presence' });
-    if (phase.kind === 'waiting' && room.sockets.size === 0) this.presence.rooms.delete(challenge.id);
+    if (phase.kind === 'waiting') this.presence.dropIfEmpty(room);
   }
 
   setReady(ws: ClientConnection, ready: boolean): void {
