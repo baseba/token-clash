@@ -305,14 +305,32 @@ test('every floor won is scored and the climb adds them up', () => {
   assert.ok(run.points > run.log[0].points);
 });
 
-test('a floor without a battle still trains the party halfway to the next cap', () => {
+test('a floor without a battle gives no experience: levels come from battles and the rewards you take', () => {
   const run = climbing();
   for (let draw = 0; !run.rooms().includes('rest'); draw++) run.rolls = { ...run.rolls, [run.floor]: `draw${draw}` };
-  const before = run.party.map((mon) => mon.level);
+  const before = run.party.map((mon) => [mon.level, mon.exp]);
   run.chooseRoom('rest', { at: 5, roster });
-  const cap = levelCap(2);
-  run.party.forEach((mon, i) => assert.equal(mon.level, Math.min(cap, before[i] + Math.ceil((cap - before[i]) / 2))));
-  assert.ok(run.lastResult?.growth.length);
+  assert.deepEqual(run.party.map((mon) => [mon.level, mon.exp]), before);
+  assert.deepEqual(run.lastResult?.growth, []);
+});
+
+test('after a rest stop, the next two plain floors offer none, whatever their draw', () => {
+  const run = climbing();
+  for (let draw = 0; !run.rooms().includes('rest'); draw++) run.rolls = { ...run.rolls, [run.floor]: `draw${draw}` };
+  run.chooseRoom('rest', { at: 5, roster });
+  assert.equal(run.restedAt, 1);
+  const offersRest = () => Array.from({ length: 40 }, (_, draw) => draw).some((draw) => {
+    run.rolls = { ...run.rolls, [run.floor]: `draw${draw}` };
+    return run.rooms().includes('rest');
+  });
+  for (const floor of [2, 3]) {
+    run.moveOn(6);
+    assert.equal(run.floor, floor);
+    assert.ok(!offersRest(), `no rest stop on floor ${floor}`);
+    win(run);
+  }
+  run.moveOn(7);
+  assert.ok(offersRest(), 'the third plain floor may offer one again');
 });
 
 test('a Pokémon far below the cap catches up faster than one near it', () => {

@@ -6279,6 +6279,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
   let mine = 0;
   let sent = null; // label of the action we sent this turn, until the turn resolves
   let aiming = null;
+  let farewell = null;
   let queue = Promise.resolve();
   let resultShown;
   const shown = new Promise((r) => (resultShown = r));
@@ -6517,7 +6518,9 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
       : { win: `Venciste a ${trainerShort(view.sides[1 - mine].name)}.`, lose: `${trainerShort(view.sides[1 - mine].name)} ganó esta vez.`, draw: 'Nadie quedó en pie.', watch: `${trainerShort(view.sides[0].name)} vs ${trainerShort(view.sides[1].name)}` }[kind];
     const icon = glyph({ win: 'trophy', lose: 'skull', draw: 'draw', watch: champ ? 'trophy' : 'flag' }[kind]);
     const duel = winner === null ? null : h('div', { class: 'result-duel' }, [0, 1].map((side) => h('span', { class: `result-side ${side === winner ? 'won' : 'lost'}` }, side === winner ? [glyph('crown'), ' '] : '', playerPill(view.sides[side], pos(side), isYou(side)))));
-    const el = h('div', { class: `result ${kind}`, onclick: () => el.remove() }, h('div', { class: 'result-card' }, h('span', { class: 'result-icon' }, icon), h('h2', null, title), duel, h('p', null, sub), h('small', null, tour ? 'Siguen las llaves del torneo' : 'Toca para cerrar')));
+    const says = c.staging?.guestSays && (kind === 'win' || kind === 'lose' || kind === 'draw') ? (kind === 'win' ? c.staging.guestSays.lose : c.staging.guestSays.win) : null;
+    const quote = says ? h('div', { class: 'result-say' }, overworldSprite(c.staging.guestAvatar, { facing: 'down', scale: 1, cls: 'tw-say-mini' }), h('p', null, `«${says}»`)) : null;
+    const el = h('div', { class: `result ${kind}`, onclick: () => el.remove() }, h('div', { class: 'result-card' }, h('span', { class: 'result-icon' }, icon), h('h2', null, title), duel, h('p', null, sub), quote, h('small', null, tour ? 'Siguen las llaves del torneo' : 'Toca para cerrar')));
     arena.append(el);
     if (kind === 'win' || kind === 'watch') confetti(el);
     if (kind === 'win' && !dead) music.victory(champ ? 'champion' : 'win');
@@ -6811,6 +6814,7 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
             h('h2', { class: 'pb-title' }, title),
             h('p', { class: 'pb-sub' }, `${trainerShort(st.sides[0].name)} vs ${trainerShort(st.sides[1].name)} · ${st.turn} ${st.turn === 1 ? 'turno' : 'turnos'}`)),
           c.tournament ? h('p', { class: 'muted pulse' }, 'Volviendo a las llaves del torneo…') : null,
+          c.staging?.guestSays && you !== null ? (farewell ??= sayBox(trainerShort(st.sides[1 - you].name), won ? c.staging.guestSays.lose : c.staging.guestSays.win, { mini: c.staging.guestAvatar })) : null,
           h('div', { class: 'pb-actions' },
             rematch,
             c.tournament ? h('a', { class: 'btn primary', href: `/t/${c.tournament.id}`, 'data-link': true }, glyph('trophy'), ' Ver llaves') : null,

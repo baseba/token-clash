@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { BOSS_LINES, CLASS_LINES, LAB_SCENE, MUSIC, NAMES, REGIONS, ROOMS, ROUTE_SCENES, sceneMusic, STOP_PEOPLE, TWIST_KEYS, TWISTS, TYPE_LINES, TYPE_SCENES, VILLAIN_LINES } from '../../public/tower-cast.js';
+import { LAB_SCENE, MUSIC, NAMES, REGIONS, ROOMS, ROUTE_SCENES, sceneMusic, STOP_PEOPLE, TWIST_KEYS, TWISTS, TYPE_SCENES } from '../../public/tower-cast.js';
 import { MUSIC_TRACKS } from '../../public/music.js';
-import { CHAMPIONS, DOWNLOADED_SPRITES, ELITE_FOUR, GYM_LEADERS } from '../../public/trainer-sprites.js';
+import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS } from '../../public/trainer-sprites.js';
 
 const backgrounds = [...readFileSync(new URL('../../public/backgrounds.js', import.meta.url), 'utf8').matchAll(/file: '([a-z0-9-]+)'/g)].map((m) => m[1]);
 const TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
@@ -17,20 +17,14 @@ test('every floor of the Tower is one of our battle backgrounds, with a track we
   for (const track of tracks) assert.ok(MUSIC_TRACKS.includes(track), track);
 });
 
-test('every type has scenes and a voice, and every boss belongs to a region', () => {
-  for (const type of TYPES) {
-    assert.ok(TYPE_SCENES[type]?.length, type);
-    assert.ok(TYPE_LINES[type]?.length >= 2, type);
-    for (const line of TYPE_LINES[type]) assert.equal(line.length, 2, type);
-  }
+test('every type has scenes, and every boss belongs to a region', () => {
+  for (const type of TYPES) assert.ok(TYPE_SCENES[type]?.length, type);
   const regional = new Set(Object.values(REGIONS).flat());
   const bosses = [...Object.values(GYM_LEADERS).flat(), ...Object.keys(ELITE_FOUR), ...CHAMPIONS];
   for (const key of bosses) assert.ok(regional.has(key), key);
-  for (const key of Object.keys(BOSS_LINES)) assert.ok(DOWNLOADED_SPRITES.includes(key), key);
   assert.ok(NAMES.m.length >= 40 && NAMES.f.length >= 40);
   assert.equal(new Set(NAMES.m).size, NAMES.m.length);
   assert.equal(new Set(NAMES.f).size, NAMES.f.length);
-  for (const lines of [...Object.values(CLASS_LINES), ...Object.values(VILLAIN_LINES)]) for (const line of lines) assert.equal(line.length, 2);
   for (const person of Object.values(STOP_PEOPLE)) assert.ok(person.speaker && person.lines.length);
   for (const key of TWIST_KEYS) assert.ok(TWISTS[key].name && TWISTS[key].text);
   assert.ok(ROOMS.trainer.battle && !ROOMS.rest.battle);

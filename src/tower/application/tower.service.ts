@@ -95,7 +95,7 @@ export class TowerService implements OnModuleInit {
       hostTeam: run.battleTeam(),
       aiName: `${floor.foe.title} ${floor.foe.name}`,
       aiTeam: run.foeTeam(),
-      staging: { scene: floor.scene, music: floor.music, guestAvatar: floor.foe.key, returnTo: '/torre', label: `Torre · Piso ${floor.number}`, aiPicks: run.foePicks() },
+      staging: { scene: floor.scene, music: floor.music, guestAvatar: floor.foe.key, returnTo: '/torre', label: `Torre · Piso ${floor.number}`, aiPicks: run.foePicks(), guestSays: { lose: floor.lines.lose, win: floor.lines.win } },
     });
     run.enterBattle(challenge.id, now());
     this.runs.save(run);
