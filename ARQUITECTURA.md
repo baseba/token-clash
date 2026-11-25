@@ -19,7 +19,7 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 | `stats` | La página de stats y los logros | nada: lee de los otros dominios y le pide los cambios a `trainers` |
 
 Más tres piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
-(archivos estáticos y health checks) y `shared` (configuración, errores, HTTP, base de datos).
+(archivos estáticos, health checks y la vista previa de los links, que lee la arena con `ArenaQueries`) y `shared` (configuración, errores, HTTP, base de datos).
 
 ```
            realtime (WS)   web          HTTP controllers de cada dominio
