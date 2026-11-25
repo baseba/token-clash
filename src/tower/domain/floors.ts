@@ -70,7 +70,14 @@ export interface Floor {
   trained: boolean;
   /** Which part of the theme's species it draws from: the weakest, any, or the strongest. */
   strength: Strength;
-  lines: { hello: string; lose: string };
+  /** What its trainer says when it sees you, when it loses and when it beats you. */
+  lines: FloorLines;
+}
+
+export interface FloorLines {
+  hello: string;
+  lose: string;
+  win: string;
 }
 
 const LEVELS_PER_FLOOR = 1.9;
@@ -182,12 +189,24 @@ const drawOf = (seed: string, rolls: Rolls, floor: number): string => (rolls[flo
  */
 const extraWays = (roll: number): number => (roll < 0.5 ? 2 : roll < 0.8 ? 3 : 4);
 
-/** The rooms a plain floor offers: always a trainer, and two to four other ways. */
-export function roomsAt(floor: number, length: number | null, seed: string, rolls: Rolls = {}, twist: TwistKey | null = null): RoomKind[] {
+/** After a rest stop, the next plain floors that offer none. */
+const FLOORS_WITHOUT_REST = 2;
+
+/** Whether a plain floor may offer a rest stop: not on the next two plain floors after the one you rested on. */
+export function restOffered(floor: number, length: number | null, restedAt: number | null): boolean {
+  if (restedAt === null) return true;
+  let plainFloors = 0;
+  for (let between = restedAt + 1; between < floor; between++) if (floorKind(between, length) === 'trainer') plainFloors++;
+  return plainFloors >= FLOORS_WITHOUT_REST;
+}
+
+/** The rooms a plain floor offers: always a trainer, and two to four other ways (no rest stop right after one). */
+export function roomsAt(floor: number, length: number | null, seed: string, rolls: Rolls = {}, twist: TwistKey | null = null, restedAt: number | null = null): RoomKind[] {
   if (floorKind(floor, length) !== 'trainer') return [];
   const random = rng(`${drawOf(seed, rolls, floor)}:rooms:${floor}`);
   const boost = (twist && TWIST_WEIGHTS[twist]) ?? {};
-  const pool = ROOM_WEIGHTS.filter(([room]) => floor > WARM_UP_FLOORS || EARLY_ROOMS.includes(room)).map(([room, weight]): [RoomKind, number] => [room, weight * (boost[room] ?? 1)]);
+  const resting = restOffered(floor, length, restedAt);
+  const pool = ROOM_WEIGHTS.filter(([room]) => (floor > WARM_UP_FLOORS || EARLY_ROOMS.includes(room)) && (room !== 'rest' || resting)).map(([room, weight]): [RoomKind, number] => [room, weight * (boost[room] ?? 1)]);
   const rooms: RoomKind[] = ['trainer'];
   if (twist === 'wild') rooms.push(pool.splice(pool.findIndex(([room]) => room === 'tough'), 1)[0][0]);
   const extra = extraWays(random());
@@ -228,17 +247,19 @@ const typesOfSpecies = (ids: readonly number[]): string[] => [...new Set(ids.fla
 const classBase = (key: string): string => key.replace(/_(m|f)(_\d+)?$|_\d+$/, '');
 const agree = (text: string, female: boolean): string => text.replaceAll('{o}', female ? 'a' : 'o');
 
-/** What a trainer says: a boss its own words; others, by its class, its team, the way you took or the type of its theme. */
-function linesFor(key: string, type: string | null, at: string, room: RoomKind | null = null): { hello: string; lose: string } {
-  const own = BOSS_LINES[key];
-  if (own) return { hello: own[0], lose: own[1] };
-  const team = key.includes('_grunt') ? VILLAIN_LINES[key.split('_')[0]] : null;
+/**
+ * What a trainer says: a boss or a villain leader its own words; a grunt its team's; others, half the
+ * time in their class's voice, else by the way you took or the type of their theme (a pair, as a pair).
+ */
+function linesFor(key: string, type: string | null, at: string, room: RoomKind | null = null): FloorLines {
+  const own = BOSS_LINES[key] ?? (key.includes('_grunt') ? VILLAIN_LINES[key.split('_')[0]] : null);
   const typed = TYPE_LINES[type ?? 'normal'] ?? TYPE_LINES.normal;
-  const voices: readonly Line[] = PAIR_CLASSES[key]
-    ? PAIR_LINES
-    : team ?? (room && ROOM_LINES[room] && hash(`${at}:mood`) % 2 ? ROOM_LINES[room] : hash(`${at}:voice`) % 2 && CLASS_LINES[classBase(key)] ? CLASS_LINES[classBase(key)] : typed);
-  const [hello, lose] = pick(voices, `${at}:line`);
-  return { hello: agree(hello, isFemale(key)), lose: agree(lose, isFemale(key)) };
+  const roomVoice = room === 'tough' || room === 'calm' ? ROOM_LINES[room] : null;
+  const classVoice = CLASS_LINES[classBase(key)];
+  const voices: readonly Line[] =
+    own ?? (classVoice && hash(`${at}:voice`) % 2 ? classVoice : PAIR_CLASSES[key] ? PAIR_LINES : roomVoice && hash(`${at}:mood`) % 2 ? roomVoice : typed);
+  const [hello, lose, win] = pick(voices, `${at}:line`).map((text) => agree(text, isFemale(key)));
+  return { hello, lose, win };
 }
 
 /** A route trainer's name, from lists shuffled once per climb so names rarely repeat; two names for a pair. */
@@ -328,7 +349,7 @@ function drawFloor(floor: number, length: number | null, difficulty: AiLevel, se
     strength: kind === 'trainer' ? (ROOM_STRENGTH[chosen ?? 'trainer'] ?? 'normal') : 'strong',
   };
   if (chosen && !ROOMS[chosen].battle)
-    return { ...base, foe: null, type: null, types: [], species: [], signature: null, scene: routeScene(floor), music: MUSIC.route, lines: { hello: '', lose: '' } };
+    return { ...base, foe: null, type: null, types: [], species: [], signature: null, scene: routeScene(floor), music: MUSIC.route, lines: { hello: '', lose: '', win: '' } };
   if (chosen === 'hideout') {
     if (hash(`${at}:boss`) % 3 === 0) {
       const bosses = [...VILLAINS.boss, ...(floor >= LEGENDS_IN_HIDEOUT_FROM ? VILLAINS.legend : [])];

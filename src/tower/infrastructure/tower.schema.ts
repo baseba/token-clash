@@ -25,6 +25,7 @@ export const towerRuns = sqliteTable(
     rerolls: integer().notNull().default(0),
     rolls: text({ mode: 'json' }).$type<Rolls>().notNull().default({}),
     log: text({ mode: 'json' }).$type<FloorScore[]>().notNull().default([]),
+    restedAt: integer('rested_at'),
     twist: text(),
     challengeId: text('challenge_id'),
     lastResult: text('last_result', { mode: 'json' }).$type<FloorResult>(),

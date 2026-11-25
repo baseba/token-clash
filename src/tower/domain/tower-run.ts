@@ -3,7 +3,7 @@
 //
 //   drafting → climbing    draft      you take your first Pokémon from the professor's offers
 //   climbing → climbing    chooseRoom on a plain floor, the way you take (a route, a tough one…)
-//   climbing → resting     chooseRoom a room with no battle: a rest stop, a den or a dark deal
+//   climbing → resting     chooseRoom a room with no battle: a rest stop, a den or a dark deal (no experience)
 //   climbing → resting     win        a floor cleared: experience, levels, evolutions and a rest
 //   resting  → climbing    moveOn     you go up (after taking your rewards and maybe a recruit)
 //   climbing → cleared     win        the last floor of a climb with an end
@@ -95,6 +95,8 @@ export interface TowerRunState {
   rolls: Rolls;
   /** The points of every floor won. */
   log: FloorScore[];
+  /** The floor of the last rest stop taken: the next two plain floors offer none (null when none yet). */
+  restedAt: number | null;
   /** The rumour of this climb: what makes it play differently (null in climbs started before rumours). */
   twist: TwistKey | null;
   challengeId: string | null;
@@ -147,6 +149,7 @@ export class TowerRun implements TowerRunState {
   rerolls!: number;
   rolls!: Rolls;
   log!: FloorScore[];
+  restedAt!: number | null;
   twist!: TwistKey | null;
   challengeId!: string | null;
   lastResult!: FloorResult | null;
@@ -182,6 +185,7 @@ export class TowerRun implements TowerRunState {
       rerolls: 0,
       rolls: {},
       log: [],
+      restedAt: null,
       twist: TWIST_KEYS[hash(`${seed}:twist`) % TWIST_KEYS.length],
       challengeId: null,
       lastResult: null,
@@ -232,7 +236,7 @@ export class TowerRun implements TowerRunState {
 
   /** The ways the current floor offers; empty on a boss floor or once one is taken. */
   rooms(): RoomKind[] {
-    return this.status === 'climbing' && !this.room ? roomsAt(this.floor, this.length, this.seed, this.rolls, this.twist) : [];
+    return this.status === 'climbing' && !this.room ? roomsAt(this.floor, this.length, this.seed, this.rolls, this.twist, this.restedAt) : [];
   }
 
   /** The floor each way leads to, to show who waits there before choosing. */
@@ -244,7 +248,10 @@ export class TowerRun implements TowerRunState {
     return this.rooms().length > 0;
   }
 
-  /** Takes one of the ways of a plain floor. One with no battle is resolved here and the floor is passed. */
+  /**
+   * Takes one of the ways of a plain floor. One with no battle is resolved here and the floor is passed,
+   * with no experience: only a battle raises levels, besides the rewards you choose.
+   */
   chooseRoom(room: RoomKind, { at, roster, releaseUid = null }: { at: number; roster: readonly RosterEntry[]; releaseUid?: string | null }): void {
     if (!this.rooms().includes(room)) throw invalid('Ese camino no está en este piso.');
     if (room === 'deal' && (this.party.length <= 1 || !this.party.some((mon) => mon.uid === releaseUid))) throw invalid('El pacto pide a uno de tu equipo, y no puedes quedarte sin Pokémon.');
@@ -254,7 +261,8 @@ export class TowerRun implements TowerRunState {
     if (room === 'deal') this.party.splice(this.party.indexOf(this.member(releaseUid as string)), 1);
     const floor = this.currentFloor();
     const random = rng(`${this.seed}:room:${floor.number}`);
-    this.lastResult = { floor: floor.number, room, won: true, growth: this.train(floor.number) };
+    this.lastResult = { floor: floor.number, room, won: true, growth: [] };
+    if (room === 'rest') this.restedAt = floor.number;
     this.cleared = floor.number;
     this.floor += 1;
     this.room = null;
@@ -389,12 +397,6 @@ export class TowerRun implements TowerRunState {
       const catchUp = 1 + CATCH_UP_PER_LEVEL * Math.max(0, nextCap - mon.level);
       return this.grow(mon, Math.max(mon.exp, Math.min(cap, mon.exp + Math.round(gained * catchUp))));
     });
-  }
-
-  /** A floor without a battle still trains the party: each Pokémon goes halfway to the next floor's cap. */
-  private train(floorNumber: number): Growth[] {
-    const nextCap = Math.min(MAX_LEVEL, levelCap(floorNumber + 1));
-    return this.party.map((mon) => this.grow(mon, Math.max(mon.exp, expForLevel(Math.min(nextCap, mon.level + Math.ceil((nextCap - mon.level) / 2))))));
   }
 
   /** New level, maybe a new form, and the moves it learns on the way: into a free slot, or known. */

@@ -248,6 +248,7 @@ test('a Tower climb: the lab, a floor fought against the AI, the rest after it a
   const room = await call(`/api/challenges/${fight.data.challengeId}`, { token });
   assert.equal(room.data.challenge.staging.returnTo, '/torre');
   assert.equal(room.data.challenge.staging.label, 'Torre · Piso 1');
+  assert.ok(room.data.challenge.staging.guestSays.lose && room.data.challenge.staging.guestSays.win, 'the rival says something whether it loses or wins');
   assert.equal(room.data.challenge.hostTeam[0].level, 5);
   const host = player(fight.data.challengeId, token);
   const end = await host.ended;

@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
+import { CLASS_LINES } from '../../catalog/domain/tower-lines.js';
 import { NAMES, START_LEVEL, TYPE_SCENES } from '../../catalog/domain/tower-cast.js';
-import { fitToParty, floorAt, floorKind, foeLevel, levelCap, roomsAt, stretchStart, teamSize } from './floors.js';
+import { fitToParty, floorAt, floorKind, foeLevel, levelCap, restOffered, roomsAt, stretchStart, teamSize } from './floors.js';
 
 const kinds = (length: number | null, upTo: number) => Array.from({ length: upTo }, (_, i) => floorKind(i + 1, length));
 const baseOf = (floor: number, length: number | null, seed: string) => floorAt(floor, length, 'mid', seed).foe?.base;
@@ -189,4 +190,32 @@ test('a plain floor offers three to five ways, and every count shows up', () => 
   const counts = new Set<number>();
   for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) for (let floor = 1; floor < 25; floor++) if (floorKind(floor, 25) === 'trainer') counts.add(roomsAt(floor, 25, seed).length);
   assert.deepEqual([...counts].sort(), [3, 4, 5]);
+});
+
+test('a rest stop is not offered on the next two plain floors after the one you rested on, a boss in between not counting', () => {
+  assert.ok(restOffered(3, 25, null));
+  assert.ok(!restOffered(2, 25, 1) && !restOffered(3, 25, 1));
+  assert.ok(restOffered(4, 25, 1));
+  assert.ok(!restOffered(6, 25, 4) && !restOffered(7, 25, 4), 'the gym on floor 5 is not a plain floor');
+  assert.ok(restOffered(8, 25, 4));
+  for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) assert.ok(!roomsAt(3, 25, seed, {}, 'market', 2).includes('rest'), seed);
+});
+
+test('every route trainer has a voice of its own, and the classes met most three lines or more', () => {
+  const met = new Map<string, number>();
+  let battles = 0;
+  for (const seed of Array.from({ length: 40 }, (_, i) => `voices${i}`))
+    for (let floor = 1; floor <= 50; floor++)
+      for (const room of roomsAt(floor, 50, seed)) {
+        const drawn = floorAt(floor, 50, 'mid', seed, room);
+        if (!drawn.foe || room === 'hideout') continue;
+        assert.ok(drawn.lines.hello && drawn.lines.lose && drawn.lines.win, drawn.foe.base);
+        const base = drawn.foe.base.replace(/_(m|f)(_\d+)?$|_\d+$/, '');
+        met.set(base, (met.get(base) ?? 0) + 1);
+        battles++;
+      }
+  for (const [base, count] of met) {
+    assert.ok((CLASS_LINES[base]?.length ?? 0) >= 2, `${base} has a voice`);
+    if (count / battles >= 0.014) assert.ok(CLASS_LINES[base].length >= 3, `${base} is met often`);
+  }
 });

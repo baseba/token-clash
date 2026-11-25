@@ -35,6 +35,8 @@ export interface Staging {
   label?: string;
   /** The AI's three, when the mode chose them (the Tower varies them like a roguelike rival). */
   aiPicks?: number[];
+  /** What the AI rival says at the end: when it loses and when it wins (a Tower trainer's own words). */
+  guestSays?: { lose: string; win: string };
 }
 
 /** What we keep of a finished battle: its public state (who fought, who won). */

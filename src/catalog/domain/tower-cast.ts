@@ -1,5 +1,9 @@
-// The Tower's cast (public/tower-cast.js, shared with the browser) with its types.
+// The Tower's cast (public/tower-cast.js, shared with the browser) with its types, and what its trainers
+// say (tower-lines.ts and boss-lines.ts), which only the server reads.
 import * as cast from '../../../public/tower-cast.js';
+
+export { CLASS_LINES, PAIR_LINES, ROOM_LINES, TYPE_LINES, VILLAIN_LINES, type Line } from './tower-lines.js';
+export { BOSS_LINES } from './boss-lines.js';
 
 export type Region = 'kanto' | 'johto' | 'hoenn' | 'sinnoh' | 'unova' | 'kalos' | 'alola' | 'galar' | 'paldea';
 export type RoomKind = 'trainer' | 'tough' | 'calm' | 'rest' | 'den' | 'hideout' | 'deal';
@@ -34,16 +38,9 @@ export const MUSIC = cast.MUSIC as {
   hideout: string;
 };
 export const NAMES: Readonly<Record<'m' | 'f', readonly string[]>> = cast.NAMES;
-export type Line = readonly [string, string];
 export const FEMALE_CLASSES: readonly string[] = cast.FEMALE_CLASSES;
 export const PAIR_CLASSES = cast.PAIR_CLASSES as Readonly<Record<string, 'mm' | 'ff' | 'mf' | 'fm'>>;
 export const NAMED_CLASSES: Readonly<Record<string, string>> = cast.NAMED_CLASSES;
-export const TYPE_LINES = cast.TYPE_LINES as unknown as Readonly<Record<string, readonly Line[]>>;
-export const CLASS_LINES = cast.CLASS_LINES as unknown as Readonly<Record<string, readonly Line[]>>;
-export const PAIR_LINES = cast.PAIR_LINES as unknown as readonly Line[];
-export const ROOM_LINES = cast.ROOM_LINES as unknown as Readonly<Partial<Record<RoomKind, readonly Line[]>>>;
-export const VILLAIN_LINES = cast.VILLAIN_LINES as unknown as Readonly<Record<string, readonly Line[]>>;
-export const BOSS_LINES = cast.BOSS_LINES as unknown as Readonly<Record<string, Line>>;
 export const RECRUIT_LINE: string = cast.RECRUIT_LINE;
 export type TwistKey = 'night' | 'market' | 'wild' | 'tutors' | 'sweet' | 'migration' | 'caps';
 export const TWIST_KEYS = cast.TWIST_KEYS as TwistKey[];
