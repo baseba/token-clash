@@ -23,6 +23,7 @@ export const FAST_TIMINGS = {
 export interface AppProcess {
   readonly base: string;
   readonly port: number;
+  readonly dataDir: string;
   start(): Promise<void>;
   stop(): Promise<void>;
   kill(): void;
@@ -36,6 +37,7 @@ export function appProcess(env: Record<string, string>, ports: number): AppProce
   return {
     base,
     port,
+    dataDir,
     async start() {
       proc = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'dist/src/main.js'], {
         cwd: PROJECT_ROOT,

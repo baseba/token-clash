@@ -69,8 +69,8 @@ test('catalog depends on no other context: it serves data, and combat decides wh
   assert.deepEqual(show(bad), []);
 });
 
-test('shared/ depends on no context: the arrows point into it, never out', () => {
-  const bad = imports.filter(({ file, target }) => file.startsWith('shared/') && contextOf(target));
+test('shared/ depends on nothing else in src: the arrows point into it, never out', () => {
+  const bad = imports.filter(({ file, target }) => file.startsWith('shared/') && target.endsWith('.ts') && !target.startsWith('shared/') && !target.startsWith('../'));
   assert.deepEqual(show(bad), []);
 });
 

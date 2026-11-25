@@ -1,21 +1,25 @@
-import { Global, Logger, Module } from '@nestjs/common';
+import { type DynamicModule, Module } from '@nestjs/common';
 import { DrizzleModule } from '@nestjs/drizzle';
 import { join } from 'node:path';
-import { importLegacyJson } from '../../../legacy/legacy-json-import.js';
 import { AppConfig } from '../../config/app-config.js';
-import { DATABASE_FILE, openDatabase } from './database.js';
+import { DATABASE_FILE, openDatabase, type Database } from './database.js';
 
-@Global()
-@Module({
-  imports: [
-    DrizzleModule.forRootAsync({
-      inject: [AppConfig],
-      useFactory: (config: AppConfig) => {
-        const db = openDatabase(join(config.dataDir, DATABASE_FILE));
-        importLegacyJson(db, config.dataDir, new Logger('LegacyImport'));
-        return { db };
-      },
-    }),
-  ],
-})
-export class DatabaseModule {}
+@Module({})
+export class DatabaseModule {
+  static forRoot({ afterOpen }: { afterOpen: (db: Database, dataDir: string) => void }): DynamicModule {
+    return {
+      module: DatabaseModule,
+      global: true,
+      imports: [
+        DrizzleModule.forRootAsync({
+          inject: [AppConfig],
+          useFactory: (config: AppConfig) => {
+            const db = openDatabase(join(config.dataDir, DATABASE_FILE));
+            afterOpen(db, config.dataDir);
+            return { db };
+          },
+        }),
+      ],
+    };
+  }
+}
