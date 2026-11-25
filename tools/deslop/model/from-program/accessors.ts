@@ -82,7 +82,8 @@ export function relayedBy(checker: ts.TypeChecker, body: ts.FunctionLikeDeclarat
     given.add(local);
   }
   const written = body.body;
-  if (written === undefined) return undefined;
+  const isAsyncOrGenerator = body.asteriskToken !== undefined || (ts.getCombinedModifierFlags(body) & ts.ModifierFlags.Async) !== 0;
+  if (written === undefined || isAsyncOrGenerator) return undefined;
   const relaysAll = ts.isBlock(written) ? written.statements.every(relaysStatement) : relays(written);
   const returned = ts.isBlock(written) ? written.statements.find(ts.isReturnStatement)?.expression : written;
   if (!relaysAll) return undefined;

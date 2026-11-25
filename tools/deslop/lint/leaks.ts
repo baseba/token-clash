@@ -1,5 +1,5 @@
 import type { Graph, ThingId, Use } from '../graph/graph.js';
-import type { ItemId, Model } from '../model/model.js';
+import type { Flow, ItemId, Model } from '../model/model.js';
 import type { NodeId } from '../model/tree.js';
 import {
   type Diagnostic,
@@ -102,11 +102,11 @@ function fieldsByThing(model: Model, graph: Graph): Map<ThingId, ItemId[]> {
   return fields;
 }
 
-function fieldsBehind(model: Model, member: ItemId, writes: boolean): ItemId[] {
+function fieldsBehind(model: Model, member: ItemId, flow: Flow): ItemId[] {
   if (model.items[member].kind === 'field') return [member];
   const wrapper = model.wrappers.get(member);
   if (wrapper?.kind !== 'accessor') return [];
-  return writes ? wrapper.leaked : wrapper.lent;
+  return [...(flow === 'read' ? [] : wrapper.leaked), ...(flow === 'write' ? [] : wrapper.lent)];
 }
 
 function reachable(from: ItemId, next: Map<ItemId, ItemId[]>): ItemId[] {
@@ -160,7 +160,7 @@ export function knownOutside(model: Model, graph: Graph): Outside {
     if (!isInsider(use.user, owner)) usedOutside(use);
     else if (use.user === owner && works(model, use)) outside.working.add(owner);
     if (use.copies) continue;
-    const behind = reachable(use.item, model.implementations).flatMap((member) => fieldsBehind(model, member, model.references[use.reference].writes));
+    const behind = reachable(use.item, model.implementations).flatMap((member) => fieldsBehind(model, member, model.references[use.reference].flow));
     for (const field of behind) {
       if (!isInsider(use.user, graph.thingOf[field])) usedOutside({ ...use, item: field, through: use.through ?? use.item });
     }

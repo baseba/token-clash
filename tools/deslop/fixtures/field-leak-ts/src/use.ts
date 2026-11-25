@@ -1,5 +1,5 @@
 import type { Desk, Port, WidePort } from './port.js';
-import type { Bracket, Crate, Decides, Getters, Holder, Insiders, Ledger, Lidded, Limit, Literals, MutableList, NoWork, ObjectField } from './vault.js';
+import type { Bracket, Crate, Decides, Generic, Getters, Holder, Insiders, Ledger, Lidded, Limit, Literals, MutableList, NoWork, ObjectField } from './vault.js';
 import type { Heir, Knot, Outer, ScalarRead, ScalarWrite, Setters, Structural, ValueCast, ValueRead, Versioned, Working } from './vault.js';
 
 declare function send(...values: unknown[]): void;
@@ -16,6 +16,8 @@ export function scalarWrite(vault: ScalarWrite, other: ScalarWrite): void {
   vault.stepped++;
   delete vault.removed;
   ({ retaken: vault.retaken } = other);
+  (vault.castAssigned as number) = 1;
+  (<number>vault.castStepped)++;
 }
 
 export function valueRead(vault: ValueRead): void {
@@ -70,6 +72,15 @@ export function objectField(vault: ObjectField, other: Limit): void {
     nested: { most },
   } = vault;
   send(most);
+  const { most: unpacked } = vault.unpacked;
+  let reassigned = 0;
+  ({
+    reassigned: { most: reassigned },
+  } = vault);
+  const {
+    keyedInPattern: { 'most': keyedInPattern },
+  } = vault;
+  send(unpacked, reassigned, vault.keyed['most'], keyedInPattern);
 }
 
 export function bracket(vault: Bracket): void {
@@ -92,12 +103,18 @@ export function getters(vault: Getters): void {
   vault.getPathWritten().most = 4;
   send(vault.getReferenced);
   send(vault.getRelayed());
+  const { most: topMost } = vault.top;
+  const { most: packedMost } = vault.getPacked();
+  send(topMost, packedMost, vault.getWide);
+  const queried: typeof vault.query = [];
+  send(queried);
 }
 
 export function setters(vault: Setters, other: Limit): void {
   ({ most: vault.byPattern } = other);
   [vault.byList] = [1];
   for (vault.byLoop of [1]) send(1);
+  (vault.byCast as number) = 2;
 }
 
 export function literals(vault: Literals): void {
@@ -107,11 +124,17 @@ export function literals(vault: Literals): void {
   vault.withIds((items) => send(items));
 }
 
-export function working(vault: Working, decides: Decides): void {
+export async function working(vault: Working, decides: Decides): Promise<void> {
   vault.checked().push(1);
   send(vault.first());
   vault.replace(2);
   decides.close();
+  send(await vault.getPromised());
+}
+
+export function generic(vault: Generic<readonly number[]>): void {
+  const { taken } = vault;
+  send(taken, vault.dotted.length);
 }
 
 function drain(holder: { shaped: number[] }): void {
@@ -156,6 +179,10 @@ export function desked(desk: Desk): void {
   desk.label = 'a';
   desk.papers.push(1);
   desk.stamp = 2;
+  (desk.seat as number) = 2;
+  desk.drafts ??= [];
+  const { most } = desk.top;
+  send(most);
 }
 
 export function unseen(boxed: Crate.Boxed, lidded: InstanceType<typeof Lidded>): void {

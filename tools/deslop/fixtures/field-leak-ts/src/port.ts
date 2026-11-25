@@ -36,10 +36,17 @@ export class Unported {
   }
 }
 
+export interface Bound {
+  most: number;
+}
+
 export interface Desk {
   label: string;
   papers: number[];
   stamp: number;
+  seat: number;
+  drafts: number[] | null;
+  top: Bound;
 }
 
 export class Desked implements Desk {
@@ -47,6 +54,10 @@ export class Desked implements Desk {
   private labelText = 'a';
   private paperList: number[] = [];
   private stampValue = 0;
+  private auditList: number[] = [];
+  private seatNumber = 0;
+  private draftList: number[] | null = null;
+  top: Bound = { most: 1 };
 
   work(): number {
     return this.secret + 1;
@@ -66,6 +77,7 @@ export class Desked implements Desk {
   }
 
   set papers(papers: number[]) {
+    const audit = this.auditList;
     this.paperList = papers;
   }
 
@@ -75,6 +87,22 @@ export class Desked implements Desk {
 
   set stamp(stamp: number) {
     this.stampValue = stamp;
+  }
+
+  get seat(): number {
+    return this.seatNumber;
+  }
+
+  set seat(seat: number) {
+    this.seatNumber = seat;
+  }
+
+  get drafts(): number[] | null {
+    return this.draftList;
+  }
+
+  set drafts(drafts: number[] | null) {
+    this.draftList = drafts === null ? null : [...drafts];
   }
 }
 

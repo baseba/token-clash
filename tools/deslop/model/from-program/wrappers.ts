@@ -2,7 +2,7 @@ import ts from 'typescript';
 import type { Accessor, Forwarder, ItemId, Wrapper } from '../model.js';
 import { relayedBy } from './accessors.js';
 import { Functions } from './forwarders.js';
-import { type Catalog, bodyOf } from './items.js';
+import { type Body, type Catalog, bodyOf } from './items.js';
 import type { Project } from './load.js';
 import { Mentions, accessNamedBy, callOf } from './mentions.js';
 import type { Occurrence } from './references.js';
@@ -76,7 +76,7 @@ export class Wrappers {
     const read = fields.filter((field) => !relayed.written.has(field));
     const alone = !relayed.callsBack && read.length === 1 && read[0] === relayed.alone ? relayed.alone : undefined;
     const copied = alone === undefined ? read.filter((field) => this.holdsValue(field)) : [];
-    const lent = relayed.callsBack ? [] : read.filter((field) => !copied.includes(field));
+    const lent = relayed.callsBack || ts.isSetAccessor(body) ? [] : read.filter((field) => !copied.includes(field));
     const leaked = fields.filter((field) => !copied.includes(field) && !lent.includes(field));
     return { kind: 'accessor', leaked, lent, copied, alone };
   }
@@ -87,18 +87,21 @@ export class Wrappers {
     return this.lenders.get(behind);
   }
 
-  private readsLent({ alone }: Lender, name: ts.Node, property: ts.Node | undefined): boolean {
-    const mention = property === undefined ? callOf(name) : accessNamedBy(name);
+  private readsLent({ alone }: Lender, name: ts.Node, given: Body): boolean {
+    const mention = ts.isAccessor(given) ? accessNamedBy(name) : callOf(name);
     if (mention !== undefined) return !this.mentions.leaks(mention, alone !== undefined);
-    return (alone !== undefined && this.values.holdsValue(property ?? this.catalog.declarations[alone][0])) || this.mentions.takesScalars(name);
+    const returned = this.project.checker.getSignatureFromDeclaration(given)?.getReturnType();
+    return (alone !== undefined && returned !== undefined && this.values.isValue(returned)) || this.mentions.takesScalars(name);
   }
 
   private markRead({ node, notation, reference }: Occurrence): void {
     const named = reference.item;
-    const lender = this.lenderBehind(named);
-    if (lender !== undefined) reference.copies = this.readsLent(lender, node, this.catalog.declarations[named].find(ts.isAccessor));
-    if (this.catalog.items[named].kind !== 'field') return;
     const mention = accessNamedBy(node);
+    const inType = notation === 'name' && mention === undefined;
+    const lender = this.lenderBehind(named);
+    const given = bodyOf(this.catalog, named);
+    if (lender !== undefined && given !== undefined) reference.copies = inType || this.readsLent(lender, node, given);
+    if (this.catalog.items[named].kind !== 'field') return;
     const taken = notation === 'destructuring' && (this.holdsValue(named) || this.mentions.takesScalars(node));
     reference.copies = notation === 'construction' || taken || (notation === 'name' && (mention === undefined || !this.mentions.leaks(mention, true)));
   }

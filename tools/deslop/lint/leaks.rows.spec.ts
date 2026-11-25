@@ -19,6 +19,8 @@ const ROWS: Row[] = [
   ['ScalarWrite::stepped', 'leaks', 'vault.stepped++', 'S1'],
   ['ScalarWrite::removed', 'leaks', 'delete vault.removed', 'S1'],
   ['ScalarWrite::retaken', 'leaks', '({ retaken: vault.retaken } = other)', 'S1'],
+  ['ScalarWrite::castAssigned', 'leaks', '(vault.castAssigned as number) = 1', 'S1, behind a cast'],
+  ['ScalarWrite::castStepped', 'leaks', '(<number>vault.castStepped)++', 'S1, behind a cast'],
   ['ValueRead::ids', 'reads', 'const ids = vault.ids, send(vault.ids), for of, [...vault.ids], .length, .map(), [0]', 'S2, D2'],
   ['ValueRead::tags', 'reads', "vault.tags.has('a'), vault.tags.size", 'S2, D2'],
   ['ValueRead::byId', 'reads', "vault.byId.get('k')?.length", 'S2, D2'],
@@ -43,6 +45,10 @@ const ROWS: Row[] = [
   ['ObjectField::typed', 'reads', 'typeof vault.typed, vault.typed instanceof Object', 'S3b'],
   ['ObjectField::picked', 'reads', 'switch (other) { case vault.picked: }', 'S3b'],
   ['ObjectField::nested', 'reads', 'const { nested: { most } } = vault', 'S3a, the path vault.nested.most written as a pattern'],
+  ['ObjectField::unpacked', 'reads', 'const { most } = vault.unpacked', 'S3a, the path vault.unpacked.most with its last step as a pattern'],
+  ['ObjectField::reassigned', 'reads', '({ reassigned: { most: reassigned } } = vault)', 'S3a, the pattern of an assignment'],
+  ['ObjectField::keyed', 'reads', "vault.keyed['most']", 'S3a, a step named by a string'],
+  ['ObjectField::keyedInPattern', 'reads', "const { keyedInPattern: { 'most': most } } = vault", 'S3a, a step named by a string'],
   ['Bracket::hidden', 'leaks', "vault['hidden'].push(1)", 'S4, a private field named by a string'],
   ['Getters::viewed', 'reads', 'get view(): readonly number[]; vault.view.length, vault.view.map(), const { view } = vault', 'accessor, S2, D2'],
   ['Getters::widened', 'leaks', 'get wide(): number[] over a readonly number[]; const { wide } = vault', 'accessor, S4, by the type the getter gives'],
@@ -54,9 +60,14 @@ const ROWS: Row[] = [
   ['Getters::pathWritten', 'leaks', 'getPathWritten(): Limit; vault.getPathWritten().most = 4', 'accessor, S1'],
   ['Getters::referenced', 'leaks', 'getReferenced(): number[]; send(vault.getReferenced)', 'accessor, not called'],
   ['Getters::relayed', 'leaks', 'getRelayed() { const relayed = this.relayed; return relayed; }; send(vault.getRelayed())', 'accessor by a const, S4'],
+  ['Getters::topped', 'reads', 'get top(): Limit; const { most } = vault.top', 'accessor, S3a'],
+  ['Getters::packed', 'reads', 'getPacked(): Limit; const { most } = vault.getPacked()', 'accessor, S3a'],
+  ['Getters::widenedByCall', 'leaks', 'getWide(): number[] over a readonly number[]; send(vault.getWide)', 'accessor, not called, by the type it returns'],
+  ['Getters::queried', 'reads', 'get query(): number[]; const queried: typeof vault.query = []', 'accessor, a type that names it does nothing to it'],
   ['Setters::fromPattern', 'leaks', 'set byPattern(value); ({ most: vault.byPattern } = other)', 'accessor writes, S1'],
   ['Setters::fromList', 'leaks', 'set byList(value); [vault.byList] = [1]', 'accessor writes, S1'],
   ['Setters::fromLoop', 'leaks', 'set byLoop(value); for (vault.byLoop of [1])', 'accessor writes, S1'],
+  ['Setters::fromCast', 'leaks', 'set byCast(value); (vault.byCast as number) = 2', 'accessor writes, S1, behind a cast'],
   ['Literals::inTuple', 'leaks', 'parts(): [number[], number]; const [list] = vault.parts()', 'accessor, literal'],
   ['Literals::inObject', 'leaks', 'snapshot() { return { list: this.inObject }; }; vault.snapshot()', 'accessor, literal'],
   ['Literals::inState', 'leaks', 'toState(): VaultState; vault.toState()', 'accessor, literal, D5'],
@@ -65,6 +76,9 @@ const ROWS: Row[] = [
   ['Working::guardedReturn', 'kept', 'checked() { if (…) …; return this.guardedReturn; }; vault.checked().push(1)', 'L1'],
   ['Working::partReturned', 'kept', 'first() { return this.partReturned[0]; }; vault.first()', 'L1'],
   ['Working::total', 'kept', 'replace(total) { this.total = total + 1; }; vault.replace(2)', 'L1'],
+  ['Working::promised', 'kept', 'async getPromised() { return this.promised; }; await vault.getPromised()', 'L1, an async method works out a promise'],
+  ['Generic::takenValue', 'leaks', 'get taken(): Value; const { taken } = vault, vault: Generic<readonly number[]>', 'limit, by the type the getter declares'],
+  ['Generic::dottedValue', 'reads', 'get dotted(): Value; vault.dotted.length, vault: Generic<readonly number[]>', 'accessor, S2, by the type at the use'],
   ['Decides::state', 'kept', "close() { this.state = 'closed'; }; decides.close()", 'L1, the method decides what it writes: work of the class, as in Rust'],
   ['Structural::held', 'leaks', 'holder.held.push(1), holder: Holder, class implements Holder', 'interface, work'],
   ['Structural::shaped', 'kept', 'drain(vault), drain(holder: { shaped: number[] })', 'L3'],
@@ -92,12 +106,16 @@ const ROWS: Row[] = [
   ['Desked::labelText', 'kept', "get label() relays, set label(label) works; desk.label = 'a', desk: Desk", 'interface, a write goes to the setter, L1'],
   ['Desked::paperList', 'kept', 'get papers() works, set papers(papers) relays; desk.papers.push(1)', 'interface, work goes to the getter, L1'],
   ['Desked::stampValue', 'leaks', 'get stamp() works, set stamp(stamp) relays; desk.stamp = 2', 'interface, a write goes to the setter'],
+  ['Desked::auditList', 'kept', 'set papers(papers) relays and reads auditList too; desk.papers.push(1)', 'interface, work reaches only what the getter lends'],
+  ['Desked::seatNumber', 'leaks', 'get seat(), set seat(seat) relay; (desk.seat as number) = 2', 'interface, a write behind a cast goes to the setter'],
+  ['Desked::draftList', 'leaks', 'get drafts() relays, set drafts(drafts) works; desk.drafts ??= []', 'interface, a write that reads first reaches the getter'],
+  ['Desked::top', 'kept', 'const { most } = desk.top', 'interface, read, S3a'],
   ['Rack::slotList', 'kept', 'tray.slots.push(1) in one subclass, get slots() in another, tray: Tray', 'interface, insider of the class of the field'],
   ['Boxed::open', 'unseen', 'boxed.open.push(1), class inside a namespace', 'limit, not modelled'],
   ['Lidded::open', 'unseen', 'lidded.open.push(1), class written as an expression', 'limit, not modelled'],
 ];
 
-const INTERFACES = new Set(['Limit', 'Holder', 'VaultState', 'Port', 'WidePort', 'Desk', 'Tray']);
+const INTERFACES = new Set(['Limit', 'Holder', 'VaultState', 'Port', 'WidePort', 'Bound', 'Desk', 'Tray']);
 
 const DECLARED_IN_PORT = new Set(['Ported', 'Desked']);
 

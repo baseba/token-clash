@@ -27,6 +27,8 @@ export class ScalarWrite {
   stepped = 0;
   removed?: number;
   retaken = 0;
+  castAssigned = 0;
+  castStepped = 0;
 
   work(): number {
     return this.secret + 1;
@@ -83,6 +85,10 @@ export class ObjectField {
   typed: Limit | null = null;
   picked: Limit | null = null;
   nested: Limit = { most: 1 };
+  unpacked: Limit = { most: 1 };
+  reassigned: Limit = { most: 1 };
+  keyed: Limit = { most: 1 };
+  keyedInPattern: Limit = { most: 1 };
 
   work(): number {
     return this.secret + 1;
@@ -110,6 +116,10 @@ export class Getters {
   private readonly widened: readonly number[] = [];
   private stamp = 0;
   private readonly stamped: Limit = { most: 1 };
+  private readonly topped: Limit = { most: 1 };
+  private readonly packed: Limit = { most: 1 };
+  private readonly widenedByCall: readonly number[] = [];
+  private readonly queried: number[] = [];
 
   work(): number {
     return this.secret + 1;
@@ -156,6 +166,22 @@ export class Getters {
     const relayed = this.relayed;
     return relayed;
   }
+
+  get top(): Limit {
+    return this.topped;
+  }
+
+  getPacked(): Limit {
+    return this.packed;
+  }
+
+  getWide(): number[] {
+    return this.widenedByCall as number[];
+  }
+
+  get query(): number[] {
+    return this.queried;
+  }
 }
 
 export class Setters {
@@ -163,6 +189,7 @@ export class Setters {
   private fromPattern = 0;
   private fromList = 0;
   private fromLoop = 0;
+  private fromCast = 0;
 
   work(): number {
     return this.secret + 1;
@@ -178,6 +205,10 @@ export class Setters {
 
   set byLoop(value: number) {
     this.fromLoop = value;
+  }
+
+  set byCast(value: number) {
+    this.fromCast = value;
   }
 }
 
@@ -219,6 +250,7 @@ export class Working {
   private readonly guardedReturn: number[] = [];
   private readonly partReturned: Limit[] = [];
   private total = 0;
+  private promised = 0;
 
   work(): number {
     return this.secret + 1;
@@ -235,6 +267,31 @@ export class Working {
 
   replace(total: number): void {
     this.total = total + 1;
+  }
+
+  async getPromised(): Promise<number> {
+    return this.promised;
+  }
+}
+
+export class Generic<Value> {
+  private secret = 0;
+
+  constructor(
+    private readonly takenValue: Value,
+    private readonly dottedValue: Value,
+  ) {}
+
+  work(): number {
+    return this.secret + 1;
+  }
+
+  get taken(): Value {
+    return this.takenValue;
+  }
+
+  get dotted(): Value {
+    return this.dottedValue;
   }
 }
 

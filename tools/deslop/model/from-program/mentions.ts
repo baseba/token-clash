@@ -65,26 +65,39 @@ export class Mentions {
 
   leaks(mention: ts.Expression, typed: boolean): boolean {
     const named = outermost(mention);
-    if (isWritten(named)) return true;
+    if (isWritten(outerCast(named))) return true;
     if (typed && this.values.holdsValue(mention)) return !this.values.holdsValue(outerCast(named));
     const end = this.endOfPath(named);
+    const into = end.parent;
+    if (ts.isVariableDeclaration(into) && into.initializer === end && this.takesScalars(into.name)) return false;
     if (end === named) return !isTested(named);
     return isWritten(end) || !this.values.isScalar(this.checker.getTypeAtLocation(end));
   }
 
   takesScalars(key: ts.Node): boolean {
-    const pattern = ts.isBindingElement(key.parent) ? key.parent.name : key;
-    if (!ts.isObjectBindingPattern(pattern)) return false;
-    const taken = (name: ts.Node) => (ts.isIdentifier(name) ? this.checker.getTypeAtLocation(pattern).getProperty(name.text) : undefined);
-    const ends = (name: ts.BindingName) => (ts.isIdentifier(name) ? this.values.isScalar(this.checker.getTypeAtLocation(name)) : this.takesScalars(name));
-    return pattern.elements.every(({ propertyName, name }) => this.isDeclaredField(taken(propertyName ?? name)) && ends(name));
+    const holder = key.parent;
+    const pattern = ts.isBindingElement(holder) ? holder.name : ts.isPropertyAssignment(holder) ? holder.initializer : key;
+    if (ts.isObjectBindingPattern(pattern)) {
+      const from = this.checker.getTypeAtLocation(pattern);
+      return pattern.elements.every(({ propertyName, name }) => this.takesScalar(from, propertyName ?? name, name));
+    }
+    if (!ts.isObjectLiteralExpression(pattern)) return false;
+    const from = this.checker.getTypeOfAssignmentPattern(pattern);
+    return pattern.properties.every((taken) => this.takesScalar(from, taken.name, ts.isPropertyAssignment(taken) ? taken.initializer : taken.name));
   }
 
-  private endOfPath(named: ts.Expression): ts.Expression {
-    let end = named;
-    const isField = (name: ts.MemberName): boolean => this.isDeclaredField(this.checker.getSymbolAtLocation(name));
-    for (let next = end.parent; ts.isPropertyAccessExpression(next) && next.expression === end && isField(next.name); next = end.parent) end = outermost(next);
-    return end;
+  private takesScalar(from: ts.Type, name: ts.Node | undefined, target: ts.Node | undefined): boolean {
+    const isKey = name !== undefined && (ts.isIdentifier(name) || ts.isStringLiteralLike(name));
+    if (!isKey || target === undefined || !this.isDeclaredField(from.getProperty(name.text))) return false;
+    return ts.isIdentifier(target) ? this.values.isScalar(this.checker.getTypeAtLocation(target)) : this.takesScalars(target);
+  }
+
+  private endOfPath(end: ts.Expression): ts.Expression {
+    const next = end.parent;
+    if ((!ts.isPropertyAccessExpression(next) && !ts.isElementAccessExpression(next)) || next.expression !== end) return end;
+    const key = ts.isPropertyAccessExpression(next) ? next.name : ts.isStringLiteralLike(next.argumentExpression) ? next.argumentExpression : undefined;
+    const isField = key !== undefined && this.isDeclaredField(this.checker.getSymbolAtLocation(key));
+    return isField ? this.endOfPath(outermost(next)) : end;
   }
 
   private isDeclaredField(property: ts.Symbol | undefined): boolean {

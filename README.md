@@ -337,9 +337,9 @@ Cada uso de afuera se juzga donde nombra el campo, sin seguir el valor. Vale el 
 
 | Paso | Condición | Veredicto |
 | --- | --- | --- |
-| S1 | Escribe el campo o una ruta de campos declarados que parte en él: `=`, `+=`, `++`, `delete`, destino de desestructurar o de un `for`. | filtra |
+| S1 | Escribe el campo o una ruta de campos declarados que parte en él: `=`, `+=`, `++`, `delete`, destino de desestructurar o de un `for`. También detrás de un cast: `(x.f as number) = 1`. | filtra |
 | S2 | El tipo que recibe es un valor. | lee, salvo un cast directo a un tipo que no es valor, que filtra. En una cadena de casts decide el de más afuera |
-| S3a | Sigue por campos declarados en el proyecto y termina en un escalar: `x.limit.most` o `const { limit: { most } } = x`. | lee |
+| S3a | Sigue por campos declarados en el proyecto y termina en un escalar. Los pasos se escriben con punto, con una clave de texto, como patrón o mezclados: `x.limit.most`, `x.limit['most']`, `const { limit: { most } } = x`, `const { most } = x.limit`. | lee |
 | S3b | Solo lo prueba o lo compara: `if (x.f)`, `!x.f`, `x.f === y`, `typeof x.f`, `case x.f:`. | lee |
 | S4 | Cualquier otra cosa: llamarle un método, indexarlo, `.length`, pasarlo, devolverlo, guardarlo, esparcirlo, recorrerlo. | filtra |
 
@@ -349,15 +349,18 @@ Los métodos se juzgan por su cuerpo:
   (también de arreglo y de objeto), casts, llamar a un parámetro y `this.f = parámetro`. Usarlo es usar sus campos, y
   cada campo se juzga por separado. El campo que escribe filtra siempre, sea valor o no. Si devuelve un solo campo, el
   tipo de retorno decide: `get items(): readonly number[]` presta para leer e `itemsMut(): number[]` presta para
-  escribir. Un getter que se toma con `const { items } = x` se juzga igual, por el tipo que entrega el getter. Si llama
-  a un parámetro, filtra todo campo suyo que no sea valor.
+  escribir. Un getter que se toma con `const { items } = x` se juzga igual, por el tipo que entrega el getter, y un
+  método que se nombra sin llamarlo (`send(x.itemsMut)`), por el tipo que devuelve. Nombrarlo en un tipo
+  (`let copy: typeof x.items`) es leer. Si llama a un parámetro, filtra todo campo suyo que no sea valor. Un setter no
+  presta nada. Un campo que el setter lee y que no es valor filtra con cada escritura.
 - **Reenviador.** El cuerpo es una sola llamada con sus mismos parámetros. Usarlo es usar lo que llama.
-- **Trabajo propio.** Cualquier otro método, también el que asigna un valor que la clase decide
-  (`close() { this.state = 'closed'; }`). Quien lo llama no ve los campos que toca.
+- **Trabajo propio.** Cualquier otro método, también el `async`, el generador y el que asigna un valor que la clase
+  decide (`close() { this.state = 'closed'; }`). Quien lo llama no ve los campos que toca.
 
 Una escritura o un trabajo a través de una propiedad de una interfaz que la clase declara con `implements` cuenta
 contra el campo que la implementa. Una lectura por la interfaz no cuenta. Si la clase implementa la propiedad con un
-getter y un setter, la escritura llega al setter y el trabajo al getter, y cada uno cuenta solo si es un accesor.
+getter y un setter, la escritura llega al setter y el trabajo al getter, y cada uno cuenta solo si es un accesor. Una
+escritura que lee primero (`+=`, `??=`, `++`) llega a los dos.
 
 **Diferencias a propósito con el original (lista cerrada):**
 
@@ -382,6 +385,8 @@ getter y un setter, la escritura llega al setter y el trabajo al getter, y cada 
 - El tipado estructural sin `implements`, y el campo que una subclase declara de nuevo cuando se trabaja sobre el de
   la clase base.
 - Las claves computadas, el estado en closures o en variables de módulo, y los generadores.
+- El tipo con que se instancia un genérico cuando un getter se toma con un patrón: `const { value } = box` sobre un
+  `Box<readonly number[]>` se juzga por el `T` declarado y filtra, y `box.value.length` lee.
 - Las clases escritas como expresión (`const Caja = class { … }`) y las declaradas dentro de un `namespace`. No
   entran al modelo.
 - Una clase cuyos campos se leen todos desde afuera no guarda nada. Hoy pasa con `Trainer`, `Challenge`,

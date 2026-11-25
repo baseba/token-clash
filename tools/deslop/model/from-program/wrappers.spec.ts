@@ -62,6 +62,10 @@ export class Vault implements Port {
     return this.items satisfies number[];
   }
 
+  widen(): number[] {
+    return this.ids as number[];
+  }
+
   getIds(): readonly number[] {
     return this.ids;
   }
@@ -92,6 +96,11 @@ export class Vault implements Port {
   }
 
   set total(count: number) {
+    this.count = count;
+  }
+
+  set audited(count: number) {
+    const items = this.items;
     this.count = count;
   }
 
@@ -219,8 +228,16 @@ export class Vault implements Port {
     return await this.items;
   }
 
+  async promised(): Promise<number> {
+    return this.count;
+  }
+
   *each(): Generator<number[]> {
     yield this.items;
+  }
+
+  *ended(): Generator<never, number[]> {
+    return this.items;
   }
 
   none(): number {
@@ -260,6 +277,7 @@ const ACCESSORS: Wrapped[] = [
   ['Vault::seen', LENDS_ITEMS],
   ['Vault::wide', 'leaks [] lends [Vault::ids] copies []'],
   ['Vault::getIds', 'leaks [] lends [Vault::ids] copies []'],
+  ['Vault::widen', 'leaks [] lends [Vault::ids] copies []'],
   ['Vault::getCount', 'leaks [] lends [Vault::count] copies []'],
   ['Vault::getLimit', 'leaks [] lends [Vault::limit] copies []'],
   ['Vault::parts', 'leaks [] lends [Vault::items] copies [Vault::count]'],
@@ -267,6 +285,7 @@ const ACCESSORS: Wrapped[] = [
   ['Vault::shorthand', LENDS_ITEMS],
   ['Vault::setCount', WRITES_COUNT],
   ['Vault::set total', WRITES_COUNT],
+  ['Vault::set audited', 'leaks [Vault::items,Vault::count] lends [] copies []'],
   ['Vault::setLater', WRITES_COUNT],
   ['Vault::swap', 'leaks [Vault::count] lends [Vault::limit] copies []'],
   ['Vault::echo', WRITES_COUNT],
@@ -301,7 +320,9 @@ const WORKING = [
   'spread',
   'closed',
   'later',
+  'promised',
   'each',
+  'ended',
   'none',
   'of',
   'shared',
@@ -336,13 +357,15 @@ test('a call of an accessor that returns one field is judged as the field is, wi
   ]);
 });
 
-test('an accessor that is taken or named and not called leaks its field unless the field holds a value', () => {
+test('a method that is an accessor, taken or named and not called, is judged by the type it returns, not by the one its field declares', () => {
   judge([
     ['hold(vault.getItems);', 'leaks'],
-    ['hold(vault.getView);', 'leaks'],
+    ['hold(vault.getView);', 'reads'],
     ['hold(vault.getCount, vault.getIds);', 'reads'],
     ['const { getCount } = vault;\n  hold(getCount);', 'reads'],
-    ['const { getView } = vault;\n  hold(getView);', 'leaks'],
+    ['const { getView } = vault;\n  hold(getView);', 'reads'],
+    ['hold(vault.widen);', 'leaks'],
+    ['const { widen } = vault;\n  widen().push(1);', 'leaks'],
   ]);
 });
 
@@ -358,6 +381,16 @@ test('a getter taken by a pattern is judged by the type the getter gives, not by
     ['hold(vault.cap.most);', 'reads'],
     ['const {\n    cap: { most },\n  } = vault;\n  hold(most);', 'reads'],
     ['const { cap } = vault;\n  hold(cap);', 'leaks'],
+    ['const { most } = vault.cap;\n  hold(most);', 'reads'],
+    ['const { most } = vault.getLimit();\n  hold(most);', 'reads'],
+    ['let most = 0;\n  ({\n    cap: { most },\n  } = vault);\n  hold(most);', 'reads'],
+  ]);
+});
+
+test('a type that names a getter or a method does nothing to the field behind it', () => {
+  judge([
+    ['const all: typeof vault.all = [];\n  hold(all);', 'reads'],
+    ['const items: ReturnType<typeof vault.getItems> = [];\n  hold(items);', 'reads'],
   ]);
 });
 

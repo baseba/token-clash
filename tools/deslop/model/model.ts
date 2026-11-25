@@ -20,6 +20,8 @@ export interface Item {
   takesSelf: boolean;
 }
 
+export type Flow = 'read' | 'write' | 'both';
+
 export interface Reference {
   file: FileId;
   line: number;
@@ -27,7 +29,7 @@ export interface Reference {
   holder: ItemId | undefined;
   item: ItemId;
   copies: boolean;
-  writes: boolean;
+  flow: Flow;
 }
 
 export interface Forwarder {

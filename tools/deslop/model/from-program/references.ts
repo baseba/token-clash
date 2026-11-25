@@ -1,9 +1,9 @@
 import ts from 'typescript';
-import type { FileId, ItemId, Reference } from '../model.js';
+import type { FileId, Flow, ItemId, Reference } from '../model.js';
 import type { NodeId } from '../tree.js';
-import { type Catalog, itemsOfSymbol, memberName, namesNamespace } from './items.js';
+import { type Catalog, itemsOfSymbol, memberName, namesNamespace, outerCast } from './items.js';
 import type { Source } from './load.js';
-import { accessNamedBy, isWritten, outermost } from './mentions.js';
+import { accessNamedBy, isWritten } from './mentions.js';
 
 export type Notation = 'name' | 'construction' | 'destructuring' | 'call';
 
@@ -59,11 +59,9 @@ function isDestructured(pattern: ts.Node): boolean {
 
 const isSuperCall = (node: ts.Node): node is ts.CallExpression => ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.SuperKeyword;
 
-type Flow = 'read' | 'write' | 'both';
-
 function flowOf(name: ts.Node): Flow {
   const access = accessNamedBy(name);
-  const place = access === undefined ? undefined : outermost(access);
+  const place = access === undefined ? undefined : outerCast(access);
   if (place === undefined || !isWritten(place)) return 'read';
   const user = place.parent;
   if (ts.isBinaryExpression(user)) return user.operatorToken.kind === ts.SyntaxKind.EqualsToken ? 'write' : 'both';
@@ -139,10 +137,10 @@ export function collectReferences(checker: ts.TypeChecker, sources: Source[], mo
   };
 
   const visitSource = (source: Source, file: FileId, from: NodeId): void => {
-    const record = (node: ts.Node, notation: Notation, items: ItemId[], writes = false): void => {
+    const record = (node: ts.Node, notation: Notation, items: ItemId[], flow: Flow = 'read'): void => {
       const line = source.syntax.getLineAndCharacterOfPosition(node.getStart(source.syntax)).line + 1;
       const holder = holderOf(node);
-      for (const item of items) occurrences.push({ node, notation, reference: { file, line, from, holder, item, copies: false, writes } });
+      for (const item of items) occurrences.push({ node, notation, reference: { file, line, from, holder, item, copies: false, flow } });
     };
     const itemsNamed = (symbols: ts.Symbol[]): ItemId[] => [...new Set(symbols.flatMap((symbol) => itemsOfSymbol(checker, catalog, symbol)))];
     const visitName = (name: Name): void => {
@@ -171,7 +169,7 @@ export function collectReferences(checker: ts.TypeChecker, sources: Source[], mo
       }
       if (definesName(parent, name)) return;
       const flow = flowOf(name);
-      record(name, 'name', called(itemsOfSymbol(checker, catalog, checker.getSymbolAtLocation(name)), flow), flow !== 'read');
+      record(name, 'name', called(itemsOfSymbol(checker, catalog, checker.getSymbolAtLocation(name)), flow), flow);
     };
     const visit = (node: ts.Node): void => {
       if (isImportOrExport(node) || exportsName(node)) return;
