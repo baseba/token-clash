@@ -77,12 +77,13 @@ servidor (`save-file.spec.ts`, `tournament.spec.ts`…), y cambiar Drizzle por o
 `infrastructure/`. `src/architecture.spec.ts` revisa los imports de cada archivo y falla si un `domain/` importa
 Nest, Drizzle u otra capa.
 
-El puerto es una clase abstracta (`TrainerRepository`) que además sirve de token de inyección de Nest:
+El puerto es una clase abstracta (`TrainerRepository`) que además sirve de token de inyección de Nest.
+
+En `trainers.module.ts`, el repositorio no está entre los `exports`:
 
 ```ts
-// trainers.module.ts
 providers: [TrainersService, { provide: TrainerRepository, useClass: DrizzleTrainerRepository }],
-exports: [TrainersService], // ← el repositorio NO se exporta
+exports: [TrainersService],
 ```
 
 `combat` y `catalog` son casi solo `domain/`: funciones puras con la aleatoriedad inyectada (`random = Math.random`),
@@ -247,7 +248,8 @@ El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection
 Los unitarios viven con su código, así que al mover o borrar un archivo su test lo acompaña. Los e2e prueban la app
 entera, sin pertenecer a ningún dominio, y por eso van en `test/`. `tsconfig.json` deja los `*.spec.ts` fuera del
 build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de `src/`, compila los tests con
-`tsconfig.test.json` y corre todo.
+`tsconfig.test.json` y las herramientas de `tools/` con `tsconfig.tools.json` (estricto), falla si encuentra un
+comentario (`tools/no-comments.ts`) y corre todo.
 
 ## 8. Decisiones y deudas conocidas
 

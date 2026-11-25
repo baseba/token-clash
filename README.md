@@ -325,6 +325,7 @@ Por carpeta:
 | `public/` | El frontend: `index.html`, `style.css`, `app.js` (toda la interfaz) y un módulo por tema. |
 | `public/upstream.js`, `public/upstream/` | De qué commit de cada repo externo salen los sprites, gritos, sonidos y música, y los manifiestos que dicen dónde está cada archivo. |
 | `scripts/` | Descargas e importaciones de datos externos (detalle abajo). |
+| `tools/` | Chequeos del código que corre `npm test` (compilados con `tsconfig.tools.json`): `no-comments.ts` falla con cualquier comentario y los borra con `npm run no-comments -- --fix`. |
 | `deploy/` | Imagen, contenedores, redes y el deploy automático (ver [Deploy](#deploy-podman--cloudflare-tunnel)). |
 
 Por tema:
