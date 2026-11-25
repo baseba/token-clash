@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// Downloads every species from PokeAPI (https://pokeapi.co) into the game's data:
-// - src/catalog/data/pokeapi.json: name, base stats, real types, abilities, every move it can learn (by level,
-//   TM/HM, tutor, egg or other means) and where it sits in its evolution chain.
-// - src/catalog/data/abilities.json: Spanish name and description of every main-series ability.
-// - src/catalog/data/movedex.json: every learnable move, with its Spanish name and description from PokeAPI and
-//   its battle data from Pokémon Showdown's MIT-licensed server data.
-// - public/upstream/sprites.json and cries.json: where the sprites and the cry of every species and battle form
-//   live upstream, via scripts/sprites.mjs and scripts/sync-cries.js.
-//
-// The server never calls PokeAPI (production has no egress): run this again to refresh the data.
-//
-//   node scripts/import-pokeapi.mjs
 
 import { writeFileSync } from 'node:fs';
 import { syncSprites } from './sprites.mjs';
@@ -127,8 +115,6 @@ await mapLimit(ids, async (id) => {
 });
 
 console.error(`${chainIds.size} cadenas evolutivas…`);
-// stage = depth in the chain (0 = first form); chainLen = forms on the longest path through it;
-// evolvesAt = the level it evolves into this form by leveling up, when a level does it.
 const placement = {};
 function walk(node, depth) {
   const below = node.evolves_to.length ? Math.max(...node.evolves_to.map((c) => walk(c, depth + 1))) : 0;

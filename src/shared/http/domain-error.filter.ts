@@ -1,6 +1,3 @@
-// The one place that turns errors into HTTP answers. Domain errors carry a *kind* (conflict,
-// not-found…) and this filter decides the status code, so the domain never knows about HTTP.
-// API errors always look like `{ "error": "message for the player" }`.
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger, NotFoundException } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { DomainError, type DomainErrorKind } from '../domain/errors.js';
@@ -21,7 +18,6 @@ export class DomainErrorFilter implements ExceptionFilter {
 
     if (err instanceof DomainError) return void reply(STATUS[err.kind], err.message);
     if (err instanceof NotFoundException) {
-      // No route matched (the app itself never throws NotFoundException: it uses DomainError).
       if (api) return void reply(404, 'No encontrado');
       return void reply(req.method === 'GET' || req.method === 'HEAD' ? 404 : 405, req.method === 'GET' || req.method === 'HEAD' ? 'not found' : 'method not allowed');
     }

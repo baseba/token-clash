@@ -1,19 +1,3 @@
-// The battle engine's public API: start a battle (createBattle), see what each side may do (validActions), and play
-// a turn (submit). Pure: no I/O and randomness injected, so a battle can be tested and replayed. The engine is
-// split by question:
-//   turn.ts            in what order a turn happens, once both sides have chosen
-//   use-move.ts        what using a move does, up to the hit (and the whole effect of a status move)
-//   damage.ts          whether an attack lands, and how hard
-//   residual.ts        what happens at the end of each turn
-//   switching.ts       a fighter coming in, going out and fainting
-//   effects.ts         every change to a fighter, a side or the field, with its event; also who is where, and speed
-//   ability-engine.ts  when an ability acts, and what its rules (ability-effects.ts) may do
-//   move-rule-api.ts   what the special move rules (move-rules.ts) may do
-//   battle-view.ts     what each client sees
-//   moves.ts           a move as the engine reads it: its data, whether Token Clash supports it, Struggle
-//   fighter.ts         a fighter built from a roster entry, and which moves it may carry
-//   conditions.ts      weather, status and stat-stage facts several modules share
-//   battle-types.ts    the types of all of the above
 import { effectiveness } from '../../catalog/domain/creatures.js';
 import { buildFighter } from './fighter.js';
 import { moveAt, type MoveData, STRUGGLE_MOVE } from './moves.js';
@@ -31,7 +15,6 @@ export { STRUGGLE_MOVE } from './moves.js';
 export { forfeit, TURN_LIMIT } from './turn.js';
 export { type EventView, viewEvents, type PublicMove, type VisibleFighterView, type HiddenFighterView, type FighterView, shownTarget, publicState } from './battle-view.js';
 
-/** How many Pokémon fight on each side. */
 export const BATTLE_SIZE = 3;
 
 function prepare(entry: RosterEntry): BattleFighter {
@@ -60,7 +43,6 @@ function prepare(entry: RosterEntry): BattleFighter {
 }
 
 export function createBattle({ id, sides, random = Math.random }: { id: string; sides: BattleSideInput[]; random?: () => number }): BattleState {
-  // `intro` is filled right below, with the events of the leads coming out.
   const init: Omit<BattleState, 'intro'> = {
     id,
     random,
@@ -156,7 +138,6 @@ function encoreMove(fighter: BattleFighter): number | undefined {
   return slot >= 0 && (fighter.pp[encore.key] ?? 0) > 0 ? slot : undefined;
 }
 
-/** The move slot a fighter must use this turn (recharging, charging, rampaging or locked in), if any. */
 function lockedInMove(fighter: BattleFighter): number | null | undefined {
   return fighter.volatiles.mustRecharge ?? fighter.volatiles.charging ?? fighter.volatiles.rampage?.move ?? fighter.volatiles.locked?.move;
 }
@@ -190,7 +171,6 @@ function moveAction(battle: BattleState, sideIndex: number, action: MoveAction):
   return aimable && (action.target === 'self' || action.target === 'foe') ? { type: 'move', move: action.move, target: action.target } : { type: 'move', move: action.move };
 }
 
-// Returns the events of the resolved turn, or null if still waiting on the other side.
 export function submit(battle: BattleState, sideIndex: number, action: Action | null | undefined): BattleEvent[] | null {
   if (!action || !validActions(battle, sideIndex).some((v) => sameAction(v, action))) throw invalid('Acción inválida');
   battle.sides[sideIndex].action = action.type === 'move' ? moveAction(battle, sideIndex, action) : { type: 'switch', to: action.to };

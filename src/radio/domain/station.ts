@@ -1,20 +1,8 @@
-// The Station aggregate: a trainer's radio station. Its owner is always the DJ and picks the
-// queue; anyone can tune in. A song plays once through, then the next queued one starts. With an
-// empty queue the last song keeps looping, and the server has nothing to do: every client loops it
-// on its own from its loop point.
-//
-// Time is the station's clock, not a timer's: `nowPlaying` says when the song started and when it
-// ends, and `advance(now)` catches up from there. A station nobody listened to for an hour is
-// exactly where it would be if someone had. Durations and the clock come from outside, so the
-// rules run without a catalog file or a real clock.
-
 import { STATION_NAME_MAX, STATION_QUEUE_MAX, type RadioTrackId } from '../../catalog/domain/radio-tracks.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
 
-/** How long a song plays once through, in milliseconds. */
 export type TrackDuration = (track: RadioTrackId) => number;
 
-/** The song on air, on the server's clock (epoch ms). */
 export interface NowPlaying {
   track: RadioTrackId;
   startedAt: number;
@@ -22,19 +10,13 @@ export interface NowPlaying {
 }
 
 export interface StationState {
-  /** One station per trainer, so the owner's id is also the station's. */
   ownerId: string;
   name: string;
   openedAt: number;
-  /** The songs waiting their turn, in order. */
   queue: RadioTrackId[];
-  /** Null while nothing was ever queued, or after the song on air left the radio (see advance). */
   nowPlaying: NowPlaying | null;
 }
 
-// Control and bidi characters would let a name break the layout around it. Other format characters
-// stay: the zero-width joiner holds emoji like 👨‍👩‍👧 together. The length counts code points, not
-// UTF-16 units, so 😀 counts once.
 function cleanName(name: string): string {
   const clean = name.replace(/[\p{Cc}\u200E\u200F\u202A-\u202E\u2066-\u2069]/gu, '').trim();
   if (!clean) throw invalid('Ponle un nombre a tu estación.');
@@ -65,11 +47,6 @@ export class Station implements StationState {
     this.name = cleanName(name);
   }
 
-  /**
-   * Plays the queue up to `now`: each song that ended hands over to the next queued one, which
-   * started when the previous one ended, not now. With nothing on air and songs waiting, the first
-   * one starts now. Says whether anything changed.
-   */
   advance(now: number, durationOf: TrackDuration): boolean {
     let changed = false;
     if (!this.nowPlaying && this.queue.length) {
@@ -83,14 +60,6 @@ export class Station implements StationState {
     return changed;
   }
 
-  /**
-   * The DJ's new queue: adding, removing and reordering all send the whole list. If nothing is on
-   * air, or the song on air already played through and is looping, the first one starts now.
-   *
-   * `playing` is when the song the DJ saw on air started (null if none). The whole list comes from
-   * the DJ's copy, which can be minutes old: if a song changed since, that list still holds songs
-   * that already played, and taking it would play them again.
-   */
   setQueue(tracks: readonly RadioTrackId[], playing: number | null, now: number, durationOf: TrackDuration): void {
     if (tracks.length > STATION_QUEUE_MAX) throw invalid(`La cola admite hasta ${STATION_QUEUE_MAX} canciones.`);
     this.advance(now, durationOf);
@@ -99,14 +68,12 @@ export class Station implements StationState {
     if (this.queue.length && (!this.nowPlaying || now >= this.nowPlaying.endsAt)) this.playNext(now, durationOf);
   }
 
-  /** The next queued song starts now. */
   skip(now: number, durationOf: TrackDuration): void {
     this.advance(now, durationOf);
     if (!this.queue.length) throw conflict('No hay más canciones en la cola: agrega una para saltar a ella.');
     this.playNext(now, durationOf);
   }
 
-  /** When the song on air hands over to the next one, or null if nothing is waiting. */
   get nextChangeAt(): number | null {
     return this.nowPlaying && this.queue.length ? this.nowPlaying.endsAt : null;
   }

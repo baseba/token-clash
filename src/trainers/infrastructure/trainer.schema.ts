@@ -1,6 +1,3 @@
-// Tables owned by the trainers context. No other context reads or writes them: they ask
-// TrainersService. Drizzle infers the row types from these definitions, and drizzle-kit generates
-// the SQL migrations in drizzle/ from them (npm run db:generate).
 import { sql } from 'drizzle-orm';
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { Ivs } from '../../catalog/domain/roster-entry.js';
@@ -13,7 +10,6 @@ export const trainers = sqliteTable(
     name: text().notNull(),
     tokenHash: text('token_hash').notNull().unique(),
     passwordHash: text('password_hash'),
-    /** Roster entry ids, leader first. A small ordered list that is always read whole: JSON. */
     team: text({ mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
     wins: integer().notNull().default(0),
     losses: integer().notNull().default(0),
@@ -31,7 +27,6 @@ export const trainers = sqliteTable(
   },
 );
 
-/** One row per Pokémon in a trainer's collection, in roster order. */
 export const rosterEntries = sqliteTable(
   'roster_entries',
   {
@@ -62,7 +57,6 @@ export const rosterEntries = sqliteTable(
   },
   (t) => [
     primaryKey({ columns: [t.trainerId, t.position] }),
-    // The same save imported in two accounts shares instance ids: stats use it to count people once.
     index('roster_entries_entry_id').on(t.entryId),
   ],
 );

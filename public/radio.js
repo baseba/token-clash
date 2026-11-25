@@ -14,7 +14,6 @@ export const RADIO_REGIONS = {
 
 export const RADIO_KINDS = { battle: 'Batalla', other: 'Otras' };
 
-/** A trainer's radio station: the longest name and queue it takes. The server checks them too. */
 export const STATION_NAME_MAX = 40;
 export const STATION_QUEUE_MAX = 30;
 

@@ -1,6 +1,3 @@
-// From "both ready" to the first turn: the countdown (a tournament match also waits a while for
-// those still arriving), each side picking 3 of its 6 with a clock, the AI's picks, and the
-// reveal of both picks before LiveBattleService starts the battle.
 import { Injectable, Logger } from '@nestjs/common';
 import { aiLevelOf, aiPicks, aiRerollCandidates, aiRerollIndex, type AiLevel } from '../../combat/domain/ai.js';
 import { reroll } from '../../combat/domain/random-party.js';
@@ -30,7 +27,6 @@ export class TeamPreviewService {
     this.timings = config.timings;
   }
 
-  /** Both players are here and ready (or it's a tournament match): the countdown starts. */
   startCountdown(room: Room, tournament: TournamentLabel | null = null): void {
     const { challenge } = room;
     const phase: CountdownPhase = {
@@ -49,7 +45,6 @@ export class TeamPreviewService {
     broadcast(room, { t: 'countdown' });
   }
 
-  /** Each side picks 3 of 6; an AI side picks on its own. A room against the AI starts here. */
   open(room: Room): void {
     const { challenge } = room;
     const phase: PreviewPhase = {
@@ -73,7 +68,6 @@ export class TeamPreviewService {
     });
   }
 
-  /** A player came back to the room: if nobody is missing now, the clock runs at its normal pace again. */
   playerArrived(room: Room, trainerId: string | null): void {
     const { phase } = room;
     if (phase.kind === 'preview'
@@ -84,7 +78,6 @@ export class TeamPreviewService {
       this.armTimer(room, phase);
   }
 
-  /** A player is marking picks (not confirmed yet): viewers see the draft live. */
   choosing(ws: ClientConnection, picks: number[]): void {
     const room = this.presence.roomOf(ws);
     if (room?.phase.kind !== 'preview' || room.phase.preview.revealed) return;
@@ -125,14 +118,12 @@ export class TeamPreviewService {
     broadcast(room, { t: 'preview' });
   }
 
-  /** People who follow a tournament (on its page or in one of its rooms) and are not AIs. */
   private tournamentFollowers(tournamentId: string): string[] {
     const ids = new Set<string>();
     for (const ws of this.presence.tournamentAudience(tournamentId)) if (ws.open && ws.trainerId) ids.add(ws.trainerId);
     return [...ids].filter((id) => !aiLevelOf(id));
   }
 
-  /** In a tournament, the preview waits (a while) until players and followers reach the room. */
   private openWhenArrived(room: Room, countdown: CountdownPhase): void {
     if (room.phase !== countdown) return;
     const { challenge } = room;
@@ -156,7 +147,6 @@ export class TeamPreviewService {
     else room.phase = { kind: 'waiting' };
   }
 
-  /** The picking clock: short while a tournament player is away. When it runs out, the picks are made for them. */
   private armTimer(room: Room, phase: PreviewPhase, extraMs = 0): void {
     clearTimeout(room.timer ?? undefined);
     phase.short = someoneAbsent(room, phase.preview.sides);
@@ -170,7 +160,6 @@ export class TeamPreviewService {
     room.timer.unref();
   }
 
-  /** The AI marks its picks one by one (viewers see them), then confirms. */
   private scheduleAiPick(room: Room, phase: PreviewPhase, sideIndex: number, level: AiLevel): void {
     const { preview } = phase;
     const side = preview.sides[sideIndex];
@@ -212,7 +201,6 @@ export class TeamPreviewService {
     }, this.timings.diceAnimationMs + this.timings.aiPickMs).unref();
   }
 
-  /** Both sides chose: everyone sees the 3 of each side for a moment, then the battle starts. */
   private reveal(room: Room, phase: PreviewPhase): void {
     if (phase.preview.revealed) return;
     if (this.timings.revealMs <= 0) return this.battles.start(room, phase.preview);

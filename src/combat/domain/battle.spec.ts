@@ -14,31 +14,25 @@ const { roster } = parseSave(readFileSync(join(PROJECT_ROOT, 'test', 'fixtures',
 test('species are deterministic and sprited by dex number', () => {
   const e = (finalID): any => ({ finalID, baseID: 403, rarity: 'common', stage: 2, chainLen: 3 });
   assert.deepEqual(species(e(405)), species(e(405)));
-  // The sprite is the species' own dex number.
   assert.equal(species(e(405)).sprite, '405');
   for (const f of roster) assert.match(species(f).sprite, /^[0-9]+$/);
-  // Real type chart, with the product over a defender's two types and immunities.
   assert.equal(effectiveness('fire', ['grass']), 2);
   assert.equal(effectiveness('fire', ['water']), 0.5);
-  assert.equal(effectiveness('fire', ['grass', 'steel']), 4); // doble super efectivo
-  assert.equal(effectiveness('ground', ['flying']), 0); // inmune
+  assert.equal(effectiveness('fire', ['grass', 'steel']), 4);
+  assert.equal(effectiveness('ground', ['flying']), 0);
   assert.equal(effectiveness(null, ['fire']), 1);
 });
 
 test('name, sprite, types and stats come straight from PokeAPI', () => {
   const e = (finalID, extra = {}): any => ({ finalID, baseID: finalID, rarity: 'common', ...extra });
-  // Real types and the six real base stats.
   assert.deepEqual(speciesData(4).types, ['fire']);
   const sp = species(e(4, { stage: 0, chainLen: 3 }));
   assert.deepEqual(sp.types, ['fire']);
   assert.deepEqual(sp.stats, { hp: 39, atk: 52, def: 43, satk: 60, sdef: 50, spd: 65 });
-  // Real PokeAPI name and dex-number sprite.
   assert.equal(sp.name, speciesData(4).name);
   assert.equal(sp.sprite, '4');
-  // Dual-type species keep both types, in PokeAPI slot order.
   assert.deepEqual(speciesData(1).types, ['grass', 'poison']);
   assert.deepEqual(speciesData(16).types, ['normal', 'flying']);
-  // A species PokeAPI doesn't know keeps working with rarity-based stats and the Normal type.
   const unknown = species(e(4999));
   assert.equal(speciesData(4999), null);
   assert.ok(unknown.name && unknown.stats.hp > 0);
@@ -80,7 +74,7 @@ test('rejects invalid actions and waits for both sides', () => {
   assert.deepEqual(validActions(fresh, 0), []);
   const ev = submit(fresh, 1, { type: 'switch', to: 1 });
   assert.equal(ev[0].t, 'turn');
-  assert.equal(ev[1].t, 'switch'); // switches happen before moves
+  assert.equal(ev[1].t, 'switch');
   assert.ok(b);
 });
 
@@ -91,7 +85,7 @@ test('events say who acts first and why, and whom a switch replaces', () => {
   const moves = ev.filter((e) => e.t === 'move');
   assert.ok(['priority', 'speed', 'tie'].includes(moves[0].why as string));
   assert.equal(moves[1]?.why, undefined);
-  for (const e of ev.filter((x) => x.t === 'damage')) assert.notEqual(e.side, (ev[ev.indexOf(e) - 1] as { side: number }).side); // damage lands on the other side
+  for (const e of ev.filter((x) => x.t === 'damage')) assert.notEqual(e.side, (ev[ev.indexOf(e) - 1] as { side: number }).side);
 
   const c = createBattle({ id: 's', random: rng(2), sides: [{ trainerId: 'a', name: 'A', entries: roster }, { trainerId: 'b', name: 'B', entries: roster }] });
   submit(c, 0, { type: 'switch', to: 1 });

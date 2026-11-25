@@ -1,4 +1,3 @@
-// The AI: builds its team, picks its three, and chooses what to do each turn. Randomness is injected.
 import { speciesData, formData, statsFor, PERFECT_IVS, effectiveness, shuffled, rng, type Random, type SpeciesData } from '../../catalog/domain/creatures.js';
 import { BATTLE_LEVEL, buildFighter, usableMovepool, MOVES_PER_FIGHTER } from './fighter.js';
 import { moveAt, moveData, type MoveData } from './moves.js';
@@ -14,8 +13,6 @@ export const AI_LEVELS = ['easy', 'mid', 'hard', 'veryhard', 'skynet'] as const;
 export type AiLevel = (typeof AI_LEVELS)[number];
 export const isAiLevel = (value: string): value is AiLevel => AI_LEVELS.some((level) => level === value);
 
-// Skynet's turns are decided by Jev (combat/infrastructure/jev/jev.ts). Everything else, and its fallback when Jev
-// can't answer, is the very hard AI.
 export const JEV_LEVEL = 'skynet';
 const tactics = (level: AiLevel): Exclude<AiLevel, typeof JEV_LEVEL> => (level === JEV_LEVEL ? 'veryhard' : level);
 export const AI_PREFIX = 'ai:';
@@ -23,7 +20,6 @@ export const LAST_AI_SPECIES = DEX_LIMIT;
 
 export const aiTrainerId = (level: AiLevel): string => `${AI_PREFIX}${level}`;
 export const aiFrame = (level: AiLevel): string => `ai-${level}`;
-/** A tournament can seat several AIs of one level: each gets a number. */
 export const aiSeatId = (level: AiLevel, seatNumber: number): string => `${aiTrainerId(level)}#${seatNumber}`;
 export function aiLevelOf(trainerId: string): AiLevel | null {
   if (!trainerId.startsWith(AI_PREFIX)) return null;
@@ -189,8 +185,6 @@ export function aiRerollIndex({ difficulty: level, own, random = Math.random }: 
   return own.map((_, index) => index).reduce((weakest, index) => (strength(index) < strength(weakest) ? index : weakest), 0);
 }
 
-// The three for the battle are picked on a hunch, without looking at the rival's party: easier
-// AIs at random, harder ones leaning towards their strongest.
 export function aiPicks({ difficulty: level, own, random = Math.random }: { difficulty: AiLevel; own: RosterEntry[]; random?: Random }): number[] {
   const difficulty = tactics(level);
   const order = own.map((_, i) => i);
@@ -204,14 +198,8 @@ export function aiPicks({ difficulty: level, own, random = Math.random }: { diff
     .map((x) => x.index);
 }
 
-// The AI decides on its belief of the battle, built only from what a human on its side sees:
-// the rival's revealed moves and ability, its HP as a percentage, and its Pokémon once they've
-// been out. The rest is a guess from the species, never the real thing. Its pending choice is
-// never there.
-
 const guesses = new Map<string, MoveData[]>();
 
-// The moves a seasoned player would expect from that species at that level.
 function expectedMoves(speciesId: number, level: number): MoveData[] {
   const key = `${speciesId}:${level}`;
   if (!guesses.has(key)) {
@@ -220,8 +208,6 @@ function expectedMoves(speciesId: number, level: number): MoveData[] {
       const probe = { id: `guess-${speciesId}`, finalID: speciesId, baseID: speciesId, level, ivs: PERFECT_IVS, learned: [] } as unknown as RosterEntry;
       moves = pickMoveset(probe, 'hard', () => 0.5).map(moveData) as MoveData[];
     } catch {
-      // The probe is a bare entry, not a real Pokémon: if the catalog can't build one for this
-      // species, the AI guesses no moves rather than stalling the turn timer with a throw.
       moves = [];
     }
     guesses.set(key, moves);
@@ -235,7 +221,6 @@ function believedFoe(fighter: BattleFighter): BattleFighter {
   let moves = fighter.moves;
   let volatiles = fighter.volatiles;
   if (!fighter.volatiles.transformed) {
-    // Revealed moves keep their slot; the unknown ones become guesses (or go, if there are none).
     const known = (move: MoveData) => fighter.revealedMoves.has(move.key);
     const extra = expectedMoves(fighter.speciesId, fighter.level).filter((g) => !fighter.moves.some((m) => known(m) && m.key === g.key));
     const slots = fighter.moves.map((m) => (known(m) ? m : extra.shift()));
@@ -473,7 +458,6 @@ function lookahead(battle: BattleState, sideIndex: number, options: Action[]): A
         total += simulate(battle, sideIndex, mine, reply, `${battle.turn}:${seed}:${JSON.stringify(mine)}:${JSON.stringify(reply)}`);
       return total / SEARCH_SEEDS;
     });
-    // When every line looks the same (say, lost either way), the plain move score breaks the tie.
     const tiebreak = mine.type === 'move' ? scoreMove(battle, sideIndex, mine.move) / 1e5 : 0;
     const value = 0.6 * Math.min(...outcomes) + 0.4 * (outcomes.reduce((a, x) => a + x, 0) / outcomes.length) + tiebreak - (mine.type === 'switch' ? LOOKAHEAD_SWITCH_COST : 0);
     if (value > bestValue) [best, bestValue] = [mine, value];
@@ -507,14 +491,8 @@ function chooseReplacement(battle: BattleState, sideIndex: number, profile: AiPr
 }
 
 const SWITCH_MARGIN = 0.35;
-/** A switch gives the rival a free hit, and going back and forth reads as nonsense: the search needs a clear gain to make one. */
 const LOOKAHEAD_SWITCH_COST = 0.25;
 
-/**
- * A Pokémon that came in after the opening turn (as a replacement or by a switch) has not fought yet:
- * it stays at least one turn instead of being called back right away. The lead may still leave a bad
- * opening.
- */
 const justCameIn = (battle: BattleState, me: BattleFighter): boolean => battle.turn > 1 && me.activeTurns < 1;
 
 function shouldSwitch(battle: BattleState, sideIndex: number, profile: AiProfile, best: number, switches: SwitchAction[], random: Random): SwitchAction | null {

@@ -6,7 +6,6 @@ const PASSWORD_MAX_LENGTH = 128;
 const KEY_LENGTH = 32;
 const SALT_BYTES = 16;
 
-/** @throws {DomainError} the password is too short or too long */
 export function checkPassword(password: string): void {
   if (password.length < PASSWORD_MIN_LENGTH) throw invalid(`La contraseña necesita al menos ${PASSWORD_MIN_LENGTH} caracteres.`);
   if (password.length > PASSWORD_MAX_LENGTH) throw invalid(`La contraseña puede tener hasta ${PASSWORD_MAX_LENGTH} caracteres.`);

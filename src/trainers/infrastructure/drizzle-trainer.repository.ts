@@ -1,9 +1,3 @@
-// Adapter: TrainerRepository on SQLite through Drizzle.
-//
-// It is also an *identity map*: every trainer is loaded once at startup and the same object is
-// handed out afterwards, so two parts of the app never hold diverging copies of one trainer. Reads
-// come from memory (a few dozen trainers); every save writes through to SQLite at once, inside a
-// transaction. If the data ever outgrows memory, only this class changes.
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { eq } from 'drizzle-orm';

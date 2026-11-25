@@ -1,8 +1,3 @@
-// The socket protocol at /ws. One gateway, thin: it keeps per-connection state, checks which
-// messages are allowed in which state, and hands each one to the use case that owns it: the arena
-// (rooms, tournaments, the lobby and their chat) or the radio (tuning in to a station, which any
-// connection can do on the side). The frames sent back are built there too.
-// What each message carries is in client-messages.ts; they arrive here already parsed.
 import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import type { IncomingMessage } from 'node:http';
 import type { WebSocket, WebSocketServer } from 'ws';
@@ -18,7 +13,6 @@ import { RadioService } from '../radio/application/radio.service.js';
 import type { ClientMessageOf } from './client-messages.js';
 import { ConnectionLimits } from './connection-limits.js';
 
-/** Adapts a WebSocket to the arena's ClientConnection port and the radio's RadioListener port. */
 class WsConnection implements ClientConnection, RadioListener {
   trainerId: string | null = null;
   roomId: string | null = null;
@@ -41,7 +35,6 @@ class WsConnection implements ClientConnection, RadioListener {
     this.socket.send(typeof frame === 'string' ? frame : JSON.stringify(frame));
   }
 
-  /** Not yet in a room, a tournament or the lobby: free to choose one. */
   get idle(): boolean {
     return !this.roomId && !this.tourId && !this.inLobby;
   }
@@ -64,7 +57,6 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
   ) {}
 
   afterInit(server: WebSocketServer): void {
-    // Drop sockets that stopped answering pings (a laptop that went to sleep, a dead network).
     this.heartbeat = setInterval(() => {
       for (const socket of server.clients) {
         const conn = this.connections.get(socket);
@@ -187,7 +179,6 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
     if (connection) this.chat.say(connection, msg.text);
   }
 
-  /** Listening doesn't touch `idle`: a player can keep a station on while battling. */
   @SubscribeMessage('radio')
   onRadio(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'radio'>): void {
     const connection = this.conn(socket);

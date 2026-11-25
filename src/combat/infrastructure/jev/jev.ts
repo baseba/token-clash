@@ -1,17 +1,10 @@
-// Skynet: each turn, Jev (TypeSafe's decision model) picks the AI's action.
-// Jev only sees what a human player on that side would see (publicState), never the rival's
-// hidden Pokémon, moves, stats or pending choice, and never trainer names or nicknames.
 import { publicState, validActions, STRUGGLE_MOVE, type Action, type BattleState, type FighterView, type PublicMove, type VisibleFighterView } from '../../domain/battle.js';
 import { effectiveness } from '../../../catalog/domain/creatures.js';
 
-// TypeSafe's endpoint. In production the app calls the egress proxy (jev-proxy.ts) instead, which
-// adds the key: the URL comes from JEV_API_URL (see SkynetService).
 export const JEV_DEFAULT_URL = 'https://api.typesafe.ai/v1/systemone';
-// Pinned, not jev-latest, so a model update can't silently change how Skynet plays.
 export const JEV_DEFAULT_MODEL = 'jev-1.14.0';
 export const JEV_TIMEOUT_MS = 4_000;
 
-/** How to reach Jev. Without apiKey no Authorization is sent: the proxy adds it. */
 export interface JevOptions {
   url?: string;
   model?: string;
@@ -69,7 +62,6 @@ export function jevState(battle: BattleState, sideIndex: number): Facts {
   const theirs = view.sides[1 - sideIndex];
   const foe = theirs.team[theirs.active];
   const foeActive = isVisible(foe) && foe.hp > 0 ? foe : null;
-  // Your own team is always fully visible to you.
   const me = mine.team[mine.active] as VisibleFighterView;
   return {
     game: 'Turn-based Pokémon singles battle, 3 Pokémon per side. Both sides choose at the same time; the faster Pokémon moves first unless a move has higher priority. You win when every rival Pokémon has fainted.',
@@ -90,7 +82,6 @@ export function jevState(battle: BattleState, sideIndex: number): Facts {
   };
 }
 
-// The valid actions as Choice criteria. Keys map back to the action the engine expects.
 export function jevOptions(battle: BattleState, sideIndex: number): { criteria: Record<string, Facts>; actions: Record<string, Action> } {
   const view = publicState(battle, sideIndex);
   const mine = view.sides[sideIndex];
@@ -126,7 +117,6 @@ export function jevOptions(battle: BattleState, sideIndex: number): { criteria: 
   return { criteria, actions };
 }
 
-// Asks Jev; resolves to { key, confidence } or throws with a short reason (never the key or body).
 export async function askJev({ url = JEV_DEFAULT_URL, model = JEV_DEFAULT_MODEL, apiKey, state, criteria, fetchImpl = fetch, timeoutMs = JEV_TIMEOUT_MS }: JevOptions & { state: Facts; criteria: Record<string, Facts> }): Promise<{ key: string; confidence: number | null }> {
   let res: Response;
   try {
@@ -156,8 +146,6 @@ export async function askJev({ url = JEV_DEFAULT_URL, model = JEV_DEFAULT_MODEL,
   return { key: answer.choice, confidence: answer.confidence ?? null };
 }
 
-// The action Jev picks for side s, or null if Jev can't decide (error, timeout, bad answer).
-// Without apiKey no Authorization is sent: the proxy adds it.
 export async function chooseJevAction(
   battle: BattleState,
   sideIndex: number,

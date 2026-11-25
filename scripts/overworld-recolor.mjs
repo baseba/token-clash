@@ -1,31 +1,17 @@
-// A colour variant of a trainer on its overworld sprite, with the same functions as the battle
-// recolour (scripts/sprite-rotate.mjs): the overworld's colours are split into families with
-// `familiesOf`, its skin found by `skinOf` from the skin tones the GBA sprites share (as the battle
-// sprites' shared tones seed theirs), each family the variant repainted on the battle sprite is found
-// on the overworld by material, and `paintPlans` turns only its tint in OKLCH to the hue the battle
-// family got, with the shadows shared by skin and clothes decided piece by piece by `recolorByMap`.
 import { hsl, isSkin, paletteOf } from './plan-trainer-variants.mjs';
 import { hexOf, hslOf, rampsOf, rgbOfHsl } from './sprite-ramps.mjs';
 import { familiesOf, hueGap, oklchOf, paintPlans, tintable } from './sprite-rotate.mjs';
 import { SKIN } from './sync-trainers.js';
 
-/** How far an overworld family may be from the battle one it stands for (hue in 60° steps, light, chroma and share). */
 const MAX_SCORE = 1.2;
-/** Share of a battle family's coloured tones (the ones a rotation turns; greys in it stay) that must be repainted to count it as changed. */
 const PAINTED_SHARE = 0.5;
 const TURNING_CHROMA = 0.035;
-/** Share of a set's pixels that must be coloured for it to read as a colour and not as grey. */
 const COLOURED_SHARE = 0.5;
-/** How much lighter than the battle tones that changed an overworld grey may be and still be tinted: a white shirt beside a black suit stays white. */
 const TINT_REACH = 0.25;
-/** Smallest overworld family worth repainting, as a share of the figure's pixels. */
 const MIN_SHARE = 0.03;
 const KIND_GAP = 1;
-/** A grey darker than this is not tinted (like the battle recolour's tint floor), so it cannot carry a variant alone. */
 const TINT_MIN_LIGHT = 0.3;
-/** Share of the official overworlds a skin tone must appear in to be one of the GBA's shared skin tones. */
 const SKIN_REUSE = 0.08;
-/** Shared tones darker than this are hair or clothes shadows more often than skin: skinOf adds the skin's own by contact. */
 const SKIN_MIN_LIGHT = 0.6;
 
 const hexKey = (hex) => parseInt(hex.slice(1), 16);
@@ -37,14 +23,12 @@ function meanHue(items) {
   return (((Math.atan2(y, x) * 180) / Math.PI) % 360 + 360) % 360;
 }
 
-/** The skin tones the official overworlds share, like the faces the battle sprites share: they seed each overworld's skin. */
 export function sharedSkinTones(sheets) {
   const seen = new Map();
   for (const sheet of sheets) for (const color of colorsOf(sheet)) seen.set(color, (seen.get(color) ?? 0) + 1);
   return new Set([...seen].filter(([color, count]) => count >= sheets.length * SKIN_REUSE && isSkin(hsl([color >> 16, (color >> 8) & 255, color & 255])) && hsl([color >> 16, (color >> 8) & 255, color & 255])[2] >= SKIN_MIN_LIGHT).map(([color]) => color));
 }
 
-/** An overworld frame's families, its skin seeded by the shared skin tones. */
 export function overworldAnalysis(frame, skinTones) {
   const palette = paletteOf(frame);
   for (const [color, entry] of palette) entry.canonSkin = skinTones.has(color);
@@ -54,11 +38,6 @@ export function overworldAnalysis(frame, skinTones) {
 const weightOf = (colors) => colors.reduce((sum, color) => sum + color.count, 0);
 const turningOf = (family) => family.colors.filter((color) => color.oklch[1] >= TURNING_CHROMA);
 
-/**
- * What a set of tones looks like, to compare materials: neutral when most of its pixels are grey (a
- * black suit with a red pin is a black suit, a grey one with an olive shadow a grey one), else the
- * hue, light and chroma of its coloured tones (a grey beside them does not count).
- */
 function lookOf(colors) {
   const turning = colors.filter((color) => color.oklch[1] >= TURNING_CHROMA);
   const neutral = weightOf(turning) < weightOf(colors) * COLOURED_SHARE;
@@ -74,7 +53,6 @@ function lookOf(colors) {
   };
 }
 
-/** The families of the battle sprite the variant repainted, each described by the tones that changed (a grey beside them stays) and the hue they were turned to, heaviest first. */
 export function battlePlans(analysis, map) {
   const painted = new Map(map.filter((entry) => entry.length === 2).map(([from, to]) => [from.toLowerCase(), oklchOf(rgbOf(to))]));
   return analysis.families
@@ -102,11 +80,6 @@ function matchScore(plan, family, opaque) {
 const paintable = (family, opaque) => !family.unsure && family.weight >= opaque * MIN_SHARE;
 const visibility = (family) => family.weight * (tintable(family) ? 0.05 : family.chroma);
 
-/**
- * The plans for an overworld frame: each repainted battle family matched to the overworld family most
- * like it, with the hue the battle one got. When none is found, the overworld's most visible family
- * takes the main one, so a variant always shows on the map.
- */
 export function overworldPlans(plans, analysis) {
   const candidates = analysis.families.filter((family) => paintable(family, analysis.opaque));
   const used = new Set();
@@ -125,11 +98,6 @@ export function overworldPlans(plans, analysis) {
   return main ? [{ family: main, hue: plans[0].hue }] : [];
 }
 
-/**
- * The repaint of an overworld frame for a variant, as a map `recolorByMap` applies (whole colours,
- * shared shadows and skin). The GBA's shared skin tones are always skin, even where `skinOf` left one
- * in a family, so they are never repainted.
- */
 export function overworldVariant(battle, overworld, map, skinTones) {
   const plans = battlePlans(familiesOf(paletteOf(battle)), map);
   if (!plans.length) return { map: [], problems: ['el sprite de batalla no cambia'] };
@@ -146,7 +114,6 @@ const NEAR_COLOR = 48;
 const FRONT = 4;
 const FRAME = 32;
 
-/** The frame looking at you (standing, facing down) of a normalized sheet: the one the colours are decided on. */
 export function frontFrame(sheet) {
   const rgba = Buffer.alloc(FRAME * FRAME * 4);
   sheet.rgba.copy(rgba, 0, FRONT * FRAME * FRAME * 4, (FRONT + 1) * FRAME * FRAME * 4);
@@ -159,11 +126,6 @@ function colorsOf(image) {
   return found;
 }
 
-/**
- * The front's repaint carried to the back and the sides, colour by colour: a colour the front has
- * gets exactly the same replacement, and one only seen from behind or the side gets the change its
- * closest front colour got (same hue, the same shift in saturation and light).
- */
 export function extendFrontMap(sheet, map) {
   const table = new Map(map.map(([from, to]) => [hexKey(from), to]));
   const front = [...colorsOf(frontFrame(sheet))];
@@ -189,7 +151,6 @@ export function extendFrontMap(sheet, map) {
   return out;
 }
 
-/** Skin is never repainted: light, warm tones (faces, arms, legs); darker reds and oranges are hair or clothes. */
 export function isSkinTone(hex) {
   const [hue, saturation, light] = hslOf(rgbOf(hex));
   return hue >= 10 && hue <= 40 && saturation >= 0.3 && light >= 0.62 && light <= 0.93;

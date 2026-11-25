@@ -1,6 +1,5 @@
 import type { IncomingMessage } from 'node:http';
 
-/** The caller's IP. Behind Cloudflare (and only then) it comes in CF-Connecting-IP. */
 export function clientIp(req: IncomingMessage, trustCf: boolean): string {
   const cf = req.headers['cf-connecting-ip'];
   if (trustCf && cf) return String(cf);

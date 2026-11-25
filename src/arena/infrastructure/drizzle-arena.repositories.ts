@@ -1,6 +1,3 @@
-// Adapters: the arena repositories on SQLite through Drizzle. Like the trainers one, they are
-// identity maps: loaded once, the same object handed out afterwards (live rooms and their timers
-// keep references to a challenge or tournament and must see every change), writes go through.
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { eq } from 'drizzle-orm';
@@ -66,7 +63,6 @@ export class DrizzleTournamentRepository extends TournamentRepository {
     return this.byId.get(id);
   }
 
-  /** The whole aggregate, in one transaction: tournament row, its seats and its bracket. */
   save(tournament: Tournament): void {
     const rows = tournamentToRows(tournament);
     this.db.transaction((tx) => {

@@ -1,14 +1,12 @@
 import type { RadioTrackId } from '../../catalog/domain/radio-tracks.js';
 import type { NowPlaying, Station } from '../domain/station.js';
 
-/** A station as clients see it, over HTTP and in the `radio` socket frame. */
 export interface StationView {
   ownerId: string;
   ownerName: string;
   name: string;
   nowPlaying: NowPlaying | null;
   queue: RadioTrackId[];
-  /** How many clients are tuned in. */
   listeners: number;
 }
 

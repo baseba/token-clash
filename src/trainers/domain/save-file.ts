@@ -1,10 +1,3 @@
-// Reads a PokeTokenBar save: the app's export / snapshot ({format: "poketokenbar.save", state})
-// or the raw live file (~/Library/Application Support/PokeTokenBar/companion-state.json).
-// We keep only game data: species numbers, rarity, level, IVs, nature, shiny, ability, gender and
-// learned moves. Names, device name and token logs are dropped on purpose.
-//
-// Pure domain: text in, roster out. No database, no HTTP.
-
 import { hash, NATURE_NAMES } from '../../catalog/domain/creatures.js';
 import { uniqueSpecies, variantKey, type Gender, type Ivs, type Rarity, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { toDuplicate, type Duplicate } from './recycling.js';
@@ -21,12 +14,10 @@ const MAX_LEARNED = 120;
 
 export interface ParsedSave {
   roster: RosterEntry[];
-  /** The repeated copies the roster leaves out (it keeps one per species and variant). */
   duplicates: Duplicate[];
   totalTokens: number;
 }
 
-// The save is untrusted JSON: everything below reads it as `unknown` and checks each field.
 type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json => !!value && typeof value === 'object';
 
@@ -38,7 +29,6 @@ const int = (value: unknown, lo: number, hi: number, fallback: number) => {
 
 function ivsFrom(profile: Json | null, seedKey: string): Ivs {
   const iv = profile && isObject(profile.ivs) ? profile.ivs : null;
-  // Old saves have no IVs: give a stable middling value instead of a random one.
   const fb = 8 + (hash(seedKey) % 16);
   if (!iv) return { hp: fb, atk: fb, def: fb, satk: fb, sdef: fb, spd: fb };
   const ivFor = (key: string) => int(iv[key], 0, 31, fb);
@@ -52,7 +42,6 @@ function ivsFrom(profile: Json | null, seedKey: string): Ivs {
   };
 }
 
-// Where finalID sits in its evolution chain (0 = first form) and how long the chain is.
 function chainInfo(chain: unknown, finalID: number, stageHint?: number): { stage?: number; chainLen?: number } {
   if (!Array.isArray(chain) || chain.length < 1 || chain.length > 10 || !chain.every(Number.isInteger)) return {};
   const stage = Number.isInteger(stageHint) ? (stageHint as number) : chain.indexOf(finalID);
@@ -107,7 +96,6 @@ export interface CaughtCandidate {
   order: number;
 }
 
-/** Keeps the first one caught of each species and variant (shiny/plain), sorted by dex number. */
 export function firstOfEachSpecies(candidates: CaughtCandidate[]): RosterEntry[] {
   const first = new Map<string, CaughtCandidate>();
   for (const candidate of candidates) {
@@ -120,10 +108,6 @@ export function firstOfEachSpecies(candidates: CaughtCandidate[]): RosterEntry[]
     .map((c) => c.entry);
 }
 
-/**
- * After a roster changes (a new save, or dropping repeats), keeps the team pointing at the same
- * Pokémon: by instance id, or by species and variant when the id changed.
- */
 export function carryTeam(team: string[], before: RosterEntry[], after: RosterEntry[]): string[] {
   const kept = new Map(after.map((e) => [e.id, e]));
   const keptByVariant = new Map(after.map((e) => [variantKey(e), e]));
@@ -135,7 +119,6 @@ export function carryTeam(team: string[], before: RosterEntry[], after: RosterEn
 export function parseSave(text: string): ParsedSave {
   let json: unknown;
   try {
-    // profile.seed is a uint64 and loses precision here; we never use it.
     json = JSON.parse(text);
   } catch {
     throw invalid('El archivo no es JSON válido.');
@@ -158,7 +141,7 @@ export function parseSave(text: string): ParsedSave {
 
   const dex = Array.isArray(state.dex) ? state.dex : [];
   dex.forEach((seen: unknown, i: number) => {
-    if (!isObject(seen) || seen.releasedAt) return; // released ones were let go, not raised
+    if (!isObject(seen) || seen.releasedAt) return;
     add(
       entryFrom(seen, {
         finalID: seen.finalID,

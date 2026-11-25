@@ -1,6 +1,3 @@
-// An attack against its target: protection, immunity and accuracy, base power, the damage formula with its
-// critical hits and multi-hits, substitutes, and what follows a hit (secondary effects, recoil, drain, forced
-// switches).
 import { type BoostKey, type Boosts, effectiveness, type MajorStatus } from '../../catalog/domain/creatures.js';
 import { MOVE_RULES } from './move-rules.js';
 import { isRain, isSun, poisoned, stageMult } from './conditions.js';

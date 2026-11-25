@@ -1,24 +1,3 @@
-// What you can take after a floor, like the item shop between waves of PokeRogue: offers of three
-// rarities, each telling every Pokémon of the party whether it fits and why. Thirty kinds, in families:
-//   moves      machines (plain and powerful), tutors, egg moves, a Mushroom (a level move from ahead),
-//              Memories (coverage of another type), Gems (a light move of another type), support
-//              machines, Quick Claws (a priority move) and Tera Shards (the strongest move of its type)
-//   EVs        vitamins (+64 in a stat), Wings (+24 for the whole party), a Macho Brace (+32 in every
-//              stat) and a vitamin bag (+64 in its attack and its Speed)
-//   IVs        weights (+8 in every IV), a Bottle Cap (one IV to 31) and a Gold one (all six)
-//   nature     a Mint (any nature) or an ideal Mint (the best one for its stats)
-//   ability    a Capsule (another ability) or a Patch (the hidden one)
-//   levels     Rare and Exp. Candies, an Exp. Share and a candy jar (for the whole party), up to the cap
-//   evolution  a stone (evolutions with no level) and a Linking Cord (a level evolution a few levels early)
-//   recruits   a Lucky Egg (a recruit of your collection) and a Golden Egg (one at your best level)
-//   looks      a Shiny Charm (it turns shiny)
-//   held items like PokeRogue's and Emerald Rogue's, one per Pokémon: type boosters, bands and lenses
-//              (common), Leftovers, berries, a Focus Band or a Rocky Helmet (rare), a Life Orb, an
-//              Expert Belt or a Focus Sash (epic). A new one replaces the one it held.
-// The higher the floor, the rarer the offers, and more of them. A climb's rumour can favour some.
-// Every offer says what it does in the terms of the battle: the stats as they end up (Speed 48 → 55),
-// the levels and the evolution they bring, and what a move adds (its own type or new coverage). A
-// vitamin or a cap is for a stat someone in the party uses: its stronger attack, its Speed or its HP.
 import { abilityOptions, moveOrigins, NATURE_KEYS, natureInfo, shuffled, speciesData, statsFor, type Random } from '../../catalog/domain/creatures.js';
 import type { Ivs } from '../../catalog/domain/roster-entry.js';
 import type { TwistKey } from '../../catalog/domain/tower-cast.js';
@@ -73,14 +52,10 @@ export const REWARD_TIERS: Record<RewardKind, RewardTier> = {
   epicItem: 'epic',
 };
 
-/** Rewards that are a held item, by the rarity of the item they bring. */
 export const ITEM_REWARDS: Readonly<Partial<Record<RewardKind, ItemTier>>> = { commonItem: 'common', rareItem: 'rare', epicItem: 'epic' };
 
-/** Rewards that work on the whole party at once, with no one to choose. */
 export const PARTY_REWARDS: readonly RewardKind[] = ['egg', 'goldenEgg', 'feather', 'expShare', 'candyJar'];
-/** Rewards that teach a move. */
 export const MOVE_REWARDS: readonly RewardKind[] = ['tm', 'tutor', 'eggMove', 'powerTm', 'mushroom', 'memory', 'gem', 'supportTm', 'quickClaw', 'teraShard'];
-/** Rewards that give levels, and to whom: the one you choose or everyone below the cap. */
 export const LEVEL_REWARDS: readonly RewardKind[] = ['candy', 'expCandy', 'expShare', 'candyJar'];
 
 export interface Reward {
@@ -90,13 +65,9 @@ export interface Reward {
   move?: string;
   levels?: number;
   stat?: StatKey;
-  /** The nature it gives each party member (an ideal Mint), by uid. */
   natures?: Record<string, string>;
-  /** The held item it is. */
   item?: string;
-  /** The party members that can take it (a move only fits those that can learn it). */
   fits: string[];
-  /** Why it fits or not, for each party member. */
   reasons: Record<string, string>;
 }
 
@@ -111,7 +82,6 @@ export interface RewardTarget {
   ivs: Ivs;
   nature: string | null;
   shiny: boolean;
-  /** The item it holds now. */
   item?: string | null;
 }
 
@@ -119,21 +89,15 @@ export interface RestContext {
   floor: number;
   boss: boolean;
   cap: number;
-  /** The rarest tier one of the offers must reach (a boss or a tough room promise more). */
   minTier: RewardTier;
-  /** The highest tier allowed (a calm room only gives common ones). */
   maxTier?: RewardTier;
   recruitable: boolean;
   count?: number;
-  /** Offers on top of the usual count. */
   extra?: number;
-  /** Kinds that show up more often. */
   favored?: readonly RewardKind[];
-  /** Levels a candy gives on top of the usual. */
   candyBonus?: number;
 }
 
-/** How each rumour changes the rewards. */
 export const TWIST_REWARDS: Partial<Record<TwistKey, Partial<RestContext>>> = {
   market: { extra: 1 },
   tutors: { favored: MOVE_REWARDS },
@@ -153,18 +117,12 @@ export const BRACE_EVS = 32;
 export const WEIGHTS_IVS = 8;
 const SHARE_LEVELS = 1;
 const JAR_LEVELS = 3;
-/** A Linking Cord evolves a Pokémon this many levels before its evolution level, at most. */
 export const CORD_REACH = 5;
-/** A Gem teaches a light move: at most this power. */
 const LIGHT_MOVE = 75;
-/** A Tera Shard teaches a strong move of its own type: at least this power. */
 const TERA_MOVE = 80;
 const FAST_SPEED = 80;
-/** A Mushroom teaches a level move from up to this many levels ahead. */
 export const MUSHROOM_REACH = 10;
-/** A machine at least this strong is a powerful one (epic); weaker ones are rare. */
 const POWERFUL_MOVE = 90;
-/** From this floor every rest offers one more reward. */
 const MORE_REWARDS_FROM = 25;
 export const MAX_STAT_EVS = 252;
 export const MAX_TOTAL_EVS = 510;
@@ -174,7 +132,6 @@ const CANDY_LEVELS = 2;
 const BOSS_CANDY_LEVELS = 3;
 const USEFUL_POWER = 60;
 const MAX_ATTEMPTS = 40;
-/** Rarer offers the higher you climb: common ones fade from 55 to 30, epic ones grow from 10 to 25. */
 const tierWeights = (floor: number): Record<RewardTier, number> => ({ common: Math.max(30, 55 - floor * 0.6), rare: 35, epic: Math.min(25, 10 + floor * 0.3) });
 export const TIER_ORDER: readonly RewardTier[] = ['common', 'rare', 'epic'];
 export const STATS: readonly StatKey[] = ['hp', 'atk', 'def', 'satk', 'sdef', 'spd'];
@@ -197,7 +154,6 @@ const power = (id: string): number => moveData(id)?.power ?? 0;
 const ANY_ORIGIN = ['level', 'machine', 'tutor', 'egg'];
 const MOVE_ORIGINS: Partial<Record<RewardKind, readonly string[]>> = { tm: ['machine'], powerTm: ['machine'], tutor: ['tutor'], eggMove: ['egg'], supportTm: ['machine', 'tutor'] };
 
-/** What a move reward can teach this Pokémon. */
 function teachableBy(kind: RewardKind, target: RewardTarget): string[] {
   if (kind === 'mushroom') return levelMovesUpTo(target.speciesId, target.level + MUSHROOM_REACH).filter((id) => !target.known.includes(id));
   const moves = teachable(target, MOVE_ORIGINS[kind] ?? ANY_ORIGIN);
@@ -224,10 +180,8 @@ function teachableBy(kind: RewardKind, target: RewardTarget): string[] {
   }
 }
 
-/** A Gem's move only needs to hit: a light one is still worth it. */
 const worthTeaching = (kind: RewardKind, id: string): boolean => (kind === 'gem' || kind === 'quickClaw' ? alwaysDamages(id) : useful(id));
 
-/** The best nature for its stats: up its stronger attack, or Speed if it is fast; down the attack it doesn't use. */
 export function idealNature(speciesId: number): string {
   const [, attack, , specialAttack, , speed] = speciesData(speciesId)?.stats ?? [0, 0, 0, 0, 0, 0];
   const physical = attack >= specialAttack;
@@ -235,13 +189,11 @@ export function idealNature(speciesId: number): string {
   return physical ? (fast ? 'jolly' : 'adamant') : fast ? 'timid' : 'modest';
 }
 
-/** Its stronger attack stat. */
 export const attackStat = (speciesId: number): StatKey => {
   const [, attack, , specialAttack] = speciesData(speciesId)?.stats ?? [0, 0, 0, 0];
   return attack >= specialAttack ? 'atk' : 'satk';
 };
 
-/** The EVs after an EV reward: each stat gets what fits under 252 and 510 in all. */
 export function evsAfter(kind: RewardKind, evs: Ivs, speciesId: number, stat: StatKey | undefined): Ivs {
   const plan: [StatKey, number][] =
     kind === 'machoBrace' ? STATS.map((key) => [key, BRACE_EVS]) : kind === 'vitaminBag' ? [[attackStat(speciesId), VITAMIN_EVS], ['spd', VITAMIN_EVS]] : [[stat as StatKey, kind === 'feather' ? FEATHER_EVS : VITAMIN_EVS]];
@@ -250,14 +202,12 @@ export function evsAfter(kind: RewardKind, evs: Ivs, speciesId: number, stat: St
   return next;
 }
 
-/** The IVs after an IV reward. */
 export function ivsAfter(kind: RewardKind, ivs: Ivs, stat: StatKey | undefined): Ivs {
   if (kind === 'goldCap') return Object.fromEntries(STATS.map((key) => [key, MAX_IV])) as unknown as Ivs;
   if (kind === 'bottleCap') return { ...ivs, [stat as StatKey]: MAX_IV };
   return Object.fromEntries(STATS.map((key) => [key, Math.min(MAX_IV, (ivs[key] ?? 0) + WEIGHTS_IVS)])) as unknown as Ivs;
 }
 
-/** The IVs, EVs and nature a Pokémon has. */
 export interface Training {
   ivs: Ivs;
   evs: Ivs;
@@ -266,10 +216,8 @@ export interface Training {
 
 const EV_KINDS: readonly RewardKind[] = ['vitamin', 'feather', 'machoBrace', 'vitaminBag'];
 const IV_KINDS: readonly RewardKind[] = ['weights', 'bottleCap', 'goldCap'];
-/** Rewards that change its stats without levels: EVs, IVs or its nature. */
 export const STAT_REWARDS: readonly RewardKind[] = [...EV_KINDS, ...IV_KINDS, 'idealMint'];
 
-/** How a stat reward leaves a Pokémon (null for any other reward). */
 export function trainingAfter(reward: Pick<Reward, 'kind' | 'stat' | 'natures'>, target: Pick<RewardTarget, 'uid' | 'speciesId' | 'ivs' | 'evs' | 'nature'>): Training | null {
   const now = { ivs: target.ivs, evs: target.evs, nature: target.nature };
   if (EV_KINDS.includes(reward.kind)) return { ...now, evs: evsAfter(reward.kind, target.evs, target.speciesId, reward.stat) };
@@ -278,11 +226,9 @@ export function trainingAfter(reward: Pick<Reward, 'kind' | 'stat' | 'natures'>,
   return null;
 }
 
-/** Its stats at its level with some IVs, EVs and nature. */
 export const statsWith = (target: Pick<RewardTarget, 'speciesId' | 'level'>, training: Training) =>
   statsFor(speciesData(target.speciesId)?.stats ?? [0, 0, 0, 0, 0, 0], training.ivs, target.level, training.nature, training.evs);
 
-/** The stats a reward changes, as the battle reads them: "Velocidad 48 → 55 · Ataque 61 → 64". The two that change most. */
 export function statShift(target: Pick<RewardTarget, 'speciesId' | 'level' | 'ivs' | 'evs' | 'nature'>, after: Training): string | null {
   const before = statsWith(target, { ivs: target.ivs, evs: target.evs, nature: target.nature });
   const next = statsWith(target, after);
@@ -292,13 +238,11 @@ export function statShift(target: Pick<RewardTarget, 'speciesId' | 'level' | 'iv
   return changed.length > 2 ? `${shown} y ${changed.length - 2} más` : shown;
 }
 
-/** A stat someone in the party would use: the stronger attack of each, Speed or HP. */
 function usefulStat(party: readonly RewardTarget[], random: Random): StatKey {
   const options = [...new Set([...party.map((target) => attackStat(target.speciesId)), 'spd', 'hp'] as StatKey[])];
   return options[Math.floor(random() * options.length)];
 }
 
-/** Levels up to the cap, and the evolution they would bring: "Nv 15 → 17 · ¡evoluciona en Ivysaur!". */
 function levelsUp(target: RewardTarget, levels: number, cap: number): string | null {
   if (target.level >= cap) return null;
   const level = Math.min(cap, target.level + levels);
@@ -308,7 +252,6 @@ function levelsUp(target: RewardTarget, levels: number, cap: number): string | n
   return `Nv ${target.level} → ${level}${evolves ? ` · ¡evoluciona en ${speciesData(form)?.name ?? '?'}!` : ''}`;
 }
 
-/** What a move adds to this Pokémon: its own type or a new one, and how strong it is. */
 function moveGain(target: RewardTarget, id: string): string {
   const move = moveData(id);
   if (!move || !alwaysDamages(id)) return 'Movimiento de apoyo';
@@ -323,10 +266,6 @@ const canStillEvolve = (target: Pick<RewardTarget, 'speciesId' | 'finalId'>): bo
   return path.indexOf(target.speciesId) < path.length - 1;
 };
 
-/**
- * A held item of that rarity for the party: a type booster goes to a type someone attacks with, an
- * Eviolite only when someone can still evolve.
- */
 function heldItemFor(tier: ItemTier, party: readonly RewardTarget[], random: Random): string | null {
   const attackTypes = [...new Set(party.flatMap((target) => target.known.filter(alwaysDamages).map((id) => moveData(id)?.type ?? '')))];
   const boosters = new Set(attackTypes.map((type) => boosterOf(type)).filter((key): key is string => !!key));
@@ -334,7 +273,6 @@ function heldItemFor(tier: ItemTier, party: readonly RewardTarget[], random: Ran
   return options.length ? options[Math.floor(random() * options.length)].key : null;
 }
 
-/** Why a held item fits a Pokémon: the moves it strengthens, and the item it replaces. */
 function itemFit(key: string, target: RewardTarget): string | null {
   const item = HELD_ITEMS[key];
   if (target.item === key) return null;
@@ -345,7 +283,6 @@ function itemFit(key: string, target: RewardTarget): string | null {
   return target.item ? `${why} · deja ${HELD_ITEMS[target.item]?.name ?? target.item}` : why;
 }
 
-/** The next form towards the one you raised, when it evolves by level and is at most 5 levels from it. */
 export function cordEvolution(target: Pick<RewardTarget, 'speciesId' | 'finalId' | 'level'>): number | null {
   const path = evolutionPath(target.finalId);
   const next = path[path.indexOf(target.speciesId) + 1];
@@ -358,10 +295,8 @@ const gained = (before: Ivs, after: Ivs): number => evTotal(after) - evTotal(bef
 
 const totalEvs = (evs: Ivs): number => STATS.reduce((sum, stat) => sum + (evs[stat] ?? 0), 0);
 
-/** How many EVs a vitamin adds to a stat: 64, or what is left under 252 for the stat and 510 in all. */
 export const vitaminRoom = (evs: Ivs, stat: StatKey): number => Math.max(0, Math.min(VITAMIN_EVS, MAX_STAT_EVS - (evs[stat] ?? 0), MAX_TOTAL_EVS - totalEvs(evs)));
 
-/** The next form towards the one you raised, when it evolves by a stone, a trade or friendship and is close to its fair level. */
 export function stoneEvolution(target: Pick<RewardTarget, 'speciesId' | 'finalId' | 'level'>): number | null {
   const path = evolutionPath(target.finalId);
   const next = path[path.indexOf(target.speciesId) + 1];
@@ -535,7 +470,6 @@ function makeReward(kind: RewardKind, party: readonly RewardTarget[], context: R
   }
 }
 
-/** Three offers by weighted rarity, at least one of `minTier` and none above `maxTier`. */
 export function restRewards(party: readonly RewardTarget[], context: RestContext, random: Random): Reward[] {
   const count = (context.count ?? REWARDS_PER_REST + (context.floor >= MORE_REWARDS_FROM ? 1 : 0)) + (context.extra ?? 0);
   const weights = tierWeights(context.floor);

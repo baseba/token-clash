@@ -1,7 +1,3 @@
-// The Trainer aggregate: a player, their collection (roster) and the team they fight with.
-// Every change to a trainer goes through these methods, which keep the rules in one place:
-// a team never repeats a species, has at most 6, and always points at Pokémon in the roster.
-
 import { abilityOptions, NATURE_NAMES, usableAbility } from '../../catalog/domain/creatures.js';
 import { MAX_EV, MAX_EV_TOTAL, validEvs } from '../../../public/stat-formula.js';
 import { validMoveset, MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
@@ -16,12 +12,10 @@ import { recycledTokens, recycleReward, type Duplicate, type RecycledRecord } fr
 export interface TrainerState {
   id: string;
   name: string;
-  /** sha256 of the session token: the token itself is never stored. */
   tokenHash: string;
   passwordHash?: string;
   sessions?: TrainerSession[];
   roster: RosterEntry[];
-  /** Roster entry ids, leader first. */
   team: string[];
   wins: number;
   losses: number;
@@ -53,7 +47,6 @@ export type Equipped = Partial<Record<EquipKind, string>>;
 
 const RARITY_RANK = { legendary: 3, rare: 2, uncommon: 1, common: 0 } as const;
 
-/** Strips control and bidi characters a name could use to break the UI, and caps its length. */
 export function cleanName(raw: string, max = 24): string {
   return raw
     .replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, '')
@@ -65,7 +58,6 @@ export function nameKey(name: string): string {
   return cleanName(name).normalize('NFC').replace(/\s+/g, ' ').toLocaleLowerCase('es');
 }
 
-/** The best 6 of a roster (level, then rarity, then shiny), one per species. */
 export function defaultTeam(roster: RosterEntry[]): string[] {
   const best = [...roster].sort((a, b) => b.level - a.level || RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity] || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0));
   return uniqueSpecies(best)
@@ -99,12 +91,10 @@ export class Trainer implements TrainerState {
     Object.assign(this, state);
   }
 
-  /** Rebuilds a trainer that already exists (from the database). */
   static restore(state: TrainerState): Trainer {
     return new Trainer(state);
   }
 
-  /** A new player: they get an id and a session token hash, and an empty roster until they import. */
   static register({ id, name, tokenHash, passwordHash, at }: { id: string; name: string; tokenHash: string; passwordHash: string; at: number }): Trainer {
     return new Trainer({ id, name, tokenHash, passwordHash, roster: [], team: [], wins: 0, losses: 0, totalTokens: 0, createdAt: at, lastSeen: at });
   }
@@ -125,7 +115,6 @@ export class Trainer implements TrainerState {
     this.sessions = [...(this.sessions ?? []), { tokenHash, openedAt: at }].slice(-MAX_SESSIONS);
   }
 
-  /** @throws {DomainError} the account has no password, so closing the session would lock it for good */
   closeSession(tokenHash: string, replacementHash: string): void {
     if (!this.hasPassword) throw conflict('Agrega una contraseña antes de cerrar sesión: sin ella no podrías volver a entrar.');
     if (tokenHash === this.tokenHash) this.tokenHash = replacementHash;
@@ -136,7 +125,6 @@ export class Trainer implements TrainerState {
     return this.avatar ?? trainerSpriteFor(this.id, STARTER_SPRITES);
   }
 
-  /** @throws {DomainError} the sprite is not one of the trainer sprites, or is sold in the shop and not bought */
   chooseAvatar(key: string): void {
     if (!isTrainerSprite(key)) throw invalid('Ese entrenador no existe.');
     if (isShopTrainer(key) && !this.owns(`trainer:${key}`) && key !== this.avatar) throw forbidden(SHOP_TRAINER_NOT_BOUGHT);
@@ -149,7 +137,6 @@ export class Trainer implements TrainerState {
     return true;
   }
 
-  /** Items that left the shop give back what was paid for them, keyed by item id. Returns the tokens refunded. */
   refundRetired(prices: Readonly<Record<string, number>>): number {
     const retired = (this.owned ?? []).filter((id) => id in prices);
     for (const kind of EQUIP_KINDS) if (this.equipped?.[kind] && `${kind}:${this.equipped[kind]}` in prices) this.equip(kind, null);
@@ -160,7 +147,6 @@ export class Trainer implements TrainerState {
     return refund;
   }
 
-  /** Moves owned trainers and the worn one to their new keys. Returns whether anything changed. */
   renameTrainers(renames: Readonly<Record<string, string>>): boolean {
     const moved = (key: string) => renames[key] ?? key;
     const owned = [...new Set((this.owned ?? []).map((id) => (id.startsWith('trainer:') ? `trainer:${moved(id.slice('trainer:'.length))}` : id)))];
@@ -172,7 +158,6 @@ export class Trainer implements TrainerState {
     return true;
   }
 
-  /** Puts back a look the trainer no longer has: one they do have, or the default one. */
   replaceLook(key: string | null): void {
     this.avatar = key ?? undefined;
   }
@@ -189,7 +174,6 @@ export class Trainer implements TrainerState {
     return Math.max(0, this.earned + this.recycledTokens - (this.shopSpent ?? 0));
   }
 
-  /** The repeated Pokémon of the last save that haven't gone through the shredder yet. */
   get recyclable(): Duplicate[] {
     const done = new Set((this.recycled ?? []).map((record) => record.id));
     return (this.duplicates ?? []).filter((duplicate) => !done.has(duplicate.id));
@@ -206,7 +190,6 @@ export class Trainer implements TrainerState {
     return added;
   }
 
-  /** @throws {DomainError} the Pokémon is not a repeated one, or it was already recycled */
   recycle(entryId: string, at: number): RecycledRecord {
     if ((this.recycled ?? []).some((record) => record.id === entryId)) throw conflict('Ese Pokémon ya pasó por la trituradora.');
     const duplicate = (this.duplicates ?? []).find((entry) => entry.id === entryId);
@@ -224,7 +207,6 @@ export class Trainer implements TrainerState {
     return this.equipped?.ball ?? DEFAULT_BALL;
   }
 
-  /** @throws {DomainError} the item doesn't exist, is already owned, or the balance is short */
   buy(itemId: string): ShopItem {
     const item = shopItem(itemId);
     if (!item) throw notFound('Ese artículo no existe.');
@@ -235,7 +217,6 @@ export class Trainer implements TrainerState {
     return item;
   }
 
-  /** @throws {DomainError} the item doesn't exist or wasn't bought */
   equip(kind: EquipKind, key: string | null): void {
     if (key !== null) {
       const item = shopItemOf(kind, key);
@@ -256,14 +237,12 @@ export class Trainer implements TrainerState {
     return entry;
   }
 
-  /** The Pokémon of the team, in order (or the default team if the saved one is empty). */
   teamEntries(): RosterEntry[] {
     const byId = new Map(this.roster.map((e) => [e.id, e]));
     const team = uniqueSpecies(this.team.map((id) => byId.get(id)).filter((e): e is RosterEntry => !!e));
     return team.length ? team : defaultTeam(this.roster).map((id) => byId.get(id)!);
   }
 
-  /** Copies of the team, for a room or a tournament match (later edits don't change them). */
   teamSnapshot(): RosterEntry[] {
     return this.teamEntries().map((e) => ({ ...e }));
   }
@@ -273,10 +252,6 @@ export class Trainer implements TrainerState {
     if (clean) this.name = clean;
   }
 
-  /**
-   * Takes a newer save. The collection is replaced by the save's, but what the player chose here
-   * (nicknames, movesets, abilities) is kept for the Pokémon that are still there, and so is the team.
-   */
   importSave(parsed: ParsedSave, at: number): void {
     const previous = this.roster;
     const kept = new Map(previous.map((e) => [e.id, { nickname: e.nickname, moveset: e.moveset, abilityChoice: e.abilityChoice, natureChoice: e.natureChoice, evs: e.evs }]));
@@ -293,7 +268,6 @@ export class Trainer implements TrainerState {
     this.updatedAt = at;
   }
 
-  /** Unknown ids and repeated species are skipped; an empty choice keeps the current team. */
   chooseTeam(ids: string[]): void {
     const byId = new Map(this.roster.map((e) => [e.id, e]));
     const picked = [...new Set(ids.filter((id) => byId.has(id)))].map((id) => byId.get(id)!);
@@ -303,7 +277,6 @@ export class Trainer implements TrainerState {
     if (team.length) this.team = team;
   }
 
-  /** An empty nickname removes it. Unknown Pokémon are ignored. */
   setNickname(entryId: string, name: string): void {
     const entry = this.roster.find((x) => x.id === entryId);
     if (!entry) return;
@@ -349,10 +322,6 @@ export class Trainer implements TrainerState {
     this.losses += 1;
   }
 
-  /**
-   * Older versions kept repeated Pokémon of a species. Keeps the first of each species and
-   * variant, and fixes the team to match. Returns whether anything changed.
-   */
   dropRepeatedSpecies(): boolean {
     const roster = uniqueVariants(this.roster ?? []);
     const team = carryTeam(this.team ?? [], this.roster, roster);

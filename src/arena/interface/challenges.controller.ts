@@ -47,14 +47,12 @@ export class ChallengesController {
     return { challenge: this.views.challenge(this.challenges.accept(trainer, checked(id)), trainer.id) };
   }
 
-  /** Open rooms and tournaments anyone can join (the lobby list, also pushed over the socket). */
   @Get('rooms')
   @MaybeAuthenticated()
   rooms(@CurrentTrainer() trainer: Trainer | undefined) {
     return { rooms: this.lobby.list(trainer?.id ?? null) };
   }
 
-  /** Your 1v1 history (paged) and your tournaments. */
   @Get('me/challenges')
   @Authenticated()
   mine(@CurrentTrainer() trainer: Trainer, @Query({ schema: HistoryQueryDto }) page: HistoryQueryDto) {
@@ -62,7 +60,6 @@ export class ChallengesController {
   }
 }
 
-/** Ids outside the format can't exist: answer like an unknown room. */
 function checked(id: string): string {
   return ROOM_ID.test(id) ? id : '\u0000';
 }

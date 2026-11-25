@@ -1,23 +1,11 @@
-// The map of a Tower floor: a strip of route seen from above, laid out like the games' routes
-// (public/tower-tiles.js) in the scene of the battle background that comes next, with the trainers'
-// overworld sprites on it. It is pixel art like the Poké Ball effects: drawn at the tiles' own size on
-// a small canvas, scaled up without smoothing, and repainted for a scene colour by colour (night,
-// snow, autumn…) instead of under a translucent layer. You walk up to the rival like in the Battle
-// Tower of Emerald: it waits in front of the way up, sees you, comes down to you and the battle
-// starts; beaten, it steps aside and you go on up. You climb going up: you come into every map where
-// you left the one before (up from below at the same column, or in by a side after a crossroads), and a
-// floor where the way splits is a crossroads with ways up, left and right. The ways with no battle
-// have a map of their own: a Pokémon Center to rest in, a burrow in the tall grass, a dark pool.
 import { overworldSprite, walkPose } from './overworld.js?v=dev';
 import { ATLAS_COLS, ATLAS_KEYS, COLS, CROSS_COL, floorWays, forkExits, LAB_SPOTS, mapLayout, PATH_ROW, ROWS, sceneLook, TILE, tintPixels, ZONES, zoneWays } from './tower-tiles.js?v=dev';
 
 export { COLS, ROWS, forkExits, ZONES };
 
-/** Where the rival waits, a tile below the top edge, and where it comes down to you. */
 const WAIT_ROW = 1;
 const MEET_ROW = PATH_ROW - 1;
 
-/** Who offers the dark deal. */
 const DEAL_FIGURE = 'hex_maniac';
 const TILE_MS = 200;
 const SIGN_MS = 2400;
@@ -25,7 +13,6 @@ const ATLAS_INDEX = new Map(ATLAS_KEYS.map((key, i) => [key, i]));
 const FALLBACK_GROUND = { tallGrass: '#70c8a0', path: '#70c8a0', lake: '#70c8a0', beach: '#e0cc88', ocean: '#5068d0', mountain: '#b89878', desert: '#e0cc88', cave: '#a88a68', snow: '#dce8f4', lab: '#e8e4c8' };
 
 let atlas = null;
-/** The tiles atlas, loaded once for the whole session (and cached by the browser for good: its URL carries the version). */
 export function preloadTiles() {
   atlas ??= new Promise((resolve) => {
     const img = new Image();
@@ -39,7 +26,6 @@ export function preloadTiles() {
 let atlasImage = null;
 preloadTiles().then((img) => { atlasImage = img; });
 
-/** Each map drawn this session, by scene, seed and forks: going back to a floor's map costs nothing. */
 const drawn = new Map();
 const DRAWN_LIMIT = 24;
 
@@ -91,11 +77,6 @@ function actor(key, { col, row, facing }) {
   place(col, row);
   const self = { el: holder, sprite, col, row };
   let steps = 0;
-  /**
-   * Walks in a straight line to a tile, frame by frame: it moves a map pixel at a time and takes one
-   * step per tile, the feet alternating from the walk before. Resolves on arrival (at once in a hidden
-   * tab, where frames don't run).
-   */
   self.walk = (toCol, toRow = self.row) => {
     const tiles = Math.abs(toCol - self.col) + Math.abs(toRow - self.row);
     if (!tiles) return Promise.resolve();
@@ -125,7 +106,6 @@ function actor(key, { col, row, facing }) {
     });
   };
   self.face = (facing) => sprite.set({ facing, stride: 0 });
-  /** Walks to a tile along a row: first to that row, then across it, then up or down to the tile. */
   self.goTo = async (toCol, toRow, alongRow = PATH_ROW) => {
     if (self.col !== toCol) {
       await self.walk(self.col, alongRow);
@@ -140,16 +120,6 @@ function actor(key, { col, row, facing }) {
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const motion = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/**
- * The map element and its cast. `hero` and `foe` are trainer keys (the foe may be absent); `stage` is
- * 'arrive' (the rival waits in front of the way up), 'rest' (the beaten rival stepped aside, or a way with
- * no battle), 'fork' (no rival, a crossroads of `forks` ways) or 'lab'. A `zone-…` scene is a way with a
- * map of its own (public/tower-tiles.js). `from` is where you left the map before: a column of the
- * bottom edge, or 'left' or 'right'. `entrance` is how you get there, under the name of the place:
- * 'fromBelow' (in from where you left the map before), 'walk' (into the lab by its door, below), 'battle'
- * (the bars of the battle open) or none, and then you stand where you came in. A `compact` map shows
- * only the rows around the path.
- */
 export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 'arrive', forks = 0, from = null, label = '', place = null, compact = false, entrance = null }) {
   const canvas = document.createElement('canvas');
   canvas.width = COLS * TILE;
@@ -206,7 +176,6 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
     await pause(ms);
     bubble.remove();
   };
-  /** A bubble over a tile of the map with no one on it: a door, a burrow. */
   const markTile = async ({ col, row }, text, ms) => {
     const spot = document.createElement('div');
     spot.className = 'tw-actor';
@@ -218,7 +187,6 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
     spot.remove();
   };
 
-  /** What happens at a way with no battle, once you are in: you rest in the Center, something stirs in the burrow, the deal is made. */
   const visitZone = async () => {
     const { hero: walker } = cast;
     if (zone === 'rest') {
@@ -251,7 +219,6 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
     }
   };
 
-  /** You arrive: up from the bottom edge (into the lab by its door), or as the battle's bars open and the beaten rival steps aside. */
   cast.arrive = async () => {
     if (entrance === 'battle' && motion()) {
       await pause(80);
@@ -268,7 +235,6 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
     cast.hero.face(facing);
     if (visit) await visitZone();
   };
-  /** You walk up to the way out: the rival sees you ("!") and comes down to meet you. */
   cast.approach = async () => {
     if (!cast.foe) return;
     if (lab) {
@@ -283,7 +249,6 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
     await cast.foe.walk(meet.col, meet.row);
     cast.foe.face('down');
   };
-  /** At a crossroads, you walk to the way you chose and out of the map by it. */
   cast.takeExit = async (index) => {
     if (!fork) return;
     const exit = forkExits(forks)[index];
@@ -294,7 +259,6 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
       await cast.hero.walk(exit.col, -2);
     } else await cast.hero.walk(exit.side === 'left' ? -2 : COLS + 1, PATH_ROW);
   };
-  /** You leave and the map fades out behind you: up past the beaten rival after a rest, down the burrow of a den, up the lab's stairs to the first floor. */
   cast.leave = async () => {
     if (lab) {
       await cast.hero.goTo(LAB_SPOTS.stairs.col, LAB_SPOTS.stairs.row, LAB_SPOTS.hero.row + 1);
@@ -313,12 +277,10 @@ export function towerMap({ scene, seed, hero, foe = null, boss = false, stage = 
     el.classList.add('fading');
     await pause(260);
   };
-  /** The screen closes in bars, like the start of a battle. */
   cast.closeIn = () => {
     el.classList.add('closing');
     return pause(700);
   };
-  /** A boss shows itself before the battle: its portrait slides in over the map. */
   cast.showdown = async (portrait, title) => {
     const card = document.createElement('div');
     card.className = 'tw-vs';

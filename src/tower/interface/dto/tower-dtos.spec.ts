@@ -1,4 +1,3 @@
-// The Tower's DTOs on their own: the defaults and what they reject.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DraftDto, EditMonDto, NewClimbDto, RecruitDto, RewardDto, RoomDto } from './tower.dto.js';

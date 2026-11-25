@@ -1,32 +1,16 @@
-// A trainer's overworld dressed in its own clothes. Many trainers walk the map as an official sprite of
-// a similar class (a generic clerk, a worker, a woman of the town) whose colours are not theirs: each
-// piece of the overworld (a family of colour: hair, a shirt, trousers) takes the hue, saturation and
-// light of the piece of the battle sprite at the same height of the figure. Unlike a colour variant
-// the light moves too, so a red shirt can become a black suit; each piece keeps the light steps
-// between its tones. Skin and outline are found as in the variants
-// (scripts/overworld-recolor.mjs) and never change.
 import { paletteOf } from './plan-trainer-variants.mjs';
 import { overworldAnalysis } from './overworld-recolor.mjs';
 import { hexOf } from './sprite-ramps.mjs';
 import { familiesOf, hueGap, rgbOfOklch } from './sprite-rotate.mjs';
 
-/** Smallest family that counts as a piece of clothing or hair, as a share of the figure. */
 const MIN_SHARE = 0.05;
-/** How far apart (in figure heights) two families may sit and still be the same piece. */
 const MAX_HEIGHT_GAP = 0.25;
-/** Height of each band of the figure that paletteOf counts in: hair, neck, top, legs. */
 const BAND_HEIGHTS = { hair: 0.11, neck: 0.25, torso: 0.43, legs: 0.79 };
-/** Share of a tone's pixels on the head (the hair band) for it to be part of the head's piece. */
 const HEAD_SHARE = 0.5;
-/** Below this chroma a family reads as white, grey or black. */
 const NEUTRAL = 0.035;
-/** A part already this close to the battle sprite's is left as it is. */
 const CLOSE = { hue: 25, light: 0.08, chroma: 0.04 };
-/** Hue gap (degrees) under which two coloured pieces of the overworld are one garment: a cap and a uniform of one violet. */
 const SAME_GARMENT = 12;
-/** How far from the body's axis (as a share of the sprite's width) a battle piece sits on average to be something held, like a lantern. */
 const HELD_REACH = 0.4;
-/** What a piece left without a pair costs, as a gap: more than any pair, so a piece is left undressed only when no battle piece sits at its height. */
 const UNPAIRED = 1;
 const LIGHT_RANGE = [0.14, 0.97];
 const MAX_CHROMA = 0.3;
@@ -47,7 +31,6 @@ function lookOf(colors) {
   return { light: average((color) => color.oklch[0]), chroma, hue: coloured.length && chroma >= NEUTRAL ? (((Math.atan2(y, x) * 180) / Math.PI) % 360 + 360) % 360 : null };
 }
 
-/** How far down the figure some tones sit, from 0 (top of the head) to 1 (the feet). */
 function heightOf(colors) {
   let hair = 0;
   let torso = 0;
@@ -65,10 +48,6 @@ function heightOf(colors) {
 
 const onHead = (color) => (color.entry.hairBand ?? 0) >= color.count * HEAD_SHARE;
 
-/**
- * The pieces of a figure: each family, split in two when its tones are both on the head and on the
- * body (blond hair and an orange dress can be one family of colour, but they are two pieces).
- */
 function piecesOf(analysis) {
   const pieces = [];
   for (const family of analysis.families.filter((candidate) => !candidate.unsure)) {
@@ -82,10 +61,6 @@ function piecesOf(analysis) {
   return pieces;
 }
 
-/**
- * The overworld's pieces with the ones of the same hue merged: at 32×32 one garment (a uniform and its
- * cap) can fall into two families of colour, while the battle sprite paints it as one.
- */
 function garmentsOf(pieces) {
   const garments = [];
   for (const piece of pieces) {
@@ -103,18 +78,10 @@ function garmentsOf(pieces) {
   return garments;
 }
 
-/** A battle piece held away from the body (a lantern, a bag in the hand) dresses nothing. */
 const isHeld = (piece) => piece.colors.reduce((sum, color) => sum + (color.entry.offAxis ?? 0), 0) / piece.colors.reduce((sum, color) => sum + color.count, 0) > HELD_REACH;
 
-/** How far apart two pieces are: their height on the figure and, half as much, their share of it. */
 const gapOf = (piece, other) => Math.abs(other.height - piece.height) + Math.abs(other.share - piece.share) / 2;
 
-/**
- * The pairing of the pieces with the battle pieces at the same height of the figure that pairs them
- * best overall, each battle piece once; and how badly: each gap weighed by the piece's share, and a
- * piece left without a pair as the worst gap. Searched whole, as a figure has only a handful of
- * pieces: taking the biggest first lets a suit take the hair's colour and leave the hair without one.
- */
 function pairPieces(pieces, battle) {
   let best = { pairs: [], cost: Infinity };
   const search = (index, pairs, cost) => {
@@ -133,12 +100,6 @@ function pairPieces(pieces, battle) {
   return best;
 }
 
-/**
- * Each piece of the overworld (hair, clothes) paired with the piece of the battle sprite at the same
- * height of the figure. The pieces of one hue are tried as one garment too, and the closer pairing wins:
- * a violet cap and uniform are one garment when the battle sprite paints them as one, while red hair
- * over a red suit stays two pieces when the battle sprite gives them different colours.
- */
 export function pairsOf(battleAnalysis, overworldAnalysis) {
   const battle = piecesOf(battleAnalysis).filter((piece) => !isHeld(piece));
   const pieces = piecesOf(overworldAnalysis);
@@ -150,7 +111,6 @@ export function pairsOf(battleAnalysis, overworldAnalysis) {
 const isClose = (a, b) =>
   Math.abs(a.light - b.light) <= CLOSE.light && Math.abs(a.chroma - b.chroma) <= CLOSE.chroma && (a.hue === null || b.hue === null ? a.hue === b.hue : hueGap(a.hue, b.hue) <= CLOSE.hue);
 
-/** An overworld piece repainted with the look of the battle one: light moved by the gap between them, chroma scaled, hue taken. */
 export function dressPiece(colors, target) {
   const own = lookOf(colors);
   const scale = own.chroma >= NEUTRAL ? target.chroma / own.chroma : 1;
@@ -162,10 +122,6 @@ export function dressPiece(colors, target) {
   });
 }
 
-/**
- * The map that dresses an overworld frame in the battle sprite's clothes, or none when every part
- * already looks like the trainer's (or the parts cannot be told apart).
- */
 export function dressMap(battle, frame, skinTones) {
   const analysis = overworldAnalysis(frame, skinTones);
   const skin = new Set(analysis.kept.skin.map((color) => color.hex));

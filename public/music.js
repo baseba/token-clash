@@ -16,7 +16,6 @@ const TYPE_PITCH = { normal: 1, fire: 1.1, water: 0.9, electric: 1.35, grass: 1,
 
 const MOVE_SFX_MANIFEST = '/sfx/moves/moves.json';
 
-/** Where a sprite's cry loads from, in order, per public/upstream/cries.json; none if it has no cry. */
 export function cryURLs(manifest, sprite) {
   const path = manifest?.[String(sprite)];
   return typeof path === 'string' ? upstreamURLs(UPSTREAM.cries, path) : [];
@@ -89,7 +88,6 @@ const UI_SOUNDS = {
 export const UI_SOUND_KINDS = Object.keys(UI_SOUNDS);
 const UI_QUIET_AFTER_SFX_S = 0.6;
 
-/** Every PokeRogue sound effect the player can ask for: scripts/sync-battle-anims.js places each one upstream. */
 export const SOUNDS = [...new Set([...Object.values(SE_SOUNDS), ...[2, 1, 0.5].map(hitSound), ...Object.values(UI_SOUNDS).map((ui) => ui.sound)])];
 
 export function uiSampleFor(kind) {
@@ -124,13 +122,6 @@ export function moveSfxCues(manifest, key, byPlayer = true) {
 
 
 
-/**
- * Where a radio station's song is, in seconds into its mp3. The time since it started is counted
- * on the server's clock: `serverNow` when the frame was sent, plus `sinceFrameMs` measured here
- * since it arrived, so a client clock that runs fast or slow doesn't matter. Past the end a song
- * that `loops` (nothing else was queued) falls inside [loopStart, duration). One that doesn't
- * loop has ended there, and the frame with the next song is on its way: null, nothing to play.
- */
 export function stationPosition({ startedAt, serverNow, sinceFrameMs }, { duration, loopStart, loops }) {
   const elapsed = Math.max(0, (serverNow - startedAt + sinceFrameMs) / 1000);
   if (elapsed < duration) return elapsed;
@@ -150,8 +141,6 @@ export function createPlayer({ storage = null } = {}) {
   let wanted = null;
   let lastSfxAt = -Infinity;
   let radio = null;
-  // The station tuned in, as its last frame said, with when that frame arrived here. It beats the
-  // personal radio and the screens' music while it lasts.
   let station = null;
   const read = (k, d) => {
     try {
@@ -288,7 +277,6 @@ export function createPlayer({ storage = null } = {}) {
     return manifests.get(url);
   }
 
-  // A sound from the first of its URLs that answers, cached by the first one.
   function loadBuffer(urls) {
     const [key] = urls;
     if (!buffers.has(key)) {
@@ -465,7 +453,6 @@ export function createPlayer({ storage = null } = {}) {
     return trackGain;
   }
 
-  // `place` says, once the mp3 is loaded, whether it loops and where it starts, or null to not start it.
   async function stream(id, track, gain, place) {
     const [buffer, loops] = await Promise.all([pokerogueBuffer('music', track), loadManifest('/music/loops.json')]);
     if (current?.id !== id || trackGain !== gain || !buffer) return;
@@ -486,10 +473,6 @@ export function createPlayer({ storage = null } = {}) {
     current.source = source;
   }
 
-  // A station's song plays once through while more are queued (the server sends the next one when
-  // it ends) and loops when it is the last one. The mp3 can take a while to load: by then the
-  // listener may have tuned out or on to another song (a tuneStation while the audio is suspended
-  // leaves `current` as it was), or the song may have ended.
   const placeOnStation = (id) => (duration, loopStart) => {
     if (id !== shown()) return null;
     const loop = !station.queue.length;
@@ -507,7 +490,6 @@ export function createPlayer({ storage = null } = {}) {
     if (track) stream(id, track, gain, station ? placeOnStation(id) : () => ({ loop: !id.startsWith('victory:'), offset: 0 }));
   }
 
-  // Back to the screen's own music once neither a station nor the personal radio covers it.
   function playWanted() {
     if (wanted) {
       current = null;
@@ -620,7 +602,6 @@ export function createPlayer({ storage = null } = {}) {
       if (radio) start(`radio:${radio}`);
       else playWanted();
     },
-    /** A `radio` frame of the station tuned in, or null to stop listening. */
     tuneStation(frame) {
       const view = frame?.station ?? null;
       station = view && { ownerId: view.ownerId, nowPlaying: view.nowPlaying, queue: view.queue, serverNow: frame.now, receivedAt: performance.now() };

@@ -1,6 +1,3 @@
-// How a Pokémon grows in the Tower, like in the games: experience on the medium-fast curve, the
-// Gen 5 scaled formula (a Pokémon below its rival learns faster), evolution at the level of its
-// species, and the last moves it learned by level, keeping the ones its trainer chose.
 import { lineage, lineageLearnset, speciesData } from '../../catalog/domain/creatures.js';
 import { MAX_LEVEL } from '../../catalog/domain/tower-cast.js';
 import { MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
@@ -12,7 +9,6 @@ const LEVELS_AFTER_PREVIOUS = 6;
 const LAST_FAIR_LEVEL = 60;
 const HIGHEST_SPECIES = 1025;
 const TRAINER_BONUS = 1.5;
-/** A climb has far fewer battles than a game: every win counts as several, like a shared Exp. Share. */
 const CLIMB_BONUS = 4;
 const BOSS_BONUS = 1.5;
 
@@ -27,7 +23,6 @@ export function levelForExp(exp: number): number {
 
 export const baseStatTotal = (speciesId: number): number => speciesData(speciesId)?.stats.reduce((sum, stat) => sum + stat, 0) ?? 300;
 
-/** The base experience a species gives, from its stat total (PokeAPI doesn't carry it). */
 export const baseExperience = (speciesId: number): number => Math.round(baseStatTotal(speciesId) ** 2 / 1300);
 
 export function expYield({ speciesId, level }: { speciesId: number; level: number }, ownLevel: number, boss: boolean): number {
@@ -35,16 +30,10 @@ export function expYield({ speciesId, level }: { speciesId: number; level: numbe
   return Math.floor((Math.floor(scaled) + 1) * TRAINER_BONUS * CLIMB_BONUS * (boss ? BOSS_BONUS : 1));
 }
 
-/** The forms from the first of the line to this one. */
 export const evolutionPath = (finalId: number): number[] => lineage(finalId).reverse();
 
 const evolutionStage = (speciesId: number): number => Math.min(2, Math.max(1, speciesData(speciesId)?.stage ?? 1));
 
-/**
- * Stone, trade and friendship evolutions have no level. They get the level a level evolution of the
- * same stage and the same strength has: a line fitted, per stage, on every level evolution in the
- * catalog (about 10 levels per 100 stat points for a first evolution, 16 for a second).
- */
 const LEVEL_FIT: ReadonlyMap<number, { slope: number; base: number }> = (() => {
   const points = new Map<number, [number, number][]>();
   for (let id = 1; id <= HIGHEST_SPECIES; id++) {
@@ -76,7 +65,6 @@ export function evolutionLevel(speciesId: number): number | null {
   return fairLevel(speciesId, evolutionLevel(data.evolvesFrom) ?? 0);
 }
 
-/** The form of the line towards `finalId` a Pokémon of this level has. */
 export function formAtLevel(finalId: number, level: number): number {
   const path = evolutionPath(finalId);
   let form = path[0];
@@ -89,7 +77,6 @@ export function formAtLevel(finalId: number, level: number): number {
 
 const learnable = (id: string): boolean => !!moveData(id)?.supported;
 
-/** The supported moves its line learns by level up to this level, in the order it learns them. */
 export function levelMovesUpTo(speciesId: number, level: number): string[] {
   return [...lineageLearnset(speciesId)]
     .filter(([id, learned]) => learnable(id) && learned.level <= level)
@@ -97,10 +84,6 @@ export function levelMovesUpTo(speciesId: number, level: number): string[] {
     .map(([id]) => id);
 }
 
-/**
- * Up to 4 moves it knows at this level: the chosen ones it has already learned, then the latest it
- * learned by level. It always keeps a move that does damage.
- */
 export function movesAtLevel(speciesId: number, level: number, chosen: readonly string[] = []): string[] {
   const reached = levelMovesUpTo(speciesId, level);
   const kept = chosen.filter((id) => reached.includes(id));

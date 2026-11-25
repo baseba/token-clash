@@ -1,17 +1,7 @@
-// Egress proxy for Skynet. The app lives on a network with no route out; this process sits on that
-// network and on an outbound one, and forwards exactly one thing: POST /v1/systemone to TypeSafe.
-// It holds the Jev key and adds it, so the app never has it. Anything else gets a 404.
-//
-//   JEV_API_KEY   TypeSafe key (a Podman secret in production). Required.
-//   JEV_UPSTREAM  where to forward (default https://api.typesafe.ai/v1/systemone; tests point it elsewhere)
-//   PORT          default 8081
-//
-// It runs as its own process (src/jev-proxy.main.ts), from the same image as the app, and doesn't
-// load Nest: it is a few lines of node:http on purpose.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
 export const JEV_UPSTREAM = 'https://api.typesafe.ai/v1/systemone';
-const MAX_BODY = 256 * 1024; // a Skynet request is a few KB
+const MAX_BODY = 256 * 1024;
 const MAX_INFLIGHT = 16;
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
@@ -44,7 +34,6 @@ export interface JevProxyOptions {
 }
 
 export function createJevProxy({ apiKey: rawKey, upstream = JEV_UPSTREAM, fetchImpl = fetch, log = console }: JevProxyOptions = {}): Server {
-  // A secret made from a file keeps its trailing newline, which would make the header invalid.
   const apiKey = rawKey?.trim();
   if (!apiKey) throw new Error('Falta JEV_API_KEY');
   let inflight = 0;
@@ -56,7 +45,6 @@ export function createJevProxy({ apiKey: rawKey, upstream = JEV_UPSTREAM, fetchI
     inflight++;
     try {
       const body = await readBody(req);
-      // Only our own headers go out: nothing from the caller is forwarded but the body.
       const up = await fetchImpl(upstream, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },

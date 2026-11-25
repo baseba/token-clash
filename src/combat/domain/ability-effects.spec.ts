@@ -34,7 +34,6 @@ function pickMoves(entry, wants = []) {
 }
 
 let n = 0;
-// Fixtures carry only the fields the rules read.
 const mon = (finalID, ability, extra: any = {}): any => {
   const { want, ...rest } = extra;
   const e = { id: `t-${finalID}-${n++}`, finalID, baseID: finalID, rarity: 'common', shiny: false, level: 50, ivs: IVS, ability, ...rest };

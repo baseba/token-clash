@@ -44,11 +44,11 @@ sigue las reglas de arriba aunque el archivo vecino no lo haga.
   `sort` (`(a, b) =>`), los parámetros de tipo genéricos (`<T>`) y el generador pseudoaleatorio. Quedan letras sueltas
   en código viejo: no las copies.
 - Un concepto, un nombre en todo el código. Si renombras, renombra en todos lados (con un codemod si son muchos).
-- Identificadores y comentarios en inglés. Los textos que ve el jugador y la documentación van en español.
-- Comenta solo el porqué: una decisión de diseño, una regla del dominio o entre dominios, una trampa externa. Cada
-  archivo puede abrir con una cabecera corta que diga para qué existe en términos del dominio. Los comentarios
-  didácticos que explican el diseño se quedan.
-- `tsconfig.json` tiene `noUnusedLocals`: borra el código muerto en vez de comentarlo.
+- Identificadores en inglés. Los textos que ve el jugador y la documentación van en español.
+- Sin comentarios en el código, tampoco directivas como `@ts-expect-error`: `npm test` falla si encuentra uno.
+  `tools/no-comments.ts` revisa JS, TS, CSS, HTML, SVG y los `tsconfig*.json`, salvo `deploy/`, `.github/` y
+  `drizzle/`. Lo que un comentario explicaría va en un nombre, en el nombre de un test o en el PR.
+- `tsconfig.json` tiene `noUnusedLocals`: borra el código muerto, no lo comentes.
 - Un valor compartido (un default, una lista) vive en un solo lugar y se importa. Por ejemplo, `DEFAULT_BALL` de
   `catalog/domain/shop.ts`.
 

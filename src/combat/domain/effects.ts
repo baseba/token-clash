@@ -1,6 +1,3 @@
-// Every change the engine makes to a fighter, a side or the field: HP, stat stages, status, volatiles, types,
-// forms, weather, terrain, screens and hazards. Each one checks its own immunities, calls the ability hooks that
-// react to it and emits its event. Also who is where: the active fighters, their sides and their bench.
 import { type BoostKey, type Boosts, formData, type MajorStatus, statsFor, type Weather } from '../../catalog/domain/creatures.js';
 import type { BoostChanges } from './ability-effects.js';
 import { isSun, poisoned, stageMult } from './conditions.js';
@@ -30,15 +27,11 @@ export const foeOf = (battle: BattleState, fighter: BattleFighter): BattleFighte
 export const nameOf = (fighter: BattleFighter): string => fighter.volatiles.illusion?.name ?? fighter.name;
 export const hasBench = (battle: BattleState, fighter: BattleFighter): boolean =>
   battle.sides[sideIndexOf(battle, fighter)].team.some((other) => other !== fighter && other.hp > 0);
-/** Slots of the side's Pokémon that could come in. */
 export const benchSlots = (side: BattleSide): number[] => side.team.flatMap((fighter, slot) => (slot !== side.active && fighter.hp > 0 ? [slot] : []));
 
 export interface BoostOptions {
-  /** Highest stage a raise may reach (Belly Drum and friends go to +6 anyway). */
   cap?: number;
-  /** Ability that caused the change, shown before it. */
   ability?: BattleFighter;
-  /** What caused it (e.g. 'intimidate'), for the rules that react to it. */
   effect?: string;
 }
 

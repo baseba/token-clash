@@ -1,6 +1,3 @@
-// Use cases for tournaments: the lobby (seats, AIs, ready), the draw, and playing the bracket one
-// match at a time. Each match is an ordinary challenge that starts at its countdown; when its
-// battle ends, LiveBattleService announces it (ArenaEvents) and the bracket advances here.
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { aiLevelOf, buildAiRandomParty, buildAiTeam } from '../../combat/domain/ai.js';
 import { randomParty } from '../../combat/domain/random-party.js';
@@ -30,7 +27,6 @@ export interface NewTournament {
 @Injectable()
 export class TournamentsService implements OnModuleInit {
   private readonly timings: ArenaTimings;
-  /** Seats of people who disconnected from the lobby, waiting for them to come back. */
   private readonly seatTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
@@ -50,7 +46,6 @@ export class TournamentsService implements OnModuleInit {
   }
 
   onModuleInit(): void {
-    // The bracket's matches lived in memory: a tournament cut by a restart can't go on.
     for (const tournament of this.tournaments.all()) {
       if (tournament.status !== 'running') continue;
       tournament.abandon();
@@ -64,7 +59,6 @@ export class TournamentsService implements OnModuleInit {
     return tournament;
   }
 
-  /** A public search sits you in a matching tournament (or returns yours); otherwise a new one opens. */
   create(trainer: Trainer, opts: NewTournament): { tournament: Tournament; joined?: boolean } {
     if (opts.visibility === 'public') {
       const { own, rival, seated } = tournamentMatchFor(this.lobby.listedTournaments(), { trainerId: trainer.id, ...opts });
@@ -91,7 +85,6 @@ export class TournamentsService implements OnModuleInit {
     this.afterSeatsChange(tournament);
   }
 
-  /** The host closes it, or anyone else gives up their seat (only before it starts). */
   leave(tournament: Tournament, trainer: Trainer): void {
     tournament.assertLobby();
     if (tournament.hostId === trainer.id) return this.close(tournament);
@@ -126,7 +119,6 @@ export class TournamentsService implements OnModuleInit {
     this.afterSeatsChange(tournament);
   }
 
-  /** A client opens the tournament page. Returns it, or null if it doesn't exist. */
   follow(ws: ClientConnection, id: string, token: string | undefined): Tournament | null {
     const tournament = this.tournaments.findById(id);
     if (!tournament) {
@@ -169,7 +161,6 @@ export class TournamentsService implements OnModuleInit {
     this.lobby.notify();
   }
 
-  /** Someone left the lobby page: their seat (or the whole tournament, for the host) waits a while. */
   private watchSeat(tournament: Tournament, trainerId: string): void {
     const key = `${tournament.id}:${trainerId}`;
     clearTimeout(this.seatTimers.get(key));
@@ -207,7 +198,6 @@ export class TournamentsService implements OnModuleInit {
   private startMatch(tournament: Tournament): void {
     const next = tournament.nextMatch();
     if (!next) return;
-    // A person always hosts when there is one (the AI side is the guest).
     const [host, guest] = next.a.ai && !next.b.ai ? [next.b, next.a] : [next.a, next.b];
     const challenge = Challenge.tournamentMatch({
       id: newId(),

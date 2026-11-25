@@ -1,17 +1,3 @@
-// The Challenge aggregate: one room and the battle played in it. Its status only moves these
-// ways, and each method refuses any other:
-//
-//   open   → active      join     a rival takes the free seat
-//   active → open        reopen   the guest left the ready check
-//   open   → cancelled   cancel   the host closes the room
-//   active → cancelled   cancel   the host closes it during the ready check
-//   active → finished    finish   the battle ended
-//   active → abandoned   abandon  a restart cut the battle
-//
-// Rooms against the AI and tournament matches are created active. What it stores of each side is
-// a *copy* of the team at the time (RosterEntry snapshots): later changes to a trainer's
-// collection don't rewrite battles already played.
-
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { conflict, type DomainError, forbidden, gone, invalid } from '../../shared/domain/errors.js';
 
@@ -22,24 +8,16 @@ export const BATTLE_MODES = ['team', 'random'] as const;
 export type BattleMode = (typeof BATTLE_MODES)[number];
 export const VISIBILITIES = ['public', 'private'] as const;
 export type Visibility = (typeof VISIBILITIES)[number];
-/**
- * How another mode dresses a battle against the AI it sets up (the Tower): the scene and music the
- * clients show, the rival's trainer sprite, and the page to go back to when it ends.
- */
 export interface Staging {
   scene: string;
   music: string;
   guestAvatar: string;
   returnTo: string;
-  /** What the battle screen says it is part of, like "Torre · Piso 12". */
   label?: string;
-  /** The AI's three, when the mode chose them (the Tower varies them like a roguelike rival). */
   aiPicks?: number[];
-  /** What the AI rival says at the end: when it loses and when it wins (a Tower trainer's own words). */
   guestSays?: { lose: string; win: string };
 }
 
-/** What we keep of a finished battle: its public state (who fought, who won). */
 export interface FinalBattleState {
   winner: number | null;
   sides: { team: { uid?: string; hp?: number; speciesName?: string; sprite?: string; types?: string[]; hidden?: boolean }[] }[];
@@ -55,9 +33,7 @@ export interface ChallengeState {
   createdAt: number;
   mode: BattleMode;
   visibility: Visibility;
-  /** Difficulty when one side is the AI. */
   ai?: string | null;
-  /** Both sides are AIs (a tournament match between two AI seats). */
   aiOnly?: boolean;
   guestId?: string;
   guestName?: string;
@@ -72,10 +48,6 @@ export interface ChallengeState {
   staging?: Staging;
 }
 
-/**
- * A 1v1 between two people: not against the AI, not a tournament match. Only these count for the
- * ranking, the history and the stats.
- */
 export const isHumanDuel = (challenge: Pick<ChallengeState, 'ai' | 'tournamentId'>): boolean => !challenge.ai && !challenge.tournamentId;
 
 interface Player {
@@ -114,12 +86,10 @@ export class Challenge implements ChallengeState {
     return new Challenge(state);
   }
 
-  /** A room waiting for a rival. In a random battle the teams are rolled when someone joins. */
   static open(input: { id: string; host: Player; hostTeam: RosterEntry[]; mode: BattleMode; visibility: Visibility; at: number }): Challenge {
     return new Challenge({ id: input.id, hostId: input.host.id, hostName: input.host.name, hostTeam: input.hostTeam, mode: input.mode, visibility: input.visibility, status: 'open', createdAt: input.at });
   }
 
-  /** A battle against the AI starts at once. Private: nobody else can take its seat. */
   static againstAi(input: { id: string; host: Player; hostTeam: RosterEntry[]; ai: Player & { level: string }; aiTeam: RosterEntry[]; mode: BattleMode; at: number; staging?: Staging }): Challenge {
     return new Challenge({
       id: input.id,
@@ -138,7 +108,6 @@ export class Challenge implements ChallengeState {
     });
   }
 
-  /** A match of a tournament bracket. Private: only people following the tournament get there. */
   static tournamentMatch(input: {
     id: string;
     host: Player & { team: RosterEntry[]; ai: string | null };
@@ -174,7 +143,6 @@ export class Challenge implements ChallengeState {
     return !!trainerId && (trainerId === this.hostId || trainerId === this.guestId);
   }
 
-  /** Why `trainerId` can't take the free seat, or null if they can. */
   joinBlocker(trainerId: string): DomainError | null {
     if (this.ai) return conflict('Esa pelea es contra la IA: no se puede entrar.');
     if (this.hostId === trainerId) return invalid('Es tu propia sala: espera a que entre alguien o mándale el link a otro jugador.');
@@ -194,7 +162,6 @@ export class Challenge implements ChallengeState {
     }
   }
 
-  /** Someone takes the free seat. In a random battle both teams are rolled now. */
   join(guest: Player, teams: { hostTeam?: RosterEntry[]; guestTeam: RosterEntry[] }): void {
     const blocked = this.joinBlocker(guest.id);
     if (blocked) throw blocked;
@@ -205,7 +172,6 @@ export class Challenge implements ChallengeState {
     this.guestName = guest.name;
   }
 
-  /** The guest left before the battle started: the room waits for someone else. */
   reopen(): void {
     this.assertActive();
     this.status = 'open';
@@ -215,11 +181,6 @@ export class Challenge implements ChallengeState {
     delete this.guestTeam;
   }
 
-  /**
-   * The host closes the room: while it waits for a rival, or during the ready check (both seated,
-   * not both ready yet). Once the countdown starts it is too late, and a tournament match is never
-   * theirs to close.
-   */
   cancel(byTrainerId: string | undefined, { readyCheck }: { readyCheck: boolean }): void {
     const waiting = this.status === 'open' || (this.status === 'active' && readyCheck);
     if (byTrainerId !== this.hostId || !waiting || this.tournamentId) throw forbidden('No puedes cerrar esta sala.');
@@ -233,7 +194,6 @@ export class Challenge implements ChallengeState {
     return true;
   }
 
-  /** Battles live in memory: one left mid-fight by a restart can't be resumed. */
   abandon(): void {
     this.assertActive();
     this.status = 'abandoned';
@@ -252,7 +212,6 @@ export class Challenge implements ChallengeState {
     if (this.status !== 'active') throw conflict('Esta pelea no está en curso.');
   }
 
-  /** Older versions kept repeated species in teams: an open room keeps one of each. */
   dropRepeatedSpecies(unique: (team: RosterEntry[]) => RosterEntry[]): boolean {
     if (this.status !== 'open' || !Array.isArray(this.hostTeam)) return false;
     const team = unique(this.hostTeam);

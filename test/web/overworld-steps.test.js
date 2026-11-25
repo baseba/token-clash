@@ -7,7 +7,6 @@ const blank = () => Buffer.alloc(F * F * 4);
 const paint = (frame, x, y, rgb) => frame.set([...rgb, 255], (y * F + x) * 4);
 const colour = (frame, x, y) => (frame[(y * F + x) * 4 + 3] ? [...frame.subarray((y * F + x) * 4, (y * F + x) * 4 + 3)] : null);
 
-/** A small figure: a head, a body and two legs, standing on row `feet`, in the given colours. */
 function figure({ head, body, leg }, { feet = 27, liftLeft = false } = {}) {
   const frame = blank();
   for (let y = feet - 15; y <= feet - 10; y++) for (let x = 12; x <= 19; x++) paint(frame, x, y, head);
@@ -26,7 +25,6 @@ const sheetOf = (frames) => {
 };
 
 const WALKER = { head: [200, 160, 120], body: [40, 80, 200], leg: [30, 30, 60] };
-/** An official walker: its steps are its standing frame a pixel lower, with the left foot lifted. */
 const walker = () => {
   const idle = figure(WALKER);
   const step = figure(WALKER, { feet: 28, liftLeft: true });

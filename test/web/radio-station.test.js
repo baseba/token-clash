@@ -26,7 +26,6 @@ test('past its end a song with more queued after it has ended: there is nothing 
   assert.equal(stationPosition({ startedAt: 0, serverNow: 99_000, sinceFrameMs: 1_500 }, playsOnce), null, 'loading the mp3 can carry it past the end');
 });
 
-// A WebSocket stand-in the test opens, answers and drops by hand.
 function fakeSockets() {
   const opened = [];
   const open = () => {

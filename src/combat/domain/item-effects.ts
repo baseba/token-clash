@@ -1,6 +1,3 @@
-// What each held item does in battle, written with the same hooks as the abilities (ability-effects.ts):
-// the engine calls a fighter's ability first and then its item. Items never use the battle's random
-// numbers unless one is held, so battles without items (the arena's) play exactly as before.
 import { HELD_ITEMS, TYPE_BOOST } from '../../catalog/domain/held-items.js';
 import { speciesData } from '../../catalog/domain/creatures.js';
 import type { AbilityEffect } from './ability-effects.js';
@@ -25,7 +22,6 @@ const canEvolve = (me: BattleFighter): boolean => {
 };
 const damaging = (category: string): boolean => category !== 'status';
 
-/** An item's rules: the same hooks an ability has. */
 export type ItemEffect = Partial<AbilityEffect>;
 
 const typeBooster = (type: string): ItemEffect => ({ onBasePower: (_engine, _me, move) => (move.type === type && damaging(move.category) ? TYPE_BOOST : 1) });

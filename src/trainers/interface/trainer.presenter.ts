@@ -1,4 +1,3 @@
-// The JSON shapes the frontend reads for a trainer and their Pokémon. Presenters only read.
 import { abilityInfo } from '../../catalog/domain/abilities.js';
 import { abilityOptions, moveOrigins, natureFor, natureInfo, NATURE_KEYS, speciesData } from '../../catalog/domain/creatures.js';
 import { buildFighter, movepool, movesetFor, MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
@@ -31,7 +30,6 @@ export function shopView(trainer: Trainer) {
 
 const recycledMon = ({ id, finalID, rarity, shiny }: Pick<RosterEntry, 'id' | 'finalID' | 'rarity' | 'shiny'>) => ({ id, name: speciesData(finalID)?.name ?? `#${finalID}`, sprite: String(finalID), rarity, shiny });
 
-/** What the recycling tab shows: the repeats left to shred and what already went through. */
 export function recyclingView(trainer: Trainer) {
   return {
     ...shopSummary(trainer),
@@ -40,7 +38,6 @@ export function recyclingView(trainer: Trainer) {
   };
 }
 
-/** The logged-in trainer, with their whole collection. */
 export function myView(trainer: Trainer, aiLevels: string[]) {
   return {
     ...trainerSummary(trainer),
@@ -54,7 +51,6 @@ export function myView(trainer: Trainer, aiLevels: string[]) {
   };
 }
 
-/** One Pokémon with everything the collection screen can change (moves, ability). */
 export function monDetail(entry: RosterEntry) {
   const chosen = new Set(movesetFor(entry));
   const origins = moveOrigins(entry);

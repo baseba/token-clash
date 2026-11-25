@@ -1,6 +1,3 @@
-// What using a move does, up to the hit: whether the fighter can act (sleep, paralysis, confusion…) and the move
-// can be used, its PP, the announcement, calling rules (Metronome…), and the whole effect of a status move.
-// Attacks go on in damage.ts.
 import type { Weather } from '../../catalog/domain/creatures.js';
 import { aimedTarget, hiddenPowerType, moveAt, moveData, type MoveData, type MoveTarget, STRUGGLE, STRUGGLE_MOVE } from './moves.js';
 import { MOVE_RULES } from './move-rules.js';
@@ -28,7 +25,6 @@ export function moveBlocked(battle: BattleState, fighter: BattleFighter, move: A
   return null;
 }
 
-/** Last Resort works once the fighter has used every other move it knows. */
 export function lastResortReady(fighter: BattleFighter): boolean {
   const others = fighter.moves.filter((move) => move.key !== 'last-resort');
   return others.length > 0 && others.every((move) => fighter.volatiles.usedMoves?.has(move.key));

@@ -1,4 +1,3 @@
-// TowerRun ⇄ row.
 import type { AiLevel } from '../../combat/domain/ai.js';
 import type { RoomKind, TwistKey } from '../../catalog/domain/tower-cast.js';
 import { TowerRun, type RunStatus } from '../domain/tower-run.js';

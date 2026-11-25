@@ -1,11 +1,3 @@
-// Characterization pin for the combat engine and the AI: 40 seeded battles between AI teams, played to the end.
-// Each battle's full log (actions, events, and hashes of what each client sees) is reduced to one hash per battle
-// in battle.replays.snapshot.txt. Moving code around keeps every hash; a change in behavior names the battles it
-// changed. Objects are written with sorted keys, so building an event in another key order is not a change.
-//
-// To read the logs: REPLAY_LOGS=1 writes them to dist/replays/<seed>.txt (a failing run writes them too). Run it on
-// main and on your branch and diff the two folders.
-// To accept a deliberate change in behavior: UPDATE_SNAPSHOTS=1 npm test, and say why in the PR.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

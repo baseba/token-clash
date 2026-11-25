@@ -29,7 +29,7 @@ function stubBrowser({ permission = 'granted' } = {}) {
 }
 
 beforeEach(() => stubBrowser());
-afterEach(() => listeners.focus?.()); // the player comes back: the title stops blinking
+afterEach(() => listeners.focus?.());
 
 test('alerts only while the player is looking at another tab or window', () => {
   const notifier = createNotifier();

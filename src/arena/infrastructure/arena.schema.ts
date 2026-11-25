@@ -1,5 +1,3 @@
-// Tables owned by the arena context. Trainers are referenced by id only (no foreign key): an id
-// here may be an AI (`ai:hard`), and the arena must not depend on how trainers are stored.
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import type { FinalBattleState, Staging } from '../domain/challenge.js';
@@ -17,7 +15,6 @@ export const challenges = sqliteTable(
     aiOnly: integer('ai_only', { mode: 'boolean' }),
     hostId: text('host_id').notNull(),
     hostName: text('host_name').notNull(),
-    /** Snapshots of the teams as they were when the room was set up (value objects): JSON. */
     hostTeam: text('host_team', { mode: 'json' }).$type<RosterEntry[]>().notNull(),
     guestId: text('guest_id'),
     guestName: text('guest_name'),
@@ -27,11 +24,9 @@ export const challenges = sqliteTable(
     matchIndex: integer('match_index'),
     winnerId: text('winner_id'),
     turns: integer(),
-    /** Public state of the battle when it ended (feeds the stats). */
     final: text({ mode: 'json' }).$type<FinalBattleState>(),
     createdAt: integer('created_at').notNull(),
     finishedAt: integer('finished_at'),
-    /** How another mode dressed the battle (scene, music, rival sprite): JSON. */
     staging: text({ mode: 'json' }).$type<Staging>(),
   },
   (t) => [index('challenges_host').on(t.hostId), index('challenges_guest').on(t.guestId), index('challenges_status').on(t.status), index('challenges_tournament').on(t.tournamentId)],
@@ -55,7 +50,6 @@ export const tournaments = sqliteTable('tournaments', {
   finishedAt: integer('finished_at'),
 });
 
-/** Seats in order: the position is the seat number the bracket refers to. */
 export const tournamentSeats = sqliteTable(
   'tournament_seats',
   {
@@ -63,7 +57,6 @@ export const tournamentSeats = sqliteTable(
       .notNull()
       .references(() => tournaments.id, { onDelete: 'cascade' }),
     position: integer().notNull(),
-    /** Trainer id, or `ai:<level>#<n>`. */
     seatId: text('seat_id').notNull(),
     name: text().notNull(),
     ai: text(),
@@ -73,7 +66,6 @@ export const tournamentSeats = sqliteTable(
   (t) => [primaryKey({ columns: [t.tournamentId, t.position] })],
 );
 
-/** The bracket: one row per match, by round and position in the round. */
 export const tournamentMatches = sqliteTable(
   'tournament_matches',
   {

@@ -1,4 +1,3 @@
-// The trainers' DTOs on their own.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LogInDto, SetPasswordDto } from './credentials.dto.js';

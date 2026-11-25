@@ -96,7 +96,6 @@ input[type=text], input[type=password] {
 }
 input[type=text]:focus, input[type=password]:focus, .btn:focus-visible, .mon:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-/* hero / import */
 .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 2rem; align-items: center; margin-top: 1rem; }
 @media (max-width: 860px) { .hero { grid-template-columns: minmax(0, 1fr); } }
 .hero p.lead { font-size: 1.1rem; color: var(--muted); max-width: 46ch; }
@@ -118,7 +117,6 @@ input[type=text]:focus, input[type=password]:focus, .btn:focus-visible, .mon:foc
 .field label { font-weight: 700; font-size: .9rem; }
 .error { color: var(--bad); font-weight: 700; margin: .5rem 0 0; }
 
-/* creature cards */
 .mons { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; }
 .mon {
   position: relative; background: var(--card-2); border: 2px solid var(--line); border-radius: 14px; padding: .6rem .6rem .7rem;
@@ -140,7 +138,6 @@ input[type=text]:focus, input[type=password]:focus, .btn:focus-visible, .mon:foc
 .el { display: inline-flex; align-items: center; gap: .2rem; padding: .05rem .45rem; border-radius: 999px; font-weight: 800; font-size: .72rem; color: #fff; text-shadow: 0 1px 1px rgb(0 0 0 / .3); background: #9099a1; }
 
 
-/* lists */
 .list { display: grid; gap: .5rem; }
 .item { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .65rem .85rem; background: var(--card-2); border-radius: 12px; border: 1px solid var(--line); text-decoration: none; color: var(--text); }
 .item:hover { border-color: #5a5099; }
@@ -150,7 +147,6 @@ input[type=text]:focus, input[type=password]:focus, .btn:focus-visible, .mon:foc
 .share { display: flex; gap: .5rem; }
 .share input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9rem; }
 
-/* battle */
 .arena {
   --s: 1; position: relative; overflow: hidden; width: 100%; max-width: min(880px, calc(60vh * 320 / 180)); aspect-ratio: 320 / 180; margin-inline: auto;
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); container-type: inline-size; image-rendering: pixelated;
@@ -289,7 +285,6 @@ input[type=text]:focus, input[type=password]:focus, .btn:focus-visible, .mon:foc
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
-/* PokeAPI sprites: small pixel art, scaled without blur */
 .creature { position: relative; aspect-ratio: 1 / 1; }
 .creature img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; user-select: none; }
 .creature img.native { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); object-fit: fill; }
@@ -1951,8 +1946,6 @@ body.signed-out .hero { margin-top: 0; }
 .rename-confirm .confirm-actions { margin-top: 1rem; }
 .rename-confirm p + p, .rename-confirm p + .hk-code { margin-top: .6rem; }
 
-/* phones: the same screens rearranged for one thumb — navigation at the bottom, the battle reads top to bottom
-   (field, your move, both teams, log), and nothing relies on hover, which touch does not have. */
 .chat-dock-label, .watch-label { display: inline; }
 :where(button, a, [role="button"], summary, label) { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
@@ -2523,7 +2516,6 @@ tr.type-shift td { animation: type-row-flash .8s ease; }
 }
 @media (prefers-reduced-motion: reduce) { .watch-card { animation: none; } }
 
-/* ---------- La Torre ---------- */
 .ow-sprite { image-rendering: pixelated; display: block; }
 .ow-sprite.ow-missing { visibility: hidden; }
 
@@ -2804,7 +2796,6 @@ button.tw-reward:hover, button.tw-reward:focus-visible { border-color: var(--acc
 .tw-twist { cursor: pointer; }
 @media (max-width: 520px) { .tw-twist-name { display: none; } }
 
-/* Another trainer's public profile (/entrenador/:id). */
 .trainer-link { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 3px; }
 .trainer-link:hover, .trainer-link:focus-visible { text-decoration-color: currentColor; }
 .trainer-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem; }
@@ -2827,7 +2818,6 @@ button.tw-reward:hover, button.tw-reward:focus-visible { border-color: var(--acc
 .tw-rumor { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; padding: .55rem .7rem; border: 1px dashed var(--line); border-radius: 12px; }
 .tw-rumor small { color: var(--muted); flex: 1 1 16rem; min-width: 0; }
 
-/* The field's states in one pill: its icons, and a tap opens the detail. */
 .field-pill { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .6rem; border-radius: 999px; border: 1px solid var(--line); background: var(--card-2); color: var(--text); font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .field-pill:hover, .field-pill:focus-visible { border-color: var(--accent); outline: none; }
 .field-pill .field-more { font-size: .75rem; color: var(--muted); }

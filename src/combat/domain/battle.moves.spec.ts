@@ -5,7 +5,6 @@ import { rng } from '../../catalog/domain/creatures.js';
 import { moveData } from './moves.js';
 
 const IV = { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 };
-// Fixtures carry only the fields the rules read.
 const mon = (id, finalID, moves, extra: any = {}): any => ({ id, finalID, baseID: finalID, rarity: 'rare', level: 50, ivs: IV, learned: moves, moveset: moves, ...extra });
 const battle = (a, b, seed = 1) => createBattle({ id: 'x', random: rng(seed), sides: [{ trainerId: 'a', name: 'A', entries: [a].flat() }, { trainerId: 'b', name: 'B', entries: [b].flat() }] });
 const idx = (b, s, key) => b.sides[s].team[b.sides[s].active].moves.findIndex((m) => m.key === key);

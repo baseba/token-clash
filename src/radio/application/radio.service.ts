@@ -1,7 +1,3 @@
-// The radio's use cases: a trainer opens, renames and closes their station and edits its queue;
-// anyone lists the stations and tunes in to one. Every read and write first catches the station up
-// with its clock (Station.advance), so what a client gets is right whether or not a timer fired.
-// The timers only push the next song to the listeners the moment it starts.
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { radioTrackDuration, type RadioTrackId } from '../../catalog/domain/radio-tracks.js';
 import { now } from '../../shared/domain/clock.js';
@@ -36,7 +32,6 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     this.timers.clear();
   }
 
-  /** Every station on air, the most listened first. */
   list(): StationView[] {
     const oldestFirst = this.stations.all().sort((a, b) => a.openedAt - b.openedAt);
     for (const station of oldestFirst) this.settle(station);
@@ -50,17 +45,14 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     return this.view(station);
   }
 
-  /** Opens the owner's station, or renames it if it is already open. */
   open(ownerId: string, name: string): StationView {
     const existing = this.stations.findByOwner(ownerId);
     if (!existing) return this.changed(Station.open(ownerId, name, now()));
-    // Renamed before it advances: a refused name leaves the station as it was, not advanced and unsaved.
     existing.rename(name);
     existing.advance(now(), radioTrackDuration);
     return this.changed(existing);
   }
 
-  /** Closes the owner's station, if open: it is deleted and its listeners hear silence. */
   close(ownerId: string): void {
     if (!this.stations.findByOwner(ownerId)) return;
     this.stations.delete(ownerId);
@@ -69,7 +61,6 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     for (const listener of this.listeners.drop(ownerId)) if (listener.open) listener.send(this.frame(ownerId, null));
   }
 
-  /** `playing` is when the song the DJ saw on air started: see Station.setQueue. */
   setQueue(ownerId: string, queue: readonly RadioTrackId[], playing: number | null): StationView {
     const at = now();
     const station = this.owned(ownerId, at);
@@ -84,29 +75,18 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     return this.changed(station);
   }
 
-  /**
-   * Tunes a client in to a station (leaving the one it heard), or out with null. Only that client
-   * gets the station's frame back, with `station: null` if that station doesn't exist: the other
-   * listeners see the new count with the next change, so a client that tunes over and over can't
-   * flood them.
-   */
   tune(listener: RadioListener, stationId: string | null): void {
     const station = stationId ? this.stations.findByOwner(stationId) : undefined;
     if (station) this.listeners.tuneIn(listener, station.ownerId);
     else this.listeners.tuneOut(listener);
-    // A station that caught up has just sent its frame to every listener, this one included.
     if (station && this.settle(station)) return;
     listener.send(this.frame(stationId, station ? this.view(station) : null));
   }
 
-  /** A client went away. */
   disconnected(listener: RadioListener): void {
     this.listeners.tuneOut(listener);
   }
 
-  // The edit that follows must use the same `at`: if the clock ticked past a song's end in between,
-  // the edit would advance the station again and could then be refused, leaving that song unsaved
-  // and unannounced.
   private owned(ownerId: string, at: number): Station {
     const station = this.stations.findByOwner(ownerId);
     if (!station) throw notFound(NO_STATION);
@@ -114,7 +94,6 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     return station;
   }
 
-  /** Catches the station up with its clock. If a song changed, saves it and tells its listeners. */
   private settle(station: Station, at = now()): boolean {
     const advanced = station.advance(at, radioTrackDuration);
     if (advanced) this.changed(station);
@@ -127,8 +106,6 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     return this.broadcast(station);
   }
 
-  // One timer per station, set to its next song change. setTimeout can fire a little early, so
-  // when it does nothing has ended yet and it sets itself again.
   private schedule(station: Station): void {
     clearTimeout(this.timers.get(station.ownerId));
     this.timers.delete(station.ownerId);
@@ -153,8 +130,6 @@ export class RadioService implements OnModuleInit, OnModuleDestroy {
     return stationView(station, this.trainers.byId(station.ownerId)?.name ?? 'Entrenador', this.listeners.count(station.ownerId));
   }
 
-  // `stationId` says which station a `station: null` frame is about, so a late answer for a station
-  // the client already left doesn't make it forget the one it tuned to since.
   private frame(stationId: string | null, station: StationView | null) {
     return { t: 'radio', stationId, station, now: now() };
   }

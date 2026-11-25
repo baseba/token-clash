@@ -1,12 +1,9 @@
-// A Pokémon ready to fight: its stats, ability and gender from the catalog, and the moves it carries into
-// battle (up to four the engine can play).
 import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
 import { abilityFor, genderFor, natureFor, PERFECT_IVS, natureInfo, type NatureInfo, learnedMoves, moveEntry, moveOrigins, rng, shuffled, species, statsFor, type EntryLike, type Stats } from '../../catalog/domain/creatures.js';
 import type { Gender, Ivs, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { isHeldItem } from '../../catalog/domain/held-items.js';
 import { moveData, moveFor, type MoveData } from './moves.js';
 
-/** A fighter as the battle and the browser see it. */
 export interface Fighter {
   uid: string;
   name: string;
@@ -28,7 +25,6 @@ export interface Fighter {
   evs: Ivs;
   speciesBase: Stats;
   ivs: Ivs;
-  /** The item it holds (only the Tower gives them), null once it is used up. Absent with none, so battles without items look as they always did. */
   item?: string | null;
 }
 

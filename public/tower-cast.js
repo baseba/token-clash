@@ -1,9 +1,3 @@
-// Who you meet in the Tower, where and what they say. The server builds each floor from it (trainer,
-// types its team uses, scene, music) and the browser draws it. Trainers are the keys of
-// public/trainer-sprites.js: their battle sprite and their overworld sprite (public/overworlds/,
-// made at install by scripts/sync-overworlds.js) are the same character. A scene is one of our battle
-// backgrounds (public/backgrounds.js); the map of a floor is drawn after it.
-
 export const TOWER_LENGTHS = [10, 25, 50, null];
 export const GYM_EVERY = 5;
 export const LEAGUE_BLOCK = 25;
@@ -16,7 +10,6 @@ export const STARTERS = 3;
 export const LAB_SCENE = 'path';
 export const PROFESSOR = { key: 'prof_oak', name: 'Profesor Oak' };
 
-/** Where a team of each type fights. */
 export const TYPE_SCENES = {
   normal: ['path', 'tall-grass'], fire: ['desert', 'mountain-night'], water: ['lake', 'beach', 'ocean'], grass: ['tall-grass', 'path-2'],
   electric: ['desert-night', 'path-2'], ice: ['snow', 'snow-night'], fighting: ['mountain-2', 'path'], poison: ['path-night', 'lake-night'],
@@ -52,11 +45,8 @@ export const NAMES = {
   f: ['Javiera', 'Antonia', 'Catalina', 'Florencia', 'Isidora', 'Martina', 'Josefa', 'Trinidad', 'Amanda', 'Emilia', 'Fernanda', 'Renata', 'Constanza', 'Valentina', 'Paz', 'Sofía', 'Agustina', 'Magdalena', 'Ignacia', 'Francisca', 'Daniela', 'Camila', 'Rocío', 'Belén', 'Macarena', 'Pía', 'Colomba', 'Laura', 'Elisa', 'Julieta', 'Olivia', 'Maite', 'Carolina', 'Bárbara', 'Gabriela', 'Montserrat', 'Violeta', 'Ana', 'Lucía', 'Inés', 'Clara', 'Rosario', 'Teresa', 'Alma', 'Victoria'],
 };
 
-/** Trainer classes that are women though their key doesn't end in _f. */
 export const FEMALE_CLASSES = ['parasol_lady', 'jacinthe_holo', 'hex_maniac', 'aroma_lady', 'beauty', 'beauty_2', 'fairy_tale_girl', 'baker', 'maid', 'vicky', 'vivi', 'lass', 'picnicker', 'battle_girl', 'lady', 'socialite', 'nurse', 'kimono_girl', 'idol', 'cowgirl', 'madame'];
-/** Classes of two trainers, by who they are: two men, two women, or a man and a woman. */
 export const PAIR_CLASSES = { twins: 'ff', mysterious_sisters: 'ff', young_couple: 'mf', hooligans: 'mm', interviewers: 'mf', sis_and_bro: 'fm' };
-/** Classes that are one character with a name of their own. */
 export const NAMED_CLASSES = { jacinthe_holo: 'Jacinthe', vicky: 'Vicky', vito: 'Vito', vivi: 'Vivi', nate: 'Nate', rosa: 'Rosa', victor: 'Victor', victoria: 'Victoria', benga: 'Benga' };
 
 export const PROFESSOR_LINES = {
@@ -67,17 +57,12 @@ export const PROFESSOR_LINES = {
 
 export const RECRUIT_LINE = 'Tus Pokémon tienen buen temple. Elige a uno de estos de tu colección para lo que viene.';
 
-/** Who you meet on a floor with no battle, and what they say. Each one has a few lines. */
 export const STOP_PEOPLE = {
   rest: { speaker: 'Enfermera de la ruta', lines: ['Tus Pokémon se ven cansados. Déjamelos un rato… ¡Listo! Toma, también encontré esto para ti.', 'Bienvenid{o} a la parada. Descansa, que lo que viene es más difícil.', '¡Qué equipo tan bonito! Tengo un par de cosas que te pueden servir.'] },
   den: { speaker: 'Criadora', lines: ['Aquí se esconden Pokémon de tu colección que quieren acompañarte.', 'Shh… si te acercas despacio, alguno se va a querer unir.', 'Estos se escaparon de la guardería buscando aventura. ¿Te llevas uno?'] },
   deal: { speaker: 'Figura en la sombra', lines: ['Je… Tengo algo que te interesa. Pero todo tiene un precio.', 'Nadie sube esta torre sin sacrificar algo. ¿Qué me ofreces?', 'Dos tesoros por uno de los tuyos. Un trato justo, ¿no crees?'] },
 };
 
-/**
- * What can be different in a climb: each one draws one of these rumours at the start. It changes
- * which ways appear, the rewards and the points, so two climbs don't play the same.
- */
 export const TWISTS = {
   night: { name: 'Noche cerrada', icon: 'planet', text: 'La torre está de noche: todas las rutas se ven oscuras y las guaridas villanas aparecen el doble.' },
   market: { name: 'Feria ambulante', icon: 'heart', text: 'Hay más paradas en el camino y cada descanso ofrece un premio más para elegir.' },
@@ -96,10 +81,6 @@ export const TWISTS = {
 };
 export const TWIST_KEYS = Object.keys(TWISTS);
 
-/**
- * Between two bosses you choose your way, like the adventure paths of Emerald Rogue: plain, tough or
- * calm trainers, a rest stop, a den to recruit, a villain hideout or a dark deal.
- */
 export const ROOMS = {
   trainer: { label: 'Ruta', icon: 'swords', battle: true, hint: 'Un entrenador de la ruta.' },
   tough: { label: 'Ruta difícil', icon: 'skull', battle: true, hint: 'Rival entrenado y 2 niveles más. Premio raro o mejor.' },
@@ -110,6 +91,5 @@ export const ROOMS = {
   deal: { label: 'Pacto oscuro', icon: 'diamond', battle: false, hint: 'Deja ir a uno de tu equipo a cambio de dos premios épicos.' },
 };
 
-/** The calm biome track that plays while you look at a floor of each scene (the battle has its own). */
 const SCENE_MUSIC = { 'tall-grass': 'tall_grass', path: 'plains', lake: 'lake', beach: 'beach', mountain: 'mountain', desert: 'desert', cave: 'cave', snow: 'snowy_forest', ocean: 'sea', underwater: 'seabed' };
 export const sceneMusic = (scene) => SCENE_MUSIC[String(scene).replace(/-(2|night)$/, '')] ?? 'town';

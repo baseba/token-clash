@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Writes public/upstream/cries.json: the cry of every species and form as a file of PokeAPI/cries
-// at the commit pinned in public/upstream.js. The latest recording when there is one, the legacy
-// one otherwise, resolved here once so the browser fetches a single file.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { UPSTREAM } from '../public/upstream.js';
@@ -12,10 +9,8 @@ const DATA = new URL('../src/catalog/data/pokeapi.json', import.meta.url);
 const MANIFEST = new URL('../public/upstream/cries.json', import.meta.url);
 const RECORDINGS = ['latest', 'legacy'];
 
-/** The cry of a Pokémon by its PokeAPI id, or null. `firstOf` answers which of some paths exists first. */
 export const resolveCry = (id, firstOf) => firstOf(RECORDINGS.map((recording) => `cries/pokemon/${recording}/${id}.ogg`));
 
-// A form's cry is its own Pokémon's (Zen Darmanitan is 10017), which only the PokeAPI API knows.
 async function formPokemonId(name) {
   const res = await fetchRetry(`${API}/pokemon-form/${name}`);
   const form = res.ok ? await res.json() : null;

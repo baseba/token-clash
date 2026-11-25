@@ -84,7 +84,6 @@ export class TournamentsController {
     throw new HttpError(405, 'Método no permitido');
   }
 
-  /** Runs a change on an existing tournament and answers with how it looks now. */
   private after(trainer: Trainer, id: string, change: (tournament: Tournament) => void) {
     const tournament = this.tournaments.find(id);
     change(tournament);

@@ -1,5 +1,3 @@
-// A database written by the first schema, where old rooms have no mode or visibility, must read
-// back the same after the later migrations: those rooms are private team battles, as they were.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -19,7 +17,6 @@ const { roster } = parseSave(readFileSync(join(PROJECT_ROOT, 'test', 'fixtures',
 const team = JSON.stringify(roster.slice(0, 2));
 const final = JSON.stringify({ winner: 0, sides: [{ team: [{ speciesName: 'Pikachu' }] }, { team: [{ hidden: true }] }] });
 
-/** Rows as the first schema stored them, mode and visibility NULL in the oldest ones. */
 const rows = [
   { id: 'old-open', status: 'open', mode: null, visibility: null, host_team: team, created_at: 1 },
   { id: 'old-done', status: 'finished', mode: null, visibility: null, host_team: team, guest_id: 't2', guest_name: 'Beto', guest_team: team, winner_id: 't1', turns: 7, final, created_at: 2, finished_at: 3 },
@@ -28,7 +25,6 @@ const rows = [
   { id: 'match', status: 'abandoned', mode: 'team', visibility: 'private', host_team: team, guest_id: 'ai:easy#1', guest_name: 'tom ai', guest_team: team, ai: 'easy', ai_only: 0, tournament_id: 'T1', round: 0, match_index: 1, created_at: 7 },
 ];
 
-/** A database migrated only up to `upTo`, with `rows` written as that schema stored them. */
 function databaseAt(upTo: string[], rowsToWrite: Record<string, string | number | null>[]): string {
   const dir = mkdtempSync(join(tmpdir(), 'tc-migrations-'));
   for (const name of upTo) cpSync(join(MIGRATIONS_DIR, name), join(dir, 'migrations', name), { recursive: true });

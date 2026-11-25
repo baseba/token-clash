@@ -40,6 +40,5 @@ test('joining explains why a room is no longer available', () => {
   assert.match(why(room('a')), /ya no está en la sala/);
   assert.equal(why(room('a'), { hostWaiting: () => true }), null);
   assert.equal(why(room('a', { visibility: 'private' })), null);
-  // The domain says which kind of "no" it is; the HTTP layer turns 'conflict' into a 409.
   assert.equal(joinBlocker(Challenge.restore(room('a', { status: 'active' })), { trainerId: 'x', now }).kind, 'conflict');
 });

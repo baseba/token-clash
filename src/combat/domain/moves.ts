@@ -1,19 +1,13 @@
-// A catalog move as Token Clash plays it. moveData() reads a movedex.json row the way the engine needs it
-// (Foul Play attacks with the target's Attack, Outrage rampages…), and decides whether the engine can play the
-// move at all: `supported`. Trainers, the AI and the browser ask this module, so the catalog never has to know
-// what the engine can do.
 import { moveEntry, type MoveEntry } from '../../catalog/domain/creatures.js';
 import { IMPOSSIBLE_MOVES, MOVE_RULES } from './move-rules.js';
 import { hiddenPowerType } from '../../../public/natures.js';
 
 export type MoveTarget = 'foe' | 'self';
 
-/** A move as the engine reads it: its movedex.json row, plus what the engine derives from it. */
 export interface MoveData extends MoveEntry {
   key: string;
   id: string;
   kind: 'attack' | 'status';
-  /** The engine plays it: the generic rules cover it or it has a rule of its own, and it isn't impossible here. */
   supported: boolean;
   weakenedByGrassyTerrain?: boolean;
   usesTargetAttack?: boolean;
@@ -64,7 +58,6 @@ const AIMABLE: Record<string, MoveTarget> = {
 };
 const SELF_COST: Record<string, number> = { 'fillet-away': 1 / 2, 'clangorous-soul': 33 / 100 };
 
-/** What a fighter uses when it has no move left to use. STRUGGLE_MOVE stands for it in an action. */
 export const STRUGGLE_MOVE = -1;
 export const STRUGGLE: MoveData = {
   key: 'struggle', id: 'struggle', name: 'Forcejeo', desc: 'Ataque desesperado que solo se usa cuando no quedan PP; daña también al usuario.',
@@ -73,7 +66,6 @@ export const STRUGGLE: MoveData = {
 
 export const aimedTarget = (move: MoveData, aim: MoveTarget | null | undefined): string => (move.aimable ? aim ?? move.aimable : move.target);
 
-/** The move in a fighter's slot, or Struggle. */
 export const FULL_FRIENDSHIP_POWER = 102;
 const HIDDEN_POWER = 60;
 

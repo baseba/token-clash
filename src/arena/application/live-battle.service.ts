@@ -1,6 +1,3 @@
-// A battle in a room, from the first turn to the result. The rules live in the combat context
-// (pure functions over a BattleState); this service drives them: the turn timer, AI and Skynet
-// turns, moves a fighter is locked into, and the result, which is the only thing stored.
 import { Injectable, Logger } from '@nestjs/common';
 import { aiLevelOf, chooseAction, JEV_LEVEL } from '../../combat/domain/ai.js';
 import { autoAction, createBattle, forcedAction, forfeit, needsAction, publicState, submit, type Action, type BattleEvent, type BattleState } from '../../combat/domain/battle.js';
@@ -19,7 +16,6 @@ import { LobbyService } from './lobby.service.js';
 import { Presence, someoneAbsent, type BattlePhase, type Room } from './presence.js';
 import { broadcast, refuse, sideIn } from './room-frames.js';
 
-/** A finished room stays this long for late viewers before it is dropped from memory. */
 const FINISHED_ROOM_MS = 10 * 60_000;
 
 const aiOnly = (battle: BattleState) => battle.sides.every((side) => aiLevelOf(side.trainerId));
@@ -42,7 +38,6 @@ export class LiveBattleService {
     this.timings = config.timings;
   }
 
-  /** The picks are in: the battle starts with the 3 each side chose. */
   start(room: Room, preview: PreviewState): void {
     const phase: BattlePhase = {
       kind: 'battle',
@@ -87,12 +82,10 @@ export class LiveBattleService {
     this.afterResolve(room, phase, forfeit(phase.battle, sideIndex));
   }
 
-  /** The client finished animating this turn (AI vs AI waits for viewers). */
   seen(ws: ClientConnection, turn: number): void {
     ws.seenTurn = Math.max(ws.seenTurn ?? 0, turn);
   }
 
-  /** AI vs AI plays at a watchable pace and waits (a while) for viewers still animating a turn. */
   private nextAiTurn(room: Room, phase: BattlePhase): void {
     const { battle } = phase;
     if (!aiOnly(battle)) return this.aiTurn(room, phase);
@@ -117,7 +110,6 @@ export class LiveBattleService {
     battle.sides.forEach((side, sideIndex) => {
       const level = aiLevelOf(side.trainerId);
       if (!level || !needsAction(battle, sideIndex)) return;
-      // Never let a Skynet bug become an unhandled rejection: the turn timer still plays for it.
       if (level === JEV_LEVEL) return void this.jevTurn(room, phase, sideIndex).catch((e) => this.logger.error(`Skynet: ${e}`));
       const action = chooseAction(battle, sideIndex, level) ?? autoAction(battle, sideIndex);
       if (!action) return;
@@ -128,8 +120,6 @@ export class LiveBattleService {
     else if (acted) broadcast(room, { t: 'ready' });
   }
 
-  // Jev answers over the network, so this side acts later. Meanwhile the rival may act, the turn
-  // timer may play for Skynet, or the room may close: the answer only counts if nothing moved.
   private async jevTurn(room: Room, phase: BattlePhase, sideIndex: number): Promise<void> {
     const { battle, jevAsked } = phase;
     const at = `${battle.turn}:${battle.phase}`;
@@ -144,7 +134,6 @@ export class LiveBattleService {
     try {
       events = submit(battle, sideIndex, action);
     } catch (error) {
-      // The turn timer still plays for Skynet.
       this.logger.warn(`Skynet: no se pudo jugar su acción (${error}).`);
       return;
     }
@@ -152,7 +141,6 @@ export class LiveBattleService {
     else broadcast(room, { t: 'ready' });
   }
 
-  /** Turn timer: whoever has not chosen gets an automatic move, so a battle always ends. */
   private armTimer(room: Room, phase: BattlePhase): void {
     clearTimeout(room.timer ?? undefined);
     room.timer = null;
@@ -182,7 +170,6 @@ export class LiveBattleService {
     this.nextAiTurn(room, phase);
   }
 
-  /** Moves a player is locked into (a charge, a rampage…) play themselves. */
   private playForcedMoves(room: Room, phase: BattlePhase): boolean {
     const { battle } = phase;
     let events: BattleEvent[] | null = null;
@@ -207,13 +194,11 @@ export class LiveBattleService {
     const { challenge } = room;
     const winnerId = battle.winner !== null ? battle.sides[battle.winner].trainerId : null;
     challenge.finish({ winnerId, turns: battle.turn, final: publicState(battle), at: now() });
-    // Only 1v1 between people counts for the ranking, which belongs to the trainers context.
     if (battle.winner !== null && isHumanDuel(challenge))
       this.trainers.recordRankedResult(battle.sides[battle.winner].trainerId, battle.sides[1 - battle.winner].trainerId);
     this.challenges.save(challenge);
     this.lobby.notify();
     this.events.matchFinished({ challenge, winnerSide: battle.winner });
-    // Keep the finished room a while for late viewers, then drop it.
     setTimeout(() => {
       if (this.presence.rooms.get(challenge.id) === room && room.sockets.size === 0) this.presence.rooms.delete(challenge.id);
     }, FINISHED_ROOM_MS).unref();

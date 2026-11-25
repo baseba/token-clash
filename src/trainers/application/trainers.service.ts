@@ -1,7 +1,3 @@
-// Use cases of the trainers context. This is the context's public face: other contexts (arena,
-// stats, realtime) talk to trainers only through this service, never through its repository or
-// its tables. TrainersModule exports this class and nothing else.
-
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { newId, newToken, now, sha256 } from '../../shared/domain/clock.js';
 import { conflict, forbidden, invalid } from '../../shared/domain/errors.js';
@@ -36,7 +32,6 @@ export class TrainersService implements OnModuleInit {
   constructor(private readonly trainers: TrainerRepository) {}
 
   onModuleInit(): void {
-    // Saves imported by older versions kept repeated species: tidy them once at startup.
     let fixed = 0;
     let relooked = 0;
     let refunded = 0;
@@ -79,12 +74,10 @@ export class TrainersService implements OnModuleInit {
     this.trainers.save(trainer);
   }
 
-  /** Who owns a session token, without marking them as seen (the lobby list does this). */
   peekToken(token: string | undefined): Trainer | undefined {
     return token === undefined ? undefined : this.trainers.findByTokenHash(sha256(token));
   }
 
-  /** Who owns a session token, and mark them as seen now (feeds "active now" in the stats). */
   authenticate(token: string): Trainer | undefined {
     const trainer = this.peekToken(token);
     if (trainer) {
@@ -94,16 +87,11 @@ export class TrainersService implements OnModuleInit {
     return trainer;
   }
 
-  /** Same, from an `Authorization: Bearer <token>` header. */
   authenticateHeader(header: string | undefined): Trainer | undefined {
     const token = bearerToken(header);
     return token ? this.authenticate(token) : undefined;
   }
 
-  /**
-   * Imports a save. Without a session it registers a new trainer and returns their token (shown
-   * once: only its hash is stored). With a session it updates that trainer's collection.
-   */
   importSave(current: Trainer | undefined, input: { save: string; name?: string; password?: string }): { token: string | null; trainer: Trainer } {
     const parsed = parseSave(input.save);
     const name = cleanName(input.name ?? '');
@@ -137,7 +125,6 @@ export class TrainersService implements OnModuleInit {
     return { token, trainer };
   }
 
-  /** @throws {DomainError} the save is not a PokeTokenBar save */
   syncSave(authorization: string | undefined, save: string): Trainer | undefined {
     const credentials = basicCredentials(authorization);
     const trainer = credentials && this.verify(credentials);
@@ -145,13 +132,11 @@ export class TrainersService implements OnModuleInit {
     return this.importSave(trainer, { save }).trainer;
   }
 
-  /** @throws {DomainError} the session can't be closed because the account has no password */
   logOut(trainer: Trainer, token: string): void {
     trainer.closeSession(sha256(token), sha256(newToken()));
     this.trainers.save(trainer);
   }
 
-  /** @throws {DomainError} another trainer has the same name, the password is too short, or the current password is wrong */
   setPassword(trainer: Trainer, input: { password: string; currentPassword?: string }): Trainer {
     if (trainer.passwordHash && !passwordMatches(input.currentPassword ?? '', trainer.passwordHash)) throw forbidden('Tu contraseña actual no coincide.');
     if (this.namesake(trainer.name, trainer)) throw conflict(`Otro entrenador también se llama ${trainer.name}: cámbiate el nombre antes de agregar una contraseña, porque con él entras.`);
@@ -166,18 +151,15 @@ export class TrainersService implements OnModuleInit {
     return this.trainers.all().find((other) => other !== owner && nameKey(other.name) === key);
   }
 
-  /** @throws {DomainError} another trainer already has that name */
   private ensureNameFree(name: string, owner?: Trainer): void {
     if (this.namesake(name, owner)) throw conflict(`Ya hay un entrenador que se llama ${cleanName(name)}, elige otro nombre.`);
   }
 
-  /** @throws {DomainError} another trainer already has that name */
   private rename(trainer: Trainer, name: string): void {
     if (cleanName(name)) this.ensureNameFree(name, trainer);
     trainer.rename(name);
   }
 
-  /** @throws {DomainError} the chosen look is not a trainer sprite, or another trainer already has the new name */
   updateProfile(trainer: Trainer, changes: ProfileChanges): Trainer {
     if (changes.name !== undefined) this.rename(trainer, changes.name);
     if (changes.avatar !== undefined) trainer.chooseAvatar(changes.avatar);
@@ -188,7 +170,6 @@ export class TrainersService implements OnModuleInit {
     return trainer;
   }
 
-  /** @throws {DomainError} the item doesn't exist, is already owned, or the balance is short */
   buy(trainer: Trainer, itemId: string): Trainer {
     trainer.buy(itemId);
     trainer.touch(now());
@@ -196,7 +177,6 @@ export class TrainersService implements OnModuleInit {
     return trainer;
   }
 
-  /** @throws {DomainError} the Pokémon is not a repeated one, or it was already recycled */
   recycle(trainer: Trainer, entryId: string): RecycledRecord {
     const record = trainer.recycle(entryId, now());
     trainer.touch(now());
@@ -204,7 +184,6 @@ export class TrainersService implements OnModuleInit {
     return record;
   }
 
-  /** @throws {DomainError} the item doesn't exist or wasn't bought */
   equip(trainer: Trainer, kind: EquipKind, key: string | null): Trainer {
     trainer.equip(kind, key);
     trainer.touch(now());
@@ -213,7 +192,7 @@ export class TrainersService implements OnModuleInit {
   }
 
   updateMon(trainer: Trainer, entryId: string, changes: { moves?: string[]; ability?: string; nature?: string; evs?: Ivs }): Trainer {
-    trainer.entry(entryId); // 404 before anything else
+    trainer.entry(entryId);
     if (changes.moves !== undefined) trainer.chooseMoves(entryId, changes.moves);
     if (changes.ability !== undefined) trainer.chooseAbility(entryId, changes.ability);
     if (changes.nature !== undefined) trainer.chooseNature(entryId, changes.nature);
@@ -223,7 +202,6 @@ export class TrainersService implements OnModuleInit {
     return trainer;
   }
 
-  /** A ranked 1v1 ended. The arena decides whether a match is ranked; trainers keep the score. */
   recordRankedResult(winnerId: string, loserId: string): void {
     const winner = this.trainers.findById(winnerId);
     const loser = this.trainers.findById(loserId);

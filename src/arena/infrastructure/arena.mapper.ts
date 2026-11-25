@@ -1,5 +1,3 @@
-// Aggregate ⇄ rows for challenges and tournaments. A tournament is one aggregate stored in three
-// tables (tournament, seats, bracket matches): it is always loaded and saved whole.
 import { compact } from '../../shared/infrastructure/database/compact.js';
 import { Challenge, type BattleMode, type ChallengeStatus, type Visibility } from '../domain/challenge.js';
 import { Tournament, type Bracket, type TournamentStatus } from '../domain/tournament.js';

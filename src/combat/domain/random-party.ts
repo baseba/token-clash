@@ -1,5 +1,3 @@
-// Random battle: the dice draw up to 6 of a collection, no repeated species, each with random
-// moves and ability among the ones that work in Token Clash. Randomness is injected.
 import { abilityOptions, usableAbility, shuffled, NATURE_KEYS, type Random } from '../../catalog/domain/creatures.js';
 import { usableMovepool, MOVES_PER_FIGHTER } from './fighter.js';
 import { moveData } from './moves.js';

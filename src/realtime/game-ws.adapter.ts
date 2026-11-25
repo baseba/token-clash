@@ -1,7 +1,3 @@
-// The WebSocket adapter: Nest's WsAdapter (the `ws` library) with two additions for our protocol.
-// - Each frame is parsed against ClientMessage (client-messages.ts) and routed by its `t` to the
-//   gateway's @SubscribeMessage('<t>') handler. Anything else is dropped.
-// - Before the handshake, ConnectionLimits checks the origin and the per-IP cap (403 otherwise).
 import type { INestApplicationContext } from '@nestjs/common';
 import { WsAdapter } from '@nestjs/platform-ws';
 import type { IncomingMessage } from 'node:http';

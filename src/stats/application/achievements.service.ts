@@ -28,7 +28,6 @@ export class AchievementsService implements OnApplicationBootstrap {
     });
   }
 
-  /** Anyone wearing a trainer they no longer have gets one they do have (or the default one). */
   onApplicationBootstrap(): void {
     let relooked = 0;
     for (const trainer of this.trainers.all()) {
@@ -51,19 +50,16 @@ export class AchievementsService implements OnApplicationBootstrap {
     return (key) => isUnlocked(record, key);
   }
 
-  /** @throws {DomainError} the item needs a trainer not unlocked yet, doesn't exist, is owned, or the balance is short */
   buy(trainer: Trainer, itemId: string): Trainer {
     const reason = buyBlocker(this.recordFor(trainer), itemId);
     if (reason) throw forbidden(reason);
     return this.trainers.buy(trainer, itemId);
   }
 
-  /** @throws {DomainError} the item doesn't exist or wasn't bought */
   equip(trainer: Trainer, kind: EquipKind, key: string | null): Trainer {
     return this.trainers.equip(trainer, kind, key);
   }
 
-  /** @throws {DomainError} the look is still locked, or is not a trainer sprite */
   chooseLook(trainer: Trainer, key: string): Trainer {
     const reason = lookBlocker(this.recordFor(trainer), trainer.avatar, key);
     if (reason) throw forbidden(reason);

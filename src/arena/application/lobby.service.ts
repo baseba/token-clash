@@ -1,6 +1,3 @@
-// The lobby: the live list of open rooms and tournaments anyone can join with one click, and of the
-// battles being played that anyone can watch. Clients on the home page subscribe over the socket and
-// get both lists again whenever they change.
 import { Injectable } from '@nestjs/common';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
@@ -26,12 +23,10 @@ export class LobbyService {
     private readonly views: ArenaViews,
   ) {}
 
-  /** Public duel rooms waiting for a rival whose host is still around. */
   publicRooms(): Challenge[] {
     return openRooms<Challenge>(this.challenges.all(), { hostWaiting: this.presence.hostWaiting });
   }
 
-  /** Public tournaments with free seats whose host is still around. */
   listedTournaments(now = Date.now()): Tournament[] {
     return this.tournaments
       .all()
@@ -60,7 +55,6 @@ export class LobbyService {
     return this.presence.watchable(watchKey(room.challenge));
   }
 
-  /** A player opens their match, or their whole tournament, to watchers: it shows up in the live list. */
   allowWatchers(ws: ClientConnection): void {
     const room = this.presence.roomOf(ws);
     const tournament = room ? this.tournamentOf(room) : ws.tourId ? this.tournaments.findById(ws.tourId) : undefined;
@@ -73,7 +67,6 @@ export class LobbyService {
     this.notify();
   }
 
-  /** Whether the room or tournament a connection just entered is open to watchers. */
   sendWatchState(ws: ClientConnection): void {
     const room = this.presence.roomOf(ws);
     const key = room ? watchKey(room.challenge) : ws.tourId ? tournamentWatchKey(ws.tourId) : null;
@@ -90,7 +83,6 @@ export class LobbyService {
     this.presence.lobby.delete(ws);
   }
 
-  /** Something listed changed: tell everyone in the lobby (batched, and only if their list changed). */
   notify(): void {
     if (this.timer) return;
     this.timer = setTimeout(() => {
@@ -99,7 +91,6 @@ export class LobbyService {
     }, 50);
   }
 
-  /** Re-check the list once a new public room's grace period is over. */
   notifyAfterGrace(): void {
     setTimeout(() => this.notify(), HOST_GRACE_MS + 100).unref();
   }

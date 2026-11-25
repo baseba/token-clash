@@ -1,29 +1,18 @@
-// What each ability does in battle (EFFECTS). The effects are hooks the engine calls (onStart,
-// onBasePower, onTryHit…) with the AbilityEngine of ability-engine.ts, so they never touch the
-// battle state directly. Names and descriptions are catalog data: catalog/domain/abilities.ts.
 import type { Boosts, BoostKey, MajorStatus, StatKey, Weather } from '../../catalog/domain/creatures.js';
 import type { MoveData } from './moves.js';
 import type { AbilityEngine } from './ability-engine.js';
 import { isIcy, isMajorStatus, isRain, isSun, poisoned, stageMult } from './conditions.js';
 import type { BattleFighter, BattleMove } from './battle-types.js';
 
-/** Stat stage changes about to apply, which onTryBoost/onChangeBoost may edit in place. */
 export type BoostChanges = Record<string, number>;
 
-/** Extra facts a damaging hit hands to onDamagingHit. */
 export interface HitInfo {
   crit: boolean;
   before: number;
   dmg: number;
 }
 
-/**
- * What an ability does. Flags are read by the engine (flag()); hooks are called by it (run(), mul(),
- * chain()). A hook returns a multiplier (mul), the new value of the number it was handed last (chain),
- * a boolean that blocks or allows, or nothing.
- */
 export interface AbilityEffect {
-  // Flags
   breakable?: boolean;
   noTrace?: boolean;
   unsuppressable?: boolean;
@@ -57,7 +46,6 @@ export interface AbilityEffect {
   wakesFaster?: boolean;
   wonderSkin?: boolean;
   weatherImmune?: string[];
-  // Hooks
   onAccuracy?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, acc: number): number;
   onAfterEachBoost?(engine: AbilityEngine, me: BattleFighter, applied: Boosts, source: BattleFighter | null, effect?: string): void;
   onAfterMoveHit?(engine: AbilityEngine, me: BattleFighter, move: BattleMove, target: BattleFighter, total: number): void;
@@ -107,7 +95,6 @@ export interface AbilityEffect {
   onWeatherChange?(engine: AbilityEngine, me: BattleFighter): void;
 }
 
-/** Names of the hooks (the methods of AbilityEffect). */
 export type AbilityHook = { [K in keyof AbilityEffect]-?: NonNullable<AbilityEffect[K]> extends (...args: never[]) => unknown ? K : never }[keyof AbilityEffect];
 
 
@@ -226,7 +213,6 @@ const ignoresIntimidate: AbilityEffect = {
   },
 };
 
-// Combines effects: hooks present in several parts all run (multipliers multiply, blocks combine).
 type AnyHook = (...args: unknown[]) => unknown;
 const merge = (...parts: AbilityEffect[]): AbilityEffect => {
   const out: Record<string, unknown> = {};

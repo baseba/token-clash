@@ -1,5 +1,3 @@
-// The MoveRuleApi: what the special rules of move-rules.ts may do to a battle. A rule never touches the battle
-// state directly.
 import { ALL_MOVE_IDS, type BoostKey, type Boosts, effectiveness, type MajorStatus, speciesData, type Stats } from '../../catalog/domain/creatures.js';
 import { moveData, type MoveData } from './moves.js';
 import { MOVE_RULES } from './move-rules.js';
@@ -11,7 +9,6 @@ import { activeFighters, activeOf, addToxicSpikes, addVolatile, boost, clearHaza
 import { flag, run, setAbility } from './ability-engine.js';
 
 const moveApis = new WeakMap<BattleState, MoveRuleApi>();
-/** The volatiles Baton Pass hands to the next fighter. */
 const BATON_PASSED = ['confusion', 'focusEnergy', 'perish', 'leechSeed', 'curse', 'ingrain', 'aquaRing', 'magnetRise', 'substitute', 'trappedBy', 'gastroAcid'] as const;
 const MAX_SPIKES = 3;
 
@@ -23,12 +20,10 @@ export function moveApi(battle: BattleState): MoveRuleApi {
   return api;
 }
 
-/** What move rules may do to the battle (move-rules.ts). */
 export type MoveRuleApi = ReturnType<typeof makeMoveApi>;
 
 function makeMoveApi(battle: BattleState) {
   const sideOf = (fighter: BattleFighter) => sideIndexOf(battle, fighter);
-  /** Protect and the guards fail more often each turn in a row they're used: 1/3, then 1/9… */
   const stallFails = (fighter: BattleFighter): boolean => {
     const stalls = fighter.volatiles.stall ?? 0;
     if (stalls > 0 && battle.random() >= 1 / 3 ** stalls) {

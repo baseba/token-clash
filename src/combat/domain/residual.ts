@@ -1,5 +1,3 @@
-// The end of a turn: weather and status damage, Leech Seed, binding moves, wishes and Future Sight, and the
-// countdowns of volatiles, side conditions, rooms, screens, weather and terrain.
 import { poisoned } from './conditions.js';
 import type { BattleFighter, BattleState, SideCondition } from './battle-types.js';
 import { computeDamage, typeEffectiveness } from './damage.js';

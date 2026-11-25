@@ -1,15 +1,3 @@
-// Overworld sprites (the small walking trainers of the Tower's maps), generated at install like the
-// trainers: every trainer key gets public/overworlds/<key>.png, a column of 16 frames of 32×32 in
-// four groups (up, down, left, right), each group idle, step, step, idle.
-//
-// Sources, all in the GBA style so they share scale and walk: Emerald Rogue (every region's leaders,
-// rivals and teams), Emerald and FireRed. A sheet without walking frames gets steps learned from the
-// official sheets that walk (scripts/overworld-steps.mjs). A colour variant repaints its base with the
-// same functions as the battle recolour (scripts/overworld-recolor.mjs). A trainer with no
-// official overworld gets one composed from officials of its gender and painted with its own colours
-// (scripts/overworld-compose.mjs), or, if that fails, the official one that looks most like it. One
-// whose colours are far from its battle sprite's (a class drawn with another class's sprite) is
-// dressed in its trainer's colours (scripts/overworld-dress.mjs).
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { DOWNLOADED_SPRITES, TRAINER_VARIANTS } from '../public/trainer-sprites.js';
 import { UPSTREAM } from '../public/upstream.js';
@@ -28,14 +16,12 @@ const REPOS = {
   fr: { upstream: UPSTREAM.firered, dir: 'graphics/object_events/pics/people/' },
 };
 
-/** Gen 3 sheets: down, up, left, then two steps of each (right is left mirrored). */
 const GBA_GROUPS = { up: [1, 5, 6, 1], down: [0, 3, 4, 0], left: [2, 7, 8, 2] };
 
 function blank() {
   return { width: FRAME, height: FRAME * FRAMES, rgba: Buffer.alloc(FRAME * FRAME * FRAMES * 4) };
 }
 
-/** Copies a w×h box of a sheet into frame `slot`, bottom-centred, keying out the background colour. */
 function place(out, sheet, sx, sy, w, h, slot, { key = null, mirror = false } = {}) {
   const ox = Math.floor((FRAME - w) / 2);
   const oy = slot * FRAME + (FRAME - h);
@@ -52,10 +38,6 @@ function place(out, sheet, sx, sy, w, h, slot, { key = null, mirror = false } = 
     }
 }
 
-/**
- * People are 16 pixels wide and bikes 32, and a sheet has 3, 4, 9 or 10 frames. When the count fits both
- * widths, the frames are 16 wide if the first 32 columns hold two figures with a background column between them.
- */
 export function frameWidth(sheet) {
   if (sheet.width % 32) return 16;
   if ([3, 4, 9, 10].includes(sheet.width / 16) && ![3, 9, 10].includes(sheet.width / 32)) return 16;
@@ -70,11 +52,9 @@ export function frameWidth(sheet) {
   return firstEnd > 0 && firstEnd <= 16 && columns.slice(16).some(Boolean) && !columns[15] ? 16 : 32;
 }
 
-/** How many frames a GBA sheet has: 9 or 10 when it walks, 3 or 4 when it only stands. */
 export const framesOf = (sheet) => Math.floor(sheet.width / frameWidth(sheet));
 const WALKING_FRAMES = 9;
 
-/** A GBA sheet laid out in our 16 frames. One that only stands repeats its standing frames as steps, until scripts/overworld-steps.mjs makes them. */
 export function normalizeGba(sheet) {
   const width = frameWidth(sheet);
   const h = sheet.height;
@@ -101,7 +81,6 @@ async function fetchSheet(source) {
   return { image: normalizeGba(sheet), walks: framesOf(sheet) >= WALKING_FRAMES };
 }
 
-/** Its most common saturated colours by hue and light, to compare a battle sprite with overworlds. */
 function colourPrint(image, { top = 0, height = image.height } = {}) {
   const buckets = new Map();
   for (let y = top; y < top + height; y++)
@@ -121,7 +100,6 @@ function colourPrint(image, { top = 0, height = image.height } = {}) {
   return new Map([...buckets].map(([bucket, n]) => [bucket, n / total]));
 }
 
-/** The colour pairs a recolour changed on the battle sprite: each base colour and what most of its pixels became. */
 export function battleRepaint(base, variant) {
   if (base.width !== variant.width || base.height !== variant.height) return [];
   const votes = new Map();
@@ -139,17 +117,13 @@ export function battleRepaint(base, variant) {
 
 const likeness = (a, b) => [...a].reduce((sum, [bucket, share]) => sum + Math.min(share, b.get(bucket) ?? 0), 0);
 
-/** The height of a grown-up standing on the map in GBA sprites: the pieces of a composed sprite come from these. */
 const ADULT_HEIGHTS = [19, 22];
-/** A map sprite whose colours look less like its battle sprite than this is dressed in its trainer's clothes (scripts/overworld-dress.mjs). */
 const DRESS_BELOW = 0.35;
-/** How tall the figure standing in front is: children and swimmers are shorter than the rest. */
 function figureHeight(image) {
   const rows = [...Array(FRAME).keys()].filter((y) => [...Array(FRAME).keys()].some((x) => image.rgba[((4 * FRAME + y) * FRAME + x) * 4 + 3]));
   return rows.length ? rows.at(-1) - rows[0] + 1 : 0;
 }
 
-/** Whether the trainer walks as its own official sprite (not another class's): that one keeps its colours, as a composed one keeps the ones it was painted with. */
 const drawnFor = (key) => SOURCES[key]?.toLowerCase().includes(key.replace(/_[mf]$/, '').replace(/_\d+$/, '')) ?? false;
 
 const isFemale = (key) => key.endsWith('_f') || FEMALE.includes(key);
@@ -176,8 +150,6 @@ async function main() {
       console.log(`  ${key}: ${err.message}`);
     }
   });
-  // In the order of overworld-sources.json, not in the order the downloads finish: composing a mini
-  // breaks ties by this order, so the same sources always make the same sprites.
   const official = new Map(Object.keys(SOURCES).filter((key) => fetched.has(key)).map((key) => [key, fetched.get(key)]));
   const { walkersOf, withSteps } = await import('./overworld-steps.mjs');
   const walkers = walkersOf([...official.values()].filter((sheet) => sheet.walks).map((sheet) => sheet.image));

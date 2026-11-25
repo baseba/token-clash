@@ -1,5 +1,3 @@
-// Adapter: StationRepository on SQLite through Drizzle. An identity map like the others: loaded
-// once, the same object handed out afterwards (a station's timer holds on to it), writes go through.
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { eq } from 'drizzle-orm';

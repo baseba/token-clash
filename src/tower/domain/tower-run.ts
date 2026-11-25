@@ -1,19 +1,3 @@
-// The TowerRun aggregate: one climb of the Tower. Its status only moves these ways, and each method
-// refuses any other:
-//
-//   drafting → climbing    draft      you take your first Pokémon from the professor's offers
-//   climbing → climbing    chooseRoom on a plain floor, the way you take (a route, a tough one…)
-//   climbing → resting     chooseRoom a room with no battle: a rest stop, a den or a dark deal (no experience)
-//   climbing → resting     win        a floor cleared: experience, levels, evolutions and a rest
-//   resting  → climbing    moveOn     you go up (after taking your rewards and maybe a recruit)
-//   climbing → cleared     win        the last floor of a climb with an end
-//   climbing → lost        lose       a battle lost (or drawn) ends the climb
-//   any open → abandoned   abandon    you give it up
-//
-// While climbing or resting the party can be changed between battles, like in PokeRogue: the moves
-// each Pokémon knows (by level, machine or tutor), the abilities it unlocked, its nature and its EVs.
-// The party are copies of collection entries plus what the climb changed; the climb never writes back
-// to the collection.
 import { abilityFor, abilityOptions, hash, rng, type Random } from '../../catalog/domain/creatures.js';
 import type { Ivs, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { MAX_LEVEL, PARTY_LIMIT, RECRUIT_LINE, ROOMS, START_LEVEL, STARTERS, TWIST_KEYS, type RoomKind, type TwistKey } from '../../catalog/domain/tower-cast.js';
@@ -37,18 +21,13 @@ export interface TowerMon {
   speciesId: number;
   level: number;
   exp: number;
-  /** The 4 (or fewer) it takes to battle. */
   moves: string[];
-  /** Every move it can swap in: learned by level so far, or taught by a machine or a tutor. */
   known: string[];
   ability: string | null;
-  /** Abilities a capsule let it use, besides the one it came with. */
   abilities: string[];
   nature: string | null;
   evs: Ivs;
-  /** The level at which you stopped its evolution: it keeps its form until it levels up again. */
   heldAt?: number | null;
-  /** The item it holds in battle (a reward). Battles never use it up for good: a berry is back in the next one. */
   item?: string | null;
 }
 
@@ -86,18 +65,12 @@ export interface TowerRunState {
   party: TowerMon[];
   offers: Offer[];
   rewards: Reward[];
-  /** The way taken on the current floor, once chosen (only plain floors offer a choice). */
   room: RoomKind | null;
-  /** How many of the rewards on offer you still take. */
   picks: number;
   rerolls: number;
-  /** The draw of each floor reached, made when you got there: its ways and route rivals were unknown before. */
   rolls: Rolls;
-  /** The points of every floor won. */
   log: FloorScore[];
-  /** The floor of the last detour taken (a hideout or a way with no battle): the next two plain floors offer none. */
   detourAt: number | null;
-  /** The rumour of this climb: what makes it play differently (null in climbs started before rumours). */
   twist: TwistKey | null;
   challengeId: string | null;
   lastResult: FloorResult | null;
@@ -127,7 +100,6 @@ function monFrom(offer: Offer): TowerMon {
 
 const NO_EVS: Ivs = { hp: 0, atk: 0, def: 0, satk: 0, sdef: 0, spd: 0 };
 export const REROLLS_PER_REST = 1;
-/** Extra experience for each level a Pokémon is below the next floor's cap. */
 const CATCH_UP_PER_LEVEL = 0.35;
 const DEAL_PICKS = 2;
 const REST_PICKS = 2;
@@ -220,7 +192,6 @@ export class TowerRun implements TowerRunState {
     this.updatedAt = at;
   }
 
-  /** The draw of the floor you just reached. */
   private rollFloor(at: number): void {
     this.rolls = { ...this.rolls, [this.floor]: hash(`${this.seed}:${this.floor}:${at}`).toString(36) };
   }
@@ -234,12 +205,10 @@ export class TowerRun implements TowerRunState {
     return this.floorAt(this.floor, this.room);
   }
 
-  /** The ways the current floor offers; empty on a boss floor or once one is taken. */
   rooms(): RoomKind[] {
     return this.status === 'climbing' && !this.room ? roomsAt(this.floor, this.length, this.seed, this.rolls, this.twist, this.detourAt) : [];
   }
 
-  /** The floor each way leads to, to show who waits there before choosing. */
   roomFloors(): Floor[] {
     return this.rooms().map((room) => this.floorAt(this.floor, room));
   }
@@ -248,10 +217,6 @@ export class TowerRun implements TowerRunState {
     return this.rooms().length > 0;
   }
 
-  /**
-   * Takes one of the ways of a plain floor. One with no battle is resolved here and the floor is passed,
-   * with no experience: only a battle raises levels, besides the rewards you choose.
-   */
   chooseRoom(room: RoomKind, { at, roster, releaseUid = null }: { at: number; roster: readonly RosterEntry[]; releaseUid?: string | null }): void {
     if (!this.rooms().includes(room)) throw invalid('Ese camino no está en este piso.');
     if (room === 'deal' && (this.party.length <= 1 || !this.party.some((mon) => mon.uid === releaseUid))) throw invalid('El pacto pide a uno de tu equipo, y no puedes quedarte sin Pokémon.');
@@ -283,21 +248,18 @@ export class TowerRun implements TowerRunState {
     return this.foeTeamAt(this.currentFloor());
   }
 
-  /** The team a rival of this floor brings against your party as it is now (to show a way before taking it, too). */
   foeTeamAt(floor: Floor): RosterEntry[] {
     const party = this.party.map((mon) => ({ ivs: mon.entry.ivs, evs: mon.evs }));
     const met = this.log.filter((entry) => entry.floor < floor.number).flatMap((entry) => entry.lines ?? []);
     return foeTeam(floor, this.difficulty, rng(`${this.seed}:${this.rolls[floor.number] ?? ''}:foe:${floor.number}`), party, met);
   }
 
-  /** Which of its team the rival of this floor takes to the battle against your party (indexes into `foeTeam()`). */
   foePicks(): number[] {
     const floor = this.currentFloor();
     const random = rng(`${this.seed}:${this.rolls[floor.number] ?? ''}:picks:${floor.number}:${this.log.length}`);
     return foePicks(floor, this.foeTeam(), this.difficulty, random, BATTLE_SIZE, this.party.map((mon) => mon.speciesId));
   }
 
-  /** The party as the battle takes it: each one at its level, in its form, with its moves, ability and nature. */
   battleTeam(): RosterEntry[] {
     return this.party.map((mon) => ({
       ...mon.entry,
@@ -320,7 +282,6 @@ export class TowerRun implements TowerRunState {
     this.updatedAt = at;
   }
 
-  /** The battle of this floor ended. Returns false when it was not this climb's battle. */
   battleFinished(challengeId: string, won: boolean, { at, roster }: { at: number; roster: readonly RosterEntry[] }): boolean {
     if (this.status !== 'climbing' || this.challengeId !== challengeId) return false;
     this.challengeId = null;
@@ -351,7 +312,6 @@ export class TowerRun implements TowerRunState {
     return true;
   }
 
-  /** What the party looks like to the rewards: who fits each one, and why. */
   rewardTargets() {
     return this.party.map((mon) => ({ uid: mon.uid, speciesId: mon.speciesId, finalId: mon.entry.finalID, level: mon.level, known: mon.known, abilities: mon.abilities, evs: mon.evs, ivs: mon.entry.ivs, nature: mon.nature, shiny: mon.entry.shiny, item: mon.item ?? null }));
   }
@@ -371,7 +331,6 @@ export class TowerRun implements TowerRunState {
     };
   }
 
-  /** Another three offers in place of these, once per rest. */
   reroll(at: number): void {
     if (this.status !== 'resting' || !this.rewards.length) throw conflict('No hay premios que cambiar.');
     if (this.rerolls <= 0) throw conflict('Ya cambiaste los premios de esta parada.');
@@ -384,10 +343,6 @@ export class TowerRun implements TowerRunState {
     this.updatedAt = at;
   }
 
-  /**
-   * Experience up to the level cap of the next floor: the party never outgrows the rivals ahead. Like
-   * Emerald Rogue's soft cap, the further below the cap a Pokémon is, the faster it catches up.
-   */
   private gainExperience(floor: Floor): Growth[] {
     const foes = this.foeTeam();
     const nextCap = Math.min(MAX_LEVEL, levelCap(floor.number + 1));
@@ -399,7 +354,6 @@ export class TowerRun implements TowerRunState {
     });
   }
 
-  /** New level, maybe a new form, and the moves it learns on the way: into a free slot, or known. */
   private grow(mon: TowerMon, exp: number): Growth {
     const before = { level: mon.level, speciesId: mon.speciesId, known: [...mon.known] };
     mon.exp = exp;
@@ -416,7 +370,6 @@ export class TowerRun implements TowerRunState {
     return { uid: mon.uid, fromLevel: before.level, toLevel: mon.level, fromSpecies: before.speciesId, toSpecies: mon.speciesId, learned };
   }
 
-  /** After an evolution, the abilities it unlocked that the new form has, and its own. */
   private settleForm(mon: TowerMon, fromSpecies: number): void {
     if (mon.speciesId === fromSpecies) return;
     const ability = abilityFor({ ...mon.entry, finalID: mon.speciesId, ...(mon.ability ? { abilityChoice: mon.ability } : {}) });
@@ -452,7 +405,6 @@ export class TowerRun implements TowerRunState {
     if (this.status !== 'climbing' && this.status !== 'resting') throw conflict('Ahora no puedes cambiar tu equipo.');
   }
 
-  /** Uses a reward on a party member, or on the whole party. Returns what changed (levels or a new form). */
   takeReward(rewardId: string, choice: RewardChoice, { at, roster }: { at: number; roster: readonly RosterEntry[] }): Growth[] {
     if (this.status !== 'resting' || this.picks <= 0) throw conflict('No hay premios que tomar ahora.');
     const reward = this.rewards.find((candidate) => candidate.id === rewardId);
@@ -526,7 +478,6 @@ export class TowerRun implements TowerRunState {
     }
   }
 
-  /** Its IVs, EVs and nature after a stat reward. */
   private applyTraining(mon: TowerMon, reward: Reward): void {
     const after = trainingAfter(reward, { uid: mon.uid, speciesId: mon.speciesId, ivs: mon.entry.ivs, evs: mon.evs, nature: mon.nature });
     if (!after) return;
@@ -556,7 +507,6 @@ export class TowerRun implements TowerRunState {
     this.updatedAt = at;
   }
 
-  /** Lets a Pokémon go for good. The party never empties. */
   release(uid: string, at: number): void {
     this.assertEditable();
     if (this.party.length <= 1) throw invalid('Tu equipo no puede quedar vacío.');
@@ -564,7 +514,6 @@ export class TowerRun implements TowerRunState {
     this.updatedAt = at;
   }
 
-  /** Changes the moves and ability of a Pokémon among the ones it has unlocked. */
   edit(uid: string, change: { moves?: string[]; ability?: string | null }, at: number): void {
     this.assertEditable();
     const mon = this.member(uid);
@@ -580,7 +529,6 @@ export class TowerRun implements TowerRunState {
     this.updatedAt = at;
   }
 
-  /** "Detener": the evolution it just went through is undone until its next level. */
   holdEvolution(uid: string, at: number): void {
     if (this.status !== 'resting') throw conflict('Ahora no hay ninguna evolución que detener.');
     const growth = this.lastResult?.growth.find((entry) => entry.uid === uid);

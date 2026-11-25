@@ -1,12 +1,9 @@
-// The compiled app (dist/src/main.js, built by `npm test`) as a separate process, like production
-// runs it. Each e2e file starts its own, on its own port and data directory.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PROJECT_ROOT } from '../src/shared/paths.js';
 
-/** Short timers so whole matches play in a few seconds. */
 export const FAST_TIMINGS = {
   TURN_MS: '1500',
   PREVIEW_MS: '1500',
@@ -31,7 +28,6 @@ export interface AppProcess {
   kill(): void;
 }
 
-/** `ports` is a range of 1000 starting there, so two e2e files running at once don't collide. */
 export function appProcess(env: Record<string, string>, ports: number): AppProcess {
   const port = ports + Math.floor(Math.random() * 1000);
   const base = `http://127.0.0.1:${port}`;

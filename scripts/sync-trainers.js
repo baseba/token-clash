@@ -6,8 +6,6 @@ import { DOWNLOADED_SPRITES, TRAINER_VARIANTS } from '../public/trainer-sprites.
 import { UPSTREAM } from '../public/upstream.js';
 import { fetchUpstream, mapLimit } from './upstream-files.js';
 
-// Served by us, unlike the rest of PokeRogue's files: each sprite is the first frame of an atlas,
-// cropped to its pixels, and the color variants are recolored from it.
 const TRAINERS = 'images/trainer';
 const OUT = new URL('../public/trainers/', import.meta.url);
 

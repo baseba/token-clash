@@ -1,6 +1,3 @@
-// The items a Pokémon can hold, like the held items of PokeRogue and Emerald Rogue. Only the Tower hands
-// them out (as rewards, and to its later rivals); the arena's battles have none. What each one does in
-// battle lives in combat/domain/item-effects.ts; this is what it is called, says and how rare it is.
 export type ItemTier = 'common' | 'rare' | 'epic';
 
 export interface HeldItemInfo {
@@ -8,15 +5,11 @@ export interface HeldItemInfo {
   name: string;
   desc: string;
   tier: ItemTier;
-  /** The type of the moves it strengthens (Charcoal, Mystic Water…). */
   boosts?: string;
-  /** It only works on a Pokémon that can still evolve (Eviolite). */
   unevolved?: boolean;
-  /** It is used up once it acts (a berry, a Focus Sash). */
   consumable?: boolean;
 }
 
-/** A type-boosting item makes the moves of its type this much stronger. */
 export const TYPE_BOOST = 1.2;
 
 const booster = (key: string, name: string, type: string, typeName: string): HeldItemInfo => ({
@@ -64,5 +57,4 @@ const LIST: readonly HeldItemInfo[] = [
 export const HELD_ITEMS: Readonly<Record<string, HeldItemInfo>> = Object.fromEntries(LIST.map((item) => [item.key, item]));
 export const HELD_ITEM_KEYS: readonly string[] = LIST.map((item) => item.key);
 export const isHeldItem = (key: string | null | undefined): key is string => !!key && key in HELD_ITEMS;
-/** The item that strengthens moves of a type, if there is one. */
 export const boosterOf = (type: string): string | null => LIST.find((item) => item.boosts === type)?.key ?? null;

@@ -1,14 +1,10 @@
-// Errors the domain and the use cases throw when a rule says no. They carry *what kind* of no it
-// is, never an HTTP status: translating a kind into a status code is the job of the HTTP layer
-// (shared/http/domain-error.filter.ts). The message is what the player reads, in Spanish.
-
 export type DomainErrorKind =
-  | 'invalid' // the request makes no sense (400)
-  | 'not-found' // it does not exist (404)
-  | 'forbidden' // it exists, but it is not yours to do (403)
-  | 'conflict' // not now: the state does not allow it (409)
-  | 'gone' // it existed but was closed for good (410)
-  | 'unavailable'; // this server cannot do it (503)
+  | 'invalid'
+  | 'not-found'
+  | 'forbidden'
+  | 'conflict'
+  | 'gone'
+  | 'unavailable';
 
 export class DomainError extends Error {
   constructor(

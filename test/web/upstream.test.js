@@ -71,7 +71,6 @@ test('a manifest that fails to load is asked for again on the next call', async 
   }
 });
 
-// The committed manifests, served to the browser as /upstream/<name>.json.
 const readManifest = (url) => JSON.parse(readFileSync(new URL(`../../public${url.split('?')[0]}`, import.meta.url), 'utf8'));
 globalThis.fetch = async (url) => ({ ok: true, json: async () => readManifest(url) });
 

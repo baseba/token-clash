@@ -1,8 +1,3 @@
-// The overworld sprite of a trainer no game drew one for, built only from official ones: the body of
-// the official whose clothes are laid out most like the trainer's, the head of the official whose
-// hair looks most like it (cut at the neck, frame by frame, only when both have the same skin), and
-// then hair, clothes and accent repainted with the trainer's own colours from its battle sprite. Skin,
-// eyes and outline keep their official colours, and the repaint passes the recolour checks.
 import { paletteOf } from './plan-trainer-variants.mjs';
 import { chromaOf, paintRampWithTones, rampsOf, recolorProblems } from './sprite-ramps.mjs';
 import { extendFrontMap, withoutSkin } from './overworld-recolor.mjs';
@@ -38,7 +33,6 @@ const meanOf = (ramp) => {
   return { weight, light, chroma, hue };
 };
 
-/** Which ramp is the hair, the top, the bottom, an accent and the skin, by where its pixels sit. */
 export function rolesOf(image) {
   const colors = paletteOf(image);
   const { ramps, shared } = rampsOf(colors);
@@ -74,7 +68,6 @@ function skinClose(a, b) {
   return Math.abs(x.light - y.light) < SKIN_GAP && hueGap(x.hue, y.hue) < 0.06;
 }
 
-/** Head rows of one sheet over the body of another, frame by frame. */
 export function joinAtNeck(head, body) {
   const rgba = Buffer.from(body.rgba);
   for (let index = 0; index < FRAMES; index++) {
@@ -117,10 +110,6 @@ function repaint(sheet, target) {
   return { image: { width: sheet.width, height: sheet.height, rgba }, painted: kept.length };
 }
 
-/**
- * The composed and repainted sheet for a battle sprite, from `officials` (key → normalized sheet).
- * Returns the templates used so the result can be checked.
- */
 export function composeMini(battle, officials) {
   const target = rolesOf(battle);
   const rated = [...officials].map(([key, sheet]) => ({ key, sheet, roles: rolesOf(frameOf(sheet, FRONT)) }));
