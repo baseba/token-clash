@@ -106,6 +106,17 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   assert.equal(ch.data.challenge.hostTeam.length, 1);
   assert.equal(ch.data.challenge.hostTeam[0].level, 100);
 
+  const shared = await (await fetch(`${base}/b/${id}`)).text();
+  assert.match(shared, /<meta property="og:title" content="Ana te desafía a una batalla">/);
+  const ogImage = shared.match(/<meta property="og:image" content="([^"]+)">/)?.[1];
+  assert.ok(ogImage?.startsWith(`${base}/og/b/${id}.png?v=`), 'the link preview points to the room card on this origin');
+  const card = await fetch(ogImage);
+  assert.equal(card.status, 200);
+  assert.equal(card.headers.get('content-type'), 'image/png');
+  assert.deepEqual([...new Uint8Array(await card.arrayBuffer()).slice(1, 4)], [...Buffer.from('PNG')]);
+  assert.equal((await fetch(`${base}/og/b/zzzzzz.png`)).status, 404);
+  assert.match(await (await fetch(`${base}/b/zzzzzz`)).text(), /<title>Token Clash<\/title>/, 'an unknown room keeps the generic page');
+
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: a.data.token })).status, 400);
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST' })).status, 401);
 
@@ -372,6 +383,8 @@ test('a 4-player tournament filled with AIs plays every match in order until a c
   const b = await call('/api/import', { method: 'POST', body: { name: 'Intrusa', save, ...newAccount() } });
   const T = (await call('/api/tournaments', { method: 'POST', token: a.data.token, body: { size: 4, mode: 'random', visibility: 'private' } })).data.tournament;
   assert.equal(T.status, 'open');
+  assert.match(await (await fetch(`${base}/t/${T.id}`)).text(), /<meta property="og:title" content="El torneo de Campeona · faltan 3 jugadores">/);
+  assert.equal((await fetch(`${base}/og/t/${T.id}.png`)).headers.get('content-type'), 'image/png');
   assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', body: { level: 'easy' } })).status, 401);
   assert.equal((await call(`/api/tournaments/${T.id}/join`, { method: 'POST', token: b.data.token })).status, 200);
   assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: b.data.token, body: { level: 'easy' } })).status, 403);

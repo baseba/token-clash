@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ArenaModule } from '../arena/arena.module.js';
 import { HealthController, WebController } from './web.controller.js';
+import { PreviewImages } from './preview-images.js';
 import { WebModule } from './web.module.js';
 
-@Module({ imports: [WebModule, ArenaModule], controllers: [HealthController, WebController] })
+@Module({ imports: [WebModule, ArenaModule], controllers: [HealthController, WebController], providers: [PreviewImages] })
 export class WebRoutesModule {}

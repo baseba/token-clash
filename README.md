@@ -283,6 +283,8 @@ Los datos y recursos de terceros son de sus autores, con sus licencias; aquí so
   Pagefault Games y sus colaboradores. Las animaciones y los sonidos `PRSFX-` son de
   [Pokémon Reborn](https://www.rebornevo.com/); las animaciones `GEN8-` son del Gen 8 Animation Project
   (CC BY-NC-SA 4.0). El navegador carga las hojas y los audios de jsDelivr; no se versionan.
+- Fuente de la miniatura de los links: [Nunito](https://github.com/googlefonts/nunito), de The Nunito Project Authors
+  (SIL Open Font License 1.1, en `assets/fonts/OFL.txt`).
 
 ## Desarrollo
 
@@ -315,7 +317,7 @@ Por carpeta:
 | `src/tower/` | La Torre: subidas con tu colección, pisos, crecimiento, premios y récords. Dueño de `tower_runs`. |
 | `src/stats/` | La página de stats y los logros. No guarda nada: los cambios del entrenador se los pide a `TrainersService`. |
 | `src/realtime/` | El protocolo WebSocket (`/ws`). |
-| `src/web/` | El frontend estático y los health checks. |
+| `src/web/` | El frontend estático, los health checks y la vista previa de los links de salas y torneos. |
 | `src/shared/` | Configuración, errores de dominio, HTTP (guards, filtro de errores) y la base de datos. |
 | `src/legacy/` | La migración única desde `data/db.json`. |
 | `src/architecture.spec.ts` | El test que hace cumplir la regla de dependencia entre capas y dominios. |
@@ -326,6 +328,7 @@ Por carpeta:
 | `public/upstream.js`, `public/upstream/` | De qué commit de cada repo externo salen los sprites, gritos, sonidos y música, y los manifiestos que dicen dónde está cada archivo. |
 | `scripts/` | Descargas e importaciones de datos externos (detalle abajo). |
 | `tools/` | Chequeos del código que corre `npm test` (compilados con `tsconfig.tools.json`): `no-comments.ts` falla con cualquier comentario y los borra con `npm run no-comments -- --fix`. |
+| `assets/` | Archivos que usa solo el servidor: la fuente Nunito (OFL) de la miniatura de los links. |
 | `deploy/` | Imagen, contenedores, redes y el deploy automático (ver [Deploy](#deploy-podman--cloudflare-tunnel)). |
 
 Por tema:
@@ -339,6 +342,7 @@ Por tema:
 | Motor de batalla | `src/combat/domain/battle.ts` (mapa de archivos al principio), `move-rules.ts`, `ability-effects.ts` | WebSocket, por la arena | `public/battle-anims.js`, `public/fx.js` |
 | IA y Skynet | `src/combat/domain/ai.ts`, `src/combat/application/skynet.service.ts`, `src/combat/infrastructure/jev/` | | |
 | Salas y emparejamiento | `src/arena/domain/challenge.ts`, `lobby.ts` | `arena/interface/challenges.controller.ts` | `public/app.js` |
+| Vista previa de un link de sala o torneo (lo que muestra un chat al pegarlo) | qué dice en `src/web/link-preview.ts`, la miniatura en `preview-card.ts` (SVG) y `preview-images.ts` (PNG con resvg y la fuente de `assets/fonts/`); los datos, en `ArenaQueries.sharedDuel` y `sharedTournament` | `/b/:id` y `/t/:id` (etiquetas Open Graph) y `/og/b/:id.png`, `/og/t/:id.png` en `web/web.controller.ts` | |
 | Pelea en vivo (fases de la sala) | `src/arena/application/duel.service.ts`, `team-preview.service.ts`, `live-battle.service.ts`, `presence.ts`; lo que ve cada cliente, en `room-frames.ts` | `src/realtime/game.gateway.ts`, mensajes en `client-messages.ts` | `public/app.js`, `public/battle-anims.js` |
 | Torneos | `src/arena/domain/tournament.ts`, `arena/application/tournaments.service.ts` | `arena/interface/tournaments.controller.ts` | `public/app.js` |
 | Chat | `src/chat/domain/chat.ts`, canales en `arena/application/arena-chat.service.ts` | WebSocket | `public/app.js` |
