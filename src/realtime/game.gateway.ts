@@ -17,8 +17,6 @@ class WsConnection implements ClientConnection, RadioListener {
   trainerId: string | null = null;
   roomId: string | null = null;
   tourId: string | null = null;
-  seenTurn?: number;
-  lastChatAt?: number;
   private inLobby = false;
   private alive = true;
 
