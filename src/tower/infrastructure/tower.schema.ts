@@ -25,6 +25,8 @@ export const towerRuns = sqliteTable(
     rerolls: integer().notNull().default(0),
     rolls: text({ mode: 'json' }).$type<Rolls>().notNull().default({}),
     log: text({ mode: 'json' }).$type<FloorScore[]>().notNull().default([]),
+    detourAt: integer('detour_at'),
+    /** Replaced by detour_at, which also counts hideouts and dens: only read, to be dropped. */
     restedAt: integer('rested_at'),
     twist: text(),
     challengeId: text('challenge_id'),

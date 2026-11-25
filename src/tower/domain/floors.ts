@@ -188,28 +188,36 @@ const drawOf = (seed: string, rolls: Rolls, floor: number): string => (rolls[flo
  * roll the floor always made, so a climb under way keeps the ways it was offered and only gains some.
  */
 const extraWays = (roll: number): number => (roll < 0.5 ? 2 : roll < 0.8 ? 3 : 4);
+/** Right after a detour, how often the plain route comes with both other routes instead of just one. */
+const BOTH_ROUTES_AFTER_DETOUR = 0.45;
 
-/** After a rest stop, the next plain floors that offer none. */
-const FLOORS_WITHOUT_REST = 2;
+/** The ways off the plain routes: the ones with no battle, and a villain hideout. */
+export const DETOURS: readonly RoomKind[] = ['rest', 'den', 'deal', 'hideout'];
+/** After a detour, the next plain floors that offer none. */
+const FLOORS_WITHOUT_DETOURS = 2;
 
-/** Whether a plain floor may offer a rest stop: not on the next two plain floors after the one you rested on. */
-export function restOffered(floor: number, length: number | null, restedAt: number | null): boolean {
-  if (restedAt === null) return true;
+/** Whether a plain floor may offer detours: not on the next two plain floors after the one you took one on. */
+export function detoursOffered(floor: number, length: number | null, detourAt: number | null): boolean {
+  if (detourAt === null) return true;
   let plainFloors = 0;
-  for (let between = restedAt + 1; between < floor; between++) if (floorKind(between, length) === 'trainer') plainFloors++;
-  return plainFloors >= FLOORS_WITHOUT_REST;
+  for (let between = detourAt + 1; between < floor; between++) if (floorKind(between, length) === 'trainer') plainFloors++;
+  return plainFloors >= FLOORS_WITHOUT_DETOURS;
 }
 
-/** The rooms a plain floor offers: always a trainer, and two to four other ways (no rest stop right after one). */
-export function roomsAt(floor: number, length: number | null, seed: string, rolls: Rolls = {}, twist: TwistKey | null = null, restedAt: number | null = null): RoomKind[] {
+/**
+ * The rooms a plain floor offers: always a trainer, and two to four other ways. Right after a detour
+ * only routes: the plain one and, as drawn, the tough one, the calm one or both.
+ */
+export function roomsAt(floor: number, length: number | null, seed: string, rolls: Rolls = {}, twist: TwistKey | null = null, detourAt: number | null = null): RoomKind[] {
   if (floorKind(floor, length) !== 'trainer') return [];
   const random = rng(`${drawOf(seed, rolls, floor)}:rooms:${floor}`);
   const boost = (twist && TWIST_WEIGHTS[twist]) ?? {};
-  const resting = restOffered(floor, length, restedAt);
-  const pool = ROOM_WEIGHTS.filter(([room]) => (floor > WARM_UP_FLOORS || EARLY_ROOMS.includes(room)) && (room !== 'rest' || resting)).map(([room, weight]): [RoomKind, number] => [room, weight * (boost[room] ?? 1)]);
+  const detours = detoursOffered(floor, length, detourAt);
+  const pool = ROOM_WEIGHTS.filter(([room]) => (floor > WARM_UP_FLOORS || EARLY_ROOMS.includes(room)) && (detours || !DETOURS.includes(room))).map(([room, weight]): [RoomKind, number] => [room, weight * (boost[room] ?? 1)]);
   const rooms: RoomKind[] = ['trainer'];
   if (twist === 'wild') rooms.push(pool.splice(pool.findIndex(([room]) => room === 'tough'), 1)[0][0]);
-  const extra = extraWays(random());
+  const roll = random();
+  const extra = detours ? extraWays(roll) : roll < BOTH_ROUTES_AFTER_DETOUR ? 2 : 1;
   while (rooms.length < Math.max(1 + extra, twist === 'wild' ? 2 : 0) && pool.length) {
     const total = pool.reduce((sum, [, weight]) => sum + weight, 0);
     let roll = random() * total;

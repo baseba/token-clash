@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { rng, speciesIdByName } from '../../catalog/domain/creatures.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { DomainError } from '../../shared/domain/errors.js';
-import { levelCap } from './floors.js';
+import { DETOURS, levelCap } from './floors.js';
 import { expForLevel } from './growth.js';
 import { FEATHER_EVS, VITAMIN_EVS } from './rewards.js';
 import { TowerRun } from './tower-run.js';
@@ -314,23 +314,48 @@ test('a floor without a battle gives no experience: levels come from battles and
   assert.deepEqual(run.lastResult?.growth, []);
 });
 
-test('after a rest stop, the next two plain floors offer none, whatever their draw', () => {
+const offersDetour = (run: TowerRun) =>
+  Array.from({ length: 40 }, (_, draw) => draw).some((draw) => {
+    run.rolls = { ...run.rolls, [run.floor]: `draw${draw}` };
+    return run.rooms().some((room) => DETOURS.includes(room));
+  });
+
+test('after a rest stop, the next two plain floors offer only routes, whatever their draw', () => {
   const run = climbing();
   for (let draw = 0; !run.rooms().includes('rest'); draw++) run.rolls = { ...run.rolls, [run.floor]: `draw${draw}` };
   run.chooseRoom('rest', { at: 5, roster });
-  assert.equal(run.restedAt, 1);
-  const offersRest = () => Array.from({ length: 40 }, (_, draw) => draw).some((draw) => {
-    run.rolls = { ...run.rolls, [run.floor]: `draw${draw}` };
-    return run.rooms().includes('rest');
-  });
+  assert.equal(run.detourAt, 1);
   for (const floor of [2, 3]) {
     run.moveOn(6);
     assert.equal(run.floor, floor);
-    assert.ok(!offersRest(), `no rest stop on floor ${floor}`);
+    assert.ok(!offersDetour(run), `no detour on floor ${floor}`);
+    assert.ok(run.rooms().every((room) => ['trainer', 'tough', 'calm'].includes(room)));
     win(run);
   }
   run.moveOn(7);
-  assert.ok(offersRest(), 'the third plain floor may offer one again');
+  assert.ok(offersDetour(run), 'the third plain floor may offer one again');
+});
+
+test('a villain hideout is a detour too: the next two plain floors have none, a gym in between not counting', () => {
+  const run = climbing();
+  for (const floor of [2, 3]) {
+    win(run);
+    run.moveOn(3);
+    assert.equal(run.floor, floor);
+  }
+  for (let draw = 0; !run.rooms().includes('hideout'); draw++) run.rolls = { ...run.rolls, [run.floor]: `draw${draw}` };
+  run.chooseRoom('hideout', { at: 4, roster });
+  assert.equal(run.detourAt, 3);
+  run.enterBattle('c3', 4);
+  assert.ok(run.battleFinished('c3', true, { at: 5, roster }));
+  for (const floor of [4, 5, 6]) {
+    run.moveOn(6);
+    assert.equal(run.floor, floor);
+    if (floor !== 5) assert.ok(!offersDetour(run), `no detour on floor ${floor}`);
+    win(run);
+  }
+  run.moveOn(7);
+  assert.ok(offersDetour(run), 'floor 7 may offer one again');
 });
 
 test('a Pokémon far below the cap catches up faster than one near it', () => {

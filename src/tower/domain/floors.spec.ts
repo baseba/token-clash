@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
 import { CLASS_LINES } from '../../catalog/domain/tower-lines.js';
 import { NAMES, START_LEVEL, TYPE_SCENES } from '../../catalog/domain/tower-cast.js';
-import { fitToParty, floorAt, floorKind, foeLevel, levelCap, restOffered, roomsAt, stretchStart, teamSize } from './floors.js';
+import { fitToParty, floorAt, floorKind, foeLevel, levelCap, detoursOffered, roomsAt, stretchStart, teamSize } from './floors.js';
 
 const kinds = (length: number | null, upTo: number) => Array.from({ length: upTo }, (_, i) => floorKind(i + 1, length));
 const baseOf = (floor: number, length: number | null, seed: string) => floorAt(floor, length, 'mid', seed).foe?.base;
@@ -192,13 +192,22 @@ test('a plain floor offers three to five ways, and every count shows up', () => 
   assert.deepEqual([...counts].sort(), [3, 4, 5]);
 });
 
-test('a rest stop is not offered on the next two plain floors after the one you rested on, a boss in between not counting', () => {
-  assert.ok(restOffered(3, 25, null));
-  assert.ok(!restOffered(2, 25, 1) && !restOffered(3, 25, 1));
-  assert.ok(restOffered(4, 25, 1));
-  assert.ok(!restOffered(6, 25, 4) && !restOffered(7, 25, 4), 'the gym on floor 5 is not a plain floor');
-  assert.ok(restOffered(8, 25, 4));
-  for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) assert.ok(!roomsAt(3, 25, seed, {}, 'market', 2).includes('rest'), seed);
+test('after a detour the next two plain floors offer only routes, as drawn, a boss in between not counting', () => {
+  assert.ok(detoursOffered(3, 25, null));
+  assert.ok(!detoursOffered(2, 25, 1) && !detoursOffered(3, 25, 1));
+  assert.ok(detoursOffered(4, 25, 1));
+  assert.ok(!detoursOffered(6, 25, 4) && !detoursOffered(7, 25, 4), 'the gym on floor 5 is not a plain floor');
+  assert.ok(detoursOffered(8, 25, 4));
+  const offers = new Set<string>();
+  for (const seed of Array.from({ length: 40 }, (_, i) => `detour${i}`))
+    for (const twist of [null, 'market', 'migration', 'night', 'wild'] as const) {
+      const rooms = roomsAt(4, 25, seed, {}, twist, 3);
+      assert.equal(rooms[0], 'trainer');
+      assert.ok(rooms.length >= 2 && rooms.every((room) => ['trainer', 'tough', 'calm'].includes(room)), `${seed} ${twist}: ${rooms}`);
+      if (twist === 'wild') assert.ok(rooms.includes('tough'));
+      offers.add([...rooms].sort().join());
+    }
+  assert.deepEqual([...offers].sort(), ['calm,tough,trainer', 'calm,trainer', 'tough,trainer'], 'not always the same three');
 });
 
 test('every route trainer has a voice of its own, and the classes met most three lines or more', () => {

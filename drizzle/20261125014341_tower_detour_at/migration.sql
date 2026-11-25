@@ -1,0 +1,1 @@
+ALTER TABLE `tower_runs` ADD `detour_at` integer;
