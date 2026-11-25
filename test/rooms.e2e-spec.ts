@@ -7,7 +7,8 @@ import { PROJECT_ROOT } from '../src/shared/paths.js';
 import { appProcess, FAST_TIMINGS } from './app-process.js';
 
 const SEAT_GRACE_MS = 400;
-const app = appProcess({ ...FAST_TIMINGS, SEAT_GRACE_MS: String(SEAT_GRACE_MS), TRUST_CF_CONNECTING_IP: '1', JEV_API_KEY: '', JEV_API_URL: '' }, 19000);
+const AI_WATCH_MS = 5000;
+const app = appProcess({ ...FAST_TIMINGS, SEAT_GRACE_MS: String(SEAT_GRACE_MS), AI_WATCH_MS: String(AI_WATCH_MS), TRUST_CF_CONNECTING_IP: '1', JEV_API_KEY: '', JEV_API_URL: '' }, 19000);
 const save = readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8');
 
 before(() => app.start());
@@ -371,4 +372,60 @@ test('tournament chat: the tournament page and its match rooms share one channel
   const said = await fanPage.next((f) => f.t === 'chat' && f.message.text === 'mirando la otra');
   assert.deepEqual([said.message.id, said.message.role, said.message.side], [4, 'player', null]);
   await Promise.all([page, fanPage, inMatch, otherMatch].map((client) => client.close()));
+});
+
+test('a socket enters one place: the lobby knows whose room is whose, and a socket already inside ignores another entry', async () => {
+  const host = await trainer('Anuncia');
+  const id = (await call('/api/challenges', { method: 'POST', token: host.token, body: { visibility: 'public' } })).data.challenge.id;
+  const own = new Client({ t: 'lobby', token: host.token });
+  const anonymous = new Client({ t: 'lobby', token: null });
+  const mineIn = async (client: Client) => (await client.next((f) => f.t === 'rooms')).rooms.find((room: any) => room.id === id)?.mine;
+  assert.equal(await mineIn(own), true);
+  assert.equal(await mineIn(anonymous), false);
+
+  own.send({ t: 'lobby', token: host.token });
+  own.send({ t: 'hello', room: id, token: host.token });
+  own.send({ t: 'tour', id: 'no-existe', token: host.token });
+  await sleep(300);
+  assert.deepEqual(own.rest(), [], 'a lobby socket stays in the lobby');
+
+  const inside = await Client.room(id, host.token);
+  await inside.next((f) => f.t === 'watch');
+  inside.send({ t: 'lobby', token: host.token });
+  inside.send({ t: 'hello', room: id, token: host.token });
+  inside.send({ t: 'tour', id: 'no-existe', token: host.token });
+  await sleep(300);
+  assert.deepEqual(inside.rest(), [], 'a room socket stays in its room');
+
+  await Promise.all([own, anonymous, inside].map((client) => client.close()));
+  await call(`/api/challenges/${id}`, { method: 'DELETE', token: host.token });
+});
+
+test('an AI-only match waits for the people watching to see each turn before playing the next', async () => {
+  const host = await trainer('Vigila');
+  const tournament = (await call('/api/tournaments', { method: 'POST', token: host.token, body: { size: 4, mode: 'team', visibility: 'private' } })).data.tournament;
+  const page = new Client({ t: 'tour', id: tournament.id, token: host.token });
+  await page.next((f) => f.t === 'chatLog');
+  await call(`/api/tournaments/${tournament.id}/ai`, { method: 'POST', token: host.token, body: { level: 'easy', count: 3 } });
+  await call(`/api/tournaments/${tournament.id}/ready`, { method: 'POST', token: host.token, body: { ready: true } });
+
+  const playing: Client[] = [];
+  const started = new Set<string>();
+  let aiOnlyMatch: string | undefined;
+  while (!aiOnlyMatch) {
+    const current = (await page.next((f) => f.t === 'tour' && f.tournament.current, 30_000)).tournament.current.challengeId;
+    if (started.has(current)) continue;
+    started.add(current);
+    if ((await call(`/api/challenges/${current}`)).data.challenge.host.id === host.me.id) playing.push(await Client.room(current, host.token, autoPlay));
+    else aiOnlyMatch = current;
+  }
+
+  const viewer = await Client.room(aiOnlyMatch, null);
+  const shown = await viewer.next((f) => f.state?.status === 'active' && f.state.turn >= 1, 30_000);
+  const turnMs = Number(FAST_TIMINGS.TURN_MS);
+  await sleep(turnMs / 4);
+  assert.deepEqual(viewer.rest().filter((f) => f.state && f.state.turn > shown.state.turn), [], 'the next turn waits for the viewer');
+  viewer.send({ t: 'seen', turn: shown.state.turn });
+  await viewer.next((f) => f.state && f.state.turn > shown.state.turn, turnMs / 2);
+  await Promise.all([page, viewer, ...playing].map((client) => client.close()));
 });
