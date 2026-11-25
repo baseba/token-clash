@@ -3,7 +3,7 @@ import type { IncomingMessage } from 'node:http';
 import { AppConfig } from '../shared/config/app-config.js';
 import { clientIp } from '../shared/http/client-ip.js';
 
-const MAX_SOCKETS_PER_IP = 30;
+export const MAX_SOCKETS_PER_IP = 30;
 
 @Injectable()
 export class ConnectionLimits {

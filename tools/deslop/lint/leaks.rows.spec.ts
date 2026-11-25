@@ -102,6 +102,7 @@ const ROWS: Row[] = [
   ['Ported::queue', 'leaks', 'port.queue.push(1)', 'interface, work'],
   ['Ported::wide', 'leaks', 'wide.wide.push(1), wide: WidePort', 'interface, work'],
   ['Ported::viewList', 'leaks', 'get view(): number[]; port.view.push(1)', 'interface, accessor'],
+  ['Ported::nameText', 'kept', "rename(name) { this.nameText = name; } implements a method of Port; port.rename('a')", 'L, a method that implements a port is never an accessor, so a setter called through the port is not seen'],
   ['Unported::room', 'kept', "port.room = 'a', class does not implement Port", 'L3'],
   ['Unported::queue', 'kept', 'port.queue.push(1), class does not implement Port', 'L3'],
   ['Desked::labelText', 'kept', "get label() relays, set label(label) works; desk.label = 'a', desk: Desk", 'interface, a write goes to the setter, L1'],

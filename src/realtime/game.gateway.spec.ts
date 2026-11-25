@@ -12,7 +12,7 @@ import type { TeamPreviewService } from '../arena/application/team-preview.servi
 import type { TournamentsService } from '../arena/application/tournaments.service.js';
 import type { RadioService } from '../radio/application/radio.service.js';
 import { AppConfig } from '../shared/config/app-config.js';
-import { ConnectionLimits } from './connection-limits.js';
+import { ConnectionLimits, MAX_SOCKETS_PER_IP } from './connection-limits.js';
 import { GameGateway } from './game.gateway.js';
 
 const HEARTBEAT_MS = 30_000;
@@ -105,7 +105,7 @@ test('a closed server stops the heartbeat', () => {
 
 test('closing a room socket leaves the lobby list, the room and the radio, and frees its slot for the address', () => {
   const { gateway, limits, calls, connect, ws, stop } = connectedGateway();
-  const sockets = Array.from({ length: 30 }, connect);
+  const sockets = Array.from({ length: MAX_SOCKETS_PER_IP }, connect);
   assert.equal(limits.allows(request), false);
   gateway.onHello(ws(sockets[0]), { t: 'hello', room: 'room-1', token: undefined });
   calls.length = 0;

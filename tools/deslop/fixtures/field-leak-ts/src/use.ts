@@ -173,6 +173,7 @@ export function ported(port: Port, wide: WidePort): void {
   if (port.seat === 'a') send(1);
   port.queue.push(1);
   port.view.push(1);
+  port.rename('a');
   wide.wide.push(1);
 }
 

@@ -427,8 +427,8 @@ test('a tournament page ignores a room or another tournament, and can still open
 
 test('an AI-only match waits for the people watching to see each turn before playing the next', async (context) => {
   const paced = appProcess({ ...FAST_TIMINGS, MATCH_MS: '3000', AI_WATCH_MS: '10000', TRUST_CF_CONNECTING_IP: '1', JEV_API_KEY: '', JEV_API_URL: '' }, 22000);
-  await paced.start();
   context.after(() => paced.kill());
+  await paced.start();
   const host = await trainer('Vigila', paced);
   const tournament = (await call('/api/tournaments', { method: 'POST', token: host.token, body: { size: 4, mode: 'team', visibility: 'private' }, server: paced })).data.tournament;
   const page = new Client({ t: 'tour', id: tournament.id, token: host.token }, undefined, paced);
