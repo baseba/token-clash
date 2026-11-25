@@ -102,7 +102,7 @@ const GHOSTS_FROM_LEVEL = 15;
 const LATE_FLOOR = 20;
 const ROOM_WEIGHTS: [RoomKind, number][] = [['tough', 30], ['calm', 18], ['rest', 20], ['den', 14], ['hideout', 10], ['deal', 6]];
 /** How a climb's rumour changes the odds of each way. */
-const TWIST_WEIGHTS: Partial<Record<TwistKey, Partial<Record<RoomKind, number>>>> = { night: { hideout: 2 }, market: { rest: 2 }, migration: { den: 2.5 } };
+const TWIST_WEIGHTS: Partial<Record<TwistKey, Partial<Record<RoomKind, number>>>> = { night: { hideout: 2 }, market: { rest: 2 }, migration: { den: 2.5 }, breeze: { calm: 2.5 }, blackMarket: { deal: 3 }, breeding: { den: 1.5 } };
 /** Scenes with a night version among our battle backgrounds. */
 const NIGHT_SCENES = ['beach', 'cave', 'desert', 'lake', 'mountain', 'ocean', 'path', 'snow', 'tall-grass'];
 const WAY_ORDER: readonly RoomKind[] = ['trainer', 'tough', 'calm', 'hideout'];
@@ -340,7 +340,9 @@ function themedTrainer(key: string, cls: ClassTrainer, at: string, seed: string,
 /** Route trainers and ways come from the floor's roll; the order of bosses is fixed for the climb so none repeats. */
 export function floorAt(floor: number, length: number | null, difficulty: AiLevel, seed: string, room: RoomKind | null = null, rolls: Rolls = {}, twist: TwistKey | null = null): Floor {
   const drawn = drawFloor(floor, length, difficulty, seed, room, rolls);
-  return twist === 'night' ? { ...drawn, scene: nightOf(drawn.scene) } : drawn;
+  if (twist === 'night') return { ...drawn, scene: nightOf(drawn.scene) };
+  if (twist === 'veterans' && drawn.foe) return { ...drawn, trained: true };
+  return drawn;
 }
 
 function drawFloor(floor: number, length: number | null, difficulty: AiLevel, seed: string, room: RoomKind | null, rolls: Rolls): Floor {

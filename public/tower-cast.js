@@ -86,6 +86,13 @@ export const TWISTS = {
   sweet: { name: 'Caramelos de sobra', icon: 'sparkle', text: 'Los caramelos aparecen más seguido y suben un nivel más.' },
   migration: { name: 'Migración', icon: 'ball', text: 'Más madrigueras en el camino: más oportunidades de sumar Pokémon de tu colección.' },
   caps: { name: 'Mercado de chapas', icon: 'cap', text: 'Las Chapas, que llevan un IV al máximo, aparecen mucho más entre los premios.' },
+  breeze: { name: 'Brisa tranquila', icon: 'wind', text: 'Las rutas tranquilas aparecen mucho más, y su premio puede ser raro.', hints: { calm: 'Rival más débil. Premio común o raro.' } },
+  blackMarket: { name: 'Mercado negro', icon: 'candle', text: 'Los pactos oscuros aparecen el triple: hay más tesoros épicos, pero cada uno cuesta un Pokémon.' },
+  items: { name: 'Bazar de objetos', icon: 'bag', text: 'Los objetos para equipar aparecen mucho más entre los premios.' },
+  meteor: { name: 'Lluvia de meteoritos', icon: 'star', text: 'Las piedras evolutivas, los Cordones Unión y los Tarros de Caramelos aparecen mucho más entre los premios.' },
+  veterans: { name: 'Liga de veteranos', icon: 'shield', text: 'Todos los rivales de ruta vienen entrenados, con naturaleza y EVs a su favor, y los puntos valen 15 % más.' },
+  breeding: { name: 'Temporada de crianza', icon: 'clover', text: 'Hay más madrigueras, y los huevos y los movimientos huevo aparecen mucho más entre los premios.' },
+  training: { name: 'Campo de entrenamiento', icon: 'target', text: 'Las vitaminas, las plumas y las mentas aparecen mucho más entre los premios.' },
 };
 export const TWIST_KEYS = Object.keys(TWISTS);
 

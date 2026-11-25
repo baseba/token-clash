@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import type { RoomKind, TwistKey } from '../../catalog/domain/tower-cast.js';
 import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
 import { CLASS_LINES } from '../../catalog/domain/tower-lines.js';
 import { NAMES, START_LEVEL, TYPE_SCENES } from '../../catalog/domain/tower-cast.js';
@@ -51,6 +52,23 @@ test('every battle is 3 against 3 from the first floor; later rivals bring more 
   assert.equal(teamSize(1, 'trainer'), 3);
   assert.ok(teamSize(30, 'trainer') > 3 && teamSize(30, 'trainer') <= 6);
   assert.equal(teamSize(25, 'champion'), 6);
+});
+
+test('rumours change the ways: a breeze brings more calm routes, a black market more dark deals, a breeding season more dens', () => {
+  const seeds = Array.from({ length: 60 }, (_, i) => `rumour${i}`);
+  const count = (twist: TwistKey | null, room: RoomKind) => seeds.reduce((sum, seed) => sum + [4, 6, 8, 12].filter((floor) => roomsAt(floor, 25, seed, {}, twist).includes(room)).length, 0);
+  assert.ok(count('breeze', 'calm') > count(null, 'calm'));
+  assert.ok(count('blackMarket', 'deal') > count(null, 'deal'));
+  assert.ok(count('breeding', 'den') > count(null, 'den'));
+});
+
+test('in a league of veterans every route rival comes trained', () => {
+  for (const seed of ['a', 'b', 'c', 'd'])
+    for (let floor = 1; floor < 25; floor++)
+      for (const room of roomsAt(floor, 25, seed)) {
+        const drawn = floorAt(floor, 25, 'easy', seed, room, {}, 'veterans');
+        if (drawn.foe) assert.ok(drawn.trained, `${seed} ${floor} ${room}`);
+      }
 });
 
 test('plain floors offer a trainer and one or two other ways; bosses offer none', () => {

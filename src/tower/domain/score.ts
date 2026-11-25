@@ -9,8 +9,8 @@ import { baseStatTotal, evolutionPath } from './growth.js';
 
 export const DIFFICULTY_MULTIPLIER: Readonly<Record<AiLevel, number>> = { easy: 0.5, mid: 1, hard: 1.5, veryhard: 2, skynet: 3 };
 export const FLOOR_POINTS: Readonly<Record<FloorKind, number>> = { trainer: 100, gym: 300, elite: 450, champion: 800 };
-/** Rumours that pay more: wild routes make every floor harder to choose around. */
-export const TWIST_MULTIPLIER: Readonly<Partial<Record<TwistKey, number>>> = { wild: 1.2 };
+/** Rumours that pay more: wild routes make every floor harder to choose around, and veterans every rival harder. */
+export const TWIST_MULTIPLIER: Readonly<Partial<Record<TwistKey, number>>> = { wild: 1.2, veterans: 1.15 };
 export const ROOM_MULTIPLIER: Readonly<Partial<Record<RoomKind, number>>> = { tough: 1.5, hideout: 1.3, calm: 0.6 };
 
 export interface FloorScore {
