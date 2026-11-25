@@ -38,6 +38,8 @@ test('the import lands before the arena closes battles left active, so an import
 
 test('a restart does not import db.json a second time', async () => {
   await app.stop();
+  const withNewcomer = { ...legacyDb, trainers: { ...legacyDb.trainers, t3: { ...legacyDb.trainers.t2, id: 't3', name: 'Carla', tokenHash: 'h3' } } };
+  writeFileSync(join(app.dataDir, 'db.json'), JSON.stringify(withNewcomer));
   await app.start();
   assert.deepEqual(await legacyNames(), ['Ana', 'Beto']);
 });
