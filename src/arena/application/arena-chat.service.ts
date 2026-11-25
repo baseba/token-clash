@@ -81,6 +81,6 @@ export class ArenaChatService {
 
   private audience(channel: ChatChannel): ClientConnection[] {
     if (channel.kind === 'tournament') return this.presence.tournamentAudience(channel.tournamentId);
-    return [...(this.presence.rooms.get(channel.challengeId)?.sockets ?? [])];
+    return this.presence.roomAudience(channel.challengeId);
   }
 }

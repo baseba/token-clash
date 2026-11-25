@@ -74,8 +74,7 @@ const playing = (phase: RoomPhase) =>
 
 @Injectable()
 export class Presence {
-  readonly rooms = new Map<string, Room>();
-  readonly lobby = new Set<ClientConnection>();
+  private readonly rooms = new Map<string, Room>();
   private readonly tours = new Map<string, Set<ClientConnection>>();
   private readonly openToWatch = new Set<string>();
 
@@ -97,7 +96,25 @@ export class Presence {
   }
 
   roomOf(ws: ClientConnection): Room | undefined {
-    return ws.roomId ? this.rooms.get(ws.roomId) : undefined;
+    return ws.roomId ? this.findRoom(ws.roomId) : undefined;
+  }
+
+  findRoom(challengeId: string): Room | undefined {
+    return this.rooms.get(challengeId);
+  }
+
+  dropIfEmpty(room: Room): void {
+    if (this.rooms.get(room.challenge.id) === room && room.sockets.size === 0) this.rooms.delete(room.challenge.id);
+  }
+
+  roomAudience(challengeId: string): ClientConnection[] {
+    return [...(this.rooms.get(challengeId)?.sockets ?? [])];
+  }
+
+  battlesOpenToWatch(): (Room & { phase: BattlePhase })[] {
+    return [...this.rooms.values()]
+      .filter((room): room is Room & { phase: BattlePhase } => room.phase.kind === 'battle' && room.phase.battle.status === 'active' && this.watchable(watchKey(room.challenge)))
+      .sort((a, b) => b.phase.startedAt - a.phase.startedAt);
   }
 
   hostWaiting = (challenge: { id: string; hostId: string }): boolean => {

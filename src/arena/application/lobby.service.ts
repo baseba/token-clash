@@ -6,12 +6,13 @@ import { HOST_GRACE_MS, openRooms } from '../domain/lobby.js';
 import type { Tournament } from '../domain/tournament.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
-import { Presence, tournamentWatchKey, watchKey, type BattlePhase, type Room } from './presence.js';
+import { Presence, tournamentWatchKey, watchKey, type Room } from './presence.js';
 
 const LISTED = 40;
 
 @Injectable()
 export class LobbyService {
+  private readonly subscribers = new Set<ClientConnection>();
   private readonly sent = new WeakMap<ClientConnection, string>();
   private timer: NodeJS.Timeout | null = null;
 
@@ -40,19 +41,14 @@ export class LobbyService {
   }
 
   liveBattles() {
-    return [...this.presence.rooms.values()]
-      .filter((room): room is Room & { phase: BattlePhase } => room.phase.kind === 'battle' && room.phase.battle.status === 'active' && this.watchable(room))
-      .sort((a, b) => b.phase.startedAt - a.phase.startedAt)
+    return this.presence
+      .battlesOpenToWatch()
       .slice(0, LISTED)
       .map((room) => this.views.liveBattle(room.challenge, room.phase, this.tournamentOf(room)));
   }
 
   private tournamentOf(room: Room): Tournament | undefined {
     return room.challenge.tournamentId ? this.tournaments.findById(room.challenge.tournamentId) : undefined;
-  }
-
-  private watchable(room: Room): boolean {
-    return this.presence.watchable(watchKey(room.challenge));
   }
 
   allowWatchers(ws: ClientConnection): void {
@@ -75,19 +71,19 @@ export class LobbyService {
 
   subscribe(ws: ClientConnection, token: string | undefined): void {
     ws.trainerId = this.trainers.peekToken(token)?.id ?? null;
-    this.presence.lobby.add(ws);
+    this.subscribers.add(ws);
     this.send(ws, true);
   }
 
   unsubscribe(ws: ClientConnection): void {
-    this.presence.lobby.delete(ws);
+    this.subscribers.delete(ws);
   }
 
   notify(): void {
     if (this.timer) return;
     this.timer = setTimeout(() => {
       this.timer = null;
-      for (const ws of this.presence.lobby) this.send(ws);
+      for (const ws of this.subscribers) this.send(ws);
     }, 50);
   }
 
