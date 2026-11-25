@@ -11,7 +11,7 @@ import { WebAssets } from './web-assets.js';
 const APP_PAGES = new Set(['/', '/equipo', '/coleccion', '/pokedex', '/stats', '/perfil', '/tienda', '/reciclaje', '/torre']);
 const SHARE_LINK = /^\/([bt]|entrenador)\/[A-Za-z0-9_-]{4,20}$/;
 const PREVIEWED_LINK = /^\/([bt])\/([A-Za-z0-9_-]{4,20})$/;
-const FALLBACK_IMAGE = { path: '/icons/token-ball-512.png', width: 512, height: 512 };
+const FALLBACK_IMAGE = { path: '/icons/token-ball-512.png', type: 'image/png', width: 512, height: 512 };
 
 type PreviewKind = 'b' | 't';
 
@@ -74,8 +74,8 @@ export class WebController {
     if (!preview) return html;
     const origin = this.config.publicOrigin || `${req.protocol}://${req.get('host')}`;
     const image = preview.card
-      ? { url: `${origin}/og/${kind}/${id}.png?v=${cardVersion(preview.card)}`, width: CARD_WIDTH, height: CARD_HEIGHT }
-      : { url: `${origin}${FALLBACK_IMAGE.path}`, width: FALLBACK_IMAGE.width, height: FALLBACK_IMAGE.height };
+      ? { url: `${origin}/og/${kind}/${id}.png?v=${cardVersion(preview.card)}`, type: 'image/png', width: CARD_WIDTH, height: CARD_HEIGHT }
+      : { url: `${origin}${FALLBACK_IMAGE.path}`, type: FALLBACK_IMAGE.type, width: FALLBACK_IMAGE.width, height: FALLBACK_IMAGE.height };
     return withLinkPreview(html, preview, `${origin}${req.path}`, image);
   }
 }
