@@ -230,7 +230,10 @@ seguir el torneo. Lo que lee un solo servicio vive en ese servicio: el último t
 - **Driver:** `node:sqlite`, el que trae Node. No hay módulos nativos que compilar en la imagen de Alpine.
 - **Migración desde JSON:** `src/legacy/legacy-json-import.ts` importa `data/db.json` una sola vez, en una
   transacción y con los mappers de cada dominio. `legacy-json-import.spec.ts` comprueba que leerlo de vuelta da
-  exactamente los mismos datos.
+  exactamente los mismos datos. La corre `app.module.ts`, que se la pasa a `DatabaseModule.forRoot({ afterOpen })`:
+  así `shared` no conoce `legacy`, y la importación pasa recién abierta y migrada la base, antes de que Nest entregue
+  la base a algún repositorio (los repositorios cargan sus tablas al construirse). `test/legacy-import.e2e-spec.ts`
+  levanta la app con un `db.json` y lo comprueba.
 - **Datos viejos, normalizados una vez:** las salas anteriores a los modos o a la visibilidad no tenían esos campos.
   Se arreglaron en dos pasos (*expand/contract*), porque si un deploy falla `deploy.sh` vuelve a la imagen anterior:
   1. **Expand** (`…_backfill`): rellenó lo que siempre significaron (`team`, `private`), y desde esa versión la
@@ -248,6 +251,7 @@ seguir el torneo. Lo que lee un solo servicio vive en ese servicio: el último t
 | Reglas de dependencia | `src/architecture.spec.ts` | lee los imports de cada archivo |
 | Persistencia y migraciones | `src/legacy/legacy-json-import.spec.ts`, `src/arena/infrastructure/arena.migrations.spec.ts` | SQLite real en un directorio temporal |
 | Todo junto | `test/app.e2e-spec.ts` | levanta la app compilada y juega peleas y torneos por HTTP y WebSocket, y la reinicia |
+| La importación de `db.json` al arrancar | `test/legacy-import.e2e-spec.ts` | levanta la app con un `db.json` en el directorio de datos, lee lo importado por HTTP y la reinicia |
 | Las salas por dentro | `test/rooms.e2e-spec.ts` | los frames que ve cada cliente en cada fase, quién se va y vuelve, y quién escucha cada mensaje del chat |
 | Frontend | `test/web/*.test.js` | JS tal cual, como el navegador (no van en `public/` porque se publicarían) |
 | Estructura de `src/` | `tools/deslop/` | `npm run deslop` reporta ciclos, enredos, campos que se filtran, módulos superficiales, carpetas anchas y archivos largos |

@@ -1,8 +1,9 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Logger, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { ArenaModule } from './arena/arena.module.js';
 import { ChatModule } from './chat/chat.module.js';
 import { CombatModule } from './combat/combat.module.js';
+import { importLegacyJson } from './legacy/legacy-json-import.js';
 import { RadioModule } from './radio/radio.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
 import { ConfigModule } from './shared/config/config.module.js';
@@ -21,7 +22,7 @@ import { WebRoutesModule } from './web/web-routes.module.js';
   imports: [
     ConfigModule,
     HttpModule,
-    DatabaseModule,
+    DatabaseModule.forRoot({ afterOpen: (db, dataDir) => importLegacyJson(db, dataDir, new Logger('LegacyImport')) }),
     CombatModule,
     TrainersModule,
     ArenaModule,

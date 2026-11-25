@@ -417,7 +417,7 @@ Por carpeta:
 | `src/realtime/` | El protocolo WebSocket (`/ws`). |
 | `src/web/` | El frontend estático, los health checks y la vista previa de los links de salas y torneos. |
 | `src/shared/` | Configuración, errores de dominio, HTTP (guards, filtro de errores) y la base de datos. |
-| `src/legacy/` | La migración única desde `data/db.json`. |
+| `src/legacy/` | La migración única desde `data/db.json`. La corre `app.module.ts` al abrir la base. |
 | `src/architecture.spec.ts` | El test que hace cumplir la regla de dependencia entre capas y dominios. |
 | `drizzle/` | Migraciones SQL generadas por drizzle-kit; la app las aplica al arrancar. |
 | `src/**/*.spec.ts` | Tests unitarios (`node:test`), al lado del código que prueban. |
