@@ -1,12 +1,3 @@
-// A duel room until its match starts: opening one against the AI, a rival taking the free seat,
-// the host closing it, the ready check, and clients coming and going. Each step of a live room
-// (RoomPhase in presence.ts) belongs to one service, which hands the room to the next:
-//
-//   DuelService          waiting → ready check (1v1 rooms only)
-//   TeamPreviewService   countdown → preview (each side picks 3 of 6) → reveal
-//   LiveBattleService    battle → result
-//
-// Nothing here is stored except the challenge, through its repository.
 import { Injectable } from '@nestjs/common';
 import { randomParty } from '../../combat/domain/random-party.js';
 import { aiTrainerId, buildAiRandomParty, buildAiTeam, type AiLevel } from '../../combat/domain/ai.js';
@@ -42,7 +33,6 @@ export class DuelService {
     this.timings = config.timings;
   }
 
-  /** A battle against the AI: no waiting room, straight to the preview. */
   startAgainstAi(trainer: Trainer, { mode, level }: { mode: BattleMode; level: AiLevel }): Challenge {
     const hostTeam = mode === 'random' ? randomParty(trainer.roster) : trainer.teamSnapshot();
     const aiTeam = mode === 'random' ? buildAiRandomParty() : buildAiTeam({ difficulty: level });
@@ -60,7 +50,6 @@ export class DuelService {
     return challenge;
   }
 
-  /** A battle against the AI that another mode sets up with its own teams and look (the Tower). */
   startStaged(trainer: Trainer, input: { level: AiLevel; hostTeam: RosterEntry[]; aiName: string; aiTeam: RosterEntry[]; staging: Staging }): Challenge {
     const challenge = Challenge.againstAi({
       id: newId(),
@@ -77,12 +66,10 @@ export class DuelService {
     return challenge;
   }
 
-  /** A random battle rolls the host's party when someone joins: a host with no Pokémon left can't be joined. */
   joinable(challenge: Challenge): boolean {
     return challenge.mode !== 'random' || !!this.trainers.byId(challenge.hostId)?.roster.length;
   }
 
-  /** Someone takes the free seat of an open room. */
   join(challenge: Challenge, guest: Trainer): void {
     if (!this.joinable(challenge)) throw conflict('El anfitrión ya no tiene Pokémon.');
     if (challenge.mode === 'random') {
@@ -99,7 +86,6 @@ export class DuelService {
     this.lobby.notify();
   }
 
-  /** The host closes the room (or leaves it): everyone inside is told. */
   close(challenge: Challenge, byTrainerId: string | undefined): void {
     const room = this.presence.rooms.get(challenge.id);
     challenge.cancel(byTrainerId, { readyCheck: room?.phase.kind === 'readyCheck' });
@@ -126,7 +112,6 @@ export class DuelService {
     if (expired.length) this.lobby.notify();
   }
 
-  /** A client opens a room page. Returns the challenge, or null if it doesn't exist. */
   enter(ws: ClientConnection, roomId: string, token: string | undefined): Challenge | null {
     if (token !== undefined) ws.trainerId = this.trainers.authenticate(token)?.id ?? null;
     const challenge = this.challenges.findById(roomId);
@@ -144,7 +129,6 @@ export class DuelService {
     return challenge;
   }
 
-  /** A client in a room disconnected. A player who drops out of the ready check has a while to come back. */
   left(ws: ClientConnection): void {
     const room = this.presence.roomOf(ws);
     if (!room) return;
@@ -154,7 +138,6 @@ export class DuelService {
     if (phase.kind === 'readyCheck' && phase.players.some((p) => p.id === ws.trainerId)) {
       broadcast(room, { t: 'lobby' });
       setTimeout(() => {
-        // This ready check only: after a reopen, a new guest starts another one.
         if (room.phase !== phase || inRoom(room, ws.trainerId)) return;
         if (ws.trainerId === challenge.hostId) this.close(challenge, challenge.hostId);
         else this.reopen(room);
@@ -164,7 +147,6 @@ export class DuelService {
     if (phase.kind === 'waiting' && room.sockets.size === 0) this.presence.rooms.delete(challenge.id);
   }
 
-  /** A player presses (or releases) "ready". When both are ready, the countdown starts. */
   setReady(ws: ClientConnection, ready: boolean): void {
     const room = this.presence.roomOf(ws);
     const trainerId = ws.trainerId;
@@ -176,13 +158,11 @@ export class DuelService {
     else broadcast(room, { t: 'lobby' });
   }
 
-  /** The guest walks out of the ready check. */
   leaveReadyCheck(ws: ClientConnection): void {
     const room = this.presence.roomOf(ws);
     if (room?.phase.kind === 'readyCheck' && room.challenge.guestId === ws.trainerId) this.reopen(room);
   }
 
-  /** The guest left during the ready check: the room goes back to waiting for a rival. */
   private reopen(room: Room): void {
     if (room.phase.kind !== 'readyCheck') return;
     const { challenge } = room;

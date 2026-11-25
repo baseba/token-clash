@@ -23,7 +23,6 @@ test('the radio plays its song in place of any screen, and the profile has its o
   assert.equal(trackFor('tab:profile'), 'title');
 });
 
-// A silent MPEG-1 Layer III frame at 128 kbps and 44.1 kHz: 417 bytes, 1152 samples.
 const FRAME_BYTES = 417;
 const frames = (count, { xingFrames = null, id3 = 0 } = {}) => {
   const bytes = new Uint8Array(id3 + FRAME_BYTES * count);

@@ -1,38 +1,21 @@
-// Every setting the server reads from the environment, parsed once at startup and typed. Nothing
-// else in the code touches process.env: it asks for AppConfig instead (dependency injection), so
-// tests can build one with whatever values they need. A value that doesn't parse stops the server
-// with a message naming the variable, instead of running with NaN timers or a half-read flag.
 import { join } from 'node:path';
 import { z } from 'zod';
 import { PROJECT_ROOT } from '../paths.js';
 
-/** How long each step of a match waits. Production uses the defaults; e2e tests shrink them. */
 export interface ArenaTimings {
   turnLimitMs: number;
-  /** Time to choose the 3 Pokémon. */
   pickLimitMs: number;
-  /** In a random battle the dice animate first: the pick limit grows by this much. */
   diceRollBonusMs: number;
-  /** The countdown before the preview. */
   countdownMs: number;
-  /** Both teams are shown this long before the battle. */
   revealMs: number;
-  /** The AI starts marking its picks once the dice animation is over. */
   diceAnimationMs: number;
-  /** How long an AI takes to mark its picks, one by one. */
   aiPickMs: number;
-  /** The animation that draws a tournament's bracket. */
   bracketDrawMs: number;
   betweenMatchesMs: number;
-  /** Minimum pause between turns when both sides are AIs, so people can watch. */
   aiVsAiPauseMs: number;
-  /** An AI-vs-AI match waits at most this long for viewers still animating a turn. */
   aiVsAiViewerWaitMs: number;
-  /** The turn and pick limit when a tournament player is not in the room. */
   absentLimitMs: number;
-  /** How long a seat (or a room host) may be disconnected before losing it. */
   seatGraceMs: number;
-  /** How long a tournament match waits for its players to arrive. */
   arrivalWaitMs: number;
 }
 
@@ -40,7 +23,6 @@ export interface JevConfig {
   apiKey: string;
   url: string | null;
   model: string | null;
-  /** Skynet needs a way to reach Jev: the egress proxy URL (which holds the key) or a key to call TypeSafe directly. */
   enabled: boolean;
 }
 
@@ -48,7 +30,6 @@ const ms = (fallback: number) => z.coerce.number().int().nonnegative().default(f
 const spanish = z.locales.es().localeError;
 const origin = z.string().refine((v) => URL.canParse(v) && new URL(v).origin === v, 'debe ser un origen, como https://clash.example.com (sin / al final)');
 
-/** The environment as the server reads it. An empty variable counts as unset. */
 const Env = z.object({
   PORT: z.coerce.number().int().min(0).max(65_535).default(8080),
   HOST: z.string().default('0.0.0.0'),
@@ -79,15 +60,12 @@ export class AppConfig {
     readonly port: number,
     readonly host: string,
     readonly dataDir: string,
-    /** When set, only this Origin may call the API with side effects or open a socket. */
     readonly publicOrigin: string,
-    /** Behind Cloudflare: the client IP comes in CF-Connecting-IP. */
     readonly trustCfConnectingIp: boolean,
     readonly jev: JevConfig,
     readonly timings: ArenaTimings,
   ) {}
 
-  /** Reads the environment, or throws with every variable that is wrong. */
   static fromEnv(env: Record<string, string | undefined> = process.env): AppConfig {
     const set = Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined && v !== ''));
     const parsed = Env.safeParse(set, { error: spanish });

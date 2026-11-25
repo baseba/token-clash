@@ -1,6 +1,3 @@
-// @RateLimit(): per-route limits on top of the global one (imports, creating rooms…). Counted by
-// IP, or by trainer. Counting by trainer needs the session guard to have run, so write @RateLimit
-// above @Authenticated() (Nest applies decorators bottom-up); otherwise every request fails.
 import { applyDecorators, CanActivate, ExecutionContext, Injectable, SetMetadata, UseGuards } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';

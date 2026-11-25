@@ -1,5 +1,3 @@
-// The /stats page: ranking, recent battles, most used Pokémon, tournaments and server totals.
-// It is a read model: it only reads (from the other contexts' public queries) and computes.
 import { humanCount, type TournamentState } from '../../arena/domain/tournament.js';
 import { isHumanDuel, type ChallengeState } from '../../arena/domain/challenge.js';
 import { TURN_LIMIT } from '../../combat/domain/battle.js';
@@ -13,7 +11,6 @@ const ACTIVE_DAY_MS = 24 * 60 * 60_000;
 
 type TrainerLike = Pick<TrainerState, 'id' | 'name' | 'wins' | 'losses' | 'roster'> & Partial<Pick<TrainerState, 'totalTokens' | 'lastSeen'>>;
 
-/** Everything the stats read, by id. */
 export interface StatsSource {
   trainers: Record<string, TrainerLike>;
   challenges: Record<string, ChallengeState>;
@@ -42,7 +39,6 @@ export function rankingOf(trainers: TrainerLike[]) {
     .sort(byRanking);
 }
 
-/** Groups accounts that imported the same save (they share Pokémon instance ids): one person each. */
 export function playersOf<T extends TrainerLike>(trainers: T[]): T[][] {
   const parent = trainers.map((_, i) => i);
   const find = (node: number): number => (parent[node] === node ? node : (parent[node] = find(parent[node])));

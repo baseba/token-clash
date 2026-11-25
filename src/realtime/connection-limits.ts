@@ -5,7 +5,6 @@ import { clientIp } from '../shared/http/client-ip.js';
 
 const MAX_SOCKETS_PER_IP = 30;
 
-/** Who may open a socket: our own origin only, and a cap of open sockets per IP. */
 @Injectable()
 export class ConnectionLimits {
   private readonly perIp = new Map<string, number>();

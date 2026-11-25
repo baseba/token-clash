@@ -1,8 +1,3 @@
-// The Tournament aggregate: seats (people and AIs), the single-elimination bracket and its
-// progress. The free functions are the rules (they work on any object with seats/bracket, which
-// keeps them trivial to test); the Tournament class is the aggregate that uses them and is the
-// only thing the use cases change.
-
 import { aiSeatId, type AiLevel } from '../../combat/domain/ai.js';
 import { conflict, forbidden } from '../../shared/domain/errors.js';
 import type { BattleMode, Visibility } from './challenge.js';
@@ -16,22 +11,18 @@ const DIFFICULTY_NAMES: Record<string, string> = { easy: 'fácil', mid: 'media',
 const ROUND_NAMES: Record<number, string> = { 1: 'Final', 2: 'Semifinal', 4: 'Cuartos de final', 8: 'Octavos de final' };
 
 export interface Seat {
-  /** A trainer id, or `ai:<level>#<n>` for an AI seat. */
   id: string;
   name: string;
   ai: string | null;
-  /** The AI's name without its difficulty, so two AIs in one tournament never share it. */
   aiBase?: string;
   ready: boolean;
 }
 
-/** Seats are numbered by their position in `seats`; null while the previous round is undecided. */
 export interface BracketMatch {
   a: number | null;
   b: number | null;
   winner: number | null;
   challengeId: string | null;
-  /** The match ended in a draw and the winner was drawn by lot. */
   coinFlip?: boolean;
 }
 
@@ -59,13 +50,11 @@ export const humanCount = (tournament: Pick<Seated, 'seats'>) => tournament.seat
 
 export const isAiSeat = (seat: Partial<Seat> | null | undefined) => !!seat?.ai;
 
-/** Players and followers of a tournament who haven't reached the room of the next match yet. */
 export function pendingArrivals({ players = [], followers = [], present = [] }: { players?: string[]; followers?: string[]; present?: (string | null)[] }): string[] {
   const here = new Set(present);
   return [...new Set([...players, ...followers])].filter((id) => !here.has(id));
 }
 
-/** Whether someone watching is still animating an earlier turn. */
 export function viewersBehind(seenTurns: (number | undefined)[], turn: number): boolean {
   return seenTurns.some((seen) => (seen ?? 0) < turn);
 }
@@ -128,7 +117,6 @@ export function nextMatch(bracket: Bracket): MatchRef | null {
   return null;
 }
 
-/** Records who won a match and moves them up. Returns the champion when it was the final. */
 export function recordWinner(bracket: Bracket, { round, index }: MatchRef, winner: number): number | null {
   const match = bracket[round][index];
   if (winner !== match.a && winner !== match.b) throw conflict('Ese asiento no jugó esta pelea.');
@@ -154,7 +142,6 @@ export function totalMatches(bracket: Bracket): number {
 
 type Searchable = Seated & { hostId: string; mode: BattleMode };
 
-/** For a public search: your own open tournament, one you already sit in, or someone else's to join. */
 export function tournamentMatchFor<T extends Searchable>(tournaments: T[], { trainerId, mode, size }: { trainerId: string; mode: BattleMode; size: number }) {
   const same = tournaments.filter((t) => t.mode === mode && t.size === size && !isFull(t));
   return { own: same.find((t) => t.hostId === trainerId) ?? null, rival: same.find((t) => t.hostId !== trainerId && seatOf(t, trainerId) === -1) ?? null, seated: same.find((t) => seatOf(t, trainerId) > 0) ?? null };
@@ -172,10 +159,8 @@ export interface TournamentState {
   startedAt?: number;
   bracket?: Bracket;
   drawAt?: number;
-  /** When the next match starts (during the draw and between matches). */
   nextAt?: number | null;
   current?: (MatchRef & { challengeId: string }) | null;
-  /** Seat index of the winner. */
   champion?: number;
   finishedAt?: number;
 }
@@ -205,7 +190,6 @@ export class Tournament implements TournamentState {
     return new Tournament(state);
   }
 
-  /** A new tournament, with its creator in the first seat (the host seat can't be removed). */
   static create(input: { id: string; host: { id: string; name: string }; mode: BattleMode; size: number; visibility: Visibility; at: number }): Tournament {
     const tournament = new Tournament({
       id: input.id,
@@ -233,12 +217,10 @@ export class Tournament implements TournamentState {
     return seatOf(this, trainerId);
   }
 
-  /** Only the host may `action` ("cerrar el torneo", "agregar IAs"…). */
   assertHost(trainerId: string, action: string): void {
     if (trainerId !== this.hostId) throw forbidden(`Solo el dueño puede ${action}.`);
   }
 
-  /** Seat changes are only allowed before the tournament starts. */
   assertLobby(): void {
     if (this.status !== 'open') throw conflict(this.status === 'cancelled' ? 'Este torneo se cerró.' : 'El torneo ya partió.');
   }
@@ -248,7 +230,6 @@ export class Tournament implements TournamentState {
     addSeat(this, { id: trainer.id, name: trainer.name, ai: null });
   }
 
-  /** Removes a seat by trainer id (someone left or lost their seat). Returns whether they sat here. */
   leave(trainerId: string): boolean {
     const seatIndex = this.seatOf(trainerId);
     if (seatIndex <= 0) return false;
@@ -264,7 +245,6 @@ export class Tournament implements TournamentState {
     setReady(this, trainerId, ready);
   }
 
-  /** Fills free seats with AIs of a difficulty, each with a name not yet used here. */
   addAis(level: AiLevel, count: number): void {
     if (this.full) throw conflict('El torneo ya está lleno.');
     const added = Math.max(1, Math.min(this.size - this.seats.length, count));
@@ -283,7 +263,6 @@ export class Tournament implements TournamentState {
     this.status = 'abandoned';
   }
 
-  /** Draws the bracket. The first match starts after the draw animation (`nextAt`). */
   start({ at, order, firstMatchAt }: { at: number; order: number[]; firstMatchAt: number }): void {
     this.status = 'running';
     this.startedAt = at;
@@ -292,7 +271,6 @@ export class Tournament implements TournamentState {
     this.nextAt = firstMatchAt;
   }
 
-  /** The next match to play, with both seats, or null. */
   nextMatch(): (MatchRef & { a: Seat; b: Seat }) | null {
     if (this.status !== 'running' || !this.bracket) return null;
     const at = nextMatch(this.bracket);
@@ -307,10 +285,6 @@ export class Tournament implements TournamentState {
     this.nextAt = null;
   }
 
-  /**
-   * A match ended. A draw (or a winner who isn't seated) is decided by lot. Returns the champion
-   * when it was the final; otherwise schedules the next match at `nextMatchAt`.
-   */
   matchFinished(at: MatchRef, winnerId: string | null, { now, nextMatchAt, random = Math.random }: { now: number; nextMatchAt: number; random?: () => number }): number | null {
     const match = this.bracket![at.round][at.index];
     let winner = this.seats.findIndex((seat) => seat.id === winnerId);
@@ -336,7 +310,6 @@ export class Tournament implements TournamentState {
     return this.bracket ? totalMatches(this.bracket) : this.size - 1;
   }
 
-  /** "Semifinal, match 5 of 7" and friends, for a match of this tournament. */
   label(at: MatchRef) {
     const bracket = this.bracket!;
     const final = at.round === bracket.length - 1;

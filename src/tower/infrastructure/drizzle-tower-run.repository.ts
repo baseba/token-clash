@@ -1,4 +1,3 @@
-// Adapter: the Tower climbs on SQLite through Drizzle, an identity map like the other repositories.
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import type { Database } from '../../shared/infrastructure/database/database.js';

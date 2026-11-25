@@ -1,6 +1,3 @@
-// The dependency rules of ARQUITECTURA.md, checked on the imports of every source file. Nest only
-// stops a module from injecting what another module doesn't export; these rules cover the rest
-// (the database module is global, and a plain `import` reaches any file).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -11,13 +8,10 @@ const SRC = join(PROJECT_ROOT, 'src');
 const CONTEXTS = ['arena', 'catalog', 'chat', 'combat', 'radio', 'stats', 'tower', 'trainers'];
 
 interface Import {
-  /** The importing file, relative to src/ ("arena/domain/lobby.ts"). */
   file: string;
-  /** A package ("drizzle-orm") or a file relative to src/ ("shared/domain/errors.ts"). */
   target: string;
 }
 
-/** Shipped code only: specs may reach anywhere they need to set a test up. */
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
@@ -40,7 +34,6 @@ const layerOf = (path: string) => path.split('/')[1];
 const isPackage = (target: string, name: string) => target === name || target.startsWith(`${name}/`);
 const usesDrizzle = (target: string) => isPackage(target, 'drizzle-orm') || isPackage(target, '@nestjs/drizzle');
 const isRepositoryPort = (target: string) => /\/domain\/[^/]+\.repositor(y|ies)\.ts$/.test(target);
-/** The entry points at the top of src/ wire everything; legacy/ is the one-time import that writes each context's tables with its own mappers. */
 const isWiring = (file: string) => !file.includes('/') || file.startsWith('legacy/');
 const show = (list: Import[]) => list.map(({ file, target }) => `${file} → ${target}`);
 

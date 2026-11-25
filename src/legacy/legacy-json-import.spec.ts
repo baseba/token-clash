@@ -1,8 +1,3 @@
-// The move from data/db.json to SQLite must not lose a single field: import a legacy file, read
-// everything back through the repositories, and compare with the original.
-//
-// Runs on a synthetic db.json built here. To check a real one (e.g. a copy of production):
-//   LEGACY_DB=/path/to/db.json node --test dist/src/legacy/legacy-json-import.spec.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -15,7 +10,6 @@ import { DrizzleChallengeRepository, DrizzleTournamentRepository } from '../aren
 import { parseSave } from '../trainers/domain/save-file.js';
 import { PROJECT_ROOT } from '../shared/paths.js';
 
-/** null, undefined and a missing key mean the same thing ("not set"): compare without them. */
 function normalize(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(normalize);
   if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).filter(([, x]) => x !== null && x !== undefined).map(([k, x]) => [k, normalize(x)]).sort(([a], [b]) => String(a).localeCompare(String(b))));
@@ -24,7 +18,6 @@ function normalize(v: unknown): unknown {
 
 const { roster } = parseSave(readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8'));
 
-/** A db.json with every optional field the JSON-file era could write. */
 function syntheticLegacy() {
   const team = roster.map((e) => ({ ...e }));
   team[0] = { ...team[0], nickname: 'Chispa', moveset: ['tackle'], abilityChoice: 'static', active: true };
@@ -53,7 +46,6 @@ function syntheticLegacy() {
   };
 }
 
-/** What reading the import back must give: a room older than modes or visibility is a private team battle, and levels are gone. */
 function expected(legacy: any) {
   const challenges = Object.entries(legacy.challenges ?? {}).map(([id, { levelCap, ...c }]: [string, any]) => [id, { ...c, mode: c.mode ?? 'team', visibility: c.visibility ?? 'private' }]);
   const tournaments = Object.entries(legacy.tournaments ?? {}).map(([id, { levelCap, aiLevel, ...t }]: [string, any]) => [id, t]);
@@ -65,9 +57,7 @@ function roundTrip(legacy: any) {
   writeFileSync(join(dir, 'db.json'), JSON.stringify(legacy));
   const db = openDatabase(join(dir, 'token-clash.db'));
   const result = importLegacyJson(db, dir);
-  // A second start never imports again.
   assert.equal(importLegacyJson(db, dir).reason, 'already-imported');
-  // And the old file is left untouched as a backup.
   assert.equal(readFileSync(join(dir, 'db.json'), 'utf8'), JSON.stringify(legacy));
   const read = {
     trainers: Object.fromEntries(new DrizzleTrainerRepository(db).all().map((t) => [t.id, { ...t }])),
@@ -89,7 +79,6 @@ test('a fresh install with no db.json just starts empty', () => {
   const dir = mkdtempSync(join(tmpdir(), 'tc-empty-'));
   const db = openDatabase(join(dir, 'token-clash.db'));
   assert.equal(importLegacyJson(db, dir).reason, 'no-file');
-  // If an old db.json shows up later (say, a rollback wrote one), it is not mixed in.
   writeFileSync(join(dir, 'db.json'), JSON.stringify(syntheticLegacy()));
   assert.equal(importLegacyJson(db, dir).reason, 'already-imported');
   assert.equal(new DrizzleTrainerRepository(db).all().length, 0);

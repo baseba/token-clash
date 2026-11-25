@@ -1,5 +1,3 @@
-// What each client sees of a battle: its own side in full, the rival as revealed so far (HP in percent, moves and
-// ability once used), and every event in those same terms. Pending choices stay hidden: only "ready" shows.
 import { HELD_ITEMS } from '../../catalog/domain/held-items.js';
 import type { BoostKey, NatureInfo, Stats } from '../../catalog/domain/creatures.js';
 import type { MoveData } from './moves.js';
@@ -86,7 +84,6 @@ function publicVolatiles(fighter: BattleFighter) {
 
 const percentOf = (hp: number, max: number): number => (hp <= 0 ? 0 : Math.max(1, Math.round((hp / max) * 100)));
 
-/** A rival's HP change, in percentages (`pct`), never exact numbers. */
 function inPercent(event: Extract<BattleEvent, { hp: number }>) {
   const hp = percentOf(event.hp, event.max);
   const shown = { ...event, hp, max: 100, pct: true as const, ...('stats' in event ? { stats: { hp: 100 } } : {}) };
@@ -95,7 +92,6 @@ function inPercent(event: Extract<BattleEvent, { hp: number }>) {
   return { ...shown, amount: event.amount > 0 ? Math.max(1, Math.abs(percentOf(before, event.max) - hp)) : 0 };
 }
 
-/** A switch shows each client the card it may see; a rival's HP and stats come as percentages. */
 function viewEvent(event: BattleEvent, viewer: number | null) {
   if (event.t === 'switch') {
     const { card, seen, ...rest } = event;
@@ -106,7 +102,6 @@ function viewEvent(event: BattleEvent, viewer: number | null) {
   return 'stats' in event ? { ...event, stats: { hp: 100 } } : event;
 }
 
-/** A BattleEvent as one client receives it. */
 export type EventView = ReturnType<typeof viewEvent>;
 
 export function viewEvents(events: BattleEvent[], viewer: number | null = null): EventView[] {
@@ -115,7 +110,6 @@ export function viewEvents(events: BattleEvent[], viewer: number | null = null):
 
 export type PublicMove = ReturnType<typeof publicMove>;
 
-/** A fighter as a client sees it: everything for its owner, what has been revealed for the rest. */
 export interface VisibleFighterView {
   uid: string;
   hidden?: false;
@@ -125,7 +119,6 @@ export interface VisibleFighterView {
   rarity: Rarity;
   shiny: boolean;
   level: number;
-  /** Exact stats for the owner; only `{ hp: 100 }` for the others, who see percentages. */
   stats: Pick<Stats, 'hp'> & Partial<Stats>;
   hp: number;
   hpPercent?: true;
@@ -143,12 +136,10 @@ export interface VisibleFighterView {
   natureInfo?: NatureInfo | null;
 }
 
-/** A rival Pokémon that hasn't come out yet. */
 export type HiddenFighterView = { uid: string; hidden: true } & { [K in Exclude<keyof VisibleFighterView, 'uid' | 'hidden'>]?: undefined };
 
 export type FighterView = VisibleFighterView | HiddenFighterView;
 
-/** A held item as the client shows it. */
 const heldItemView = (key: string) => ({ key, name: HELD_ITEMS[key]?.name ?? key, desc: HELD_ITEMS[key]?.desc ?? '' });
 
 export function fighterView(battle: BattleState, sideIndex: number, slot: number, own: boolean, spectator = false): FighterView {

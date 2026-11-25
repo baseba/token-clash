@@ -1,4 +1,3 @@
-// The arena's DTOs on their own: the defaults the home screen relies on, and what they reject.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HistoryQueryDto } from './history-query.dto.js';

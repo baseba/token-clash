@@ -1,5 +1,3 @@
-// Use cases for duel rooms, as the HTTP API offers them: open (or find) a room, look at it, close
-// it, join it, and list your history.
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { uniqueSpecies } from '../../catalog/domain/roster-entry.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
@@ -18,7 +16,6 @@ import { Presence } from './presence.js';
 export interface NewChallenge {
   mode: BattleMode;
   visibility: Visibility;
-  /** AI difficulty, to play against the AI. */
   ai?: string;
 }
 
@@ -40,12 +37,10 @@ export class ChallengesService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     for (const challenge of this.challenges.all()) {
-      // Battles live in memory: whatever a restart left mid-fight is closed for good.
       if (challenge.status === 'active') {
         challenge.abandon();
         this.challenges.save(challenge);
       }
-      // Older versions allowed repeated species in a team.
       if (challenge.dropRepeatedSpecies(uniqueSpecies)) this.challenges.save(challenge);
     }
     this.duels.expireStale(now());
@@ -63,10 +58,6 @@ export class ChallengesService implements OnModuleInit, OnModuleDestroy {
     return challenge;
   }
 
-  /**
-   * "New battle": against the AI it starts at once. A public search joins an open room with the
-   * same mode (or returns your own); otherwise a new room is opened.
-   */
   create(trainer: Trainer, input: NewChallenge): { challenge: Challenge; joined?: boolean } {
     if (input.ai !== undefined) {
       this.skynet.assertOffered(input.ai);
@@ -97,7 +88,6 @@ export class ChallengesService implements OnModuleInit, OnModuleDestroy {
     return { challenge };
   }
 
-  /** The host closes their room (while it waits, or during the ready check). */
   close(trainer: Trainer | undefined, id: string): Challenge {
     const challenge = this.find(id);
     this.duels.close(challenge, trainer?.id);
@@ -112,7 +102,6 @@ export class ChallengesService implements OnModuleInit, OnModuleDestroy {
     return challenge!;
   }
 
-  /** Your 1v1 battles (newest first, paged) and your recent tournaments. */
   history(trainer: Trainer, { offset, limit }: { offset: number; limit: number }) {
     const mine = this.challenges
       .all()

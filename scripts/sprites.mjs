@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Writes public/upstream/sprites.json: the four sprites of every species and form (front, front
-// shiny, back, back shiny) as files of PokeAPI/sprites at the commit pinned in public/upstream.js.
-// Black/White animated GIFs where the species has one, PNGs otherwise. The fallbacks are resolved
-// here, once, so the browser loads each sprite with no guessing.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { UPSTREAM } from '../public/upstream.js';
@@ -16,12 +12,8 @@ const API_SPRITE = /^https:\/\/raw\.githubusercontent\.com\/PokeAPI\/sprites\/[^
 const DATA = new URL('../src/catalog/data/pokeapi.json', import.meta.url);
 const MANIFEST = new URL('../public/upstream/sprites.json', import.meta.url);
 
-// The manifest lists front, front shiny, back and back shiny. Each variant after the front tries
-// these sprites in order and then falls back to the front: a missing back-shiny shows the
-// front-shiny before a plain back, so a shiny still looks shiny.
 const FALLBACKS = [['frontShiny'], ['back'], ['backShiny', 'frontShiny', 'back']];
 
-/** The four sprites of a set, or null if it has no front. `firstOf` answers which of some paths exists first. */
 export async function resolveVariants(candidates, firstOf) {
   const front = await firstOf(candidates.front);
   if (!front) return null;
@@ -47,7 +39,6 @@ function speciesTarget(id) {
   return { slug: id, candidates: async () => ({ gif: Number(id) <= LAST_BW_SPECIES ? fromStem(GIF_DIR, 'gif', id) : null, png: fromStem(PNG_DIR, 'png', id) }) };
 }
 
-// A form's sprites come from the PokeAPI API; its GIF is named after the species and the form.
 function formTarget(name) {
   return {
     slug: name,

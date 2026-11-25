@@ -1,6 +1,3 @@
-// Abilities as catalog facts: their Spanish name and description (from PokeAPI) and the ones that
-// have no effect in Token Clash (INERT) and why. What each ability *does* in battle is a combat rule:
-// see combat/domain/ability-effects.ts.
 import { readFileSync } from 'node:fs';
 import { catalogFile } from '../../shared/paths.js';
 

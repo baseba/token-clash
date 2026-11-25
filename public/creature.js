@@ -1,10 +1,7 @@
 import { UPSTREAM, upstreamManifest, upstreamURLs } from './upstream.js?v=dev';
 
-// Each sprite slug's front, front shiny, back and back shiny on jsDelivr, from the manifest that
-// scripts/sprites.mjs resolves. If jsDelivr fails, the page's image fallback retries raw GitHub.
 let sprites = new Map();
 
-/** Whether the sprite manifest is in. A failed load leaves it empty, and loadSprites can run again. */
 export const spritesLoaded = () => sprites.size > 0;
 
 export async function loadSprites() {
@@ -12,7 +9,6 @@ export async function loadSprites() {
   sprites = new Map(Object.entries(manifest).flatMap(([dir, slugs]) => Object.entries(slugs).map(([slug, files]) => [slug, files.map((file) => upstreamURLs(UPSTREAM.sprites, dir + file)[0])])));
 }
 
-// The player's own creature is seen from behind, like in the classic battle view; everyone else from the front.
 export function spriteURL(mon, { back = false } = {}) {
   return sprites.get(String(mon.sprite))?.[(back ? 2 : 0) + (mon.shiny ? 1 : 0)] ?? '';
 }

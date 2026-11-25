@@ -1,5 +1,3 @@
-// The Tower's cast (public/tower-cast.js, shared with the browser) with its types, and what its trainers
-// say (tower-lines.ts and boss-lines.ts), which only the server reads.
 import * as cast from '../../../public/tower-cast.js';
 
 export { CLASS_LINES, PAIR_LINES, ROOM_LINES, TYPE_LINES, VILLAIN_LINES, type Line } from './tower-lines.js';
@@ -44,7 +42,6 @@ export const NAMED_CLASSES: Readonly<Record<string, string>> = cast.NAMED_CLASSE
 export const RECRUIT_LINE: string = cast.RECRUIT_LINE;
 export type TwistKey = 'night' | 'market' | 'wild' | 'tutors' | 'sweet' | 'migration' | 'caps' | 'breeze' | 'blackMarket' | 'items' | 'meteor' | 'veterans' | 'breeding' | 'training';
 export const TWIST_KEYS = cast.TWIST_KEYS as TwistKey[];
-/** What a rumour says of a way instead of its usual hint, when it changes that way. */
 export const TWIST_HINTS: Readonly<Partial<Record<TwistKey, Partial<Record<RoomKind, string>>>>> = Object.fromEntries(
   Object.entries(cast.TWISTS as Record<string, { hints?: Partial<Record<RoomKind, string>> }>).map(([key, twist]) => [key, twist.hints ?? {}]),
 );

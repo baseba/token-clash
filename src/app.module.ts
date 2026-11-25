@@ -1,15 +1,3 @@
-// The application: one Nest module per bounded context, plus shared infrastructure.
-//
-//   catalog   species, moves, abilities, types (static data + pure rules; no module needed)
-//   combat    battle engine, team preview, AI, Skynet
-//   trainers  players, their collection and team          ← owns tables trainers, roster_entries
-//   arena     duel rooms, live matches, tournaments        ← owns challenges, tournaments, seats, matches
-//   chat      room and tournament chat (in memory)
-//   radio     trainers' radio stations and their queues   ← owns radio_stations
-//   tower     climbs of the Tower with your collection     ← owns tower_runs
-//   stats     read model for /stats
-//   realtime  the WebSocket protocol (/ws)
-//   web       the static frontend and health checks
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { ArenaModule } from './arena/arena.module.js';
@@ -42,12 +30,10 @@ import { WebRoutesModule } from './web/web-routes.module.js';
     TowerModule,
     StatsModule,
     RealtimeModule,
-    // Last: its catch-all route serves the frontend and must not shadow anything above.
     WebRoutesModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: DomainErrorFilter },
-    // Checks every @Body/@Query/@Param that declares a schema (the DTOs in */interface/dto/).
     { provide: APP_PIPE, useFactory: validationPipe },
   ],
 })

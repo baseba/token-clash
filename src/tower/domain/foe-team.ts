@@ -1,13 +1,3 @@
-// The team of the trainer on a floor: species of its types, in the form they have at that level,
-// moves learned by level, and its strongest Pokémon (the ace) a level above the rest when the rival is
-// strong. The Tower is a roguelike, so a team is a draw, not the best of its theme: every species that
-// fits may come, all of generations 1 to 5. Tough rivals and leaders lean a little towards the stronger
-// ones, calm rivals bring the weakest, and a species you already met in the climb seldom comes back. A
-// themed class brings one or two of its own species (a Rocket grunt its Zubat or Koffing) and fills up
-// with others of its types; a species of several final forms comes as any of them.
-// Later rivals hold items too, like yours: a leader's ace first, then a tough rival's, then whole teams. Rivals are measured against your party, not against perfect
-// Pokémon: their IVs are around yours, and a trained rival has about as many EVs as yours. Later on
-// they also know moves from machines, and then from tutors and eggs, stronger the higher you climb.
 import { effectiveness, finalForms, moveOrigins, shuffled, speciesData, type Random } from '../../catalog/domain/creatures.js';
 import type { Ivs, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import type { AiLevel } from '../../combat/domain/ai.js';
@@ -22,65 +12,46 @@ import { boosterOf } from '../../catalog/domain/held-items.js';
 import { towerSpecies } from './species-pool.js';
 
 const LEGENDARY_TOTAL = 580;
-/**
- * How much a team leans to the stronger species that fit, by who brings it: a calm rival none, a leader
- * the most, and still gently, so each climb brings different teams. Difficulty does not narrow the draw (that is
- * for the arena's 1v1 and tournaments): it shows in how well the rival picks its three from what it drew.
- */
 const LEAN: Record<Strength | 'leader', number> = { weak: 0, normal: 0.25, strong: 0.4, leader: 1 };
-/** A species (any form of its line) you already met in this climb is this much less likely to come back. */
 const MET_AGAIN = 0.1;
-/** At most this many of a themed class's own species in one team. */
 const OWN_SPECIES = 2;
-/** How much a rival's pick of its three weighs how good each one is: 0 picks at random, and the hardest take the best. */
 const PICK_SKILL: Record<AiLevel, number> = { easy: 0, mid: 1, hard: 3, veryhard: 6, skynet: 10 };
-/** How much the type matchup against your party counts next to raw power when picking. */
 const MATCHUP_WEIGHT = 0.35;
 const LEGENDS_FROM_FLOOR = 40;
 const FEWEST_CHOICES = 12;
-/** How far a rival's IVs sit from your party's average, by difficulty; a boss two more. */
 const IV_EDGE: Record<AiLevel, number> = { easy: -6, mid: -3, hard: 0, veryhard: 2, skynet: 4 };
 const BOSS_IV_EDGE = 2;
 const IV_SPREAD = 3;
 const UNKNOWN_IV = 15;
-/** The EVs of a trained rival, as a share of the EVs your party has on average. */
 const EV_SHARE: Record<AiLevel, number> = { easy: 0.5, mid: 0.8, hard: 1, veryhard: 1.15, skynet: 1.3 };
 const MACHINES_FROM_FLOOR = 3;
 const TUTORS_FROM_FLOOR = 10;
-/** One more taught move every this many floors. */
 const TAUGHT_EVERY = 12;
 const TAUGHT_LIMIT = { route: 2, boss: 3 };
-/** The strongest taught move a Pokémon of this level may know: about 57 at 10, 81 at 30, anything past 60. */
 const taughtPowerCap = (level: number): number => 45 + level * 1.2;
 const STAB = 1.5;
 const TAUGHT_CHOICES = 4;
 
-/** From which floor a rival's Pokémon hold items, by who they are; harder difficulties a few floors sooner, the easiest never. */
 const ITEMS_FROM = { leaderAce: 6, strongAce: 12, leaderTeam: 26, routeAce: 30 };
 const ITEMS_SOONER: Record<AiLevel, number> = { easy: -Infinity, mid: -5, hard: 0, veryhard: 3, skynet: 6 };
 const LATE_ITEMS_FROM = 20;
 
-/** Who on a rival's team holds an item on this floor. */
 function holdsItem(floor: Floor, difficulty: AiLevel, ace: boolean): boolean {
   const at = floor.number + ITEMS_SOONER[difficulty];
   if (isLeader(floor)) return at >= (ace ? ITEMS_FROM.leaderAce : ITEMS_FROM.leaderTeam);
   return ace && at >= (floor.strength === 'strong' ? ITEMS_FROM.strongAce : ITEMS_FROM.routeAce);
 }
 
-/** An item that suits it: a booster of a type it attacks with, or one that keeps it standing; stronger ones later. */
 function foeItem(moves: readonly string[], floorNumber: number, random: Random): string {
   const boosters = [...new Set(moves.filter(alwaysDamages).map((id) => boosterOf(moveData(id)?.type ?? '')).filter((key): key is string => !!key))];
   const options = [...boosters, 'leftovers', 'sitrus-berry', ...(floorNumber >= LATE_ITEMS_FROM ? ['life-orb', 'expert-belt', 'focus-sash', 'rocky-helmet'] : ['muscle-band', 'wise-glasses'])];
   return options[Math.floor(random() * options.length)];
 }
 
-/** Early routes have weak Pokémon: the form a species has at that level must fit this stat total. */
 const powerCap = (level: number): number => 300 + level * 8;
 const STRONG_BONUS = 40;
-/** Below this level a team knows little more than Normal moves, and a Ghost would be unbeatable. */
 const GHOSTS_FROM_LEVEL = 15;
 
-/** The trainer's theme first: a Hiker only brings Rock or Ground, a leader only its type. Strongest first. */
 function candidates(floor: Floor): number[] {
   const legends = floor.kind === 'champion' || floor.number >= LEGENDS_FROM_FLOOR;
   const all = towerSpecies().filter((id) => legends || baseStatTotal(id) < LEGENDARY_TOTAL);
@@ -95,7 +66,6 @@ function candidates(floor: Floor): number[] {
   return floor.strength === 'weak' ? ranked.slice(-Math.max(FEWEST_CHOICES, Math.ceil(ranked.length / 2))) : ranked;
 }
 
-/** One of the options by weight, taken out of both lists. */
 function drawWeighted<T>(options: T[], weights: number[], random: Random): T {
   let roll = random() * weights.reduce((sum, weight) => sum + weight, 0);
   const index = Math.max(0, weights.findIndex((weight) => (roll -= weight) <= 0));
@@ -103,11 +73,9 @@ function drawWeighted<T>(options: T[], weights: number[], random: Random): T {
   return options.splice(index, 1)[0];
 }
 
-/** A weight for each place of a list ranked strongest first: flat with no lean, steeper the more it leans. */
 const rankWeights = (length: number, lean: number): number[] => Array.from({ length }, (_, rank) => (1 - rank / length) ** lean);
 const lineOf = (id: number): number => evolutionPath(id)[0];
 
-/** What the rivals are measured against: the IVs and EVs of each Pokémon of your party. */
 export interface PartyStats {
   ivs: Ivs;
   evs: Ivs;
@@ -115,7 +83,6 @@ export interface PartyStats {
 
 const averageOf = (values: readonly number[], fallback: number): number => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : fallback);
 
-/** Around your party's average in each stat, a few points up or down. */
 function foeIvs(party: readonly PartyStats[], edge: number, random: Random): Ivs {
   const ivs = { ...NO_STATS };
   for (const stat of STATS) {
@@ -128,7 +95,6 @@ function foeIvs(party: readonly PartyStats[], edge: number, random: Random): Ivs
 const NO_STATS: Ivs = { hp: 0, atk: 0, def: 0, satk: 0, sdef: 0, spd: 0 };
 const totalEvs = (evs: Ivs): number => STATS.reduce((sum, stat) => sum + (evs[stat] ?? 0), 0);
 
-/** A nature for its best attack, and the EVs into that attack, then Speed, then HP. */
 function training(speciesId: number, budget: number): { natureChoice: string; evs: Ivs } {
   let left = Math.min(MAX_TOTAL_EVS, Math.max(0, Math.round(budget)));
   const take = (wanted: number) => {
@@ -142,7 +108,6 @@ function training(speciesId: number, budget: number): { natureChoice: string; ev
   return { natureChoice: idealNature(speciesId), evs };
 }
 
-/** How many of its moves a rival learned from a machine, a tutor or an egg: more on later floors and for bosses. */
 function taughtSlots(floor: Floor, difficulty: AiLevel): number {
   if (difficulty === 'easy' || floor.number < MACHINES_FROM_FLOOR) return 0;
   const boss = isLeader(floor);
@@ -156,7 +121,6 @@ const moveScore = (id: string, types: readonly string[]): number => {
   return move.power * ((move.accuracy ?? 100) / 100) * (move.type && types.includes(move.type) ? STAB : 1);
 };
 
-/** Its level moves, with the weakest attacks swapped for taught ones within the power its level allows. */
 function withTaughtMoves(speciesId: number, level: number, floor: number, moves: readonly string[], slots: number, random: Random): string[] {
   if (!slots) return [...moves];
   const types = speciesData(speciesId)?.types ?? [];
@@ -223,10 +187,8 @@ export function foeTeam(floor: Floor, difficulty: AiLevel, random: Random, party
   });
 }
 
-/** What a Pokémon is worth in battle at its level: its stats, by its base stat total. */
 const battleWorth = (mon: RosterEntry): number => (baseStatTotal(mon.finalID) * (mon.battleLevel ?? mon.level)) / 100;
 
-/** How its types fare against your party: what its own types hit, less what yours hit it with, on average. */
 function matchup(speciesId: number, rivals: readonly number[]): number {
   if (!rivals.length) return 0;
   const mine = speciesData(speciesId)?.types ?? [];
@@ -238,12 +200,6 @@ function matchup(speciesId: number, rivals: readonly number[]): number {
   }, 0) / rivals.length;
 }
 
-/**
- * The three a rival takes from the team it drew: the best of that selection, as well as its
- * difficulty lets it judge. Each one's worth is its power at its level and how its types fare against
- * your party; an easy rival picks at random, a harder one leans more and more to the best. A leader
- * always brings its ace.
- */
 export function foePicks(floor: Pick<Floor, 'kind' | 'room' | 'signature'>, team: readonly RosterEntry[], difficulty: AiLevel, random: Random, count: number, rivals: readonly number[] = []): number[] {
   const worth = team.map((mon) => battleWorth(mon));
   const top = Math.max(...worth, 1);

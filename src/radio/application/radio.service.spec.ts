@@ -1,5 +1,3 @@
-// RadioService with its timers on a fake clock: the push of the next song to the listeners, and
-// the catch-up of stations nobody listened to while the server was down.
 import { afterEach, beforeEach, test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { radioTrackDuration } from '../../catalog/domain/radio-tracks.js';

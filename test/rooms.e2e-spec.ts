@@ -1,6 +1,3 @@
-// The life of a duel room as its clients see it over the socket: which frames arrive, in which
-// order and with which keys, when someone leaves or comes back during the ready check, when the
-// host closes it, and who hears each chat message. Runs its own server with a short seat grace.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -10,7 +7,6 @@ import { PROJECT_ROOT } from '../src/shared/paths.js';
 import { appProcess, FAST_TIMINGS } from './app-process.js';
 
 const SEAT_GRACE_MS = 400;
-// Each trainer imports from their own address (the import is rate-limited per IP), as behind Cloudflare.
 const app = appProcess({ ...FAST_TIMINGS, SEAT_GRACE_MS: String(SEAT_GRACE_MS), TRUST_CF_CONNECTING_IP: '1', JEV_API_KEY: '', JEV_API_URL: '' }, 19000);
 const save = readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8');
 
@@ -36,7 +32,6 @@ async function trainer(name: string) {
   return { token: data.token as string, me: data.me };
 }
 
-/** A socket that keeps every frame, raw and parsed, and can wait for the next one that matches. */
 class Client {
   readonly ws: WebSocket;
   readonly raw: string[] = [];
@@ -64,7 +59,6 @@ class Client {
     this.ws.send(JSON.stringify(message));
   }
 
-  /** The next frame (after the last one returned) that matches. */
   async next(match: (frame: any) => boolean, ms = 8000): Promise<any> {
     for (const until = Date.now() + ms; Date.now() < until; await sleep(10)) {
       const index = this.frames.findIndex((frame, i) => i >= this.cursor && match(frame));
@@ -76,7 +70,6 @@ class Client {
     throw new Error(`no matching frame; got ${JSON.stringify(this.frames.slice(this.cursor).map((f) => f.t))}`);
   }
 
-  /** Frames that arrived after the last one returned by next(). */
   rest(): any[] {
     return this.frames.slice(this.cursor);
   }
@@ -88,7 +81,6 @@ class Client {
   }
 }
 
-/** Plays like the real client: presses ready, picks the first ones, takes the first legal action. */
 function autoPlay(frame: any, client: Client): void {
   if (frame.t === 'lobby' && frame.you != null && !frame.players[frame.you].ready) client.send({ t: 'set-ready', ready: true });
   const mine = frame.preview && frame.you != null ? frame.preview.sides[frame.you] : null;
@@ -96,7 +88,6 @@ function autoPlay(frame: any, client: Client): void {
   if (frame.actions?.length) client.send({ t: 'act', action: frame.actions[0] });
 }
 
-/** Which step of the match a frame shows. */
 function phaseOf(frame: any): string | null {
   if (frame.t === 'waiting') return 'waiting';
   if (frame.t === 'lobby') return 'readyCheck';
@@ -122,7 +113,6 @@ const seat = (who: { me: any }, { ready, online }: { ready: boolean; online: boo
   online,
 });
 
-/** A private room whose guest has accepted (over HTTP): the ready check has begun. */
 async function acceptedRoom(hostName: string, guestName: string) {
   const host = await trainer(hostName);
   const guest = await trainer(guestName);
@@ -196,7 +186,6 @@ test('a guest who reconnects within the grace keeps the seat, and both ready sta
   assert.deepEqual(Object.keys(countdown), ['t', 'ms', 'players', 'you', 'tournament', 'waiting']);
   assert.deepEqual([countdown.you, countdown.tournament, countdown.waiting], [1, null, null]);
   assert.deepEqual(countdown.players, [seat(host, { ready: true, online: true }), seat(guest, { ready: true, online: true })].map(({ ready, online, ...player }) => player));
-  // Once the countdown runs, the host can no longer close the room.
   assert.equal((await call(`/api/challenges/${id}`, { method: 'DELETE', token: host.token })).status, 403);
   await Promise.all([hostClient.close(), again.close()]);
 });
@@ -264,7 +253,6 @@ test('a 1v1 goes waiting → ready check → countdown → preview → battle fo
   assert.equal(endHost.deadline, null);
   assert.deepEqual(endViewer.actions, []);
 
-  // After the battle the players still talk from their side; viewers have none.
   const chatter = await trainer('Hincha');
   const fan = await Client.room(id, chatter.token);
   const heard = [];
@@ -298,7 +286,6 @@ test('room chat: players and viewers talk in the room, floods and anonymous view
   anonymous.send({ t: 'chat', text: 'sin sesión' });
   guestClient.send({ t: 'chat', text: '   ' });
   await sleep(100);
-  // One at a time: two sockets give no order between them.
   fanClient.send({ t: 'chat', text: 'miro nomás' });
   await anonymous.next((f) => f.t === 'chat');
   guestClient.send({ t: 'chat', text: 'listo' });
@@ -335,7 +322,6 @@ test('tournament chat: the tournament page and its match rooms share one channel
   const onPage = [first, await fanPage.next((f) => f.t === 'chat')];
   assert.deepEqual(onPage.map((f) => [f.message.name, f.message.role, f.message.side]), [['Organiza', 'player', null], ['Hinchada', 'watcher', null]]);
 
-  // Round one has the host's match and a match between two AIs, in either order.
   let matchId: string | undefined;
   let aiMatchId: string | undefined;
   const room = new Promise<Client>(async (resolve) => {
@@ -357,7 +343,6 @@ test('tournament chat: the tournament page and its match rooms share one channel
     const said = await client.next((f) => f.t === 'chat' && f.message.text === 'desde la sala');
     assert.deepEqual([said.message.id, said.message.role, said.message.side], [3, 'player', 0]);
   }
-  // In a match they don't play, a seated player still talks as a player of the tournament.
   while (!aiMatchId) await sleep(50);
   const otherMatch = await Client.room(aiMatchId, host.token);
   otherMatch.send({ t: 'chat', text: 'mirando la otra' });

@@ -1,5 +1,3 @@
-// HTTP entry points of the trainers context. Controllers are thin: read the request, call one use
-// case, present the result. Rules live in the domain; orchestration in TrainersService.
 import { All, Body, Controller, Get, Headers, HttpCode, Param, Post, Put } from '@nestjs/common';
 import { pokedexOf } from '../../catalog/domain/pokedex.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
@@ -24,7 +22,6 @@ export class TrainersController {
     private readonly skynet: SkynetService,
   ) {}
 
-  /** Upload a save: registers you (first time) or updates your collection. */
   @Post('import')
   @HttpCode(200)
   @RateLimit({ bucket: 'import', by: 'ip', max: 20, windowMs: 10 * 60_000, message: 'Demasiadas importaciones, espera unos minutos.' })
@@ -109,11 +106,10 @@ export class TrainersController {
   @All('me/mons/:id')
   @Authenticated()
   monOtherMethods(@CurrentTrainer() trainer: Trainer, @Param('id') id: string) {
-    trainer.entry(id); // 404 first, like the routes above
+    trainer.entry(id);
     throw new HttpError(405, 'Método no permitido');
   }
 
-  /** Species you have registered (owned, or an earlier form of one you own). */
   @Get('pokedex')
   @Authenticated()
   pokedex(@CurrentTrainer() trainer: Trainer) {

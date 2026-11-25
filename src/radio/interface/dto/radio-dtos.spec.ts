@@ -1,4 +1,3 @@
-// The radio's DTOs on their own: what they accept and what they turn down before the domain sees it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OpenStationDto, StationQueueDto } from './station.dto.js';

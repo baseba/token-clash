@@ -1,4 +1,3 @@
-// The stats DTOs on their own.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ChooseLookDto } from './choose-look.dto.js';

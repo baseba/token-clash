@@ -1,10 +1,3 @@
-// Creatures. Everything comes from PokeAPI (https://pokeapi.co), downloaded into the game by
-// scripts/import-pokeapi.mjs: src/catalog/data/pokeapi.json holds the name, base stats, real types
-// and evolution placement of every species, and public/upstream/sprites.json says where each
-// species' front/back sprites live in PokeAPI/sprites (the browser loads them from a CDN). The
-// server never calls PokeAPI (production has no egress). The type chart and labels live in
-// public/types.js, shared with the browser. src/catalog/data/movedex.json holds every learnable move.
-
 import { readFileSync } from 'node:fs';
 import { catalogFile } from '../../shared/paths.js';
 import { effectiveness } from './type-chart.js';
@@ -19,10 +12,8 @@ export type Stats = Record<StatKey, number>;
 export type BoostKey = 'atk' | 'def' | 'satk' | 'sdef' | 'spd' | 'acc' | 'eva';
 export type Boosts = Partial<Record<BoostKey, number>>;
 export type MoveCategory = 'physical' | 'special' | 'status';
-/** The status a Pokémon keeps until cured (burn, paralysis, poison, bad poison, sleep, freeze). */
 export const MAJOR_STATUSES = ['brn', 'par', 'psn', 'tox', 'slp', 'frz'] as const;
 export type MajorStatus = (typeof MAJOR_STATUSES)[number];
-/** The primal ones (harshsun, heavyrain, winds) only come from abilities, and last while their setter stays. */
 export type Weather = 'sun' | 'rain' | 'sand' | 'hail' | 'snow' | 'harshsun' | 'heavyrain' | 'winds';
 
 export interface MoveSecondary {
@@ -34,7 +25,6 @@ export interface MoveSecondary {
   confuse?: boolean;
 }
 
-/** A move as movedex.json has it: its Spanish name and description from PokeAPI, its battle data from Pokémon Showdown. */
 export interface MoveEntry {
   name: string;
   desc: string;
@@ -99,7 +89,6 @@ export interface BaseStats {
   speed: number;
 }
 
-/** PokeAPI data of a species. */
 export interface SpeciesData extends RawSpecies {
   base: BaseStats;
 }
@@ -143,7 +132,6 @@ export function floats(id: number): boolean {
   return species.types.includes('flying') || [...(species.abilities ?? []), species.hiddenAbility].some((a) => FLOATING_ABILITIES.has(a as string));
 }
 
-// PokeAPI data of a species number, or null when we don't have it (unknown or newer species).
 export function speciesData(id: number): SpeciesData | null {
   const species = POKEAPI[id];
   if (!species) return null;
@@ -219,7 +207,6 @@ export function family(id: number): { id: number; stage: number }[] {
   return out;
 }
 
-/** The fully evolved species a Pokémon can become (itself when it doesn't evolve), up to `maxId`. */
 export function finalForms(id: number, maxId = Infinity): number[] {
   const finals: number[] = [];
   const visit = (cur: number) => {
@@ -245,7 +232,6 @@ export function lineageLearnset(id: number): Map<string, { level: number; from: 
 
 const TEACH_ORIGINS = ['machine', 'tutor', 'egg', 'other'] as const;
 
-/** Entry fields the move and ability rules read. */
 export type EntryLike = Pick<RosterEntry, 'finalID'> & Partial<RosterEntry>;
 
 export function moveOrigins(entry: EntryLike): Map<string, MoveOrigin> {
@@ -305,8 +291,6 @@ export function natureFor(entry: Pick<RosterEntry, 'nature' | 'natureChoice'>): 
 
 const RARITY_BASE: Record<string, number> = { common: 55, uncommon: 65, rare: 75, legendary: 90 };
 
-// Species: name, sprite, types and stats straight from PokeAPI. A species PokeAPI doesn't know
-// (unknown or newer) falls back to its dex number, the Normal type and stats derived from rarity.
 export function species(entry: EntryLike): SpeciesView {
   const { finalID, rarity } = entry;
   const data = speciesData(finalID);
@@ -361,7 +345,6 @@ export function genderFor(entry: EntryLike): Gender | null {
   return hash(`gender:${entry.id ?? entry.finalID}`) % 8 < rate ? 'female' : 'male';
 }
 
-/** IVs as stats read them: old fixtures may omit the special ones, which fall back to atk/def. */
 type IvsLike = Pick<Ivs, 'hp' | 'atk' | 'def' | 'spd'> & Partial<Pick<Ivs, 'satk' | 'sdef'>>;
 
 export function statsFor(bases: readonly number[], iv: IvsLike, level: number, nature: string | null = null, evs: Partial<Ivs> = {}): Stats {

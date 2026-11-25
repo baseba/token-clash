@@ -5,7 +5,6 @@ import { rng } from '../../catalog/domain/creatures.js';
 import { moveData } from './moves.js';
 
 const IV = { hp: 15, atk: 15, def: 15, spd: 15 };
-// Fixtures carry only the fields the rules read.
 const mon = (id, finalID, moves, extra: any = {}): any => ({ id, finalID, baseID: finalID, rarity: 'rare', level: 50, ivs: IV, learned: moves, moveset: moves, ...extra });
 const attacker = (extra?) => mon('atk', 68, ['body-slam', 'flamethrower', 'brick-break', 'defog'], { abilityChoice: 'guts', ...extra });
 const defender = (extra?) => mon('def', 122, ['reflect', 'light-screen', 'aurora-veil', 'growl'], { abilityChoice: 'soundproof', ...extra });

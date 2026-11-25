@@ -1,4 +1,3 @@
-// Team preview: each side sees the rival's party (up to 6) and secretly picks the 3 that fight.
 import { buildFighter, type Fighter } from './fighter.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
@@ -12,9 +11,7 @@ export interface PreviewSide {
   avatar?: string;
   frame?: string | null;
   entries: RosterEntry[];
-  /** Indexes into entries, once confirmed. */
   picks: number[] | null;
-  /** What the side has marked so far, shown to spectators. */
   draft?: number[];
   rerolled?: number;
 }
@@ -22,7 +19,6 @@ export interface PreviewSide {
 export interface PreviewState {
   mode: string;
   sides: PreviewSide[];
-  /** Both picked: everyone sees the picks for a moment before the battle. */
   revealed?: boolean;
 }
 
@@ -71,7 +67,6 @@ export const previewReady = (preview: PreviewState): boolean => preview.sides.ev
 export const chosenEntries = (preview: PreviewState, sideIndex: number): RosterEntry[] =>
   preview.sides[sideIndex].picks!.map((i) => preview.sides[sideIndex].entries[i]);
 
-/** What a rival sees of a Pokémon in your party: no stats, moves or ability. */
 export type SeenCard = Pick<Fighter, 'name' | 'speciesName' | 'sprite' | 'shiny' | 'floats' | 'rarity' | 'types' | 'gender'>;
 
 function seenCard(fighter: Fighter): SeenCard {
@@ -108,7 +103,6 @@ export interface PreviewView {
   revealed: boolean;
 }
 
-/** The preview as `viewer` (a side index, or null for a spectator) may see it. */
 export function previewView(preview: PreviewState, viewer: number | null = null): PreviewView {
   return {
     mode: preview.mode ?? 'team',

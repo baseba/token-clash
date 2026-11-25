@@ -31,11 +31,10 @@ const ls = {
     try { return localStorage.getItem(k); } catch { return null; }
   },
   set: (k, v) => {
-    try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* private mode: session only */ }
+    try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {}
   },
 };
 
-// An access link (/#key=…) restores the session on another browser.
 if (location.hash.startsWith('#key=')) {
   const k = location.hash.slice(5);
   if (/^[A-Za-z0-9_-]{20,100}$/.test(k)) ls.set('tc_token', k);
@@ -47,7 +46,6 @@ const notifier = createNotifier();
 let me = null;
 let cleanup = null;
 
-// ---------- utils ----------
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
@@ -58,9 +56,9 @@ function h(tag, attrs, ...kids) {
         if (prop.startsWith('--')) el.style.setProperty(prop, val);
         else el.style[prop] = val;
       }
-    } // CSSOM, so CSP-safe
+    }
     else if (k === 'html') {
-      el.innerHTML = v; // only ever creatureHTML(), which validates the sprite slug
+      el.innerHTML = v;
       if (!el.classList.contains('sub-doll')) el.querySelectorAll('.creature img').forEach(fitSprite);
     }
     else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
@@ -117,7 +115,6 @@ async function copy(text, okMsg = 'Copiado') {
   }
 }
 
-// A colored chip for one type. For a creature, pass its types array to render one chip per type.
 function typeChip(t) {
   if (!t) return null;
   const c = TYPES[t];
@@ -228,11 +225,9 @@ const SCREEN_END = {
   cleaner: (name, team) => `Antibarrera elimina ${name} del equipo de ${team}.`,
 };
 const TERRAIN = { electric: { icon: 'bolt', name: 'Campo Eléctrico' }, grassy: { icon: 'leaf', name: 'Campo de Hierba' }, misty: { icon: 'fog', name: 'Campo de Niebla' }, psychic: { icon: 'orb', name: 'Campo Psíquico' } };
-/** How many icons the field's pill shows before it counts the rest: fewer on a phone, where the bar is tight. */
 const FIELD_ICONS = 4;
 const FIELD_ICONS_NARROW = 2;
 const narrowScreen = () => matchMedia('(max-width: 520px)').matches;
-/** What each weather and terrain does, for the field's detail. A terrain only reaches who touches the ground. */
 const WEATHER_DESC = {
   sun: 'Los ataques de Fuego pegan más fuerte y los de Agua más débil.',
   rain: 'Los ataques de Agua pegan más fuerte y los de Fuego más débil.',
@@ -243,7 +238,6 @@ const WEATHER_DESC = {
   heavyrain: 'Como la lluvia, y además los ataques de Fuego se apagan.',
   winds: 'Los ataques muy eficaces contra Volador le pegan normal.',
 };
-/** What each room does while it lasts: its start line tells it began, this tells what changes. */
 const ROOM_DESC = {
   gravity: 'Todos tocan el suelo: los Volador y los que levitan reciben ataques de Tierra. Los ataques aciertan más y no se puede volar ni saltar.',
   trickroom: 'Los más lentos atacan primero.',
@@ -636,7 +630,6 @@ function renderWho() {
   $who.append(h('a', { class: 'chip who-chip', href: '/perfil', 'data-link': true, 'data-tip': 'Tu perfil' }, avatarPic(me.avatar, 'sm', me.frame), me.name), h('span', { class: 'chip' }, h('span', { class: 'w' }, `${me.wins}V`), ' · ', h('span', { class: 'l' }, `${me.losses}D`)));
 }
 
-// ---------- routing ----------
 let routeSeq = 0;
 let loadedPath = null;
 let shownPath = location.pathname + location.search;
@@ -799,15 +792,12 @@ document.addEventListener('focusin', (e) => {
   el ? showTip(el) : hideTip();
 });
 document.addEventListener('focusout', hideTip);
-// Touch has no hover: a tap on a tip that is not itself a control opens it, and the next tap closes it.
 document.addEventListener('click', (e) => {
   const el = lastPointer === 'touch' ? e.target.closest?.('[data-tip]') : null;
   if (el && el !== tipTarget && !el.closest('button, a[href], input, select, label, [role="button"]')) showTip(el);
   else hideTip();
 }, true);
 addEventListener('scroll', hideTip, { passive: true, capture: true });
-// A sprite is sized only once it loads, so remember each size: a card rebuilt by a filter or a page
-// change lays out at its final size at once instead of jumping when the image arrives.
 const spriteSizes = new Map();
 function fitSprite(img) {
   const size = spriteSizes.get(img.getAttribute('src'));
@@ -881,7 +871,6 @@ function radioButton() {
   const count = h('span', { class: 'muted small' });
   const list = h('div', { class: 'radio-list', role: 'listbox', 'aria-label': 'Canciones' });
   const dlg = h('dialog', { class: 'info-dlg radio-dlg', onclick: (e) => e.target === e.currentTarget && e.currentTarget.close() });
-  // The station tuned in keeps playing on every page and after a reload: one feed for the whole app.
   const feed = createStationFeed({
     open: () => new WebSocket(wsURL()),
     storage: { getItem: (k) => ls.get(k), setItem: (k, v) => ls.set(k, v) },
@@ -893,13 +882,11 @@ function radioButton() {
     },
   });
   const stations = stationsPanel({ h, api, toast, feed });
-  // Opening or closing my station shows or hides the track list under its panel.
   const mine = myStationPanel({ h, api, toast, feed, session: () => me, onChange: () => paint() });
   const shown = () => {
     const words = query.toLowerCase();
     return RADIO_TRACKS.filter((t) => (!kind || t.kind === kind) && (!region || t.region === region) && (!words || `${t.title} ${RADIO_REGIONS[t.region]}`.toLowerCase().includes(words)));
   };
-  // Picking a song of your own stops listening to a station: otherwise the click would play nothing.
   const tune = (id) => {
     if (id) feed.tune(null);
     music.setRadio(id);
@@ -912,9 +899,6 @@ function radioButton() {
     count,
   );
   const tabs = h('div', { class: 'segmented radio-tabs', role: 'group', 'aria-label': 'Radio' }, Object.entries(RADIO_TABS).map(([value, label]) => h('button', { type: 'button', class: 'seg-item', 'data-tab': value, onclick: () => show(value) }, label)));
-  // Every tab is mounted once and shown or hidden, never re-inserted: moving a node takes the focus
-  // off the search box and scrolls the list back to the top. The filtered track list is shared by
-  // "Pistas" and "Mi estación", so it moves only when the tab does.
   const tracksPane = h('div', { class: 'radio-tab' }, now, filters, list);
   const minePicker = h('div', { class: 'radio-tab' }, h('b', { class: 'small' }, 'Agregar canciones'));
   const minePane = h('div', { class: 'radio-tab' }, mine.root, minePicker);
@@ -954,8 +938,6 @@ function radioButton() {
       ),
     );
   }
-  // Rebuilt only when what it shows changes: a frame arriving must not take the keyboard focus off
-  // the song just added.
   let listKey = null;
   function paintList() {
     const key = `${tab}|${query}|${kind}|${region}|${feed.tuned ? '' : music.radio}`;
@@ -1061,9 +1043,6 @@ function renderSound() {
 }
 renderSound();
 
-// Without the sprite manifest every Pokémon would stay blank for the session, so each navigation
-// asks for it again. One request at a time, and the repaint waits if it would drop unsaved edits.
-// A battle the player moved into meanwhile is not repainted: that would reconnect its socket mid-fight.
 let spritesRetry = null;
 function retrySprites() {
   if (spritesLoaded() || spritesRetry) return;
@@ -1268,7 +1247,6 @@ function accountCard() {
   return card;
 }
 
-// ---------- import ----------
 function importCard({ onDone, compact: small = false } = {}) {
   const err = h('p', { class: 'error', hidden: true });
   const nameInput = h('input', { type: 'text', id: 'tname', maxlength: 24, placeholder: 'Ej: Seba', value: me?.name || '', autocomplete: 'nickname' });
@@ -1470,8 +1448,6 @@ rm -rf ${plistPath} ${SYNC_DIR} ~/Library/Logs/TokenClash`),
   );
 }
 
-// ---------- profile ----------
-// ---------- shop ----------
 const tokensM = (n) => `${Math.floor(n / 1_000_000).toLocaleString('es')} M`;
 const FREE_ITEMS = [
   { id: 'ball:pb', kind: 'ball', key: 'pb', name: 'Poké Ball', rarity: null, price: 0, desc: 'La Poké Ball de siempre.', owned: true, free: true },
@@ -1914,7 +1890,6 @@ const STATE_GLYPH = { equipped: 'star', owned: 'check', locked: 'lock', buy: 'co
   if (location.hash === '#cuenta') accountDlg.showModal();
 }
 
-// ---------- recycling ----------
 const RECYCLE_RARITY = { common: 'Común', uncommon: 'Poco común', rare: 'Raro', legendary: 'Legendario' };
 const SHRED_SOUNDS = [
   { sound: 'prsfx-shift-gear.wav', at: 0, gain: 0.6 },
@@ -2015,7 +1990,6 @@ async function recyclingPage(seq) {
       : [h('p', { class: 'muted' }, 'Todavía no trituras nada.')]));
   }
 
-  // On touch the list has to keep scrolling, so a card lifts only after a short hold; a plain tap asks instead.
   function startDrag(e, mon) {
     if (busy || e.button !== 0) return;
     const source = e.currentTarget;
@@ -2127,7 +2101,6 @@ async function recyclingPage(seq) {
       const strip = h('span', { class: 'shred-strip' });
       Object.assign(strip.style, { left: `${(i / SHRED_STRIPS) * 100}%`, width: `${100 / SHRED_STRIPS}%`, backgroundImage: `url("${spriteUrl}")`, backgroundSize: `${SHRED_STRIPS * 100}% 100%`, backgroundPosition: `${(i / (SHRED_STRIPS - 1)) * 100}% 0` });
       output.append(strip);
-      // A CSS background never retries, so each strip follows the host the feed image loaded from.
       feed.addEventListener('load', () => (strip.style.backgroundImage = `url("${feed.currentSrc}")`));
       const sway = (i - (SHRED_STRIPS - 1) / 2) * 11 + (Math.random() - 0.5) * 24;
       const spin = (Math.random() - 0.5) * 70;
@@ -2191,7 +2164,6 @@ async function recyclingPage(seq) {
   );
 }
 
-// ---------- home ----------
 async function homePage(seq) {
   document.title = 'Token Clash';
   await loadMe();
@@ -2255,7 +2227,6 @@ let installNudgeClosed = false;
 const installRepaints = new Set();
 const isInstalled = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isAppleMobile = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-// Chrome offers its own install dialog only through this event; held, it can open from our button.
 addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   installPrompt = e;
@@ -2439,7 +2410,6 @@ function renderHome() {
   );
 }
 
-// ---------- tower ----------
 const FLOOR_KIND = {
   trainer: { label: 'Ruta', icon: 'swords' },
   gym: { label: 'Gimnasio', icon: 'shield' },
@@ -2507,10 +2477,9 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const isDesk = () => matchMedia('(min-width: 900px)').matches;
 const sessionFlag = {
   get: (key) => { try { return sessionStorage.getItem(key); } catch { return null; } },
-  set: (key) => { try { sessionStorage.setItem(key, '1'); } catch { /* shown again next time */ } },
+  set: (key) => { try { sessionStorage.setItem(key, '1'); } catch {} },
 };
 
-/** A panel: a sheet that rises from the bottom on the phone, a centered card on the computer. */
 function towerDialog(title, ...body) {
   const dlg = h('dialog', { class: 'info-dlg tw-dlg', 'aria-label': title ?? body.find((node) => node?.querySelector?.('h2'))?.querySelector('h2')?.textContent ?? '', onclick: (e) => e.target === e.currentTarget && dlg.close(), onclose: () => dlg.remove() },
     h('div', { class: 'tw-dlg-body' },
@@ -2538,7 +2507,6 @@ async function towerCall(btn, path, { method = 'POST', body, render = true } = {
   }
 }
 
-/** What someone says, like the games' text box: the words appear one by one; a tap shows them all. */
 function sayBox(speaker, text, { mini = null } = {}) {
   const words = h('span', { class: 'tw-say-text' });
   const box = h('div', { class: 'tw-say', role: 'status' }, mini ? overworldSprite(mini, { facing: 'down', scale: 1, cls: 'tw-say-mini' }) : null, h('div', null, speaker ? h('span', { class: 'tw-speaker' }, speaker) : null, words));
@@ -2594,8 +2562,6 @@ function renderTower(data) {
   return towerClimb(run);
 }
 
-// ----- pieces shared by the screens -----
-
 function expBar(mon, { cap = mon.atCap } = {}) {
   const span = Math.max(1, mon.exp.to - mon.exp.from);
   const pct = cap ? 100 : Math.max(0, Math.min(100, ((mon.exp.now - mon.exp.from) / span) * 100));
@@ -2624,7 +2590,6 @@ function evoLine(line, current = null) {
   ]));
 }
 
-/** The Collection's card: stats with their nature, the ability and what it does, every move and its line. */
 function towerInfoCard(mon, { cap = null, line = mon.line, moves = true, ability = true, extra = null } = {}) {
   return h('div', { class: 'info-card tw-info-card' },
     h('header', null,
@@ -2641,10 +2606,8 @@ function towerInfoCard(mon, { cap = null, line = mon.line, moves = true, ability
     line?.length > 1 ? h('section', null, h('h3', null, 'Evolución'), evoLine(line, mon.speciesId)) : null);
 }
 
-/** The rivals of the next floors, for the "strong against / careful with" lines of a Pokémon's card. */
 const upcomingFoes = (run) => (run.status === 'climbing' && run.room && run.current?.foe && run.current.types?.length ? [{ name: `${run.current.foe.title} ${run.current.foe.name}`, types: run.current.types }] : []);
 
-/** The battle prep's card for a Pokémon: matchups against what comes, stats, ability and moves, its line, and the action. */
 function towerPrepInfo(run, mon, { line = mon.line, action = () => null } = {}) {
   const dlg = h('dialog', { class: 'info-dlg', 'aria-label': mon.name, onclick: (e) => e.target === e.currentTarget && dlg.close(), onclose: () => dlg.remove() });
   const paint = () => {
@@ -2662,7 +2625,6 @@ function towerPrepInfo(run, mon, { line = mon.line, action = () => null } = {}) 
   return dlg;
 }
 
-/** Which attacking types hurt it more and which less: what to know before taking it. */
 function typeDefense(mon) {
   const rows = Object.keys(TYPES).map((type) => [type, effectiveness(type, mon.types ?? [])]);
   const list = (test) => rows.filter(([, times]) => test(times)).sort((a, b) => b[1] - a[1]).map(([type, times]) => h('span', { class: 'tw-def' }, typeChip(type), times >= 4 ? h('small', null, '×4') : times === 0 ? h('small', null, '×0') : null));
@@ -2686,7 +2648,6 @@ function partyCell(mon, { selected = false, order = null, onclick, label }) {
   h('div', { class: 'name-plate' }, h('b', null, ...shinyName(mon), genderMark(mon.gender)), h('small', null, `Nv ${mon.level}`), typeChips(mon.types ?? [])));
 }
 
-/** The party in one line: each Poké Ball with its level; a tap shows the details. */
 function teamStrip(run) {
   return h('button', { type: 'button', class: 'tw-strip', 'aria-label': 'Ver tu equipo', onclick: () => teamSheet(run) },
     Array.from({ length: PARTY_LIMIT }, (_, i) => {
@@ -2732,18 +2693,15 @@ function floorPill(run, { button = true } = {}) {
   return h('button', { type: 'button', class: 'tw-floor-pill', onclick: () => towerDialog('La torre', towerFloors(run), h('p', { class: 'nb-note' }, `Tu tope de nivel en este piso: ${run.cap}. Superados: ${run.cleared}.`)) }, glyph('flag'), text);
 }
 
-/** This climb's rumour: what plays differently. */
 function twistChip(run) {
   const twist = TWISTS[run.twist];
   if (!twist) return null;
   return h('button', { type: 'button', class: 'chip tw-twist', 'aria-label': `Rumor: ${twist.name}`, onclick: () => towerDialog(twist.name, h('p', null, twist.text), h('p', { class: 'nb-note' }, 'Cada subida trae un rumor distinto. Lo dijo el Profesor al empezar.')) }, glyph(twist.icon), h('span', { class: 'tw-twist-name' }, ` ${twist.name}`));
 }
 
-/** A line said to the player, agreeing with how their trainer looks ("cansado" or "cansada"). */
 const toPlayer = (text) => text.replaceAll('{o}', /(^|_)f(_|$)/.test(playerOverworld()) ? 'a' : 'o');
 const lineFor = (lines, seed) => lines[[...String(seed)].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7) % lines.length];
 
-/** Who waits at a floor with no battle (a rest stop, a den, a dark deal) and what they say. */
 function stopTalk(run) {
   const person = STOP_PEOPLE[run.lastResult?.room];
   if (!person || run.lastResult?.floor !== run.floor - 1) return null;
@@ -2754,8 +2712,6 @@ function towerTop(run) {
   const menu = h('details', { class: 'tw-menu' }, h('summary', { 'aria-label': 'Opciones' }, glyph('menu')), h('div', { class: 'tw-menu-list' }, h('button', { class: 'btn ghost sm', onclick: towerAbandon }, glyph('flag'), ' Abandonar')));
   return h('div', { class: 'tw-top' }, floorPill(run), twistChip(run), h('span', { class: 'chip' }, AI_LABEL[run.difficulty]), h('span', { class: 'chip', 'data-tip': 'Tus puntos en esta subida' }, glyph('trophy'), ` ${pointsText(run.points ?? 0)}`), menu);
 }
-
-// ----- the setup, the end and the records -----
 
 function towerSummary(last) {
   const won = last.status === 'cleared';
@@ -2784,7 +2740,6 @@ function towerSetup(data) {
     towerStatsCard(data.records)));
 }
 
-/** Asks before a step that throws something away, so a stray tap doesn't cost a reward or a recruit. */
 function towerConfirm(title, text, { stay, go, onGo }) {
   const dlg = towerDialog(title,
     h('p', null, text),
@@ -2793,7 +2748,6 @@ function towerConfirm(title, text, { stay, go, onGo }) {
       h('button', { class: 'btn primary', onclick: (e) => { dlg.close(); onGo(e.currentTarget); } }, go)));
 }
 
-/** What you leave behind if you go up now: rewards you can still take, a Pokémon you could still recruit. */
 function leftBehind(run) {
   const rewards = run.picks > 0 ? run.rewards.length : 0;
   const lost = [
@@ -2810,8 +2764,6 @@ function towerAbandon() {
       h('button', { class: 'btn', onclick: () => dlg.close() }, 'Seguir subiendo'),
       h('button', { class: 'btn danger', onclick: async (e) => { if (await towerCall(e.currentTarget, '/api/tower', { method: 'DELETE' })) dlg.close(); } }, glyph('flag'), ' Abandonar')));
 }
-
-// ----- the lab -----
 
 function towerLab(run) {
   const picked = [];
@@ -2886,11 +2838,8 @@ function towerLab(run) {
   if (!reducedMotion()) cast.arrive().then(() => cast.approach());
 }
 
-// ----- after a win: experience, levels, moves, evolutions -----
-
 const resultKey = (run) => `tw-seen:${run.id}:${run.lastResult?.floor}`;
 
-/** Why a move is worth having for this Pokémon: same-type bonus, the stat it hits with, its side effects. */
 function moveWhy(mon, move) {
   const tags = [];
   if (move.category !== 'status' && mon.types?.includes(move.type)) tags.push(['good', 'STAB ×1,5']);
@@ -2906,7 +2855,6 @@ function moveWhy(mon, move) {
 
 const moveWorth = (mon, move) => (move.category === 'status' ? 45 : (move.power || 40) * (mon.types?.includes(move.type) ? 1.5 : 1) * ((move.accuracy || 100) / 100));
 
-/** Which equipped move a new one should replace: the one worth least, if it is worth less than the new one. */
 function suggestedSwap(mon, move) {
   const equipped = mon.known.filter((known) => mon.equipped.includes(known.key));
   const weakest = [...equipped].sort((a, b) => moveWorth(mon, a) - moveWorth(mon, b))[0];
@@ -2921,7 +2869,6 @@ function compareTag(mon, known, move) {
   return ['good', stab ? 'Más débil' : 'Más débil y sin STAB'];
 }
 
-/** "¿Cuál olvida?": the new move with why it helps, and each move it carries with what it gives. */
 function forgetPicker(mon, move, { onForget, onSkip, skipLabel }) {
   const equipped = mon.known.filter((known) => mon.equipped.includes(known.key));
   let choice = suggestedSwap(mon, move);
@@ -3032,8 +2979,6 @@ function towerResults(run) {
   show();
 }
 
-// ----- the editor -----
-
 function monEditor(run, mon) {
   const equipped = [...mon.equipped];
   let ability = mon.ability;
@@ -3083,11 +3028,8 @@ function monEditor(run, mon) {
   };
 }
 
-// ----- the rest: rewards and recruits -----
-
 const joinNames = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} y ${list.at(-1)}` : list[0] ?? '');
 
-/** The reward as it would work on your party right now. */
 function rewardSummary(run, reward) {
   const fits = run.party.filter((mon) => reward.fits.includes(mon.uid));
   const names = fits.map((mon) => mon.name);
@@ -3107,7 +3049,6 @@ function rewardRow(run, reward, { pick = false, onclick = null } = {}) {
     h('div', null, h('span', { class: `tw-tier tier-${reward.tier}` }, TIER_LABEL[reward.tier]), h('b', null, info.name(reward)), h('small', null, rewardSummary(run, reward))));
 }
 
-/** The nature a Mint gives and how this Pokémon's stats end up with it. */
 function mintStep(run, reward, mon, send) {
   let nature = null;
   const stats = h('div');
@@ -3210,11 +3151,8 @@ function restPanel(run) {
   return recruit ?? h('div', { class: 'tw-panel' }, h('h2', null, 'Listo para subir'), h('p', { class: 'nb-note' }, 'Tu equipo se recuperó. Toca tu equipo para cambiar movimientos o habilidades antes de seguir.'));
 }
 
-// ----- each floor -----
-
 let towerCast = null;
 
-/** You walk to the way you chose on the map, then the floor goes on from there. */
 async function takeRoom(run, room, body) {
   document.querySelectorAll('.tw-room, .tw-sign').forEach((button) => { button.disabled = true; });
   const index = run.rooms.findIndex((option) => option.kind === room.kind);
@@ -3245,7 +3183,6 @@ function roomRow(run, room) {
       h('small', null, room.hint)));
 }
 
-/** Who in your party hits the rival's types hard, and who its types hit hard: what decides who you bring. */
 function matchupAgainst(run, types) {
   if (!types?.length) return null;
   const hits = (mon) => [...new Set([...(mon.types ?? []), ...mon.known.filter((move) => mon.equipped.includes(move.key) && move.category !== 'status').map((move) => move.type)])].filter((type) => types.some((foeType) => effectiveness(type, [foeType]) >= 2));
@@ -3259,7 +3196,6 @@ function matchupAgainst(run, types) {
     line('bad', 'Sufren', weak, 'por'));
 }
 
-/** A rival team's levels as they will fight: one level, or the lowest to the highest (its ace). */
 const levelsLabel = (levels, fallback) => (!levels || levels.min === levels.max ? `Nv ${levels?.min ?? fallback}` : `Nv ${levels.min} a ${levels.max}`);
 
 function nextBattlePanel(run, cta) {
@@ -3280,7 +3216,6 @@ function nextBattlePanel(run, cta) {
     cta);
 }
 
-/** How you got to the screen being drawn: walking from the floor before, back from a battle, or none (a reload). */
 let towerEntrance = null;
 const takeEntrance = () => {
   const entrance = towerEntrance;
@@ -3288,7 +3223,6 @@ const takeEntrance = () => {
   return entrance;
 };
 
-/** Where you left each map of a climb, so the next one starts there: by floor and map ('fork' or 'floor'). Kept so a reload draws the same maps. */
 const TOWER_ENTRIES = 'tower-entries';
 const entriesOf = (runId) => {
   let saved = null;
@@ -3297,14 +3231,12 @@ const entriesOf = (runId) => {
 };
 const rememberEntry = (runId, key, from) => ls.set(TOWER_ENTRIES, JSON.stringify({ run: runId, entries: { ...entriesOf(runId), [key]: from } }));
 
-/** Puts a Tower screen on the page. Between two Tower screens the map stays and the rest slides, like one game. */
 function towerSwap(page) {
   const apply = () => $app.replaceChildren(page);
   if (document.startViewTransition && !reducedMotion() && $app.querySelector('.tw-map')) document.startViewTransition(apply);
   else apply();
 }
 
-/** The map of where the climb stands: the fork of a floor, its rival waiting, or the rest after it. */
 function floorStage(run, entrance) {
   const floor = run.current;
   const choosing = run.status === 'climbing' && run.rooms.length > 0;
@@ -3340,7 +3272,6 @@ function floorStage(run, entrance) {
   return cast;
 }
 
-/** You walk off the floor and up to the next one, after a confirmation if you'd leave something behind. */
 function moveOn(btn, run) {
   const lost = leftBehind(run);
   if (!lost) return walkUp(btn, run);
@@ -3356,7 +3287,6 @@ async function walkUp(btn, run) {
   if (!(await towerCall(btn, '/api/tower/move-on'))) towerEntrance = null;
 }
 
-/** You walk up to the rival, it speaks, a boss shows itself, and the screen closes into the battle. */
 async function startFight(run, cast, say, cta) {
   const floor = run.current;
   cta.disabled = true;
@@ -3598,7 +3528,6 @@ function ago(ts) {
 }
 
 const isMe = (t) => !!me && t.id === me.id;
-/** A trainer's name that opens their public profile. */
 const trainerLink = (id, name) => (id ? h('a', { class: 'trainer-link', href: `/entrenador/${encodeURIComponent(id)}`, 'data-link': true }, name) : name);
 const record = (t) => h('span', { class: 'record' }, h('span', { class: 'w' }, `${t.wins}V`), ' ', h('span', { class: 'l' }, `${t.losses}D`));
 const rateBar = (t) => h('span', { class: 'rate', 'data-tip': t.games ? `${t.wins} de ${t.games} batallas ganadas` : 'Sin batallas todavía' }, h('span', { class: 'rate-bar' }, h('i', { style: { width: percent(t.winRate ?? 0) } })), h('span', { class: 'rate-num' }, percent(t.winRate)));
@@ -3649,7 +3578,6 @@ function rankingCard(ranking) {
 const DIFFICULTY_MULTIPLIER = { easy: 0.5, mid: 1, hard: 1.5, veryhard: 2, skynet: 3 };
 const pointsText = (points) => `${points.toLocaleString('es')} pts`;
 
-/** A climb's points floor by floor: the floor, the rival team, the way and the difficulty. */
 function towerScoreSheet(record) {
   const roomLabel = (entry) => (entry.room && entry.room !== 'trainer' ? ROOMS[entry.room]?.label : FLOOR_KIND[entry.kind].label);
   return towerDialog(`${record.name} · ${pointsText(record.points)}`,
@@ -3810,7 +3738,6 @@ const RESULT_CHIP = { won: ['good', 'Ganó'], lost: ['bad', 'Perdió'], draw: ['
 const SEARCH_RESULTS = 8;
 const searchable = (text) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
 
-/** A search box that finds any trainer by name and opens their profile. The list of names loads on first use. */
 function trainerSearch() {
   let trainers = null;
   const results = h('ul', { class: 'trainer-results', id: 'trainer-search-results', hidden: true });
@@ -3866,7 +3793,6 @@ function trainerSearch() {
     input, results);
 }
 
-/** What another trainer uses from the shop, shown as it looks in a battle. */
 function usingCard(profile) {
   const { using } = profile;
   const rarityTag = (item, free) => (item?.rarity ? h('span', { class: `rarity-tag rarity-${item.rarity}` }, RARITIES[item.rarity]?.label ?? item.rarity) : free ? h('span', { class: 'rarity-tag' }, RARITIES.free.label) : null);
@@ -3883,7 +3809,6 @@ function usingCard(profile) {
     ));
 }
 
-/** Another trainer's public profile: record, the Pokémon they bring, their battles and what they use from the shop. */
 async function trainerPage(id, seq) {
   document.title = 'Entrenador · Token Clash';
   await loadMe();
@@ -3986,7 +3911,6 @@ function foldSections(root, openByDefault) {
   }
 }
 
-// ---------- pokedex ----------
 const GEN_LABELS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
 const DEX_STATS = ['PS', 'Ataque', 'Defensa', 'At. esp.', 'Def. esp.', 'Velocidad'];
 function genderText(rate) {
@@ -4167,7 +4091,6 @@ async function pokedexPage(seq) {
   paintGrid();
 }
 
-// ---------- team ----------
 const PARTY_SIZE = 6;
 const MODE_ICON = { team: 'bag', random: 'dice' };
 const modeGlyph = (mode) => glyph(MODE_ICON[mode] ?? MODE_ICON.team, { label: MODE_LABEL[mode] ?? MODE_LABEL.team });
@@ -4815,7 +4738,6 @@ async function monPanel(uid, panel, { isCurrent, inParty, toggleParty, onSaved }
   return { dirty, refreshPartyButton };
 }
 
-// ---------- battle ----------
 async function battlePage(id, seq) {
   await loadMe();
   if (stale(seq)) return;
@@ -4841,7 +4763,7 @@ async function battlePage(id, seq) {
   let closed = false;
   let ws = null;
   let retry = 0;
-  let battle = null; // battle UI controller, once a battle exists
+  let battle = null;
   let prep = null;
   let match = null;
   let duel = null;
@@ -5101,7 +5023,6 @@ function readyButton(ready, onToggle) {
   return h('button', { class: `btn ${ready ? '' : 'primary'} ready-btn`, 'aria-pressed': String(ready), onclick: (e) => { e.currentTarget.disabled = true; onToggle(!ready); } }, ...(ready ? ['Ya no estoy listo'] : [glyph('check'), ' ¡Estoy listo!']));
 }
 
-/** Watches a room's frames and alerts the player when the game is waiting on them. */
 function roomAlerts(c) {
   let open = c.status === 'open';
   let waitingOnYou = false;
@@ -5352,7 +5273,6 @@ async function tournamentPage(id, seq) {
   };
 }
 
-/** Alerts a seated player when the tournament lobby fills up and when everyone but them is ready. */
 function tournamentAlerts(initial) {
   const full = (T) => T.seats.length === T.size;
   let wasFull = full(initial);
@@ -6273,11 +6193,11 @@ function chatDock(chat) {
 }
 
 function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, sendSurrender = null) {
-  let frame = null; // last frame from the server
-  let view = null; // what is on screen (lags behind frame while events play)
+  let frame = null;
+  let view = null;
   let playing = false;
   let mine = 0;
-  let sent = null; // label of the action we sent this turn, until the turn resolves
+  let sent = null;
   let aiming = null;
   let farewell = null;
   let queue = Promise.resolve();
@@ -6425,13 +6345,11 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
   };
   const activeOf = (side) => view.sides[side].team[view.sides[side].active];
   const isYou = (side) => frame?.you === side;
-  // "tu Bigfin" / "Bigfin de Pedro": the same creature can be on both teams, so always say whose.
   const mon = (side, name) => (isYou(side) ? ['tu ', h('b', null, name)] : [h('b', null, name), ` de ${trainerShort(view.sides[side].name)}`]);
   const capFirst = (parts) => {
     const [first, ...rest] = parts.flat();
     return typeof first === 'string' ? [first.replace(/\p{L}/u, (ch) => ch.toUpperCase()), ...rest] : [first, ...rest];
   };
-  // Skip the show when the tab is hidden, so coming back doesn't replay a backlog.
   let backlog = 0;
   const wait = (ms) => (document.hidden ? Promise.resolve() : sleep(backlog > 1 ? ms / Math.min(4, backlog) : ms));
   const settle = (r) => (typeof r === 'number' ? wait(r) : r);
@@ -6441,7 +6359,6 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     els.log.scrollTop = els.log.scrollHeight;
   }
   function say(parts, side, sub = false) {
-    // The same nodes also go to the log, so the banner gets copies.
     const line = h('span', { class: sub ? 'say-detail' : 'say-main' }, [parts].flat(Infinity).map((n) => (n instanceof Node ? n.cloneNode(true) : n)));
     const main = els.say.querySelector('.say-main');
     if (sub && main) {
@@ -6628,7 +6545,6 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     return chips;
   }
 
-  /** Weather, terrain and rooms: what reaches both sides. */
   function fieldStates() {
     const fl = view.field || {};
     return [
@@ -6638,7 +6554,6 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     ].filter(Boolean);
   }
 
-  /** The field in detail: what each weather, terrain or room in play does. Each team's traps and screens stay on its card. */
   function openFieldInfo() {
     const row = (state) => h('li', { class: 'field-row' }, h('span', { class: 'field-row-icon' }, glyph(state.icon)),
       h('div', null, h('b', null, state.name), state.detail ? h('p', { class: 'muted' }, state.detail) : null));
@@ -6925,7 +6840,6 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
     tie: 'misma velocidad, le tocó primero',
   };
 
-  // Plays one event on screen and in the log; returns how long to linger on it.
   let currentMove = null;
   let draggedSide = null;
 
@@ -7406,7 +7320,6 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
 
   async function apply(msg) {
     if (dead) return;
-    // A viewer who just accepted reconnects as a player: redraw from their side.
     const first = !frame || (msg.you != null && msg.you !== mine);
     frame = msg;
     if (first) {
@@ -7482,7 +7395,6 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
       view = clone(msg.state);
       paintAll();
     }
-    // Keep "Elegiste: …" while the server has our choice; a 'ready'/'presence' frame may race our own submit.
     if (msg.you != null && !msg.state.sides[msg.you].ready && msg.t !== 'ready' && msg.t !== 'presence') sent = null;
     renderControls();
   }
@@ -7508,11 +7420,6 @@ function battleUI(c, sendAction, sendSeen = () => {}, chat = null, bar = null, s
 
 fallBackToRaw(document);
 document.querySelector('footer.credits')?.append(feedbackButton());
-// The first paint waits for the manifests only a moment: a request that stalls between Cloudflare
-// and the tunnel would keep the page on "Cargando…" for as long as it lasts. A late sprite manifest
-// repaints through retrySprites, which joins the request already in flight. Late faces only refresh
-// the header, since a repaint would drop what the player typed, and the next page crops every
-// avatar. A battle keeps waiting: repainting it would reconnect its socket mid-fight.
 const MANIFEST_WAIT_MS = 1000;
 const manifests = Promise.all([loadSprites(), loadFaces().then(renderWho)]);
 (location.pathname.startsWith('/b/') ? manifests : Promise.race([manifests, sleep(MANIFEST_WAIT_MS)])).finally(route);

@@ -95,7 +95,6 @@ export function placeEntry(entry, { user, target, scale, width, height }) {
   return { x: px, y: py, scaleX: (zoomX / 100) * flip, scaleY: zoomY / 100, angle: -angle };
 }
 
-/** How many 96-pixel cells a sheet has per row. */
 export const sheetColumns = (width) => Math.max(1, Math.floor(width / CELL));
 
 export function animLength(config) {
@@ -162,8 +161,6 @@ export function createAnimPlayer(field) {
       img.src = url;
     });
 
-  // A sheet by its key, from the first of its URLs that loads: CSS backgrounds have no error
-  // fallback of their own, so they use the loaded image's src.
   const tintedSheets = new Map();
   function tintedSheet(sheet, hex) {
     const key = `${sheet.src}|${hex}`;

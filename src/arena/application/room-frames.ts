@@ -1,5 +1,3 @@
-// What each client in a room sees: one frame per phase, built for that client (a player sees their
-// own side, a viewer sees both as the public does). The `t` of a frame says why it was sent.
 import type { Logger } from '@nestjs/common';
 import { publicState, validActions, viewEvents, type BattleEvent } from '../../combat/domain/battle.js';
 import { previewView, type PreviewState } from '../../combat/domain/team-preview.js';
@@ -8,12 +6,10 @@ import { DomainError } from '../../shared/domain/errors.js';
 import type { ClientConnection } from './connection.js';
 import { inRoom, type Room } from './presence.js';
 
-/** Why a frame is sent. A battle frame after a turn also carries what happened in it. */
 export type FrameCause =
   | { t: 'lobby' | 'countdown' | 'preview' | 'presence' | 'ready' | 'start' }
   | { t: 'events'; events: BattleEvent[]; timedOut: boolean };
 
-/** The side a trainer plays in this battle or preview, or null for a viewer. */
 export function sideIn(sides: { trainerId: string }[], trainerId: string | null | undefined): number | null {
   if (!trainerId) return null;
   const index = sides.findIndex((side) => side.trainerId === trainerId);
@@ -77,15 +73,10 @@ export function broadcast(room: Room, cause: FrameCause): void {
   for (const ws of room.sockets) if (ws.open) ws.send(frameFor(room, ws, cause));
 }
 
-/** Viewers (not the players) see each side's draft as it is marked. */
 export function broadcastToViewers(room: Room, preview: PreviewState): void {
   for (const ws of room.sockets) if (ws.open && sideIn(preview.sides, ws.trainerId) === null) ws.send(frameFor(room, ws, { t: 'preview' }));
 }
 
-/**
- * A rule said no: the player reads why. Anything else is an engine bug: it goes to the log, and the
- * player still gets an error frame (the client only shows frames with a `t`), never a stuck screen.
- */
 export function refuse(ws: ClientConnection, error: unknown, logger: Pick<Logger, 'error'>): void {
   if (error instanceof DomainError) return ws.send({ t: 'error', error: error.message });
   logger.error(error instanceof Error ? (error.stack ?? error.message) : String(error));

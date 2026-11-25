@@ -16,7 +16,6 @@ test('gender follows the real ratio of each species', () => {
   assert.equal(buildFighter({ id: 'e', finalID: 29, level: 20, ivs: {} } as any).gender, 'female');
 });
 
-// Fixtures carry only the fields the rules read.
 const mon = (id, finalID): any => ({ id, finalID, baseID: finalID, rarity: 'common', level: 50, ivs: { hp: 15, atk: 15, def: 15, spd: 15 }, learned: ['attract', 'growl'], moveset: ['attract', 'growl'], abilityChoice: 'rivalry' });
 
 function attract(user, target) {

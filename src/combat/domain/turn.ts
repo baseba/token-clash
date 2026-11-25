@@ -1,6 +1,3 @@
-// How a turn resolves once both sides have chosen: switches first, then moves by priority and speed, then the end
-// of the turn. A move that switches its user out (U-turn, Baton Pass) pauses the turn until that side picks who
-// comes in, and fainted fighters are replaced before the next turn.
 import { moveAt } from './moves.js';
 import type { BattleEvent, BattleSide, BattleState, Mover, SwitchAction } from './battle-types.js';
 import { useMove } from './use-move.js';
@@ -23,7 +20,6 @@ function finish(battle: BattleState, winner: number | null, reason: 'limit' | 'f
   emit(battle, { t: 'end', winner, ...(reason ? { reason } : {}) });
 }
 
-/** @throws {DomainError} the battle is already over */
 export function forfeit(battle: BattleState, sideIndex: number): BattleEvent[] {
   if (battle.status !== 'active') throw conflict('La pelea ya terminó.');
   const events: BattleEvent[] = [];
@@ -49,7 +45,6 @@ export function resolveTurn(battle: BattleState): BattleEvent[] {
   battle.events = events;
   battle.moved = new Set();
   for (const fighter of activeFighters(battle)) fighter.activeTurns += 1;
-  // Both sides have chosen by now (submit() only resolves then).
   const acts = battle.sides.flatMap((side, sideIndex) => (side.action ? [{ sideIndex, ...side.action }] : []));
   battle.chosen = battle.sides.map((side) => (side.action?.type === 'move' ? moveAt(side.team[side.active], side.action.move) : null));
   for (const side of battle.sides) side.action = null;
@@ -82,7 +77,6 @@ export function resolveTurn(battle: BattleState): BattleEvent[] {
     })
     .sort((x, y) => y.prio - x.prio || y.frac - x.frac || (battle.field.rooms.trickroom ? x.spd - y.spd : y.spd - x.spd) || y.tie - x.tie);
 
-  // When both attack, say why the first one went first (priority move, faster, or a coin flip).
   const why = movers.length === 2 ? (movers[0].prio !== movers[1].prio || movers[0].frac !== movers[1].frac ? 'priority' : movers[0].spd !== movers[1].spd ? 'speed' : 'tie') : null;
   movers.forEach((a, i) => (a.why = i === 0 ? why : null));
 

@@ -1,6 +1,3 @@
-// The Tower's use cases: starting a climb, taking the first Pokémon, fighting each floor (a battle
-// against the AI the arena runs), recruiting after a boss and giving up. The arena tells when a
-// battle ends; the climb reacts, like a tournament does.
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { aiTrainerId, type AiLevel } from '../../combat/domain/ai.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
@@ -50,7 +47,6 @@ export class TowerService implements OnModuleInit {
     return this.runs.all().filter((run) => run.trainerId === trainerId && !run.open);
   }
 
-  /** The best climb of each trainer at each difficulty: the most points, the earliest first. */
   records(): TowerRecord[] {
     const best = new Map<string, TowerRun>();
     for (const run of this.runs.all()) {
@@ -64,7 +60,6 @@ export class TowerService implements OnModuleInit {
       .sort((a, b) => b.points - a.points || a.at - b.at);
   }
 
-  /** @throws {DomainError} the difficulty is not offered, or a climb is already open */
   start(trainer: Trainer, input: { difficulty: string; length: number | null }): TowerRun {
     this.skynet.assertOffered(input.difficulty);
     if (this.current(trainer.id)) throw conflict('Ya tienes una subida en curso: termínala o abandónala primero.');
@@ -73,7 +68,6 @@ export class TowerService implements OnModuleInit {
     return run;
   }
 
-  /** @throws {DomainError} there is no open climb, or the picks are not valid */
   draft(trainer: Trainer, offerIds: string[]): TowerRun {
     const run = this.open(trainer);
     run.draft(offerIds, now());
@@ -81,10 +75,6 @@ export class TowerService implements OnModuleInit {
     return run;
   }
 
-  /**
-   * The battle of the current floor: the one already being played if there is one, or a new one.
-   * @throws {DomainError} there is no open climb or nothing to fight now
-   */
   fight(trainer: Trainer): { run: TowerRun; challengeId: string } {
     const run = this.open(trainer);
     if (run.challengeId && this.arena.challengeStatus(run.challengeId) === 'active') return { run, challengeId: run.challengeId };
@@ -102,42 +92,34 @@ export class TowerService implements OnModuleInit {
     return { run, challengeId: challenge.id };
   }
 
-  /** @throws {DomainError} there is no open climb, or no such reward to take now */
   takeReward(trainer: Trainer, input: { reward: string } & RewardChoice): TowerRun {
     return this.change(trainer, (run, at) => run.takeReward(input.reward, input, { at, roster: trainer.roster }));
   }
 
-  /** @throws {DomainError} there is no open climb, or the rewards were already changed */
   reroll(trainer: Trainer): TowerRun {
     return this.change(trainer, (run, at) => run.reroll(at));
   }
 
-  /** @throws {DomainError} there is no open climb, or that way is not on this floor */
   chooseRoom(trainer: Trainer, input: { room: RoomKind; release: string | null }): TowerRun {
     return this.change(trainer, (run, at) => run.chooseRoom(input.room, { at, roster: trainer.roster, releaseUid: input.release }));
   }
 
-  /** @throws {DomainError} there is no open climb, or nothing to recruit now */
   recruit(trainer: Trainer, input: { offer: string; release: string | null }): TowerRun {
     return this.change(trainer, (run, at) => run.recruit(input.offer, input.release, at));
   }
 
-  /** @throws {DomainError} there is no open climb, or the change is not allowed */
   edit(trainer: Trainer, uid: string, change: { moves?: string[]; ability?: string | null }): TowerRun {
     return this.change(trainer, (run, at) => run.edit(uid, change, at));
   }
 
-  /** @throws {DomainError} there is no open climb, or it would empty the party */
   release(trainer: Trainer, uid: string): TowerRun {
     return this.change(trainer, (run, at) => run.release(uid, at));
   }
 
-  /** @throws {DomainError} there is no open climb, or that Pokémon did not just evolve */
   holdEvolution(trainer: Trainer, uid: string): TowerRun {
     return this.change(trainer, (run, at) => run.holdEvolution(uid, at));
   }
 
-  /** @throws {DomainError} there is no open climb, or it is not resting */
   moveOn(trainer: Trainer): TowerRun {
     return this.change(trainer, (run, at) => run.moveOn(at));
   }
@@ -149,7 +131,6 @@ export class TowerService implements OnModuleInit {
     return run;
   }
 
-  /** @throws {DomainError} there is no open climb */
   abandon(trainer: Trainer): TowerRun {
     const run = this.open(trainer);
     run.abandon(now());

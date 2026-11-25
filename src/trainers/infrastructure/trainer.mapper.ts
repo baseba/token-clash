@@ -1,5 +1,3 @@
-// Translates between the Trainer aggregate and its rows. The domain never sees a row and the
-// tables never see a Trainer: if the schema changes, only this file and the schema change.
 import type { Gender, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { compact } from '../../shared/infrastructure/database/compact.js';
 import { Trainer } from '../domain/trainer.js';

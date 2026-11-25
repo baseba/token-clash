@@ -4,11 +4,9 @@ import { createBattle, submit, validActions } from '../../domain/battle.js';
 import { rng } from '../../../catalog/domain/creatures.js';
 import { jevState, jevOptions, chooseJevAction } from './jev.js';
 
-// Fixtures carry only the fields the rules read.
 const mon = (id, finalID, moves, extra: any = {}): any => ({ id, finalID, baseID: finalID, rarity: 'rare', level: 50, ivs: { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 }, learned: moves, moveset: moves, ...extra });
 const duel = (a, b) => createBattle({ id: 'j', random: rng(1), sides: [{ trainerId: 'u1', name: 'Ana Secreta', entries: a }, { trainerId: 'ai:skynet', name: 'IA Skynet', entries: b }] });
 
-// A fake Jev: answers with whatever `pick` returns for the criteria it was sent.
 function fakeJev(pick, { status = 200 } = {}) {
   const calls = [];
   const fetchImpl = async (url, init) => {
@@ -57,7 +55,6 @@ test('when Jev fails, times out or answers nonsense, Skynet gets no answer and f
     assert.equal(await chooseJevAction(b, 1, { apiKey: 'k', fetchImpl: fakeJev(() => 'move_0', { status: 529 }).fetchImpl }), null);
     assert.equal(await chooseJevAction(b, 1, { apiKey: 'k', fetchImpl: fakeJev(() => 'move_9').fetchImpl }), null);
     assert.equal(await chooseJevAction(b, 1, { apiKey: 'k', fetchImpl: async () => { throw new TypeError('fetch failed'); } }), null);
-    // Holds a timer so the test process stays alive until the (unref'd) abort fires.
     const slow = (url, init): Promise<Response> => new Promise((_, reject) => {
       const hold = setTimeout(() => {}, 5_000);
       init.signal.addEventListener('abort', () => (clearTimeout(hold), reject(init.signal.reason)));

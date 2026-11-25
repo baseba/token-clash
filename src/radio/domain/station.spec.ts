@@ -4,7 +4,6 @@ import { DomainError } from '../../shared/domain/errors.js';
 import { STATION_QUEUE_MAX } from '../../catalog/domain/radio-tracks.js';
 import { Station } from './station.js';
 
-// Songs of round lengths, so every start and end below can be read at a glance.
 const LENGTHS: Record<string, number> = { intro: 60_000, gym: 100_000, champion: 150_000 };
 const durationOf = (track: string) => LENGTHS[track];
 
@@ -66,7 +65,6 @@ test('each song plays once through, then the next one starts when it ended', () 
 test('after a long gap nobody listened to, the station lands on the song it would be playing', () => {
   const station = Station.open('ana', 'Radio', T0);
   station.setQueue(['intro', 'gym', 'champion'], null, T0, durationOf);
-  // intro 0–60 s, gym 60–160 s, champion 160–310 s.
   assert.equal(station.advance(T0 + 200_000, durationOf), true);
   assert.deepEqual(station.nowPlaying, { track: 'champion', startedAt: T0 + 160_000, endsAt: T0 + 310_000 });
   assert.deepEqual(station.queue, []);

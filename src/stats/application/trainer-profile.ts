@@ -1,7 +1,3 @@
-// A trainer's public profile: what anyone can see of another player. Like the /stats page it is a read
-// model over what trainers and arena let anyone read: the record, the ranking place, the Pokémon they
-// bring to battles (those were shown to every rival), the battles against players, and the shop items
-// they are using. The collection itself stays private: only its size.
 import { isHumanDuel, type ChallengeState } from '../../arena/domain/challenge.js';
 import { DEFAULT_BALL, shopItemOf, type ShopKind } from '../../catalog/domain/shop.js';
 import type { Equipped } from '../../trainers/domain/trainer.js';
@@ -37,14 +33,12 @@ function favoritesOf(battles: ChallengeState[], id: string) {
   return [...usage.values()].sort((a, b) => b.uses - a.uses || b.wins - a.wins || a.name.localeCompare(b.name)).slice(0, FAVORITES);
 }
 
-/** Every trainer anyone can look up, by name: what the profile search lists. */
 export function trainerDirectory(trainers: ProfileTrainer[]) {
   return trainers
     .map((trainer) => ({ id: trainer.id, name: trainer.name, avatar: trainer.look ?? null, frame: trainer.equipped?.frame ?? null, wins: trainer.wins, losses: trainer.losses }))
     .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
 }
 
-/** The public profile of trainer `id`, or null when there is no such trainer. */
 export function trainerProfile(source: ProfileSource, id: string) {
   const trainer = source.trainers[id];
   if (!trainer) return null;

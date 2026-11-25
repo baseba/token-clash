@@ -1,7 +1,3 @@
-// Who gives you Pokémon in the Tower, always from your own collection. At the start the professor
-// offers a balanced handful (weaker, middling and stronger lines alike, a single legendary at most);
-// after a boss, the leader you beat offers lines of its type. Every Pokémon starts as the form its
-// level allows, on the way to the form you raised.
 import { hash, NATURE_KEYS, shuffled, speciesData, type Random } from '../../catalog/domain/creatures.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { LAB_OFFERS, PROFESSOR } from '../../catalog/domain/tower-cast.js';
@@ -26,7 +22,6 @@ const RECRUIT_OFFERS = 3;
 
 export const lineOf = (entry: RosterEntry): number => evolutionPath(entry.finalID)[0];
 
-/** One entry per evolution line, of species the catalog knows. */
 export function collectionLines(roster: readonly RosterEntry[], random: Random): RosterEntry[] {
   const byLine = new Map<number, RosterEntry>();
   for (const entry of shuffled(roster, random)) if (speciesData(entry.finalID) && !byLine.has(lineOf(entry))) byLine.set(lineOf(entry), entry);
@@ -37,7 +32,6 @@ const fits = (entry: RosterEntry, types: readonly string[]): boolean =>
   !types.length || evolutionPath(entry.finalID).some((id) => speciesData(id)?.types.some((type) => types.includes(type)));
 
 
-/** Saves from before natures had none: the Tower gives each one a nature of its own, always the same. */
 export const natureOf = (entry: RosterEntry): string => entry.natureChoice ?? entry.nature ?? NATURE_KEYS[hash(`nature:${entry.id}`) % NATURE_KEYS.length];
 
 const offerOf = (guide: OfferGuide, entry: RosterEntry, level: number): Offer => ({
@@ -48,13 +42,11 @@ const offerOf = (guide: OfferGuide, entry: RosterEntry, level: number): Offer =>
   level,
 });
 
-/** The moves it comes with: what its form knows at this level, keeping the ones you chose if it already learned them. */
 export const offerMoves = (offer: Offer): string[] => movesAtLevel(offer.speciesId, offer.level, offer.entry.moveset ?? []);
 
 const isLegendary = (entry: RosterEntry): boolean => baseStatTotal(entry.finalID) >= LEGENDARY_TOTAL;
 const STRENGTH_TIERS = 3;
 
-/** The same number of lines from each third of your collection by strength, one legendary at most. */
 export function labOffers(roster: readonly RosterEntry[], level: number, random: Random): Offer[] {
   const lines = collectionLines(roster, random).sort((a, b) => baseStatTotal(a.finalID) - baseStatTotal(b.finalID));
   const guide: OfferGuide = { key: PROFESSOR.key, title: PROFESSOR.name, line: '' };

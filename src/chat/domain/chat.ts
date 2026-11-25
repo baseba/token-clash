@@ -1,7 +1,3 @@
-// Chat rules: what a message may contain and the bounded history each channel keeps. Which channel
-// a room talks in is the arena's call. Chat is deliberately ephemeral: it lives in memory and a
-// restart clears it.
-
 export const CHAT_MAX_LENGTH = 200;
 export const CHAT_HISTORY = 80;
 export const CHAT_COOLDOWN_MS = 800;
@@ -17,7 +13,6 @@ export interface ChatMessage {
   at: number;
 }
 
-/** Cleans a message (control characters, extra spaces, length), or null if nothing is left. */
 export function chatText(raw: string): string | null {
   const text = raw.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
   return text ? [...text].slice(0, CHAT_MAX_LENGTH).join('') : null;
@@ -27,7 +22,6 @@ export function appendChat<T>(history: T[], message: T, limit = CHAT_HISTORY): T
   return [...history, message].slice(-limit);
 }
 
-/** In-memory history: the last messages of the most recently used channels. */
 export function createChatStore({ channels = CHAT_CHANNELS, history = CHAT_HISTORY } = {}) {
   const store = new Map<string, { messages: ChatMessage[]; seq: number }>();
   return {

@@ -1,10 +1,3 @@
-// One-off migration from the JSON-file era: until v0.2 everything lived in data/db.json. On the
-// first start with SQLite, its trainers, challenges and tournaments are copied into the database in
-// a single transaction, using each context's own mappers (so the rows are exactly what the
-// repositories would write).
-//
-// data/db.json is left untouched: it stays as a backup, and if a deploy rolls back to the previous
-// image, that image still finds its data there.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LoggerService } from '@nestjs/common';
@@ -22,7 +15,6 @@ import { rosterEntries, trainers } from '../trainers/infrastructure/trainer.sche
 export const LEGACY_FILE = 'db.json';
 const META_KEY = 'legacy_json_import';
 
-/** Rooms older than modes or visibility have neither. */
 type LegacyChallenge = Omit<ChallengeState, 'mode' | 'visibility'> & Partial<Pick<ChallengeState, 'mode' | 'visibility'>>;
 
 interface LegacyDb {
@@ -31,7 +23,6 @@ interface LegacyDb {
   tournaments?: Record<string, TournamentState>;
 }
 
-/** Those rooms were team battles, and private (link only). */
 const withDefaults = (challenge: LegacyChallenge): ChallengeState => ({ ...challenge, mode: challenge.mode ?? 'team', visibility: challenge.visibility ?? 'private' });
 
 export interface LegacyImportResult {
@@ -58,7 +49,6 @@ export function importLegacyJson(db: Database, dataDir: string, log?: Pick<Logge
   }
   const [{ trainerCount }] = db.select({ trainerCount: count() }).from(trainers).all();
   if (trainerCount > 0) {
-    // Someone already has data in SQLite: never mix an old JSON into it.
     log?.warn(`Hay ${LEGACY_FILE} pero la base ya tiene datos: no lo importo.`);
     mark({ result: 'skipped-db-not-empty' });
     return { imported: false, reason: 'db-not-empty' };

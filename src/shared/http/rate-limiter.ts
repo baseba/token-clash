@@ -1,6 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 
-/** Fixed-window counters in memory: enough for one small server. */
 @Injectable()
 export class RateLimiter implements OnModuleDestroy {
   private readonly buckets = new Map<string, { hits: number; reset: number }>();
@@ -9,7 +8,6 @@ export class RateLimiter implements OnModuleDestroy {
     for (const [key, bucket] of this.buckets) if (now > bucket.reset) this.buckets.delete(key);
   }, 60_000).unref();
 
-  /** Counts one hit for `key` and says whether it went over `max` in the window. */
   limited(key: string, max: number, windowMs: number): boolean {
     const now = Date.now();
     let bucket = this.buckets.get(key);

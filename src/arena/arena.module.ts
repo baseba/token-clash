@@ -18,12 +18,6 @@ import { DrizzleChallengeRepository, DrizzleTournamentRepository } from './infra
 import { ChallengesController } from './interface/challenges.controller.js';
 import { TournamentsController } from './interface/tournaments.controller.js';
 
-/**
- * Arena context: where battles happen. Duel rooms (lobby, matchmaking, ready check, live match)
- * and tournaments (seats, bracket), which are a series of duel rooms. It uses trainers (teams,
- * names, the ranking) only through TrainersService, the chat through ChatService (it keeps the
- * messages, the arena routes them), and the combat engine as plain functions.
- */
 @Module({
   imports: [TrainersModule, CombatModule, ChatModule],
   controllers: [ChallengesController, TournamentsController],
@@ -42,7 +36,6 @@ import { TournamentsController } from './interface/tournaments.controller.js';
     ArenaQueries,
     ArenaChatService,
   ],
-  // For the realtime gateway (socket messages), the read-only stats and the Tower (its battles).
   exports: [LobbyService, DuelService, TeamPreviewService, LiveBattleService, TournamentsService, ArenaChatService, ArenaQueries, ArenaEvents],
 })
 export class ArenaModule {}

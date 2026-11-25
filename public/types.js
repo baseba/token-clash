@@ -1,7 +1,3 @@
-// The 18 real PokeAPI types, in Spanish, with the real type chart. Shared by the server (battle
-// maths) and the browser (so the UI can show effectiveness before you attack). A creature can have
-// one or two types; a move has exactly one.
-
 export const TYPES = {
   normal: { label: 'Normal', color: '#9099a1' },
   fire: { label: 'Fuego', color: '#e8603c' },
@@ -25,8 +21,6 @@ export const TYPES = {
 
 export const typeLabel = (t) => TYPES[t]?.label ?? t;
 
-// Attacking type -> { defending type: multiplier }. Only the non-1 cases are listed (2 = super
-// effective, 0.5 = resisted, 0 = immune). Gen 6+ chart.
 const CHART = {
   normal: { rock: 0.5, ghost: 0, steel: 0.5 },
   fire: { fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5, steel: 2 },
@@ -48,8 +42,6 @@ const CHART = {
   fairy: { fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5 },
 };
 
-// How much a move of `moveType` does to a creature with `defTypes` (string or array): the product
-// of the chart over each defending type. 0, 0.25, 0.5, 1, 2 or 4.
 export function effectiveness(moveType, defTypes) {
   if (!moveType || !defTypes) return 1;
   const list = Array.isArray(defTypes) ? defTypes : [defTypes];

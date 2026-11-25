@@ -1,5 +1,3 @@
-// A fighter comes in (entry hazards, Healing Wish, its ability), goes out (what it loses, what Baton Pass hands
-// on), is dragged out (Roar, Dragon Tail), or faints (Destiny Bond, Grudge).
 import { effectiveness } from '../../catalog/domain/creatures.js';
 import type { BattleFighter, BattleMove, BattleState } from './battle-types.js';
 import { activeFighters, activeOf, benchSlots, boost, clamp, clearToxicSpikes, clearWeather, cure, emit, freshBoosts, grounded, heal, hurt, lookOf, nameOf, setStatus, sideIndexOf, speedOf } from './effects.js';

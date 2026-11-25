@@ -1,5 +1,3 @@
-// The table owned by the tower context. The trainer and the battle are referenced by id only: they
-// belong to other contexts.
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { FloorResult, TowerMon } from '../domain/tower-run.js';
 import type { Offer } from '../domain/lab.js';
@@ -26,7 +24,6 @@ export const towerRuns = sqliteTable(
     rolls: text({ mode: 'json' }).$type<Rolls>().notNull().default({}),
     log: text({ mode: 'json' }).$type<FloorScore[]>().notNull().default([]),
     detourAt: integer('detour_at'),
-    /** Replaced by detour_at, which also counts hideouts and dens: only read, to be dropped. */
     restedAt: integer('rested_at'),
     twist: text(),
     challengeId: text('challenge_id'),

@@ -1,8 +1,3 @@
-// The tiles of the Tower's maps, generated at install like the sprites: public/tiles/tower.png holds
-// the metatiles of public/tower-tiles.js (ATLAS_KEYS, in order, 16 per row), rendered from Pokémon
-// Emerald's tilesets at the commit pinned in public/upstream.js. A metatile is 16×16: two layers of
-// four 8×8 tiles, each with its palette and flips (pret/pokeemerald, include/fieldmap.h). Only the
-// metatiles the maps use are rendered, so the atlas is a single small file the page caches.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { ATLAS_COLS, ATLAS_KEYS, metatileOf, TILE, TILESETS, tilesetOf } from '../public/tower-tiles.js';
@@ -15,7 +10,6 @@ const PRIMARY_METATILES = 512;
 const PRIMARY_PALETTES = 6;
 const PALETTES = 13;
 
-/** The palette indexes of a 4 or 8 bit indexed PNG, as the tilesets keep them (colours come from the .pal files). */
 export function decodeIndexed(png) {
   const parts = [];
   for (let at = 8; at < png.length; ) {
@@ -60,7 +54,6 @@ async function fetchTileset(path, palettes) {
   return { tiles: decodeIndexed(tiles), metatiles, palettes: Object.fromEntries(palettes.map((i, n) => [i, parsePalette(colors[n].toString('utf8'))])) };
 }
 
-/** Draws metatile `id` of a primary and secondary tileset pair at (ox, oy) of an RGBA image `width` wide. */
 export function drawMetatile(rgba, width, ox, oy, id, primary, secondary) {
   const palettes = { ...primary.palettes, ...(secondary?.palettes ?? {}) };
   const source = id < PRIMARY_METATILES ? primary.metatiles : secondary.metatiles;

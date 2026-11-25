@@ -6,7 +6,6 @@ import { OpenStationDto, StationQueueDto } from './dto/station.dto.js';
 
 const NO_SESSION = 'Primero importa tu equipo para abrir una estación.';
 
-/** Listening is open to anyone. Everything under /station acts on the session's own station: the owner is always the DJ. */
 @Controller('api/radio')
 export class RadioController {
   constructor(private readonly radio: RadioService) {}

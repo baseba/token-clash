@@ -139,7 +139,6 @@ export interface Goal {
   text: string;
   have: number;
   need: number;
-  /** Which Pokémon count, when the text names a group of them. */
   hint?: string;
 }
 
@@ -340,14 +339,12 @@ export const isUnlocked = (record: PlayerRecord, key: string): boolean => {
   return !unlock || unlock.ways.some((way) => done(way.map((rule) => rule(record))));
 };
 
-/** Why this player can't buy the item yet, or null if the shop may sell it: a variant needs its original trainer unlocked first. */
 export function buyBlocker(record: PlayerRecord, itemId: string): string | null {
   const requires = shopItem(itemId)?.requires;
   if (requires && !isUnlocked(record, requires)) return 'Primero desbloquea al entrenador original.';
   return null;
 }
 
-/** Why this player can't wear the look, or null if they can. The look they already wear stays theirs even if it would be locked now. */
 export function lookBlocker(record: PlayerRecord, currentAvatar: string | null | undefined, key: string): string | null {
   if (key === currentAvatar || isUnlocked(record, key)) return null;
   return isShopTrainer(key) ? SHOP_TRAINER_NOT_BOUGHT : 'Todavía no desbloqueas a ese entrenador.';

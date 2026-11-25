@@ -1,6 +1,3 @@
-// What the Tower's bosses say in their own voice: gym leaders, the Elite Four, champions and the
-// villains waiting in a hideout, each with at least two lines of [when it sees you, when it loses,
-// when it beats you]. "{o}" agrees with who says it.
 import type { Line } from './tower-lines.js';
 
 const GIOVANNI: readonly Line[] = [
@@ -487,7 +484,6 @@ export const BOSS_LINES: Readonly<Record<string, readonly Line[]>> = {
     ['Escribo novelas sobre las peleas. Esta será un capítulo.', 'Un capítulo trágico.', 'Un capítulo glorioso.'],
     ['Mis fantasmas me inspiran. ¡Y pelean!', 'Me quedé sin inspiración.', '¡Inspiración total!'],
   ],
-  // The villains who wait in a hideout: admins, squad bosses and team bosses.
   archer: [
     ['El Team Rocket volverá a su gloria. Empezando por ti.', 'Volveremos. Siempre volvemos.', 'La gloria del Team Rocket empieza hoy.'],
     ['Giovanni volverá. Y yo prepararé su regreso.', 'Giovanni no puede saber de esto.', 'Giovanni estará orgulloso.'],

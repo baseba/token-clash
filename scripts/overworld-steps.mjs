@@ -1,30 +1,11 @@
-// The walking frames of an overworld sheet that only stands (most gym leaders and the Elite Four of
-// the GBA games never walk), learned from the official sheets that do walk. In every walking sheet a
-// step is the standing frame one pixel lower, with only the legs and the swinging hands changed (the
-// bottom rows): measured on the official walkers, that alone matches 78 % of the pixels of their real
-// steps, and this generator 84 %, where the old one (body up, legs mirrored) matched 21 %.
-//
-// A step is made like this: the body drops a pixel; the official walkers whose standing legs look most
-// like these vote, pixel by pixel, on how the legs and hands change; each changed pixel takes its colour
-// from this sprite's own standing frame, at the place the walker's pixel moved from; a walker's outline
-// becomes this sprite's darkest colour around that place (black for most, dark blue jeans or a dark red
-// cap for Red, who has no black outline), and above the feet nothing is erased, so the hands never thin out.
-
 const FRAME = 32;
-/** Rows above the feet that a step changes: legs and hands. */
 const STEP_ROWS = 10;
-/** Rows above the feet where a step may also take pixels away (the feet lifting); above them, hands only move, never vanish. */
 const LEG_ROWS = 5;
-/** Rows above the feet compared to find walkers with legs like these. */
 const MATCH_ROWS = 12;
-/** Walkers that vote on each pixel. */
 const VOTERS = 5;
-/** How much taller or shorter a walker may be and still lend its steps. */
 const HEIGHT_GAP = 2;
-/** How far (in pixels) a changed pixel is looked for in the walker's standing frame, to find where it moved from. */
 const MOVE_REACH = 2;
 const LUMA_SPAN = 96;
-/** The sheet's groups are up, down, left and right; the right one is the left one mirrored. */
 const LEFT = 2;
 const RIGHT = 3;
 
@@ -55,10 +36,6 @@ function boundsOf(frame) {
   return { top, bottom, middle: Math.round((left + right) / 2), height: bottom - top + 1 };
 }
 
-/**
- * The colour a sprite outlines itself with: the commonest one on the edge of its silhouette. Black for
- * most, dark red or dark blue for some (Red); a walker's outline becomes this sprite's own, never another colour.
- */
 export function outlineOf(frame) {
   const tally = new Map();
   for (let y = 0; y < FRAME; y++)
@@ -71,7 +48,6 @@ export function outlineOf(frame) {
   return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? -1;
 }
 
-/** The frame one pixel lower: the body of every step. */
 export function dropped(frame) {
   const out = Buffer.alloc(FRAME * FRAME * 4);
   frame.copy(out, FRAME * 4, 0, (FRAME - 1) * FRAME * 4);
@@ -84,7 +60,6 @@ const mirrored = (frame) => {
   return out;
 };
 
-/** How alike two standing frames are near the feet, aligned at the feet and the middle: same shape, similar light. */
 function likeness(frame, bounds, walker) {
   const dx = bounds.middle - walker.bounds.middle;
   const dy = bounds.bottom - walker.bounds.bottom;
@@ -101,10 +76,6 @@ function likeness(frame, bounds, walker) {
   return pixels ? score / pixels : 0;
 }
 
-/**
- * What the generator learns from: each official sheet that walks, by direction (up, down, left), with
- * its standing frame, that frame dropped a pixel and its two steps. Built once for every sheet to make.
- */
 export function walkersOf(sheets) {
   return [0, 1, LEFT].map((group) =>
     sheets.map((sheet) => {
@@ -114,7 +85,6 @@ export function walkersOf(sheets) {
   );
 }
 
-/** The two steps of a standing frame facing one way (0 up, 1 down, 2 left), from the walkers of that direction. */
 export function stepsOf(idle, walkers) {
   const bounds = boundsOf(idle);
   const outline = outlineOf(idle);
@@ -170,11 +140,6 @@ export function stepsOf(idle, walkers) {
   });
 }
 
-/**
- * A standing sheet with its steps filled in, for every direction (the right one mirrors the left, as the
- * GBA sheets do). `memo` keeps the steps of each standing frame already made: sheets that share a frame
- * (the same official sprite under two classes) are made once.
- */
 export function withSteps(sheet, walkers, memo = new Map()) {
   const out = { width: sheet.width, height: sheet.height, rgba: Buffer.from(sheet.rgba) };
   for (const group of [0, 1, LEFT]) {

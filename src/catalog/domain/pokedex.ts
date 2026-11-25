@@ -1,10 +1,7 @@
-// The Pokédex of a trainer: which species of the 1st to 5th generation they have registered. A
-// species counts once its Pokémon (or something that evolves from it) is in the collection.
 import { lineage, family, speciesData } from './creatures.js';
 import { abilityInfo } from './abilities.js';
 import type { RosterEntry } from './roster-entry.js';
 
-/** The game covers generations 1 to 5: the Pokédex and the AI's teams stop at #649 (Genesect). */
 export const DEX_LIMIT = 649;
 
 export const GENERATIONS: [number, number][] = [
@@ -26,7 +23,6 @@ export interface PokedexEntry {
   weight: number | null;
   genderRate: number | null;
   abilities: { name: string; hidden: boolean }[];
-  /** How many of this species the trainer has (not counting evolutions). */
   owned: number;
   shiny: boolean;
   levels: number[];

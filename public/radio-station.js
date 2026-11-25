@@ -1,17 +1,8 @@
-// Radio stations in the browser: the feed that keeps the tuned station playing across pages and
-// reloads, and the "Estaciones" and "Mi estación" tabs of the radio dialog. A station is a trainer's:
-// its owner picks the queue and anyone can listen.
 import { RADIO_REGIONS, radioTrack, STATION_NAME_MAX, STATION_QUEUE_MAX } from './radio.js?v=dev';
 import { glyph } from './glyphs.js?v=dev';
 
 const STATION_KEY = 'tc_station';
 
-/**
- * The station this browser listens to, remembered in `storage`, over one socket of its own (apart
- * from the room and lobby sockets, which come and go with each page). It reconnects with backoff
- * and tunes in again. Every `radio` frame of the tuned station goes to `onFrame`, and `onFrame(null)`
- * when listening stops; a frame with `station: null` means it closed, and the browser forgets it.
- */
 export function createStationFeed({ open, storage = null, onFrame, retryIn = (ms, retry) => setTimeout(retry, ms) }) {
   const read = () => {
     try {
@@ -74,15 +65,12 @@ export function createStationFeed({ open, storage = null, onFrame, retryIn = (ms
 
   connect();
   return {
-    /** The owner id of the station tuned in, or null. */
     get tuned() {
       return tuned;
     },
-    /** The tuned station as its last frame showed it, or null before the first one. */
     get station() {
       return last;
     },
-    /** Tunes in to a station by its owner's id, or out with null. */
     tune(stationId) {
       if (stationId === tuned) return;
       if (!stationId) {
@@ -106,7 +94,6 @@ const trackLine = (id) => {
 };
 const listenersLabel = (count) => (count === 1 ? '1 oyente' : `${count} oyentes`);
 
-/** The "Estaciones" tab: every station on air, the most listened first; one click tunes in. */
 export function stationsPanel({ h, api, toast, feed }) {
   const root = h('div', { class: 'station-panel' });
   let stations = null;
@@ -149,7 +136,6 @@ export function stationsPanel({ h, api, toast, feed }) {
     );
   }
 
-  /** A `radio` frame replaces its station's row. Whichever came last, the list or the frame, wins. */
   function update(view) {
     if (!view || !stations) return;
     stations = stations.map((station) => (station.ownerId === view.ownerId ? view : station));
@@ -158,13 +144,8 @@ export function stationsPanel({ h, api, toast, feed }) {
   return { root, load, paint, update };
 }
 
-/**
- * The "Mi estación" tab: open your station, see what's on air, edit the queue (every edit sends the
- * whole queue), skip and close. Songs are added from the same filtered list as the "Pistas" tab.
- */
 export function myStationPanel({ h, api, toast, feed, session, onChange }) {
   let station;
-  // Built once and kept mounted: a frame arriving while the DJ types a name must not wipe it.
   const message = h('p', { class: 'muted' });
   const nameInput = h('input', { type: 'text', maxlength: STATION_NAME_MAX, required: true, placeholder: 'Radio Kanto', 'aria-label': 'Nombre de la estación' });
   const submit = h('button', { class: 'btn sm primary', type: 'submit' });
@@ -198,14 +179,11 @@ export function myStationPanel({ h, api, toast, feed, session, onChange }) {
       station = (await request()).station;
     } catch (error) {
       toast(error.message);
-      // The tab only follows the station while tuned to it, so it can be stale (a song changed, or
-      // another tab closed the station): show where it is now.
       if (error.status === 409 || error.status === 404) return load();
     }
     paint();
   }
 
-  // `playing` lets the server refuse an edit made on a copy older than the song on air.
   const setQueue = (queue) => act(() => api('/api/radio/station/queue', { method: 'PUT', body: { queue, playing: station.nowPlaying?.startedAt ?? null } }));
   const move = (from, to) => {
     const queue = [...station.queue];
@@ -214,7 +192,6 @@ export function myStationPanel({ h, api, toast, feed, session, onChange }) {
     setQueue(queue);
   };
 
-  /** Adds a song to the end of the queue. */
   function add(trackId) {
     if (station) setQueue([...station.queue, trackId]);
   }
@@ -272,7 +249,6 @@ export function myStationPanel({ h, api, toast, feed, session, onChange }) {
     );
   }
 
-  /** A `radio` frame of the owner's own station keeps the tab current. The caller repaints the dialog. */
   function update(view) {
     if (!view || !station || view.ownerId !== station.ownerId) return;
     station = view;

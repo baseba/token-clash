@@ -1,7 +1,3 @@
-// A Pokémon as the trainer raised it in PokeTokenBar: the only creature data we keep from a save.
-// Everything else (name, stats, types, sprites, moves) is derived from the catalog by species number.
-// It is a value object: battles, rooms and tournaments take copies of it ("snapshots").
-
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'legendary';
 export type Gender = 'male' | 'female';
 
@@ -15,11 +11,8 @@ export interface Ivs {
 }
 
 export interface RosterEntry {
-  /** Instance id from the save (a UUID), stable across re-imports. */
   id: string;
-  /** Species (national dex number) it is now. */
   finalID: number;
-  /** First species of its evolution line. */
   baseID: number;
   rarity: Rarity;
   shiny: boolean;
@@ -29,25 +22,17 @@ export interface RosterEntry {
   abilitySlot?: 1 | 2 | 3 | null;
   gender?: Gender | null;
   nature?: string | null;
-  /** Every move it learned in the save. */
   learned?: string[];
-  /** Up to 4 moves chosen for battle (from the save, the collection screen or the dice). */
   moveset?: string[];
-  /** Ability chosen in the collection screen (or by the dice). */
   abilityChoice?: string;
   natureChoice?: string;
   evs?: Ivs;
   nickname?: string;
-  /** Position in its evolution chain (0 = first form) and the chain's length. */
   stage?: number;
   chainLen?: number;
-  /** The one currently growing in PokeTokenBar. */
   active?: boolean;
-  /** The level it fights at, when a mode sets one (the Tower); otherwise every battle is at level 100. */
   battleLevel?: number;
-  /** The IVs it fights with, when a mode sets them (the Tower); otherwise every battle is with perfect IVs. */
   battleIvs?: Ivs;
-  /** The item it holds in battle, when a mode gives one (the Tower). */
   heldItem?: string;
 }
 
@@ -64,8 +49,6 @@ function firstBy<T>(list: T[], key: (item: T) => string | number): T[] {
   });
 }
 
-/** One per species and variant: a shiny and a plain one of the same species can both stay. */
 export const uniqueVariants = <T extends Pick<RosterEntry, 'finalID' | 'shiny'>>(roster: T[]): T[] => firstBy<T>(roster, variantKey);
 
-/** One per species: a team never repeats a species. */
 export const uniqueSpecies = <T extends Pick<RosterEntry, 'finalID'>>(roster: T[]): T[] => firstBy<T>(roster, (e) => e.finalID);

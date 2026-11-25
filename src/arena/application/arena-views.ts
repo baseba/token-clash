@@ -1,5 +1,3 @@
-// What the clients see of rooms and tournaments (the JSON shapes the frontend reads). Presenters
-// only read: they never change an aggregate.
 import { Injectable } from '@nestjs/common';
 import { buildFighter } from '../../combat/domain/fighter.js';
 import { aiFrame, aiLevelOf } from '../../combat/domain/ai.js';
@@ -13,7 +11,6 @@ import type { Challenge, Staging } from '../domain/challenge.js';
 import { humanCount, reachedRound, roundName, type Tournament } from '../domain/tournament.js';
 import { Presence, type BattlePhase, type CountdownPlayer } from './presence.js';
 
-/** The look of a staged battle; the AI's planned three stay hidden from the players. */
 const stagingView = ({ aiPicks, ...look }: Staging) => look;
 
 @Injectable()
@@ -25,7 +22,6 @@ export class ArenaViews {
     private readonly skynet: SkynetService,
   ) {}
 
-  /** The current name of a trainer (it may have changed since the room was created). */
   nameOf(id: string | null | undefined, fallback?: string): string | undefined {
     return this.trainers.byId(id)?.name ?? fallback;
   }
@@ -55,7 +51,6 @@ export class ArenaViews {
     };
   }
 
-  /** A duel room in the "open rooms" list. */
   room(challenge: Challenge, viewerId: string | null) {
     const host = this.trainers.byId(challenge.hostId);
     return {
@@ -68,7 +63,6 @@ export class ArenaViews {
     };
   }
 
-  /** A battle being played, in the "live battles" list. */
   liveBattle(challenge: Challenge, phase: BattlePhase, tournament: Tournament | undefined) {
     return {
       id: challenge.id,
@@ -79,7 +73,6 @@ export class ArenaViews {
     };
   }
 
-  /** A tournament in the "open rooms" list. */
   tournamentRoom(tournament: Tournament, viewerId: string | null) {
     const host = this.trainers.byId(tournament.hostId);
     return {
@@ -135,7 +128,6 @@ export class ArenaViews {
     };
   }
 
-  /** A 1v1 in `trainerId`'s history. */
   pastChallenge(challenge: Challenge, trainerId: string) {
     const mine = challenge.hostId === trainerId;
     return {
@@ -153,7 +145,6 @@ export class ArenaViews {
     };
   }
 
-  /** A tournament in `trainerId`'s history: how far they got. */
   pastTournament(tournament: Tournament, trainerId: string) {
     const seat = tournament.seatOf(trainerId);
     const reached = tournament.bracket ? reachedRound(tournament.bracket, seat) : -1;

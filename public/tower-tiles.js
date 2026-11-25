@@ -1,25 +1,12 @@
-// The tiles of the Tower's maps and how each floor's map is laid out, with no DOM so the install
-// script and the tests can use it. The tiles are 16×16 metatiles of Pokémon Emerald's tilesets
-// (pret/pokeemerald): scripts/sync-tilesets.js renders the ones listed here into one atlas at install,
-// public/tiles/tower.png, which is not versioned (like the sprites). Each map is our own layout, built
-// the way the games build a route: a tree border, a path or a strip of sand, tall grass, ledges and
-// rocks, and a scene of the battle background that comes next (grass, a lake, a beach, a cave, snow…).
-// You climb the Tower going up: a floor where the way splits is a crossroads you reach from below, with
-// ways to the left, to the right and one to three up; the path of a floor can also open below (you came
-// up into it) or above (you go up from it).
-// A key is a metatile id of the General tileset, or of Cave or Lab (Building) in the high bits.
-
 export const COLS = 16;
 export const ROWS = 7;
 export const TILE = 16;
 export const PATH_ROW = 3;
-/** Where a crossroads meets the way you came up by. */
 export const CROSS_COL = 8;
 
 const CAVE = 0x1000;
 const LAB = 0x2000;
 
-/** The tilesets a key belongs to, as scripts/sync-tilesets.js reads them. */
 export const TILESETS = {
   0: { primary: 'primary/general', secondary: null },
   [CAVE]: { primary: 'primary/general', secondary: 'secondary/cave' },
@@ -28,7 +15,6 @@ export const TILESETS = {
 export const tilesetOf = (key) => key & 0xf000;
 export const metatileOf = (key) => key & 0x0fff;
 
-/** A 3×3 set: corners, edges and middle of a patch, in reading order. */
 const patch = (ids) => ({ tl: ids[0], t: ids[1], tr: ids[2], l: ids[3], c: ids[4], r: ids[5], bl: ids[6], b: ids[7], br: ids[8] });
 
 export const T = {
@@ -75,19 +61,12 @@ export const T = {
   burrow: 0x0a7,
 };
 
-/** Every key a map can use: the atlas holds these, in this order. */
 export const ATLAS_KEYS = [...new Set(Object.values(T).flatMap((value) => (typeof value === 'number' ? [value] : Object.values(value).flat(2))))];
 export const ATLAS_COLS = 16;
 
-/** The columns of the ways that leave a crossroads upwards, by how many there are. */
 const UP_COLS = { 1: [CROSS_COL], 2: [5, 11], 3: [4, CROSS_COL, 12] };
-/** Half the width of a way that leaves the map up or down: three tiles, like the band it meets. */
 const WAY_HALF = 1;
 
-/**
- * Where each way leaves a crossroads, in the order the ways are offered: up the middle first (the
- * plain route), then left and right, then the other ways up. Every exit is on the map's edge.
- */
 export function forkExits(count) {
   const sides = count >= 2 ? [{ side: 'left', col: 0, row: PATH_ROW }, { side: 'right', col: COLS - 1, row: PATH_ROW }] : [];
   const ups = (UP_COLS[count - sides.length] ?? []).map((col) => ({ side: 'up', col, row: 0 }));
@@ -96,15 +75,8 @@ export function forkExits(count) {
 }
 
 const fromSide = (from) => typeof from === 'string';
-/** Whether you come into a map on its left half: up from a column left of the middle, or in by the left edge. */
 export const comesFromLeft = (from) => (fromSide(from) ? from === 'left' : from <= CROSS_COL);
 
-/**
- * How a floor's map is crossed: you come into it where you left the map before, `from` (a column of
- * its bottom edge, or 'left' or 'right' after leaving a crossroads by a side), and go up out of it at
- * `upTo`, where the rival waits; once beaten it steps aside to `aside`, off the way up. With no `from`
- * (the first floor, a reload) the seed picks a column below.
- */
 export function floorWays(seed, from = null) {
   const random = seeded(`${seed}:ways`);
   const low = 3 + Math.floor(random() * 4);
@@ -116,7 +88,6 @@ export function floorWays(seed, from = null) {
   return { from: start, upTo, aside: upTo + (upTo <= CROSS_COL ? 1 : -1) };
 }
 
-/** The openings of a map's path: columns that go down off its bottom edge and up off its top one, and the sides it opens to. */
 export function openingsOf({ forks = 0, from = null, upTo = null }) {
   const exits = forks ? forkExits(forks) : [];
   const up = forks ? exits.filter((exit) => exit.side === 'up').map((exit) => exit.col) : upTo != null ? [upTo] : [];
@@ -124,17 +95,10 @@ export function openingsOf({ forks = 0, from = null, upTo = null }) {
   return { up, down, left: from === 'left' || exits.some((exit) => exit.side === 'left'), right: from === 'right' || exits.some((exit) => exit.side === 'right') };
 }
 
-/** The ways with no battle of a floor, and the villains' hideout, each with a map of its own. */
 export const ZONES = ['rest', 'den', 'deal', 'hideout'];
 const ZONE_LOOKS = { rest: { family: 'path', tints: [] }, den: { family: 'tallGrass', tints: [] }, deal: { family: 'path', tints: ['gloom'] }, hideout: { family: 'cave', tints: ['lair'] } };
 const POOL = { col: 6, width: 4 };
 
-/**
- * How a zone's map is crossed, by its theme. At the stop you go into a Pokémon Center (`door`) and
- * out up the path; at the den you find the burrow in the tall grass and leave down it; at the dark
- * deal a figure waits in front of a black pool (`spot` is where you meet it); the hideout is guarded
- * like a floor, its rival in front of the door in the rock.
- */
 export function zoneWays(zone, seed, from = null) {
   const ways = floorWays(seed, from);
   const left = comesFromLeft(ways.from);
@@ -153,7 +117,6 @@ export function zoneWays(zone, seed, from = null) {
   return ways;
 }
 
-/** The pieces that make a zone what it is, laid over its ground: the Center, the burrow, the pool and its fence, the door's guards. */
 function zoneMarks(zone, ways) {
   const marks = [];
   const put = (row, col, key) => marks.push({ row, col, key });
@@ -184,7 +147,6 @@ function drawZone(zone, scene, seed, from) {
   return grid;
 }
 
-/** What a battle background looks like on the map: its layout and the colours it is repainted with. */
 export function sceneLook(scene) {
   const name = String(scene ?? 'path');
   if (name.startsWith('zone-')) return { ...ZONE_LOOKS[name.slice(5)], zone: name.slice(5) };
@@ -207,11 +169,6 @@ function seeded(text) {
   };
 }
 
-/**
- * The cells you can walk on: a band three tiles tall along the path, from the first way to the last
- * (or to the edge where a way leaves by a side), and a strip three tiles wide from the band to each
- * opening above and below.
- */
 function wayCells({ up, down, left, right }) {
   const cells = new Set();
   const add = (row, col) => { if (row >= 0 && row < ROWS && col >= 0 && col < COLS) cells.add(row * COLS + col); };
@@ -224,12 +181,6 @@ function wayCells({ up, down, left, right }) {
   return cells;
 }
 
-/**
- * The map of a floor as rows of keys. The way runs from where you come in to where you leave: up
- * from below at `from` and out the top at `upTo` on a floor, or at a crossroads from below to `forks`
- * ways (up, left and right). A side with no way out is closed with trees, rocks or water, and the way
- * has the edges of the ground it is laid on.
- */
 export function mapLayout({ scene, seed, forks = 0, from = null, upTo = null }) {
   const { family, zone } = sceneLook(scene);
   if (zone) return drawZone(zone, scene, seed, from);
@@ -238,11 +189,6 @@ export function mapLayout({ scene, seed, forks = 0, from = null, upTo = null }) 
   return drawScene(family, scene, seed, openings);
 }
 
-/**
- * The professor's lab, the ground floor of the Tower: you come in by the mat of its door, below; the
- * professor waits across the table, by the Poké Ball; you go up the stairs in the back wall to the
- * first floor. Bookcases and the healing machine close its sides.
- */
 export const LAB_SPOTS = {
   door: { col: 6, row: ROWS - 1 },
   hero: { col: 6, row: PATH_ROW + 1 },
@@ -265,7 +211,6 @@ function drawLab() {
   return grid;
 }
 
-/** The key of a patch for a cell of a region, by which of its four neighbours are in it. */
 function patchKey(piece, inside, row, col) {
   const v = !inside(row - 1, col) ? 't' : !inside(row + 1, col) ? 'b' : '';
   const h = !inside(row, col - 1) ? 'l' : !inside(row, col + 1) ? 'r' : '';
@@ -294,7 +239,6 @@ function drawScene(family, scene, seed, openings, reserved = new Set()) {
       for (let r = row; r < row + height; r++) for (let c = col; c < col + width; c++) if (rows.includes(r)) take(r, c, key);
     }
   };
-  /** Whole objects of `width` tiles along a row, restarted after each gap so none is cut in half; a lone tile left over gets `single`. */
   const rowOfWhole = (row, width, pieceAt, single) => {
     for (let col = 0; col < COLS; ) {
       if (!free(row, col)) { col++; continue; }
@@ -434,7 +378,6 @@ function rgb(hue, sat, light) {
   return [channel(hue / 360 + 1 / 3), channel(hue / 360), channel(hue / 360 - 1 / 3)];
 }
 
-/** Repaints one colour for a scene, colour by colour, so the pixel art keeps its hard edges. */
 const TINTS = {
   night: (r, g, b) => [r * 0.46 + 22, g * 0.5 + 26, b * 0.68 + 70],
   sunset: (r, g, b) => [r * 1.02 + 18, g * 0.86 + 6, b * 0.7],
@@ -463,7 +406,6 @@ const TINTS = {
   },
 };
 
-/** Repaints RGBA pixels in place with a scene's tints, caching each colour's result. */
 export function tintPixels(data, tints) {
   if (!tints.length) return data;
   const memo = new Map();

@@ -23,7 +23,7 @@ test('reads an export: finished + active, skips released', () => {
   assert.deepEqual([active.stage, active.chainLen], [1, 2]);
   assert.equal(active.level, 92);
   const old = roster.find((e) => e.finalID === 144);
-  assert.equal(old.level, 100); // no profile: finished means full level
+  assert.equal(old.level, 100);
   assert.ok(old.ivs.hp >= 8 && old.ivs.hp <= 23);
 });
 

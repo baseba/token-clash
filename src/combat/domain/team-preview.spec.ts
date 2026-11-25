@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { createPreview, pick, previewView } from './team-preview.js';
 
 const IV = { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 };
-// Fixtures carry only the fields the rules read.
 const mon = (finalID, n): any => ({ id: `m${finalID}-${n}`, finalID, baseID: finalID, rarity: 'rare', level: 50, ivs: IV });
 const party = (n) => [25, 6, 9, 3, 143, 94].slice(0, n).map((id, i) => mon(id, i));
 const preview = () => createPreview({ sides: [{ trainerId: 'a', name: 'Ana', entries: party(6) }, { trainerId: 'b', name: 'Beto', entries: party(6) }] });

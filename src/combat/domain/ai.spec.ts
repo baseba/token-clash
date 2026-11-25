@@ -93,7 +93,6 @@ test('the AI always takes three distinct Pokémon to the battle', () => {
   }
 });
 
-// Fixtures carry only the fields the rules read.
 const mon = (id, finalID, moves, extra: any = {}): any => ({ id, finalID, baseID: finalID, rarity: 'rare', level: 50, ivs: { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 }, learned: moves, moveset: moves, ...extra });
 const duel = (a, b, seed = 1) => createBattle({ id: 'x', random: rng(seed), sides: [{ trainerId: 'ai:a', name: 'A', entries: a }, { trainerId: 'ai:b', name: 'B', entries: b }] });
 const moveKey = (b, s, action) => b.sides[s].team[b.sides[s].active].moves[action.move]?.key;

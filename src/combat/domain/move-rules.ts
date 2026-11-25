@@ -1,6 +1,3 @@
-// Special rules of moves: what the generic engine can't express with the move's data alone (Protect,
-// Substitute, Metronome, Psych Up…). Each rule gets the MoveRuleApi of move-rule-api.ts, so it never
-// touches the battle state directly.
 import type { BoostKey, Boosts } from '../../catalog/domain/creatures.js';
 import { TYPES } from '../../catalog/domain/type-chart.js';
 import type { MoveRuleApi } from './move-rule-api.js';
@@ -8,39 +5,23 @@ import type { BattleFighter, BattleMove, SideCondition, Volatiles } from './batt
 import { stageMult } from './conditions.js';
 import { FULL_FRIENDSHIP_POWER, moveData, type MoveData } from './moves.js';
 
-/** What a calling move (Metronome, Copycat…) asks the engine to use instead. */
 export interface CalledMove {
   key?: string;
   powerMult?: number;
   fail?: string | null;
 }
 
-/**
- * The hooks a move may define. `foe` is the rival on the field, or null when it has fainted. A status
- * move aimed at the foe stops before its rule when there is none, so useOn always gets one.
- */
 export interface MoveRule {
-  /** Why it fails before doing anything (a reason for the browser), or nothing. */
   fail?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): string | null | undefined | false;
-  /** Use another move instead. */
   call?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): CalledMove | null | undefined;
-  /** Runs before the move; 'skip' stops it. */
   before?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): 'skip' | null;
-  /** The whole effect of a status move on its user or the field. Returns whether it did something. */
   use?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove): boolean;
-  /** The whole effect of a status move aimed at the foe (or at its user, bounced back or aimed there by the trainer: then `foe` is the user). */
   useOn?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter, move: BattleMove): boolean;
-  /** After the move, with the damage it dealt. */
   after?(api: MoveRuleApi, me: BattleFighter, foe: BattleFighter | null, move: BattleMove, dealt: number): void;
-  /** Fixed damage of an attack (null: it does nothing). */
   damage?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove): number | null | undefined;
-  /** Base power of an attack. */
   power?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove): number;
-  /** How many times it hits. */
   hits?(api: MoveRuleApi, me: BattleFighter): number;
-  /** Power of each hit, counted from 0. */
   hitPower?(api: MoveRuleApi, me: BattleFighter, hit: number): number;
-  /** After all hits landed, with the total damage. */
   hit?(api: MoveRuleApi, me: BattleFighter, target: BattleFighter, move: BattleMove, total: number): void;
 }
 

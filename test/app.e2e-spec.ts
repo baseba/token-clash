@@ -11,8 +11,6 @@ import { appProcess, FAST_TIMINGS, type AppProcess } from './app-process.js';
 
 const save = readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8');
 
-// Same topology as production: the app has no key and talks to the egress proxy, which adds it
-// and forwards to a stand-in for Jev that always picks the last option it is offered.
 const FAKE_JEV_KEY = 'fake-jev-key';
 const jevCalls: any[] = [];
 const fakeJev = createServer((req, res) => {
@@ -69,7 +67,6 @@ function player(room: string, token: string | null): { ws: WebSocket; frames: an
     frames.push(m);
     if (m.state?.status === 'finished') resolveEnd(m);
     if (m.t === 'lobby' && m.you != null && !m.players[m.you].ready) ws.send(JSON.stringify({ t: 'set-ready', ready: true }));
-    // Team preview: take the first ones; then always pick the first legal action.
     const mine = m.preview && m.you != null ? m.preview.sides[m.you] : null;
     if (mine && !mine.ready) ws.send(JSON.stringify({ t: 'pick', picks: mine.party.slice(0, mine.needed).map((_, i) => i) }));
     if (m.actions?.length) ws.send(JSON.stringify({ t: 'act', action: m.actions[0] }));
@@ -118,7 +115,7 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   await new Promise<any>((r) => host.ws.on('open', r));
   await new Promise<any>((r) => setTimeout(r, 100));
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token })).status, 200);
-  assert.equal(await battles(), '1'); // deploy/deploy.sh waits for this to reach 0
+  assert.equal(await battles(), '1');
   const guest = player(id, b.data.token);
   const preview = await new Promise<any>((r) => guest.ws.on('message', (raw) => { const m = JSON.parse(String(raw)); if (m.preview) r(m.preview); }));
   const countdown = host.frames.find((f) => f.t === 'countdown');
@@ -146,7 +143,7 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   const lb = await call('/api/leaderboard');
   const total = lb.data.trainers.reduce((n, t) => n + t.wins + t.losses, 0);
   assert.equal(total, 2);
-  assert.equal(lb.data.trainers.find((t) => t.name.startsWith('Beto')).name, 'Beto <b>'); // stored as text, escaped by the client
+  assert.equal(lb.data.trainers.find((t) => t.name.startsWith('Beto')).name, 'Beto <b>');
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token })).status, 409);
 
   assert.equal((await fetch(`${base}/stats`)).status, 200);
@@ -337,7 +334,6 @@ test('timeouts auto-play so a battle always ends', async () => {
     ws.on('message', (raw) => { const m = JSON.parse(String(raw)); if (m.t === 'lobby' && !m.players[m.you].ready) ws.send(JSON.stringify({ t: 'set-ready', ready: true })); });
     return ws;
   });
-  // After both press ready nobody plays; the 1.5 s turn timer drives the battle to the end.
   const watcher = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
   watcher.on('open', () => watcher.send(JSON.stringify({ t: 'hello', room: id })));
   const end = await new Promise<any>((r) => watcher.on('message', (raw) => { const m = JSON.parse(String(raw)); if (m.state?.status === 'finished') r(m); }));
@@ -577,7 +573,6 @@ test('requests with the wrong shape get a 400 before reaching the domain', async
   const noFile = await call('/api/import', { method: 'POST', body: { name: 'Dora' } });
   assert.equal(noFile.status, 400);
   assert.equal(noFile.data.error, 'Falta el archivo.');
-  // Without a session the guard answers first: shape is checked only for whoever may call.
   assert.equal((await call('/api/challenges', { method: 'POST', body: { mode: 'chaos' } })).status, 401);
   const unknownAi = await call('/api/challenges', { method: 'POST', token, body: { ai: 'godlike' } });
   assert.equal(unknownAi.status, 400);
@@ -672,7 +667,6 @@ test('everything survives a restart: sessions, collections, results, tournaments
   await call('/api/me', { method: 'PUT', token, body: { nickname: { id: uid, name: 'Chispa' } } });
   await call('/api/radio/station', { method: 'PUT', token, body: { name: 'Radio Memoria' } });
   await call('/api/radio/station/queue', { method: 'PUT', token, body: { queue: ['battle_rocket_boss', 'title', 'town'], playing: null } });
-  // A battle in progress lives in memory only: after a restart it must show up as cut.
   const live = (await call('/api/challenges', { method: 'POST', token, body: { ai: 'easy' } })).data.challenge;
   assert.equal(live.status, 'active');
 

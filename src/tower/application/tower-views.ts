@@ -1,4 +1,3 @@
-// What the client sees of a climb (the JSON shapes the frontend reads). Presenters only read.
 import { buildFighter, type Fighter } from '../../combat/domain/fighter.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { abilityOptions, natureInfo, NATURE_KEYS, speciesData } from '../../catalog/domain/creatures.js';
@@ -41,7 +40,6 @@ const moveInfo = (id: string) => {
   const move = moveData(id);
   return move ? { ...move, key: id } : { key: id, name: id, type: null, power: 0, category: 'status', desc: '' };
 };
-/** The lowest and highest level of a rival's team, as it will fight. */
 const levelRange = (team: readonly RosterEntry[]): { min: number; max: number } => {
   const levels = team.map((mon) => mon.battleLevel ?? mon.level);
   return { min: Math.min(...levels), max: Math.max(...levels) };
@@ -143,7 +141,6 @@ export class TowerViews {
     return { kind: room, ...ROOMS[room], hint, foe: floor.foe, level: floor.level, levels: team.length ? levelRange(team) : null, type: floor.type, types: floor.types, scene: floor.scene, teamSize: floor.teamSize, trained: floor.trained };
   }
 
-  /** Its evolution line up to the form it was raised into, with the level each step comes at. */
   private line(entry: RosterEntry, finalId: number) {
     return evolutionPath(finalId).map((id, index) => ({ id, name: speciesName(id), sprite: buildFighter({ ...entry, finalID: id }).sprite, level: index ? evolutionLevel(id) : null }));
   }
@@ -158,7 +155,6 @@ export class TowerViews {
     return next ? { id: next, name: speciesName(next), sprite: buildFighter({ ...entry, finalID: next }).sprite } : null;
   }
 
-  /** A reward, with the stats each Pokémon it fits would end up with when it changes them. */
   private reward(run: TowerRun, reward: Reward) {
     const statsAfter: Record<string, ReturnType<typeof statsWith>> = {};
     for (const mon of run.party.filter((member) => reward.fits.includes(member.uid))) {

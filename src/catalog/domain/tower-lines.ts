@@ -1,11 +1,5 @@
-// What the Tower's route trainers say: [when it sees you, when it loses, when it beats you]. "{o}"
-// agrees with who says it: "cansado" or "cansada". Every voice has at least two lines and the ones you
-// meet most (the types, the rookies and the seasoned, the villain grunts) three or more, so a climb
-// rarely hears one twice. Only the server reads them: a floor brings its own lines.
-
 export type Line = readonly [hello: string, lose: string, win: string];
 
-/** What a trainer says by the type of its theme. */
 export const TYPE_LINES: Readonly<Record<string, readonly Line[]>> = {
   normal: [
     ['¡Nada de trucos raros! Un buen combate y ya.', 'Bien jugado. Sin trucos y aun así me ganaste.', 'Sin trucos, ¿ves? A veces lo simple basta.'],
@@ -117,7 +111,6 @@ export const TYPE_LINES: Readonly<Record<string, readonly Line[]>> = {
   ],
 };
 
-/** What a rival says on a tough way (it trained for this) or a calm one (it's in no hurry). */
 export const ROOM_LINES: Readonly<Record<'tough' | 'calm', readonly Line[]>> = {
   tough: [
     ['Si viniste por aquí es porque buscas un desafío. Te lo daré.', 'Pocos me ganan en este camino. Te felicito.', 'Buscabas un desafío. Lo encontraste.'],
@@ -133,7 +126,6 @@ export const ROOM_LINES: Readonly<Record<'tough' | 'calm', readonly Line[]>> = {
   ],
 };
 
-/** Two trainers who fight together, when they don't speak in their own voice. */
 export const PAIR_LINES: readonly Line[] = [
   ['¡Somos dos y peleamos como uno! ¿Te la puedes?', 'Ni de a dos pudimos…', 'No te la pudiste. Somos dos, al final.'],
   ['¡Hey, mira! Alguien que quiere pelear con nosotros.', 'Bueno… al menos perdimos juntos.', 'Querías pelear con nosotros. Mala idea.'],
@@ -147,7 +139,6 @@ const PLAYER_LINES: readonly Line[] = [
   ['Mis Pokémon y yo venimos de muy lejos para esto.', 'De lejos venimos, y de lejos nos devolvemos.', 'Valió la pena el viaje.'],
 ];
 
-/** Each class's own voice: half the time a trainer of a class speaks in it, else by its type or its way. */
 export const CLASS_LINES: Readonly<Record<string, readonly Line[]>> = {
   cyclist: [
     ['¡No me bajo de la bici ni para pelear!', 'Se me salió la cadena.', '¡Y ni me bajé de la bici!'],
@@ -489,7 +480,6 @@ export const CLASS_LINES: Readonly<Record<string, readonly Line[]>> = {
   ],
 };
 
-/** Each villain team's grunts, by the start of their key. */
 export const VILLAIN_LINES: Readonly<Record<string, readonly Line[]>> = {
   rocket: [
     ['¡Team Rocket en acción! Entrega tus Pokémon y nadie sale herido.', '¡El Team Rocket despega de nuevo!', 'Te dije que los entregaras. Ahora son míos… bueno, casi.'],

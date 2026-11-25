@@ -4,10 +4,6 @@ import { AppConfig } from '../config/app-config.js';
 import { clientIp } from './client-ip.js';
 import { RateLimiter } from './rate-limiter.js';
 
-/**
- * Applies to every /api request: writes only from our own origin (CSRF), and a global per-IP rate
- * limit. Runs before routing, so it also covers unknown endpoints.
- */
 @Injectable()
 export class ApiProtectionMiddleware implements NestMiddleware {
   constructor(

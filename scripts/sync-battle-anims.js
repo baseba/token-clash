@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// PokeRogue's battle animations, converted for our field at install and build time: one JSON per
-// animation in public/anims/, their sound cues in public/sfx/moves/moves.json, the music loop points
-// and the recolored Poké Balls of public/anims/ui/. The sheets, sounds and music they name are not
-// downloaded: public/upstream/pokerogue.json says where each one lives in pokerogue-assets and the
-// browser loads it from jsDelivr. `--manifest` (npm run anims) rewrites that manifest; run it when
-// the pinned commit, the moves or the music change.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { Buffer } from 'node:buffer';
 import { resolve } from 'node:path';
@@ -41,10 +35,6 @@ const UI_IMAGES = [...BALLS.flatMap((ball) => [`pokeball/${ball}.png`, `pokeball
 
 const pokerogue = (path) => fetchUpstream(UPSTREAM.pokerogue, path);
 
-/**
- * Our key for a sheet or a sound: its PokeRogue name made URL-safe ("PRAS- Fire" is "pras-fire").
- * A name with no letters or digits keeps itself (Copycat's sheet is "!").
- */
 export const assetName = (resourceName) => resourceName.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+(?=\.)|-+$/g, '') || resourceName;
 
 const BALL_PALETTE_SLOTS = {
@@ -163,7 +153,6 @@ export function resourcesOf(anim) {
   };
 }
 
-/** The keys a converted animation names that the manifest can't place. */
 export function missingAssets(anim, manifest) {
   const named = anim.flatMap((side) => [
     ...[side.graphic, ...side.bg.map((event) => event[2])].filter(Boolean).map((key) => ['graphics', key]),
@@ -178,8 +167,6 @@ async function downloadTo(path, file) {
   writeFileSync(file, Buffer.from(await res.arrayBuffer()));
 }
 
-// Where each key lives in pokerogue-assets, checked with a HEAD request. A sound effect of ours is
-// in PokeRogue's effects folder or its menu folder; music tracks keep their subfolders (bw/…).
 async function resolveManifest(anims, failed) {
   const files = { graphics: new Map(), moveSounds: new Map() };
   const place = (section, key, path) => {
@@ -214,9 +201,6 @@ async function resolveManifest(anims, failed) {
 
 const failure = (what, failed) => new Error(`No se pudieron procesar ${failed.length} ${what}: ${failed.slice(0, 10).join(', ')}${failed.length > 10 ? '…' : ''}`);
 
-/**
- * @throws {Promise<Error>} if a resource can't be downloaded or the manifest can't place it
- */
 export async function syncBattleAnims({ writeManifest = false, log = (msg) => process.stderr.write(`${msg}\n`) } = {}) {
   for (const dir of [UI, MUSIC, new URL('./', CUES)]) mkdirSync(dir, { recursive: true });
   const keys = [...Object.keys(JSON.parse(readFileSync(MOVEDEX, 'utf8'))), ...COMMON_ANIMS, ...CHARGE_ANIMS];
