@@ -13,8 +13,8 @@ const tournament = (overrides: Partial<SharedTournament> = {}): SharedTournament
   seats: [{ name: 'Brock', avatar: 'brock' }, { name: 'Bea', avatar: 'bea' }],
   ...overrides,
 });
-const PAGE = `<head>\n  <title>Token Clash</title>\n  <meta name="description" content="Batallas.">\n  <link rel="icon" href="/icon.svg">\n</head>`;
-const IMAGE = { url: 'https://clash.example.com/og/b/abcd.png?v=1', width: 1200, height: 630 };
+const PAGE = `<html lang="es">\n<head>\n  <title>Token Clash</title>\n  <meta name="description" content="Batallas.">\n  <link rel="icon" href="/icon.svg">\n</head>`;
+const IMAGE = { url: 'https://clash.example.com/og/b/abcd.png?v=1', type: 'image/png', width: 1200, height: 630 };
 
 test('an open room says who challenges and how the battle is fought, never which Pokémon the host brings', () => {
   const preview = duelPreview(duel());
@@ -78,7 +78,19 @@ test('a dollar sign in a name is written as is', () => {
 });
 
 test('without a card the page asks for the small summary', () => {
-  const html = withLinkPreview(PAGE, duelPreview(duel({ open: false })), 'https://x.example/b/abcd', { url: 'https://x.example/icon.png', width: 512, height: 512 });
+  const html = withLinkPreview(PAGE, duelPreview(duel({ open: false })), 'https://x.example/b/abcd', { url: 'http://x.example/icon.png', type: 'image/png', width: 512, height: 512 });
   assert.match(html, /<meta name="twitter:card" content="summary">/);
   assert.match(html, /<meta property="og:image:width" content="512">/);
+  assert.ok(!html.includes('og:image:secure_url'), 'an image over plain http has no secure url');
+});
+
+test('Google, X and the old image readers find the same title, description and image in their own tags', () => {
+  const html = withLinkPreview(PAGE, duelPreview(duel()), 'https://clash.example.com/b/abcd', IMAGE);
+  assert.match(html, /<html lang="es" itemscope itemtype="https:\/\/schema\.org\/WebPage">/);
+  for (const tag of ['itemprop="name"', 'name="twitter:title"']) assert.ok(html.includes(`<meta ${tag} content="Blue te desafía a una batalla">`), tag);
+  for (const tag of ['itemprop="image"', 'name="twitter:image"', 'property="og:image:secure_url"']) assert.ok(html.includes(`<meta ${tag} content="${IMAGE.url}">`), tag);
+  assert.ok(html.includes(`<link rel="image_src" href="${IMAGE.url}">`));
+  assert.ok(html.includes('<link rel="canonical" href="https://clash.example.com/b/abcd">'));
+  assert.ok(html.includes('<meta property="og:image:type" content="image/png">'));
+  assert.ok(html.includes('<meta property="og:locale" content="es_CL">'));
 });

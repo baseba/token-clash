@@ -91,6 +91,7 @@ const escapeHtml = (text: string): string => text.replaceAll('&', '&amp;').repla
 
 export interface PreviewImage {
   url: string;
+  type: string;
   width: number;
   height: number;
 }
@@ -98,19 +99,33 @@ export interface PreviewImage {
 export function withLinkPreview(html: string, preview: LinkPreview, pageUrl: string, image: PreviewImage): string {
   const title = escapeHtml(preview.title);
   const description = escapeHtml(preview.description);
+  const page = escapeHtml(pageUrl);
+  const imageUrl = escapeHtml(image.url);
   const tags = [
+    `<link rel="canonical" href="${page}">`,
+    `<link rel="image_src" href="${imageUrl}">`,
+    `<meta itemprop="name" content="${title}">`,
+    `<meta itemprop="description" content="${description}">`,
+    `<meta itemprop="image" content="${imageUrl}">`,
     `<meta property="og:site_name" content="Token Clash">`,
     `<meta property="og:type" content="website">`,
-    `<meta property="og:url" content="${escapeHtml(pageUrl)}">`,
+    `<meta property="og:locale" content="es_CL">`,
+    `<meta property="og:url" content="${page}">`,
     `<meta property="og:title" content="${title}">`,
     `<meta property="og:description" content="${description}">`,
-    `<meta property="og:image" content="${escapeHtml(image.url)}">`,
+    `<meta property="og:image" content="${imageUrl}">`,
+    ...(image.url.startsWith('https://') ? [`<meta property="og:image:secure_url" content="${imageUrl}">`] : []),
+    `<meta property="og:image:type" content="${escapeHtml(image.type)}">`,
     `<meta property="og:image:width" content="${image.width}">`,
     `<meta property="og:image:height" content="${image.height}">`,
     `<meta property="og:image:alt" content="${title}">`,
     `<meta name="twitter:card" content="${preview.card ? 'summary_large_image' : 'summary'}">`,
+    `<meta name="twitter:title" content="${title}">`,
+    `<meta name="twitter:description" content="${description}">`,
+    `<meta name="twitter:image" content="${imageUrl}">`,
   ].map((tag) => `  ${tag}\n`).join('');
   return html
+    .replace(/<html lang="es">/, () => '<html lang="es" itemscope itemtype="https://schema.org/WebPage">')
     .replace(/<title>[^<]*<\/title>/, () => `<title>${title} · Token Clash</title>`)
     .replace(/<meta name="description" content="[^"]*">\n/, () => `<meta name="description" content="${description}">\n${tags}`);
 }
