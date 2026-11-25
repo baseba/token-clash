@@ -364,7 +364,7 @@ export class TowerRun implements TowerRunState {
       boss,
       cap: levelCap(this.floor),
       minTier,
-      ...(floor.room === 'calm' ? { maxTier: 'common' as const } : {}),
+      ...(floor.room === 'calm' && this.twist !== 'breeze' ? { maxTier: 'common' as const } : {}),
       recruitable: !boss,
       ...(this.twist ? TWIST_REWARDS[this.twist] ?? {} : {}),
       ...overrides,

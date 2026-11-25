@@ -422,3 +422,23 @@ test('a held item goes to the one you choose, replaces the one it had, and goes 
   run.takeReward('j', { uid: mon.uid }, { at: 6, roster });
   assert.equal(mon.item, 'life-orb');
 });
+
+test('in a breeze a calm route may reward a rare offer; otherwise it only gives common ones', () => {
+  const tiers = (twist: TowerRun['twist']) => {
+    const seen = new Set<string>();
+    for (let climb = 0; climb < 30; climb++) {
+      const run = TowerRun.start({ id: `calm${climb}`, trainerId: 't1', difficulty: 'mid', length: 25, roster, at: 0, random: rng(climb) });
+      run.draft(run.offers.slice(0, run.starters).map((offer) => offer.id), 1);
+      run.twist = twist;
+      for (let draw = 0; draw < 40 && !run.rooms().includes('calm'); draw++) run.rolls = { ...run.rolls, [run.floor]: `draw${draw}` };
+      if (!run.rooms().includes('calm')) continue;
+      run.chooseRoom('calm', { at: 2, roster });
+      run.enterBattle('c1', 2);
+      run.battleFinished('c1', true, { at: 3, roster });
+      for (const reward of run.rewards) seen.add(reward.tier);
+    }
+    return seen;
+  };
+  assert.deepEqual([...tiers(null)], ['common']);
+  assert.ok(tiers('breeze').has('rare'));
+});

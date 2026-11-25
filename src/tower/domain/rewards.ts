@@ -139,6 +139,10 @@ export const TWIST_REWARDS: Partial<Record<TwistKey, Partial<RestContext>>> = {
   tutors: { favored: MOVE_REWARDS },
   sweet: { favored: LEVEL_REWARDS, candyBonus: 1 },
   caps: { favored: ['bottleCap', 'goldCap', 'weights'] },
+  items: { favored: ['commonItem', 'rareItem', 'epicItem', 'quickClaw'] },
+  meteor: { favored: ['stone', 'linkingCord', 'candyJar'] },
+  breeding: { favored: ['egg', 'goldenEgg', 'eggMove'] },
+  training: { favored: ['vitamin', 'feather', 'idealMint', 'mint', 'machoBrace', 'vitaminBag'] },
 };
 const FAVORED_CHANCE = 0.7;
 

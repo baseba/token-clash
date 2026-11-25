@@ -42,7 +42,11 @@ export const FEMALE_CLASSES: readonly string[] = cast.FEMALE_CLASSES;
 export const PAIR_CLASSES = cast.PAIR_CLASSES as Readonly<Record<string, 'mm' | 'ff' | 'mf' | 'fm'>>;
 export const NAMED_CLASSES: Readonly<Record<string, string>> = cast.NAMED_CLASSES;
 export const RECRUIT_LINE: string = cast.RECRUIT_LINE;
-export type TwistKey = 'night' | 'market' | 'wild' | 'tutors' | 'sweet' | 'migration' | 'caps';
+export type TwistKey = 'night' | 'market' | 'wild' | 'tutors' | 'sweet' | 'migration' | 'caps' | 'breeze' | 'blackMarket' | 'items' | 'meteor' | 'veterans' | 'breeding' | 'training';
 export const TWIST_KEYS = cast.TWIST_KEYS as TwistKey[];
+/** What a rumour says of a way instead of its usual hint, when it changes that way. */
+export const TWIST_HINTS: Readonly<Partial<Record<TwistKey, Partial<Record<RoomKind, string>>>>> = Object.fromEntries(
+  Object.entries(cast.TWISTS as Record<string, { hints?: Partial<Record<RoomKind, string>> }>).map(([key, twist]) => [key, twist.hints ?? {}]),
+);
 export const ROOMS = cast.ROOMS as Readonly<Record<RoomKind, RoomInfo>>;
 export const ROOM_KINDS = Object.keys(cast.ROOMS) as [RoomKind, ...RoomKind[]];

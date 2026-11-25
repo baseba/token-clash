@@ -103,6 +103,14 @@ test('rumours change the rewards: more of the favoured kinds, one more offer, sw
   const party = [target('a', 'Charmander'), target('b', 'Squirtle')];
   const count = (context: RestContext, kinds: string[]) => Array.from({ length: 80 }, (_, seed) => restRewards(party, context, rng(seed)).filter((reward) => kinds.includes(reward.kind)).length).reduce((a, b) => a + b, 0);
   assert.ok(count({ ...plain, ...TWIST_REWARDS.tutors }, ['tm', 'tutor']) > count(plain, ['tm', 'tutor']));
+  const epic: RestContext = { ...plain, minTier: 'epic' };
+  for (const [twist, base, kinds] of [
+    ['items', plain, ['commonItem', 'rareItem', 'epicItem', 'quickClaw']],
+    ['meteor', epic, ['stone', 'linkingCord', 'candyJar']],
+    ['breeding', epic, ['egg', 'goldenEgg', 'eggMove']],
+    ['training', plain, ['vitamin', 'feather', 'idealMint', 'mint', 'machoBrace', 'vitaminBag']],
+  ] as const)
+    assert.ok(count({ ...base, ...TWIST_REWARDS[twist] }, [...kinds]) > count(base, [...kinds]), twist);
   assert.equal(restRewards(party, { ...plain, ...TWIST_REWARDS.market }, rng(1)).length, REWARDS_PER_REST + 1);
   const candy = Array.from({ length: 40 }, (_, seed) => restRewards(party, { ...plain, ...TWIST_REWARDS.sweet }, rng(seed))).flat().find((reward) => reward.kind === 'candy');
   assert.equal(candy?.levels, 3);

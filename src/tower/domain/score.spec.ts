@@ -33,3 +33,9 @@ test('a stronger or higher-level team is worth more, and a climb adds up its flo
   const log = [scoreOf(1, 'mid'), scoreOf(2, 'mid')];
   assert.equal(totalPoints(log), log[0].points + log[1].points);
 });
+
+test('a league of veterans pays more for every floor', () => {
+  const floor = floorAt(3, 25, 'mid', 's', 'trainer');
+  const team = [{ finalID: 6, level: 20 }];
+  assert.ok(floorScore(floor, team, 'mid', 'veterans').points > floorScore(floor, team, 'mid').points);
+});

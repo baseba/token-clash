@@ -2,7 +2,7 @@
 import { buildFighter, type Fighter } from '../../combat/domain/fighter.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { abilityOptions, natureInfo, NATURE_KEYS, speciesData } from '../../catalog/domain/creatures.js';
-import { ROOMS } from '../../catalog/domain/tower-cast.js';
+import { ROOMS, TWIST_HINTS, type TwistKey } from '../../catalog/domain/tower-cast.js';
 import { HELD_ITEMS } from '../../catalog/domain/held-items.js';
 import { abilityInfo } from '../../catalog/domain/abilities.js';
 import { moveData } from '../../combat/domain/moves.js';
@@ -77,7 +77,7 @@ export class TowerViews {
       cap: levelCap(run.floor),
       picks: run.picks,
       rerolls: run.rerolls,
-      rooms: run.roomFloors().map((option) => this.room(option, option.foe ? run.foeTeamAt(option) : [])),
+      rooms: run.roomFloors().map((option) => this.room(option, option.foe ? run.foeTeamAt(option) : [], run.twist)),
       room: run.room,
       challengeId: run.challengeId,
       party: run.party.map((mon, index) => ({
@@ -137,9 +137,10 @@ export class TowerViews {
     });
   }
 
-  private room(floor: Floor, team: readonly RosterEntry[]) {
+  private room(floor: Floor, team: readonly RosterEntry[], twist: TwistKey | null) {
     const room = floor.room ?? 'trainer';
-    return { kind: room, ...ROOMS[room], foe: floor.foe, level: floor.level, levels: team.length ? levelRange(team) : null, type: floor.type, types: floor.types, scene: floor.scene, teamSize: floor.teamSize, trained: floor.trained };
+    const hint = (twist && TWIST_HINTS[twist]?.[room]) ?? ROOMS[room].hint;
+    return { kind: room, ...ROOMS[room], hint, foe: floor.foe, level: floor.level, levels: team.length ? levelRange(team) : null, type: floor.type, types: floor.types, scene: floor.scene, teamSize: floor.teamSize, trained: floor.trained };
   }
 
   /** Its evolution line up to the form it was raised into, with the level each step comes at. */
