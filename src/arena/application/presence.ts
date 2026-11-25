@@ -96,7 +96,7 @@ export class Presence {
   }
 
   roomOf(ws: ClientConnection): Room | undefined {
-    return ws.roomId ? this.rooms.get(ws.roomId) : undefined;
+    return ws.roomId ? this.findRoom(ws.roomId) : undefined;
   }
 
   findRoom(challengeId: string): Room | undefined {
