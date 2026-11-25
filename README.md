@@ -304,6 +304,86 @@ npm run db:generate  # tras cambiar un *.schema.ts: genera la migración SQL en 
 Node 22.13 o más (usa `node:sqlite`, que viene con Node). `.nvmrc` fija la versión, y `npm run dev` y `npm test` avisan
 antes de partir si la de tu terminal es más vieja (`scripts/check-node.mjs`).
 
+### Chequeo de estructura (`npm run deslop`)
+
+`tools/deslop/` es un port de [`deslop-please`](https://github.com/deterministic-machines/deslop-please) a
+TypeScript. Revisa `src/` con seis reglas. Hoy solo reporta y no corre en `npm test`.
+
+| Regla | Reporta |
+| --- | --- |
+| `module-cycle` | Carpetas o archivos hermanos que se usan en círculo. Un tipo en una firma cuenta. |
+| `tangle` | Clases, funciones o constantes que se conocen en círculo, en más de un módulo o más de siete. |
+| `field-leak` | Código de afuera que trabaja sobre un campo de una clase que guarda sus campos. |
+| `shallow-module` | Una carpeta que muestra más de siete funciones, con una lista de más de siete, y no esconde más de las que muestra. |
+| `wide-directory` | Una carpeta con más de 15 archivos y carpetas. |
+| `long-file` | Un archivo con más de 2.000 líneas. |
+
+El código de test no cuenta en ninguna regla. `load.ts` descarta los `*.spec.ts`, `*.test.ts` y `*.e2e-spec.ts` y las
+carpetas `test/`, `tests/` y `__tests__/` antes de armar el modelo, así que tampoco suman en `wide-directory` ni en
+`long-file`. Si una carpeta muestra las mismas funciones que otra de más adentro y tiene el mismo total,
+`shallow-module` reporta solo la de más adentro.
+
+**La regla de `field-leak`.** Un campo es una propiedad de instancia de una clase que no guarda una función, o una
+propiedad de parámetro del constructor. Las propiedades estáticas son constantes. Una clase guarda sus campos cuando
+al menos uno no tiene ningún uso de afuera, ni de lectura, y un método de instancia suyo trabaja con ellos. Solo esas
+clases reportan. Son de adentro la clase misma (también sobre otra instancia y en sus métodos estáticos), lo que está
+en su tangle y las clases de su línea `extends`. Todo otro código es de afuera, aunque esté en el mismo archivo.
+
+Un valor es un escalar (texto, número, booleano, enum, literales, `null`, `undefined` y sus uniones) o un
+`ReadonlyArray`, una tupla `readonly`, un `ReadonlySet` o un `ReadonlyMap` cuyos elementos son valores. Nada más es
+valor: tampoco `T[]`, `Map`, `Set`, un objeto, `Readonly<{…}>`, `Date`, una función, `any` ni `unknown`.
+
+Cada uso de afuera se juzga donde nombra el campo, sin seguir el valor. Vale el primer paso que calza:
+
+| Paso | Condición | Veredicto |
+| --- | --- | --- |
+| S1 | Escribe el campo o una ruta de campos declarados que parte en él: `=`, `+=`, `++`, `delete`, destino de desestructurar o de un `for`. | filtra |
+| S2 | El tipo que recibe es un valor. | lee, salvo un cast directo a un tipo que no es valor, que filtra |
+| S3a | Sigue por campos declarados en el proyecto y termina en un escalar: `x.limit.most`. | lee |
+| S3b | Solo lo prueba o lo compara: `if (x.f)`, `!x.f`, `x.f === y`, `typeof x.f`. | lee |
+| S4 | Cualquier otra cosa: llamarle un método, indexarlo, `.length`, pasarlo, devolverlo, guardarlo, esparcirlo, recorrerlo. | filtra |
+
+Los métodos se juzgan por su cuerpo:
+
+- **Accesor.** El cuerpo solo tiene sintaxis de relevo: `return`, `const` locales, `this.f`, parámetros, literales
+  (también de arreglo y de objeto), casts, llamar a un parámetro y `this.f = parámetro`. Usarlo es usar sus campos. Si
+  devuelve un solo campo, el tipo de retorno decide: `get items(): readonly number[]` presta para leer e
+  `itemsMut(): number[]` presta para escribir. Si escribe un campo o llama a un parámetro, filtra todo campo suyo que
+  no sea valor.
+- **Reenviador.** El cuerpo es una sola llamada con sus mismos parámetros. Usarlo es usar lo que llama.
+- **Trabajo propio.** Cualquier otro método, también el que asigna un valor que la clase decide
+  (`close() { this.status = 'closed'; }`). Quien lo llama no ve los campos que toca.
+
+Una escritura o un trabajo a través de una propiedad de una interfaz que la clase declara con `implements` cuenta
+contra el campo que la implementa. Una lectura por la interfaz no cuenta.
+
+**Diferencias a propósito con el original (lista cerrada):**
+
+- El texto es escalar. En Rust, `String` es dato.
+- Llamar o indexar un valor es leerlo: `x.tags.has('a')` y `const tags = x.tags; tags.has('a')` dan lo mismo, porque
+  `tsc` impide mutar una colección `Readonly*`.
+- Usar entero un campo que no es valor filtra. En TypeScript eso entrega una referencia que se puede escribir.
+- No hay lista de copias: `[...x.f]` y `structuredClone(x.f)` de un campo que no es valor filtran. La salida es un
+  tipo valor o un método de la clase dueña.
+- Un literal de objeto con campos propios es un accesor.
+- La línea de herencia es de adentro.
+- Un cast directo de un valor a un tipo que no es valor filtra.
+- Las interfaces declaradas con `implements` llevan el trabajo al campo.
+
+**Lo que no ve, a propósito (lista cerrada):**
+
+- Un método de trabajo que entrega un campo (`checked() { …; return this.items; }`). Es la regla del original.
+- `any`, un cast del objeto entero, un cast aplicado después del uso y la reflexión (`Object.assign`, `Reflect`,
+  `.call`).
+- El tipado estructural sin `implements`, y el campo que una subclase declara de nuevo cuando se trabaja sobre el de
+  la clase base.
+- Las claves computadas, el estado en closures o en variables de módulo, y los generadores.
+- Una clase cuyos campos se leen todos desde afuera no guarda nada. Hoy pasa con `Trainer`, `Challenge`,
+  `Tournament`, `TowerRun` y `Station`, porque sus mappers leen todo.
+
+Cada caso está fijado en una fila de `tools/deslop/lint/leaks.rows.spec.ts`, y los del original en
+`tools/deslop/lint/check.parity.spec.ts`. Una forma nueva se agrega como fila, no como código que siga valores.
+
 ### Dónde está cada cosa
 
 Por carpeta:
@@ -329,7 +409,7 @@ Por carpeta:
 | `public/` | El frontend: `index.html`, `style.css`, `app.js` (toda la interfaz) y un módulo por tema. |
 | `public/upstream.js`, `public/upstream/` | De qué commit de cada repo externo salen los sprites, gritos, sonidos y música, y los manifiestos que dicen dónde está cada archivo. |
 | `scripts/` | Descargas e importaciones de datos externos (detalle abajo). |
-| `tools/` | Chequeos del código que corre `npm test` (compilados con `tsconfig.tools.json`): `no-comments.ts` falla con cualquier comentario y los borra con `npm run no-comments -- --fix`. |
+| `tools/` | Chequeos del código, compilados con `tsconfig.tools.json`. `no-comments.ts` corre en `npm test`: falla con cualquier comentario y los borra con `npm run no-comments -- --fix`. `deslop/` revisa la estructura de `src/` con `npm run deslop` (ver [Chequeo de estructura](#chequeo-de-estructura-npm-run-deslop)); sus specs corren en `npm test`, el chequeo todavía no. |
 | `assets/` | Archivos que usa solo el servidor: la fuente Nunito (OFL) de la miniatura de los links. |
 | `deploy/` | Imagen, contenedores, redes y el deploy automático (ver [Deploy](#deploy-podman--cloudflare-tunnel)). |
 

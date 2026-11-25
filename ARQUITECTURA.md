@@ -244,12 +244,15 @@ El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection
 | Todo junto | `test/app.e2e-spec.ts` | levanta la app compilada y juega peleas y torneos por HTTP y WebSocket, y la reinicia |
 | Las salas por dentro | `test/rooms.e2e-spec.ts` | los frames que ve cada cliente en cada fase, quién se va y vuelve, y quién escucha cada mensaje del chat |
 | Frontend | `test/web/*.test.js` | JS tal cual, como el navegador (no van en `public/` porque se publicarían) |
+| Estructura de `src/` | `tools/deslop/` | `npm run deslop` reporta ciclos, enredos, campos que se filtran, módulos superficiales, carpetas anchas y archivos largos |
 
 Los unitarios viven con su código, así que al mover o borrar un archivo su test lo acompaña. Los e2e prueban la app
 entera, sin pertenecer a ningún dominio, y por eso van en `test/`. `tsconfig.json` deja los `*.spec.ts` fuera del
 build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de `src/`, compila los tests con
 `tsconfig.test.json` y las herramientas de `tools/` con `tsconfig.tools.json` (estricto), falla si encuentra un
-comentario (`tools/no-comments.ts`) y corre todo.
+comentario (`tools/no-comments.ts`) y corre todo, también los specs de `tools/deslop/`. `npm run deslop` todavía no es
+parte de `npm test`. Hoy reporta la deuda de estructura de `src/` y no falla el build. Sus reglas están en el README,
+en [Chequeo de estructura](README.md#chequeo-de-estructura-npm-run-deslop).
 
 ## 8. Decisiones y deudas conocidas
 
