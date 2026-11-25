@@ -126,7 +126,7 @@ export class TournamentsService implements OnModuleInit {
       return null;
     }
     if (token !== undefined) ws.signIn(this.trainers.authenticate(token));
-    ws.follow(tournament);
+    if (!ws.follow(tournament.id)) return null;
     this.presence.followTournament(tournament.id, ws);
     this.broadcast(tournament);
     return tournament;

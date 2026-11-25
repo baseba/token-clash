@@ -8,18 +8,15 @@ import { LiveBattleService } from '../arena/application/live-battle.service.js';
 import { LobbyService } from '../arena/application/lobby.service.js';
 import { TeamPreviewService } from '../arena/application/team-preview.service.js';
 import { TournamentsService } from '../arena/application/tournaments.service.js';
-import type { Challenge } from '../arena/domain/challenge.js';
-import type { Tournament } from '../arena/domain/tournament.js';
 import type { RadioListener } from '../radio/application/radio-listeners.js';
 import { RadioService } from '../radio/application/radio.service.js';
-import type { Trainer } from '../trainers/domain/trainer.js';
 import type { ClientMessageOf } from './client-messages.js';
 import { ConnectionLimits } from './connection-limits.js';
 
 class WsConnection implements ClientConnection, RadioListener {
-  trainerId: string | null = null;
-  roomId: string | null = null;
-  tourId: string | null = null;
+  #trainerId: string | null = null;
+  #roomId: string | null = null;
+  #tourId: string | null = null;
   private inLobby = false;
   private alive = true;
 
@@ -30,6 +27,18 @@ class WsConnection implements ClientConnection, RadioListener {
     socket.on('pong', () => (this.alive = true));
   }
 
+  get trainerId(): string | null {
+    return this.#trainerId;
+  }
+
+  get roomId(): string | null {
+    return this.#roomId;
+  }
+
+  get tourId(): string | null {
+    return this.#tourId;
+  }
+
   get open(): boolean {
     return this.socket.readyState === 1;
   }
@@ -38,24 +47,28 @@ class WsConnection implements ClientConnection, RadioListener {
     this.socket.send(typeof frame === 'string' ? frame : JSON.stringify(frame));
   }
 
-  signIn(trainer: Trainer | undefined): void {
-    this.trainerId = trainer?.id ?? null;
-  }
-
-  enterRoom(challenge: Challenge): void {
-    this.roomId = challenge.id;
-  }
-
-  follow(tournament: Tournament): void {
-    this.tourId = tournament.id;
+  signIn(trainer: { readonly id: string } | undefined): void {
+    this.#trainerId = trainer?.id ?? null;
   }
 
   get idle(): boolean {
-    return !this.roomId && !this.tourId && !this.inLobby;
+    return !this.#roomId && !this.#tourId && !this.inLobby;
+  }
+
+  enterRoom(roomId: string): boolean {
+    if (!this.idle) return false;
+    this.#roomId = roomId;
+    return true;
+  }
+
+  follow(tourId: string): boolean {
+    if (!this.idle) return false;
+    this.#tourId = tourId;
+    return true;
   }
 
   enterLobby(): boolean {
-    if (this.roomId || this.inLobby) return false;
+    if (this.#roomId || this.inLobby) return false;
     this.inLobby = true;
     return true;
   }

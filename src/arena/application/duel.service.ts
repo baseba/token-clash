@@ -119,7 +119,7 @@ export class DuelService {
       ws.send({ t: 'error', error: 'Ese desafío no existe.' });
       return null;
     }
-    ws.enterRoom(challenge);
+    if (!ws.enterRoom(challenge.id)) return null;
     const room = this.presence.room(challenge);
     room.sockets.add(ws);
     if (ws.trainerId === challenge.hostId && challenge.status === 'open') this.lobby.notify();
