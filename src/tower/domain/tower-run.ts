@@ -20,7 +20,7 @@ import { MAX_LEVEL, PARTY_LIMIT, RECRUIT_LINE, ROOMS, START_LEVEL, STARTERS, TWI
 import type { AiLevel } from '../../combat/domain/ai.js';
 import { MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
-import { fitToParty, floorAt, isBoss, isLastFloor, levelCap, roomsAt, type Floor, type Rolls } from './floors.js';
+import { DETOURS, fitToParty, floorAt, isBoss, isLastFloor, levelCap, roomsAt, type Floor, type Rolls } from './floors.js';
 import { foePicks, foeTeam } from './foe-team.js';
 import { BATTLE_SIZE } from '../../combat/domain/battle.js';
 import { evolutionPath, expForLevel, expYield, formAtLevel, levelForExp, levelMovesUpTo, movesAtLevel } from './growth.js';
@@ -95,8 +95,8 @@ export interface TowerRunState {
   rolls: Rolls;
   /** The points of every floor won. */
   log: FloorScore[];
-  /** The floor of the last rest stop taken: the next two plain floors offer none (null when none yet). */
-  restedAt: number | null;
+  /** The floor of the last detour taken (a hideout or a way with no battle): the next two plain floors offer none. */
+  detourAt: number | null;
   /** The rumour of this climb: what makes it play differently (null in climbs started before rumours). */
   twist: TwistKey | null;
   challengeId: string | null;
@@ -149,7 +149,7 @@ export class TowerRun implements TowerRunState {
   rerolls!: number;
   rolls!: Rolls;
   log!: FloorScore[];
-  restedAt!: number | null;
+  detourAt!: number | null;
   twist!: TwistKey | null;
   challengeId!: string | null;
   lastResult!: FloorResult | null;
@@ -185,7 +185,7 @@ export class TowerRun implements TowerRunState {
       rerolls: 0,
       rolls: {},
       log: [],
-      restedAt: null,
+      detourAt: null,
       twist: TWIST_KEYS[hash(`${seed}:twist`) % TWIST_KEYS.length],
       challengeId: null,
       lastResult: null,
@@ -236,7 +236,7 @@ export class TowerRun implements TowerRunState {
 
   /** The ways the current floor offers; empty on a boss floor or once one is taken. */
   rooms(): RoomKind[] {
-    return this.status === 'climbing' && !this.room ? roomsAt(this.floor, this.length, this.seed, this.rolls, this.twist, this.restedAt) : [];
+    return this.status === 'climbing' && !this.room ? roomsAt(this.floor, this.length, this.seed, this.rolls, this.twist, this.detourAt) : [];
   }
 
   /** The floor each way leads to, to show who waits there before choosing. */
@@ -257,12 +257,12 @@ export class TowerRun implements TowerRunState {
     if (room === 'deal' && (this.party.length <= 1 || !this.party.some((mon) => mon.uid === releaseUid))) throw invalid('El pacto pide a uno de tu equipo, y no puedes quedarte sin Pokémon.');
     this.room = room;
     this.updatedAt = at;
+    if (DETOURS.includes(room)) this.detourAt = this.floor;
     if (ROOMS[room].battle) return;
     if (room === 'deal') this.party.splice(this.party.indexOf(this.member(releaseUid as string)), 1);
     const floor = this.currentFloor();
     const random = rng(`${this.seed}:room:${floor.number}`);
     this.lastResult = { floor: floor.number, room, won: true, growth: [] };
-    if (room === 'rest') this.restedAt = floor.number;
     this.cleared = floor.number;
     this.floor += 1;
     this.room = null;
