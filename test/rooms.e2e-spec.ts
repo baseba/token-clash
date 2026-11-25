@@ -267,6 +267,28 @@ test('a 1v1 goes waiting → ready check → countdown → preview → battle fo
   await Promise.all([hostClient, guestClient, viewer, fan].map((client) => client.close()));
 });
 
+test('the lobby lists a battle live once a player opens it to watchers, and drops it when it ends', async () => {
+  const { host, guest, id } = await acceptedRoom('Abre', 'Asoma');
+  const readyAndPick = (frame: any, client: Client) => {
+    if (frame.t === 'lobby' && frame.you != null && !frame.players[frame.you].ready) client.send({ t: 'set-ready', ready: true });
+    const mine = frame.preview && frame.you != null ? frame.preview.sides[frame.you] : null;
+    if (mine && !mine.ready) client.send({ t: 'pick', picks: mine.party.slice(0, mine.needed).map((_, i) => i) });
+  };
+  const lobby = new Client({ t: 'lobby', token: null });
+  const listed = (frame: any) => frame.live.find((battle: any) => battle.id === id);
+  assert.equal(listed(await lobby.next((f) => f.t === 'rooms')), undefined);
+  const hostClient = await Client.room(id, host.token, readyAndPick);
+  const guestClient = await Client.room(id, guest.token, readyAndPick);
+  await hostClient.next((f) => f.t === 'start');
+  hostClient.send({ t: 'watch' });
+  const live = listed(await lobby.next((f) => f.t === 'rooms' && listed(f)));
+  assert.deepEqual([live.mode, live.tournament, live.sides.map((side: any) => side.name)], ['team', null, ['Abre', 'Asoma']]);
+  guestClient.send({ t: 'surrender' });
+  await hostClient.next((f) => f.state?.status === 'finished');
+  await lobby.next((f) => f.t === 'rooms' && !listed(f));
+  await Promise.all([hostClient, guestClient, lobby].map((client) => client.close()));
+});
+
 test('room chat: players and viewers talk in the room, floods and anonymous viewers are dropped', async () => {
   const { host, guest, id } = await acceptedRoom('Charla', 'Respuesta');
   const fan = await trainer('Mirona');
