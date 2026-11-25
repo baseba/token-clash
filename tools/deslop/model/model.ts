@@ -27,6 +27,7 @@ export interface Reference {
   holder: ItemId | undefined;
   item: ItemId;
   copies: boolean;
+  writes: boolean;
 }
 
 export interface Forwarder {
@@ -37,6 +38,7 @@ export interface Forwarder {
 
 export interface Accessor {
   kind: 'accessor';
+  leaked: ItemId[];
   lent: ItemId[];
   copied: ItemId[];
 }

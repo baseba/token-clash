@@ -7,7 +7,7 @@ import type { ItemId } from '../model/model.js';
 import { keys, workspace } from '../testing/workspace.js';
 import { knownOutside } from './leaks.js';
 
-type Standing = 'leaks' | 'reads' | 'kept' | 'unguarded';
+type Standing = 'leaks' | 'reads' | 'kept' | 'unguarded' | 'unseen';
 
 type Row = [field: string, standing: Standing, outside: string, decidedBy: string];
 
@@ -23,6 +23,8 @@ const ROWS: Row[] = [
   ['ValueRead::tags', 'reads', "vault.tags.has('a'), vault.tags.size", 'S2, D2'],
   ['ValueRead::byId', 'reads', "vault.byId.get('k')?.length", 'S2, D2'],
   ['ValueCast::castIds', 'leaks', '(vault.castIds as number[]).push(1)', 'S2 cast, D8'],
+  ['ValueCast::chainCast', 'leaks', '(vault.chainCast as readonly number[] as number[]).push(1)', 'S2 cast, D8, by the outermost cast'],
+  ['ValueCast::checkedCast', 'leaks', '((vault.checkedCast satisfies readonly number[]) as number[]).push(1)', 'S2 cast, D8, past satisfies'],
   ['MutableList::counted', 'leaks', 'vault.counted.length', 'S4'],
   ['MutableList::passed', 'leaks', 'send(vault.passed)', 'S4, D3'],
   ['MutableList::aliased', 'leaks', 'const aliased = vault.aliased', 'S4, at the alias'],
@@ -39,15 +41,22 @@ const ROWS: Row[] = [
   ['ObjectField::defaulted', 'leaks', 'vault.defaulted ?? other', 'S4'],
   ['ObjectField::chosen', 'leaks', 'vault.chosen || other', 'S4'],
   ['ObjectField::typed', 'reads', 'typeof vault.typed, vault.typed instanceof Object', 'S3b'],
-  ['ObjectField::nested', 'leaks', 'const { nested: { most } } = vault', 'S4, taken whole'],
+  ['ObjectField::picked', 'reads', 'switch (other) { case vault.picked: }', 'S3b'],
+  ['ObjectField::nested', 'reads', 'const { nested: { most } } = vault', 'S3a, the path vault.nested.most written as a pattern'],
   ['Bracket::hidden', 'leaks', "vault['hidden'].push(1)", 'S4, a private field named by a string'],
-  ['Getters::viewed', 'reads', 'get view(): readonly number[]; vault.view.length, vault.view.map()', 'accessor, S2, D2'],
+  ['Getters::viewed', 'reads', 'get view(): readonly number[]; vault.view.length, vault.view.map(), const { view } = vault', 'accessor, S2, D2'],
+  ['Getters::widened', 'leaks', 'get wide(): number[] over a readonly number[]; const { wide } = vault', 'accessor, S4, by the type the getter gives'],
+  ['Getters::stamp', 'leaks', 'touch(stamp) { this.stamp = stamp; return this.stamped; }; vault.touch(3).most', 'accessor writes'],
+  ['Getters::stamped', 'reads', 'touch(stamp): Limit, beside the field it writes; vault.touch(3).most', 'accessor, S3a, each field by its own row'],
   ['Getters::lentOut', 'leaks', 'get all(): number[]; vault.all.length', 'accessor, S4'],
   ['Getters::level', 'leaks', 'set depth(level), setLevel(level); vault.depth = 2, vault.setLevel(3)', 'accessor writes'],
   ['Getters::cap', 'reads', 'getCap(): Limit; vault.getCap().most', 'accessor, S3a'],
   ['Getters::pathWritten', 'leaks', 'getPathWritten(): Limit; vault.getPathWritten().most = 4', 'accessor, S1'],
   ['Getters::referenced', 'leaks', 'getReferenced(): number[]; send(vault.getReferenced)', 'accessor, not called'],
   ['Getters::relayed', 'leaks', 'getRelayed() { const relayed = this.relayed; return relayed; }; send(vault.getRelayed())', 'accessor by a const, S4'],
+  ['Setters::fromPattern', 'leaks', 'set byPattern(value); ({ most: vault.byPattern } = other)', 'accessor writes, S1'],
+  ['Setters::fromList', 'leaks', 'set byList(value); [vault.byList] = [1]', 'accessor writes, S1'],
+  ['Setters::fromLoop', 'leaks', 'set byLoop(value); for (vault.byLoop of [1])', 'accessor writes, S1'],
   ['Literals::inTuple', 'leaks', 'parts(): [number[], number]; const [list] = vault.parts()', 'accessor, literal'],
   ['Literals::inObject', 'leaks', 'snapshot() { return { list: this.inObject }; }; vault.snapshot()', 'accessor, literal'],
   ['Literals::inState', 'leaks', 'toState(): VaultState; vault.toState()', 'accessor, literal, D5'],
@@ -56,7 +65,7 @@ const ROWS: Row[] = [
   ['Working::guardedReturn', 'kept', 'checked() { if (…) …; return this.guardedReturn; }; vault.checked().push(1)', 'L1'],
   ['Working::partReturned', 'kept', 'first() { return this.partReturned[0]; }; vault.first()', 'L1'],
   ['Working::total', 'kept', 'replace(total) { this.total = total + 1; }; vault.replace(2)', 'L1'],
-  ['Decides::state', 'kept', "close() { this.state = 'closed'; }; decides.close()", 'L1, a value the class decides'],
+  ['Decides::state', 'kept', "close() { this.state = 'closed'; }; decides.close()", 'L1, the method decides what it writes: work of the class, as in Rust'],
   ['Structural::held', 'leaks', 'holder.held.push(1), holder: Holder, class implements Holder', 'interface, work'],
   ['Structural::shaped', 'kept', 'drain(vault), drain(holder: { shaped: number[] })', 'L3'],
   ['Structural::anyTyped', 'kept', '(vault as any).anyTyped.push(1)', 'L2'],
@@ -80,9 +89,17 @@ const ROWS: Row[] = [
   ['Ported::viewList', 'leaks', 'get view(): number[]; port.view.push(1)', 'interface, accessor'],
   ['Unported::room', 'kept', "port.room = 'a', class does not implement Port", 'L3'],
   ['Unported::queue', 'kept', 'port.queue.push(1), class does not implement Port', 'L3'],
+  ['Desked::labelText', 'kept', "get label() relays, set label(label) works; desk.label = 'a', desk: Desk", 'interface, a write goes to the setter, L1'],
+  ['Desked::paperList', 'kept', 'get papers() works, set papers(papers) relays; desk.papers.push(1)', 'interface, work goes to the getter, L1'],
+  ['Desked::stampValue', 'leaks', 'get stamp() works, set stamp(stamp) relays; desk.stamp = 2', 'interface, a write goes to the setter'],
+  ['Rack::slotList', 'kept', 'tray.slots.push(1) in one subclass, get slots() in another, tray: Tray', 'interface, insider of the class of the field'],
+  ['Boxed::open', 'unseen', 'boxed.open.push(1), class inside a namespace', 'limit, not modelled'],
+  ['Lidded::open', 'unseen', 'lidded.open.push(1), class written as an expression', 'limit, not modelled'],
 ];
 
-const INTERFACES = new Set(['Limit', 'Holder', 'VaultState', 'Port', 'WidePort']);
+const INTERFACES = new Set(['Limit', 'Holder', 'VaultState', 'Port', 'WidePort', 'Desk', 'Tray']);
+
+const DECLARED_IN_PORT = new Set(['Ported', 'Desked']);
 
 const KEPT_BY_EVERY_CLASS = 'secret';
 
@@ -104,17 +121,18 @@ function standings(): Map<string, Standing> {
   return found;
 }
 
-test('each field of the cases only TypeScript has stands as its row says, and no field is left without a row', () => {
+test('each field of the cases only TypeScript has stands as its row says, none is left without a row, and a class the model does not see has none', () => {
   const found = standings();
   assert.deepEqual(
-    ROWS.map(([field, , outside, decidedBy]) => [field, found.get(field), outside, decidedBy]),
+    ROWS.map(([field, , outside, decidedBy]) => [field, found.get(field) ?? 'unseen', outside, decidedBy]),
     ROWS,
   );
-  assert.deepEqual([...found.keys()].sort(), ROWS.map(([field]) => field).sort());
+  const seen = ROWS.filter(([, standing]) => standing !== 'unseen');
+  assert.deepEqual([...found.keys()].sort(), seen.map(([field]) => field).sort());
 });
 
 test('the cases only TypeScript has report the fields that leak from a class that guards, and nothing else', () => {
   const leaking = ROWS.filter(([, standing]) => standing === 'leaks').map(([field]) => field);
-  const modules = new Map(leaking.map((field) => [field, field.startsWith('Ported::') ? 'port' : 'vault']));
+  const modules = new Map(leaking.map((field) => [field, DECLARED_IN_PORT.has(field.split('::')[0]) ? 'port' : 'vault']));
   assert.deepEqual(keys(workspace('field-leak-ts')), leaking.map((field) => `field-leak src::${modules.get(field)}::${field}`).sort());
 });

@@ -56,7 +56,7 @@ test('a field an outsider uses leaks from a struct that guards its others', () =
 test('a getter is seen through and free code in the same file is an outsider', () => {
   const { sample, admit, head } = queue();
   const made = getter(sample, head);
-  sample.model.wrappers.set(made, { kind: 'accessor', lent: [head], copied: [] });
+  sample.model.wrappers.set(made, { kind: 'accessor', leaked: [], lent: [head], copied: [] });
   const drained = sample.item(sample.model.items[head].owner, 'drained', 'function');
   sample.refer(drained, made);
   sample.refer(admit, made);
@@ -66,14 +66,14 @@ test('a getter is seen through and free code in the same file is an outsider', (
     'src/queue.ts:6:1: `p::queue::drained`, through `RunQueue::head`',
     'src/sched.ts:7:1: `p::sched::admit`, through `RunQueue::head`',
   ]);
-  sample.model.wrappers.set(made, { kind: 'accessor', lent: [], copied: [head] });
+  sample.model.wrappers.set(made, { kind: 'accessor', leaked: [], lent: [], copied: [head] });
   assert.deepEqual(keys(sample), ['p::queue::RunQueue::items']);
 });
 
 test('a borrow a getter lends is no leak where its caller only reads it', () => {
   const { sample, admit, head } = queue();
   const made = getter(sample, head);
-  sample.model.wrappers.set(made, { kind: 'accessor', lent: [head], copied: [] });
+  sample.model.wrappers.set(made, { kind: 'accessor', leaked: [], lent: [head], copied: [] });
   sample.read(admit, made);
   assert.deepEqual(keys(sample), ['p::queue::RunQueue::items']);
   sample.refer(admit, made);

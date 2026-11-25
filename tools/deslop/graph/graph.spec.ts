@@ -32,7 +32,7 @@ test('a use of a wrapper is a use of what is behind it and its own body is no us
   const field = sample.member(queue, first, 'Queue::inner', 'field');
   const getter = sample.member(inner, first, 'Inner::items', 'function');
   const forwarder = sample.member(queue, first, 'Queue::items', 'function');
-  sample.model.wrappers.set(getter, { kind: 'accessor', lent: [items], copied: [] });
+  sample.model.wrappers.set(getter, { kind: 'accessor', leaked: [], lent: [items], copied: [] });
   sample.model.wrappers.set(forwarder, { kind: 'forwarder', target: getter, fields: [field] });
   sample.refer(getter, items);
   sample.refer(forwarder, field);

@@ -146,6 +146,8 @@ export function sealed(): unknown {
 
 const QUEUE = `export class Queue {
   private start = 0;
+  private others: number[] = [];
+  private label = 'queue';
 
   get head(): number {
     return this.start;
@@ -153,6 +155,22 @@ const QUEUE = `export class Queue {
 
   set head(head: number) {
     this.start = head;
+  }
+
+  get rest(): number[] {
+    return this.others;
+  }
+
+  set rest(rest: number[]) {
+    this.others = rest;
+  }
+
+  get name(): string {
+    return this.label;
+  }
+
+  set name(name: string) {
+    this.label = name;
   }
 }
 `;
@@ -174,6 +192,31 @@ export function write(queue: Queue): void {
 
 export function bump(queue: Queue): void {
   queue.head += 1;
+}
+
+export function step(queue: Queue): void {
+  queue.head++;
+}
+
+export function listed(queue: Queue): void {
+  [queue.head] = [1];
+}
+
+export function spread(queue: Queue): void {
+  [...queue.rest] = [1];
+}
+
+export function keyed(queue: Queue): void {
+  ({ most: queue.head } = { most: 1 });
+}
+
+export function defaulted(queue: Queue): void {
+  ({ most: queue.head = 2 } = {} as { most?: number });
+}
+
+export function looped(queue: Queue): void {
+  for (queue.head of [1]) break;
+  for (queue.name in {}) break;
 }
 `;
 
@@ -298,6 +341,16 @@ test('a read names the getter, a write the setter, and a write that reads first 
   assert.deepEqual(heldBy(model, 'taken'), ['Queue', 'Queue::head']);
   assert.deepEqual(heldBy(model, 'write'), ['Queue', 'Queue::set head']);
   assert.deepEqual(heldBy(model, 'bump'), ['Queue', 'Queue::head', 'Queue::set head']);
+  assert.deepEqual(heldBy(model, 'step'), ['Queue', 'Queue::head', 'Queue::set head']);
+});
+
+test('a target of a destructuring or of a for names the setter, as an assignment does', () => {
+  const model = modelOf({ 'src/queue.ts': QUEUE, 'src/user.ts': QUEUE_USER });
+  assert.deepEqual(heldBy(model, 'listed'), ['Queue', 'Queue::set head']);
+  assert.deepEqual(heldBy(model, 'spread'), ['Queue', 'Queue::set rest']);
+  assert.deepEqual(heldBy(model, 'keyed'), ['Queue', 'Queue::set head']);
+  assert.deepEqual(heldBy(model, 'defaulted'), ['Queue', 'Queue::set head']);
+  assert.deepEqual(heldBy(model, 'looped'), ['Queue', 'Queue::set head', 'Queue::set name']);
 });
 
 test('a name exported as the default is a use, and a value worked out to be the default names what it is made of', () => {

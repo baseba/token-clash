@@ -49,7 +49,7 @@ test('S1: a write to the field, or to a path of declared fields that starts at i
   ]);
 });
 
-test('S2: whatever else is done with a value reads it, but a cast of it to what is no value leaks', () => {
+test('S2: whatever else is done with a value reads it, but a cast of it to what is no value leaks, judged by the outermost cast', () => {
   judge([
     ['hold(queue.head, queue.head + 1, String(queue.head));', 'reads'],
     ['hold(queue.name.length, queue.name.toUpperCase());', 'reads'],
@@ -64,10 +64,14 @@ test('S2: whatever else is done with a value reads it, but a cast of it to what 
     ['hold(queue.marks as number[]);', 'leaks'],
     ['hold(<number[]>queue.marks);', 'leaks'],
     ['hold(queue.head as unknown);', 'leaks'],
+    ['hold(queue.marks as readonly number[] as number[]);', 'leaks'],
+    ['hold((queue.marks satisfies readonly number[]) as number[]);', 'leaks'],
+    ['hold((queue.marks as readonly number[])! as number[]);', 'leaks'],
+    ['hold(queue.marks as number[] as readonly number[]);', 'reads'],
   ]);
 });
 
-test('S3a: a path of declared fields that ends in a scalar reads, and one that ends in anything else leaks', () => {
+test('S3a: a path of declared fields that ends in a scalar reads, written with dots or as a pattern, and one that ends in anything else leaks', () => {
   judge([
     ['hold(queue.limit.most);', 'reads'],
     ['hold(queue.limit.deep.count);', 'reads'],
@@ -75,6 +79,12 @@ test('S3a: a path of declared fields that ends in a scalar reads, and one that e
     ['hold(queue.limit!.most, (queue.limit).most);', 'reads'],
     ['hold(queue.shape.rows);', 'reads'],
     ['hold(queue.limit.most.toFixed(1));', 'reads'],
+    ['const {\n    limit: { most },\n  } = queue;\n  hold(most);', 'reads'],
+    ['const {\n    limit: {\n      most,\n      deep: { count: deepCount },\n    },\n  } = queue;\n  hold(most, deepCount);', 'reads'],
+    ['const {\n    limit: { deep },\n  } = queue;\n  hold(deep);', 'leaks'],
+    ['const {\n    limit: { most, ...rest },\n  } = queue;\n  hold(most, rest);', 'leaks'],
+    ['const {\n    items: { length },\n  } = queue;\n  hold(length);', 'leaks'],
+    ['const {\n    items: [first],\n  } = queue;\n  hold(first);', 'leaks'],
     ['hold(queue.limit.deep);', 'leaks'],
     ['hold(queue.limit.deep.list);', 'leaks'],
     ['hold(queue.limit.deep.list.length);', 'leaks'],
@@ -82,7 +92,7 @@ test('S3a: a path of declared fields that ends in a scalar reads, and one that e
   ]);
 });
 
-test('S3b: a field that is only tested or compared is read, whatever it holds', () => {
+test('S3b: a field that is only tested or compared, a case label too, is read, whatever it holds', () => {
   judge([
     ['if (queue.spare) hold();', 'reads'],
     ['while (queue.spare) break;', 'reads'],
@@ -90,6 +100,7 @@ test('S3b: a field that is only tested or compared is read, whatever it holds', 
     ['for (; queue.spare; ) break;', 'reads'],
     ['hold(queue.spare ? 1 : 2);', 'reads'],
     ['switch (queue.spare) {\n    default:\n      hold();\n  }', 'reads'],
+    ['switch (other.spare) {\n    case queue.spare:\n      hold();\n  }', 'reads'],
     ['hold(!queue.spare, typeof queue.spare);', 'reads'],
     ['hold(queue.spare === other.spare, queue.spare !== null, queue.items == null, queue.items != null);', 'reads'],
     ['hold(queue.spare instanceof Object);', 'reads'],
@@ -110,7 +121,6 @@ test('S4: anything else done with what is no value leaks, at the place that name
     ['const items = queue.items;\n  hold(ok);', 'leaks'],
     ['const { items } = queue;\n  hold(items);', 'leaks'],
     ['let items: number[] = [];\n  ({ items } = queue);\n  hold(items);', 'leaks'],
-    ['const {\n    limit: { most },\n  } = queue;\n  hold(most);', 'leaks'],
     ['hold([...queue.items], queue.items.slice(), structuredClone(queue.limit));', 'leaks'],
     ['for (const item of queue.items) hold(item);', 'leaks'],
     ['hold(queue.spare ?? ok);', 'leaks'],

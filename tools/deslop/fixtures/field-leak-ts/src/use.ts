@@ -1,6 +1,6 @@
-import type { Port, WidePort } from './port.js';
-import type { Bracket, Decides, Getters, Holder, Insiders, Ledger, Limit, Literals, MutableList, NoWork, ObjectField } from './vault.js';
-import type { Heir, Knot, Outer, ScalarRead, ScalarWrite, Structural, ValueCast, ValueRead, Versioned, Working } from './vault.js';
+import type { Desk, Port, WidePort } from './port.js';
+import type { Bracket, Crate, Decides, Getters, Holder, Insiders, Ledger, Lidded, Limit, Literals, MutableList, NoWork, ObjectField } from './vault.js';
+import type { Heir, Knot, Outer, ScalarRead, ScalarWrite, Setters, Structural, ValueCast, ValueRead, Versioned, Working } from './vault.js';
 
 declare function send(...values: unknown[]): void;
 
@@ -22,6 +22,7 @@ export function valueRead(vault: ValueRead): void {
   const ids = vault.ids;
   send(
     ids,
+    vault.ids,
     vault.ids.length,
     vault.ids.map((id) => id + 1),
     vault.ids[0],
@@ -33,6 +34,8 @@ export function valueRead(vault: ValueRead): void {
 
 export function valueCast(vault: ValueCast): void {
   (vault.castIds as number[]).push(1);
+  (vault.chainCast as readonly number[] as number[]).push(1);
+  ((vault.checkedCast satisfies readonly number[]) as number[]).push(1);
 }
 
 export function mutableList(vault: MutableList): void {
@@ -59,6 +62,10 @@ export function objectField(vault: ObjectField, other: Limit): void {
   send(vault.defaulted ?? other);
   send(vault.chosen || other);
   send(typeof vault.typed, vault.typed instanceof Object);
+  switch (other) {
+    case vault.picked:
+      send(3);
+  }
   const {
     nested: { most },
   } = vault;
@@ -74,13 +81,23 @@ export function getters(vault: Getters): void {
     vault.view.length,
     vault.view.map((item) => item),
   );
-  send(vault.all.length);
+  const { view } = vault;
+  send(view.length, vault.all.length);
+  const { wide } = vault;
+  wide.push(1);
+  send(vault.touch(3).most);
   vault.depth = 2;
   vault.setLevel(3);
   send(vault.getCap().most);
   vault.getPathWritten().most = 4;
   send(vault.getReferenced);
   send(vault.getRelayed());
+}
+
+export function setters(vault: Setters, other: Limit): void {
+  ({ most: vault.byPattern } = other);
+  [vault.byList] = [1];
+  for (vault.byLoop of [1]) send(1);
 }
 
 export function literals(vault: Literals): void {
@@ -133,4 +150,15 @@ export function ported(port: Port, wide: WidePort): void {
   port.queue.push(1);
   port.view.push(1);
   wide.wide.push(1);
+}
+
+export function desked(desk: Desk): void {
+  desk.label = 'a';
+  desk.papers.push(1);
+  desk.stamp = 2;
+}
+
+export function unseen(boxed: Crate.Boxed, lidded: InstanceType<typeof Lidded>): void {
+  boxed.open.push(1);
+  lidded.open.push(1);
 }

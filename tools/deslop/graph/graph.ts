@@ -67,8 +67,9 @@ function behind(model: Model, reference: Reference): Used[] {
       continue;
     }
     if (wrapper === undefined) return [...used, { item: at, copies: at === reference.item && reference.copies }];
+    const leaked = wrapper.leaked.map((field) => ({ item: field, copies: false }));
     const lent = wrapper.lent.map((field) => ({ item: field, copies: reference.copies }));
-    return [...used, ...lent, ...wrapper.copied.map((field) => ({ item: field, copies: true }))];
+    return [...used, ...leaked, ...lent, ...wrapper.copied.map((field) => ({ item: field, copies: true }))];
   }
 }
 

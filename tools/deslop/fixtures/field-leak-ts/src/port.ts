@@ -35,3 +35,70 @@ export class Unported {
     return this.secret + 1;
   }
 }
+
+export interface Desk {
+  label: string;
+  papers: number[];
+  stamp: number;
+}
+
+export class Desked implements Desk {
+  private secret = 0;
+  private labelText = 'a';
+  private paperList: number[] = [];
+  private stampValue = 0;
+
+  work(): number {
+    return this.secret + 1;
+  }
+
+  get label(): string {
+    return this.labelText;
+  }
+
+  set label(label: string) {
+    this.labelText = label.trim();
+  }
+
+  get papers(): number[] {
+    this.secret += 1;
+    return this.paperList;
+  }
+
+  set papers(papers: number[]) {
+    this.paperList = papers;
+  }
+
+  get stamp(): number {
+    return this.stampValue + this.secret;
+  }
+
+  set stamp(stamp: number) {
+    this.stampValue = stamp;
+  }
+}
+
+export interface Tray {
+  slots: number[];
+}
+
+export class Rack {
+  private secret = 0;
+  protected readonly slotList: number[] = [];
+
+  work(): number {
+    return this.secret + 1;
+  }
+}
+
+export class TrayRack extends Rack implements Tray {
+  get slots(): number[] {
+    return this.slotList;
+  }
+}
+
+export class SpareRack extends Rack {
+  refill(tray: Tray): void {
+    tray.slots.push(1);
+  }
+}

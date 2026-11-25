@@ -3,6 +3,7 @@ import type { FileId, ItemId, Reference } from '../model.js';
 import type { NodeId } from '../tree.js';
 import { type Catalog, itemsOfSymbol, memberName, namesNamespace } from './items.js';
 import type { Source } from './load.js';
+import { accessNamedBy, isWritten, outermost } from './mentions.js';
 
 export type Notation = 'name' | 'construction' | 'destructuring' | 'call';
 
@@ -61,16 +62,12 @@ const isSuperCall = (node: ts.Node): node is ts.CallExpression => ts.isCallExpre
 type Flow = 'read' | 'write' | 'both';
 
 function flowOf(name: ts.Node): Flow {
-  let place = name.parent;
-  while (ts.isParenthesizedExpression(place.parent) || ts.isNonNullExpression(place.parent)) place = place.parent;
+  const access = accessNamedBy(name);
+  const place = access === undefined ? undefined : outermost(access);
+  if (place === undefined || !isWritten(place)) return 'read';
   const user = place.parent;
-  if (ts.isPrefixUnaryExpression(user) || ts.isPostfixUnaryExpression(user)) {
-    return user.operator === ts.SyntaxKind.PlusPlusToken || user.operator === ts.SyntaxKind.MinusMinusToken ? 'both' : 'read';
-  }
-  if (!ts.isBinaryExpression(user) || user.left !== place) return 'read';
-  const operator = user.operatorToken.kind;
-  if (operator === ts.SyntaxKind.EqualsToken) return 'write';
-  return operator >= ts.SyntaxKind.FirstAssignment && operator <= ts.SyntaxKind.LastAssignment ? 'both' : 'read';
+  if (ts.isBinaryExpression(user)) return user.operatorToken.kind === ts.SyntaxKind.EqualsToken ? 'write' : 'both';
+  return ts.isPrefixUnaryExpression(user) || ts.isPostfixUnaryExpression(user) ? 'both' : 'write';
 }
 
 export function collectReferences(checker: ts.TypeChecker, sources: Source[], modules: NodeId[], catalog: Catalog): Occurrence[] {
@@ -94,10 +91,8 @@ export function collectReferences(checker: ts.TypeChecker, sources: Source[], mo
     return undefined;
   };
 
-  const called = (name: Name, items: ItemId[], destructured: boolean): ItemId[] => {
+  const called = (items: ItemId[], flow: Flow): ItemId[] => {
     const declared = (item: ItemId) => catalog.declarations[item][0];
-    if (!items.some((item) => ts.isAccessor(declared(item)))) return items;
-    const flow = destructured ? 'read' : flowOf(name);
     return items.filter((item) => {
       if (ts.isGetAccessorDeclaration(declared(item))) return flow !== 'write';
       return !ts.isSetAccessorDeclaration(declared(item)) || flow !== 'read';
@@ -144,10 +139,10 @@ export function collectReferences(checker: ts.TypeChecker, sources: Source[], mo
   };
 
   const visitSource = (source: Source, file: FileId, from: NodeId): void => {
-    const record = (node: ts.Node, notation: Notation, items: ItemId[]): void => {
+    const record = (node: ts.Node, notation: Notation, items: ItemId[], writes = false): void => {
       const line = source.syntax.getLineAndCharacterOfPosition(node.getStart(source.syntax)).line + 1;
       const holder = holderOf(node);
-      for (const item of items) occurrences.push({ node, notation, reference: { file, line, from, holder, item, copies: false } });
+      for (const item of items) occurrences.push({ node, notation, reference: { file, line, from, holder, item, copies: false, writes } });
     };
     const itemsNamed = (symbols: ts.Symbol[]): ItemId[] => [...new Set(symbols.flatMap((symbol) => itemsOfSymbol(checker, catalog, symbol)))];
     const visitName = (name: Name): void => {
@@ -157,12 +152,12 @@ export function collectReferences(checker: ts.TypeChecker, sources: Source[], mo
         const taken = names && ts.isObjectBindingPattern(parent.parent) && parent.dotDotDotToken === undefined;
         const sources = taken ? [checker.getTypeAtLocation(parent.parent), ...takenFrom(parent.parent)] : [];
         const items = itemsNamed(sources.flatMap((source) => propertiesOf(source, name.text)));
-        record(name, 'destructuring', called(name, items, true));
+        record(name, 'destructuring', called(items, 'read'));
         return;
       }
       if ((ts.isPropertyAssignment(parent) || ts.isShorthandPropertyAssignment(parent)) && parent.name === name) {
         if (isDestructured(parent.parent)) {
-          record(name, 'destructuring', called(name, itemsNamed(takenByAssignment(name, parent.parent)), true));
+          record(name, 'destructuring', called(itemsNamed(takenByAssignment(name, parent.parent)), 'read'));
         } else {
           const given = itemsNamed(propertiesOf(checker.getContextualType(parent.parent), name.text));
           record(
@@ -174,7 +169,9 @@ export function collectReferences(checker: ts.TypeChecker, sources: Source[], mo
         if (ts.isShorthandPropertyAssignment(parent)) record(name, 'name', itemsOfSymbol(checker, catalog, checker.getShorthandAssignmentValueSymbol(parent)));
         return;
       }
-      if (!definesName(parent, name)) record(name, 'name', called(name, itemsOfSymbol(checker, catalog, checker.getSymbolAtLocation(name)), false));
+      if (definesName(parent, name)) return;
+      const flow = flowOf(name);
+      record(name, 'name', called(itemsOfSymbol(checker, catalog, checker.getSymbolAtLocation(name)), flow), flow !== 'read');
     };
     const visit = (node: ts.Node): void => {
       if (isImportOrExport(node) || exportsName(node)) return;

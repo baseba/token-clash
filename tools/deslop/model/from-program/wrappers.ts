@@ -9,7 +9,6 @@ import type { Occurrence } from './references.js';
 import { Values } from './values.js';
 
 interface Lender extends Accessor {
-  toRead: boolean;
   alone: ItemId | undefined;
 }
 
@@ -23,7 +22,7 @@ export class Wrappers {
   static findAndMarkReads(project: Project, catalog: Catalog, occurrences: Occurrence[]): Map<ItemId, Wrapper> {
     const wrappers = new Wrappers(project, catalog, occurrences);
     for (const occurrence of occurrences) wrappers.markRead(occurrence);
-    const accessors = [...wrappers.lenders].map(([item, { lent, copied }]): [ItemId, Wrapper] => [item, { kind: 'accessor', lent, copied }]);
+    const accessors = [...wrappers.lenders].map(([item, { leaked, lent, copied }]): [ItemId, Wrapper] => [item, { kind: 'accessor', leaked, lent, copied }]);
     return new Map<ItemId, Wrapper>([...wrappers.forwarders, ...accessors]);
   }
 
@@ -73,11 +72,13 @@ export class Wrappers {
     if (body === undefined || parent === undefined || !takesSelf) return undefined;
     const relayed = relayedBy(this.project.checker, body, (access) => this.ownField(access, parent));
     if (relayed === undefined || relayed.fields.size === 0) return undefined;
-    const toRead = relayed.written.size === 0 && !relayed.callsBack;
-    const alone = toRead && relayed.fields.size === 1 ? relayed.alone : undefined;
     const fields = [...relayed.fields].sort((a, b) => a - b);
-    const lent = fields.filter((field) => alone !== undefined || relayed.written.has(field) || !this.holdsValue(field));
-    return { kind: 'accessor', lent, copied: fields.filter((field) => !lent.includes(field)), toRead, alone };
+    const read = fields.filter((field) => !relayed.written.has(field));
+    const alone = !relayed.callsBack && read.length === 1 && read[0] === relayed.alone ? relayed.alone : undefined;
+    const copied = alone === undefined ? read.filter((field) => this.holdsValue(field)) : [];
+    const lent = relayed.callsBack ? [] : read.filter((field) => !copied.includes(field));
+    const leaked = fields.filter((field) => !copied.includes(field) && !lent.includes(field));
+    return { kind: 'accessor', leaked, lent, copied, alone };
   }
 
   private lenderBehind(named: ItemId): Lender | undefined {
@@ -86,19 +87,19 @@ export class Wrappers {
     return this.lenders.get(behind);
   }
 
-  private readsLent({ toRead, alone }: Lender, name: ts.Node, isProperty: boolean): boolean {
-    const mention = isProperty ? accessNamedBy(name) : callOf(name);
-    if (!toRead || mention === undefined) return toRead && alone !== undefined && this.holdsValue(alone);
-    return !this.mentions.leaks(mention, alone !== undefined);
+  private readsLent({ alone }: Lender, name: ts.Node, property: ts.Node | undefined): boolean {
+    const mention = property === undefined ? callOf(name) : accessNamedBy(name);
+    if (mention !== undefined) return !this.mentions.leaks(mention, alone !== undefined);
+    return (alone !== undefined && this.values.holdsValue(property ?? this.catalog.declarations[alone][0])) || this.mentions.takesScalars(name);
   }
 
   private markRead({ node, notation, reference }: Occurrence): void {
     const named = reference.item;
     const lender = this.lenderBehind(named);
-    if (lender !== undefined) reference.copies = this.readsLent(lender, node, this.catalog.declarations[named].some(ts.isAccessor));
+    if (lender !== undefined) reference.copies = this.readsLent(lender, node, this.catalog.declarations[named].find(ts.isAccessor));
     if (this.catalog.items[named].kind !== 'field') return;
     const mention = accessNamedBy(node);
-    const taken = notation === 'destructuring' && this.holdsValue(named);
+    const taken = notation === 'destructuring' && (this.holdsValue(named) || this.mentions.takesScalars(node));
     reference.copies = notation === 'construction' || taken || (notation === 'name' && (mention === undefined || !this.mentions.leaks(mention, true)));
   }
 }

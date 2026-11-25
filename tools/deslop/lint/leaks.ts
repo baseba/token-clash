@@ -102,10 +102,11 @@ function fieldsByThing(model: Model, graph: Graph): Map<ThingId, ItemId[]> {
   return fields;
 }
 
-function fieldsLentBy(model: Model, member: ItemId): ItemId[] {
+function fieldsBehind(model: Model, member: ItemId, writes: boolean): ItemId[] {
   if (model.items[member].kind === 'field') return [member];
   const wrapper = model.wrappers.get(member);
-  return wrapper?.kind === 'accessor' ? wrapper.lent : [];
+  if (wrapper?.kind !== 'accessor') return [];
+  return writes ? wrapper.leaked : wrapper.lent;
 }
 
 function reachable(from: ItemId, next: Map<ItemId, ItemId[]>): ItemId[] {
@@ -159,9 +160,9 @@ export function knownOutside(model: Model, graph: Graph): Outside {
     if (!isInsider(use.user, owner)) usedOutside(use);
     else if (use.user === owner && works(model, use)) outside.working.add(owner);
     if (use.copies) continue;
-    for (const implementing of reachable(use.item, model.implementations)) {
-      if (isInsider(use.user, graph.thingOf[implementing])) continue;
-      for (const field of fieldsLentBy(model, implementing)) usedOutside({ ...use, item: field, through: use.through ?? use.item });
+    const behind = reachable(use.item, model.implementations).flatMap((member) => fieldsBehind(model, member, model.references[use.reference].writes));
+    for (const field of behind) {
+      if (!isInsider(use.user, graph.thingOf[field])) usedOutside({ ...use, item: field, through: use.through ?? use.item });
     }
   }
   return outside;

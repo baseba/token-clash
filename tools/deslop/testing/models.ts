@@ -25,7 +25,7 @@ export function wrapperOf(model: Model, name: string): string {
   const wrapper = model.wrappers.get(item);
   const names = (items: ItemId[]) => items.map((listed) => model.items[listed].name).join(',');
   if (wrapper?.kind === 'forwarder') return `forwards to ${model.items[wrapper.target].name} on [${names(wrapper.fields)}]`;
-  return wrapper === undefined ? 'works' : `lends [${names(wrapper.lent)}] copies [${names(wrapper.copied)}]`;
+  return wrapper === undefined ? 'works' : `leaks [${names(wrapper.leaked)}] lends [${names(wrapper.lent)}] copies [${names(wrapper.copied)}]`;
 }
 
 export function userOf(type: string, body: string): string {

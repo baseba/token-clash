@@ -338,24 +338,26 @@ Cada uso de afuera se juzga donde nombra el campo, sin seguir el valor. Vale el 
 | Paso | Condición | Veredicto |
 | --- | --- | --- |
 | S1 | Escribe el campo o una ruta de campos declarados que parte en él: `=`, `+=`, `++`, `delete`, destino de desestructurar o de un `for`. | filtra |
-| S2 | El tipo que recibe es un valor. | lee, salvo un cast directo a un tipo que no es valor, que filtra |
-| S3a | Sigue por campos declarados en el proyecto y termina en un escalar: `x.limit.most`. | lee |
-| S3b | Solo lo prueba o lo compara: `if (x.f)`, `!x.f`, `x.f === y`, `typeof x.f`. | lee |
+| S2 | El tipo que recibe es un valor. | lee, salvo un cast directo a un tipo que no es valor, que filtra. En una cadena de casts decide el de más afuera |
+| S3a | Sigue por campos declarados en el proyecto y termina en un escalar: `x.limit.most` o `const { limit: { most } } = x`. | lee |
+| S3b | Solo lo prueba o lo compara: `if (x.f)`, `!x.f`, `x.f === y`, `typeof x.f`, `case x.f:`. | lee |
 | S4 | Cualquier otra cosa: llamarle un método, indexarlo, `.length`, pasarlo, devolverlo, guardarlo, esparcirlo, recorrerlo. | filtra |
 
 Los métodos se juzgan por su cuerpo:
 
 - **Accesor.** El cuerpo solo tiene sintaxis de relevo: `return`, `const` locales, `this.f`, parámetros, literales
-  (también de arreglo y de objeto), casts, llamar a un parámetro y `this.f = parámetro`. Usarlo es usar sus campos. Si
-  devuelve un solo campo, el tipo de retorno decide: `get items(): readonly number[]` presta para leer e
-  `itemsMut(): number[]` presta para escribir. Si escribe un campo o llama a un parámetro, filtra todo campo suyo que
-  no sea valor.
+  (también de arreglo y de objeto), casts, llamar a un parámetro y `this.f = parámetro`. Usarlo es usar sus campos, y
+  cada campo se juzga por separado. El campo que escribe filtra siempre, sea valor o no. Si devuelve un solo campo, el
+  tipo de retorno decide: `get items(): readonly number[]` presta para leer e `itemsMut(): number[]` presta para
+  escribir. Un getter que se toma con `const { items } = x` se juzga igual, por el tipo que entrega el getter. Si llama
+  a un parámetro, filtra todo campo suyo que no sea valor.
 - **Reenviador.** El cuerpo es una sola llamada con sus mismos parámetros. Usarlo es usar lo que llama.
 - **Trabajo propio.** Cualquier otro método, también el que asigna un valor que la clase decide
-  (`close() { this.status = 'closed'; }`). Quien lo llama no ve los campos que toca.
+  (`close() { this.state = 'closed'; }`). Quien lo llama no ve los campos que toca.
 
 Una escritura o un trabajo a través de una propiedad de una interfaz que la clase declara con `implements` cuenta
-contra el campo que la implementa. Una lectura por la interfaz no cuenta.
+contra el campo que la implementa. Una lectura por la interfaz no cuenta. Si la clase implementa la propiedad con un
+getter y un setter, la escritura llega al setter y el trabajo al getter, y cada uno cuenta solo si es un accesor.
 
 **Diferencias a propósito con el original (lista cerrada):**
 
@@ -373,11 +375,15 @@ contra el campo que la implementa. Una lectura por la interfaz no cuenta.
 **Lo que no ve, a propósito (lista cerrada):**
 
 - Un método de trabajo que entrega un campo (`checked() { …; return this.items; }`). Es la regla del original.
+- Un método que escribe en un campo un valor que él decide y no un parámetro (`close() { this.state = 'closed'; }`).
+  Es trabajo propio de la clase, como en el original, que exige que el tipo del campo esté en la firma del accesor.
 - `any`, un cast del objeto entero, un cast aplicado después del uso y la reflexión (`Object.assign`, `Reflect`,
   `.call`).
 - El tipado estructural sin `implements`, y el campo que una subclase declara de nuevo cuando se trabaja sobre el de
   la clase base.
 - Las claves computadas, el estado en closures o en variables de módulo, y los generadores.
+- Las clases escritas como expresión (`const Caja = class { … }`) y las declaradas dentro de un `namespace`. No
+  entran al modelo.
 - Una clase cuyos campos se leen todos desde afuera no guarda nada. Hoy pasa con `Trainer`, `Challenge`,
   `Tournament`, `TowerRun` y `Station`, porque sus mappers leen todo.
 

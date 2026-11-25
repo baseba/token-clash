@@ -34,6 +34,18 @@ export class Vault implements Port {
     return this.items;
   }
 
+  get seen(): readonly number[] {
+    return this.items;
+  }
+
+  get wide(): number[] {
+    return this.ids as number[];
+  }
+
+  get cap(): Limit {
+    return this.limit;
+  }
+
   list = () => this.items;
 
   relayed(): number[] {
@@ -90,6 +102,21 @@ export class Vault implements Port {
 
   swap(count: number): Limit {
     this.count = count;
+    return this.limit;
+  }
+
+  echo(count: number): number {
+    this.count = count;
+    return this.count;
+  }
+
+  stamp(count: number) {
+    this.count = count;
+    return { items: this.items, ids: this.ids };
+  }
+
+  visit(each: (items: number[]) => void): Limit {
+    each(this.items);
     return this.limit;
   }
 
@@ -218,9 +245,9 @@ export class Heir extends Vault {
 
 const FILES = { ...GLOBALS, 'src/vault.ts': VAULT };
 
-const LENDS_ITEMS = 'lends [Vault::items] copies []';
+const LENDS_ITEMS = 'leaks [] lends [Vault::items] copies []';
 
-const LENDS_COUNT = 'lends [Vault::count] copies []';
+const WRITES_COUNT = 'leaks [Vault::count] lends [] copies []';
 
 const ACCESSORS: Wrapped[] = [
   ['Vault::getItems', LENDS_ITEMS],
@@ -230,18 +257,23 @@ const ACCESSORS: Wrapped[] = [
   ['Vault::relayed', LENDS_ITEMS],
   ['Vault::cast', LENDS_ITEMS],
   ['Vault::getView', LENDS_ITEMS],
-  ['Vault::getIds', 'lends [Vault::ids] copies []'],
-  ['Vault::getCount', LENDS_COUNT],
-  ['Vault::getLimit', 'lends [Vault::limit] copies []'],
-  ['Vault::parts', 'lends [Vault::items] copies [Vault::count]'],
-  ['Vault::snapshot', 'lends [Vault::items] copies [Vault::ids,Vault::count]'],
+  ['Vault::seen', LENDS_ITEMS],
+  ['Vault::wide', 'leaks [] lends [Vault::ids] copies []'],
+  ['Vault::getIds', 'leaks [] lends [Vault::ids] copies []'],
+  ['Vault::getCount', 'leaks [] lends [Vault::count] copies []'],
+  ['Vault::getLimit', 'leaks [] lends [Vault::limit] copies []'],
+  ['Vault::parts', 'leaks [] lends [Vault::items] copies [Vault::count]'],
+  ['Vault::snapshot', 'leaks [] lends [Vault::items] copies [Vault::ids,Vault::count]'],
   ['Vault::shorthand', LENDS_ITEMS],
-  ['Vault::setCount', LENDS_COUNT],
-  ['Vault::set total', LENDS_COUNT],
-  ['Vault::setLater', LENDS_COUNT],
-  ['Vault::swap', 'lends [Vault::count,Vault::limit] copies []'],
-  ['Vault::withItems', LENDS_ITEMS],
-  ['Vault::withIds', 'lends [] copies [Vault::ids]'],
+  ['Vault::setCount', WRITES_COUNT],
+  ['Vault::set total', WRITES_COUNT],
+  ['Vault::setLater', WRITES_COUNT],
+  ['Vault::swap', 'leaks [Vault::count] lends [Vault::limit] copies []'],
+  ['Vault::echo', WRITES_COUNT],
+  ['Vault::stamp', 'leaks [Vault::count] lends [Vault::items] copies [Vault::ids]'],
+  ['Vault::withItems', 'leaks [Vault::items] lends [] copies []'],
+  ['Vault::withIds', 'leaks [] lends [] copies [Vault::ids]'],
+  ['Vault::visit', 'leaks [Vault::items,Vault::limit] lends [] copies []'],
   ['Heir::inherited', LENDS_ITEMS],
 ];
 
@@ -309,17 +341,37 @@ test('an accessor that is taken or named and not called leaks its field unless t
     ['hold(vault.getItems);', 'leaks'],
     ['hold(vault.getView);', 'leaks'],
     ['hold(vault.getCount, vault.getIds);', 'reads'],
-    ['const { all } = vault;\n  hold(all);', 'leaks'],
     ['const { getCount } = vault;\n  hold(getCount);', 'reads'],
+    ['const { getView } = vault;\n  hold(getView);', 'leaks'],
   ]);
 });
 
-test('an accessor that writes or calls back always leaks what is no value, and one that hands fields out in a literal is judged at its call', () => {
+test('a getter taken by a pattern is judged by the type the getter gives, not by the one its field declares', () => {
+  judge([
+    ['const { all } = vault;\n  hold(all);', 'leaks'],
+    ['const { seen } = vault;\n  hold(seen.length);', 'reads'],
+    ['const { seen: mine } = vault;\n  hold(mine);', 'reads'],
+    ["const { 'seen': mine } = vault;\n  hold(mine);", 'reads'],
+    ['let seen: readonly number[] = [];\n  ({ seen } = vault);\n  hold(seen);', 'reads'],
+    ['const { wide } = vault;\n  wide.push(1);', 'leaks'],
+    ['let wide: readonly number[] = [];\n  ({ wide } = vault);\n  hold(wide);', 'leaks'],
+    ['hold(vault.cap.most);', 'reads'],
+    ['const {\n    cap: { most },\n  } = vault;\n  hold(most);', 'reads'],
+    ['const { cap } = vault;\n  hold(cap);', 'leaks'],
+  ]);
+});
+
+test('an accessor always leaks the field it writes and, if it calls back, what is no value; its other fields are judged at its call', () => {
   judge([
     ['vault.setCount(1);', 'leaks'],
     ['vault.total = 1;', 'leaks'],
+    ['[vault.total] = [1];', 'leaks'],
+    ['({ count: vault.total } = { count: 1 });', 'leaks'],
+    ['({ count: vault.total = 2 } = { count: 1 });', 'leaks'],
+    ['for (vault.total of [1]) hold();', 'leaks'],
     ['vault.setLater(1);', 'leaks'],
     ['hold(vault.swap(1).most);', 'leaks'],
+    ['if (vault.visit(hold)) hold();', 'leaks'],
     ['vault.withItems((items) => hold(items));', 'leaks'],
     ['vault.withIds(hold);', 'reads'],
     ['hold(vault.parts());', 'leaks'],

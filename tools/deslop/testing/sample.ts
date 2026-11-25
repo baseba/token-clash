@@ -44,7 +44,7 @@ export class Sample {
   refer(holder: ItemId, item: ItemId): void {
     const from = this.model.items[holder].owner;
     const file = this.model.files.findIndex((candidate) => candidate.module === from) as FileId;
-    this.model.references.push({ file, line: this.model.references.length + 1, from, holder, item, copies: false });
+    this.model.references.push({ file, line: this.model.references.length + 1, from, holder, item, copies: false, writes: false });
   }
 
   read(holder: ItemId, item: ItemId): void {

@@ -72,7 +72,7 @@ export const compareText = (a: string, b: string): number => (a < b ? -1 : a > b
 
 export const compareLocations = (a: Location, b: Location): number => compareText(a.file, b.file) || a.line - b.line;
 
-export const sameLocation = (a: Location, b: Location): boolean => compareLocations(a, b) === 0;
+export const sameLocation = (location: Location, other: Location): boolean => compareLocations(location, other) === 0;
 
 export const ascending = <Id extends number>(ids: Iterable<Id>): Id[] => [...ids].sort((a, b) => a - b);
 

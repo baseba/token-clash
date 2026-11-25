@@ -47,6 +47,8 @@ export class ValueRead {
 export class ValueCast {
   private secret = 0;
   readonly castIds: readonly number[] = [];
+  readonly chainCast: readonly number[] = [];
+  readonly checkedCast: readonly number[] = [];
 
   work(): number {
     return this.secret + 1;
@@ -79,6 +81,7 @@ export class ObjectField {
   defaulted: Limit | null = null;
   chosen: Limit | null = null;
   typed: Limit | null = null;
+  picked: Limit | null = null;
   nested: Limit = { most: 1 };
 
   work(): number {
@@ -104,6 +107,9 @@ export class Getters {
   private readonly pathWritten: Limit = { most: 1 };
   private readonly referenced: number[] = [];
   private readonly relayed: number[] = [];
+  private readonly widened: readonly number[] = [];
+  private stamp = 0;
+  private readonly stamped: Limit = { most: 1 };
 
   work(): number {
     return this.secret + 1;
@@ -111,6 +117,15 @@ export class Getters {
 
   get view(): readonly number[] {
     return this.viewed;
+  }
+
+  get wide(): number[] {
+    return this.widened as number[];
+  }
+
+  touch(stamp: number): Limit {
+    this.stamp = stamp;
+    return this.stamped;
   }
 
   get all(): number[] {
@@ -140,6 +155,29 @@ export class Getters {
   getRelayed(): number[] {
     const relayed = this.relayed;
     return relayed;
+  }
+}
+
+export class Setters {
+  private secret = 0;
+  private fromPattern = 0;
+  private fromList = 0;
+  private fromLoop = 0;
+
+  work(): number {
+    return this.secret + 1;
+  }
+
+  set byPattern(value: number) {
+    this.fromPattern = value;
+  }
+
+  set byList(value: number) {
+    this.fromList = value;
+  }
+
+  set byLoop(value: number) {
+    this.fromLoop = value;
   }
 }
 
@@ -343,3 +381,23 @@ export class Outer {
     return this.inner.getList();
   }
 }
+
+export namespace Crate {
+  export class Boxed {
+    kept = 0;
+    open: number[] = [];
+
+    work(): number {
+      return this.kept + 1;
+    }
+  }
+}
+
+export const Lidded = class {
+  kept = 0;
+  open: number[] = [];
+
+  work(): number {
+    return this.kept + 1;
+  }
+};

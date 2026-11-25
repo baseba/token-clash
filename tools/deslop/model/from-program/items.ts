@@ -39,6 +39,12 @@ export function unwrapped(expression: ts.Expression): ts.Expression {
   return inner;
 }
 
+export function outerCast(expression: ts.Expression): ts.Expression {
+  let outer = expression;
+  while (KEEPS_ITS_VALUE.has(outer.parent.kind)) outer = outer.parent as ts.Expression;
+  return outer;
+}
+
 export function namesNamespace(checker: ts.TypeChecker, path: ts.Expression): boolean {
   const name = ts.isPropertyAccessExpression(path) ? path.name : path;
   const symbol = ts.isIdentifier(name) ? checker.getSymbolAtLocation(name) : undefined;
