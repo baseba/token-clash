@@ -129,6 +129,7 @@ export async function working(vault: Working, decides: Decides): Promise<void> {
   send(vault.first());
   vault.replace(2);
   decides.close();
+  decides.take({ id: 'a' });
   send(await vault.getPromised());
 }
 

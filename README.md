@@ -380,6 +380,9 @@ escritura que lee primero (`+=`, `??=`, `++`) llega a los dos.
 - Un método de trabajo que entrega un campo (`checked() { …; return this.items; }`). Es la regla del original.
 - Un método que escribe en un campo un valor que él decide y no un parámetro (`close() { this.state = 'closed'; }`).
   Es trabajo propio de la clase, como en el original, que exige que el tipo del campo esté en la firma del accesor.
+- Un método que escribe en un campo una parte de su argumento (`enterRoom(challenge) { this.roomId = challenge.id; }`).
+  También es trabajo propio, como en el original, porque el tipo del campo no está en la firma. Un setter escrito así
+  sigue siendo un setter: el chequeo no lo ve, y la revisión sí.
 - `any`, un cast del objeto entero, un cast aplicado después del uso y la reflexión (`Object.assign`, `Reflect`,
   `.call`).
 - El tipado estructural sin `implements`, y el campo que una subclase declara de nuevo cuando se trabaja sobre el de

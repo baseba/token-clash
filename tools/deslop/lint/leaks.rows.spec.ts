@@ -80,6 +80,7 @@ const ROWS: Row[] = [
   ['Generic::takenValue', 'leaks', 'get taken(): Value; const { taken } = vault, vault: Generic<readonly number[]>', 'limit, by the type the getter declares'],
   ['Generic::dottedValue', 'reads', 'get dotted(): Value; vault.dotted.length, vault: Generic<readonly number[]>', 'accessor, S2, by the type at the use'],
   ['Decides::state', 'kept', "close() { this.state = 'closed'; }; decides.close()", 'L1, the method decides what it writes: work of the class, as in Rust'],
+  ['Decides::seat', 'kept', "take(seat) { this.seat = seat.id; }; decides.take({ id: 'a' })", 'L1, the method writes a part of its argument: work of the class, as in Rust'],
   ['Structural::held', 'leaks', 'holder.held.push(1), holder: Holder, class implements Holder', 'interface, work'],
   ['Structural::shaped', 'kept', 'drain(vault), drain(holder: { shaped: number[] })', 'L3'],
   ['Structural::anyTyped', 'kept', '(vault as any).anyTyped.push(1)', 'L2'],

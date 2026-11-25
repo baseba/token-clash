@@ -298,13 +298,18 @@ export class Generic<Value> {
 export class Decides {
   private secret = 0;
   private state = 'open';
+  private seat = '';
 
   work(): number {
-    return this.secret + this.state.length;
+    return this.secret + this.state.length + this.seat.length;
   }
 
   close(): void {
     this.state = 'closed';
+  }
+
+  take(seat: { readonly id: string }): void {
+    this.seat = seat.id;
   }
 }
 
