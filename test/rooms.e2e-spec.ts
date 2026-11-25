@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import WebSocket from 'ws';
 import { PROJECT_ROOT } from '../src/shared/paths.js';
-import { appProcess, FAST_TIMINGS } from './app-process.js';
+import { appProcess, FAST_TIMINGS, type AppProcess } from './app-process.js';
 
 const SEAT_GRACE_MS = 400;
 const app = appProcess({ ...FAST_TIMINGS, SEAT_GRACE_MS: String(SEAT_GRACE_MS), TRUST_CF_CONNECTING_IP: '1', JEV_API_KEY: '', JEV_API_URL: '' }, 19000);
@@ -17,8 +17,11 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const newAccount = () => ({ password: 'contraseña-segura' });
 
-async function call(path: string, { method = 'GET', body = undefined as unknown, token = undefined as string | undefined, ip = '10.0.0.1' } = {}): Promise<{ status: number; data: any }> {
-  const res = await fetch(app.base + path, {
+async function call(
+  path: string,
+  { method = 'GET', body = undefined as unknown, token = undefined as string | undefined, ip = '10.0.0.1', server = app } = {},
+): Promise<{ status: number; data: any }> {
+  const res = await fetch(server.base + path, {
     method,
     headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body ? JSON.stringify(body) : undefined,
@@ -27,8 +30,8 @@ async function call(path: string, { method = 'GET', body = undefined as unknown,
 }
 
 let trainers = 0;
-async function trainer(name: string) {
-  const { data } = await call('/api/import', { method: 'POST', body: { name, save, ...newAccount() }, ip: `10.0.1.${++trainers}` });
+async function trainer(name: string, server: AppProcess = app) {
+  const { data } = await call('/api/import', { method: 'POST', body: { name, save, ...newAccount() }, ip: `10.0.1.${++trainers}`, server });
   return { token: data.token as string, me: data.me };
 }
 
@@ -38,8 +41,8 @@ class Client {
   readonly frames: any[] = [];
   private cursor = 0;
 
-  constructor(first: object, onFrame?: (frame: any, client: Client) => void) {
-    this.ws = new WebSocket(`ws://127.0.0.1:${app.port}/ws`);
+  constructor(first: object, onFrame?: (frame: any, client: Client) => void, server: AppProcess = app) {
+    this.ws = new WebSocket(`ws://127.0.0.1:${server.port}/ws`);
     this.ws.on('open', () => this.send(first));
     this.ws.on('message', (data) => {
       const frame = JSON.parse(String(data));
@@ -49,8 +52,8 @@ class Client {
     });
   }
 
-  static async room(room: string, token: string | null, onFrame?: (frame: any, client: Client) => void): Promise<Client> {
-    const client = new Client({ t: 'hello', room, token }, onFrame);
+  static async room(room: string, token: string | null, onFrame?: (frame: any, client: Client) => void, server: AppProcess = app): Promise<Client> {
+    const client = new Client({ t: 'hello', room, token }, onFrame, server);
     await client.next((f) => f.t === 'chatLog');
     return client;
   }
@@ -371,4 +374,87 @@ test('tournament chat: the tournament page and its match rooms share one channel
   const said = await fanPage.next((f) => f.t === 'chat' && f.message.text === 'mirando la otra');
   assert.deepEqual([said.message.id, said.message.role, said.message.side], [4, 'player', null]);
   await Promise.all([page, fanPage, inMatch, otherMatch].map((client) => client.close()));
+});
+
+test('a lobby or room socket ignores any other entry, and the lobby knows whose room is whose', async () => {
+  const host = await trainer('Anuncia');
+  const id = (await call('/api/challenges', { method: 'POST', token: host.token, body: { visibility: 'public' } })).data.challenge.id;
+  const own = new Client({ t: 'lobby', token: host.token });
+  const anonymous = new Client({ t: 'lobby', token: null });
+  const mineIn = async (client: Client) => (await client.next((f) => f.t === 'rooms')).rooms.find((room: any) => room.id === id)?.mine;
+  assert.equal(await mineIn(own), true);
+  assert.equal(await mineIn(anonymous), false);
+
+  own.send({ t: 'lobby', token: host.token });
+  own.send({ t: 'hello', room: id, token: host.token });
+  own.send({ t: 'tour', id: 'no-existe', token: host.token });
+  await sleep(300);
+  assert.deepEqual(own.rest(), [], 'a lobby socket stays in the lobby');
+
+  const inside = await Client.room(id, host.token);
+  await inside.next((f) => f.t === 'watch');
+  inside.send({ t: 'lobby', token: host.token });
+  inside.send({ t: 'hello', room: id, token: host.token });
+  inside.send({ t: 'tour', id: 'no-existe', token: host.token });
+  await sleep(300);
+  assert.deepEqual(inside.rest(), [], 'a room socket stays in its room');
+
+  await Promise.all([own, anonymous, inside].map((client) => client.close()));
+  await call(`/api/challenges/${id}`, { method: 'DELETE', token: host.token });
+});
+
+test('a tournament page ignores a room or another tournament, and can still open the lobby', async () => {
+  const host = await trainer('Sigue');
+  const room = (await call('/api/challenges', { method: 'POST', token: host.token, body: { visibility: 'public' } })).data.challenge.id;
+  const createTournament = async () =>
+    (await call('/api/tournaments', { method: 'POST', token: host.token, body: { size: 4, mode: 'team', visibility: 'private' } })).data.tournament.id;
+  const followed = await createTournament();
+  const other = await createTournament();
+  const page = new Client({ t: 'tour', id: followed, token: host.token });
+  await page.next((f) => f.t === 'watch');
+
+  page.send({ t: 'hello', room, token: host.token });
+  page.send({ t: 'tour', id: other, token: host.token });
+  await sleep(300);
+  assert.deepEqual(page.rest(), [], 'a tournament page stays on its tournament');
+
+  page.send({ t: 'lobby', token: host.token });
+  assert.ok((await page.next((f) => f.t === 'rooms')).rooms.some((listed: any) => listed.id === room));
+
+  await page.close();
+  await call(`/api/challenges/${room}`, { method: 'DELETE', token: host.token });
+});
+
+test('an AI-only match waits for the people watching to see each turn before playing the next', async (context) => {
+  const paced = appProcess({ ...FAST_TIMINGS, MATCH_MS: '3000', AI_WATCH_MS: '10000', TRUST_CF_CONNECTING_IP: '1', JEV_API_KEY: '', JEV_API_URL: '' }, 22000);
+  context.after(() => paced.kill());
+  await paced.start();
+  const host = await trainer('Vigila', paced);
+  const tournament = (await call('/api/tournaments', { method: 'POST', token: host.token, body: { size: 4, mode: 'team', visibility: 'private' }, server: paced })).data.tournament;
+  const page = new Client({ t: 'tour', id: tournament.id, token: host.token }, undefined, paced);
+  await page.next((f) => f.t === 'chatLog');
+  await call(`/api/tournaments/${tournament.id}/ai`, { method: 'POST', token: host.token, body: { level: 'easy', count: 3 }, server: paced });
+  await call(`/api/tournaments/${tournament.id}/ready`, { method: 'POST', token: host.token, body: { ready: true }, server: paced });
+
+  const playing: Client[] = [];
+  const started = new Set<string>();
+  let aiOnlyMatch: string | undefined;
+  while (!aiOnlyMatch) {
+    const current = (await page.next((f) => f.t === 'tour' && f.tournament.current, 30_000)).tournament.current.challengeId;
+    if (started.has(current)) continue;
+    started.add(current);
+    const hostId = (await call(`/api/challenges/${current}`, { server: paced })).data.challenge.host.id;
+    if (hostId === host.me.id) playing.push(await Client.room(current, host.token, autoPlay, paced));
+    else aiOnlyMatch = current;
+  }
+
+  const viewer = await Client.room(aiOnlyMatch, null, undefined, paced);
+  assert.equal(viewer.frames.some((f) => f.state), false, 'the viewer arrives during the countdown, before the first turn');
+  const shown = await viewer.next((f) => f.state?.status === 'active' && f.state.turn >= 1, 30_000);
+  const turnMs = Number(FAST_TIMINGS.TURN_MS);
+  await sleep(turnMs / 4);
+  assert.deepEqual(viewer.rest().filter((f) => f.state && f.state.turn > shown.state.turn), [], 'the next turn waits for the viewer');
+  viewer.send({ t: 'seen', turn: shown.state.turn });
+  await viewer.next((f) => f.state && f.state.turn > shown.state.turn, turnMs / 2);
+  await Promise.all([page, viewer, ...playing].map((client) => client.close()));
 });

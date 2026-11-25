@@ -113,13 +113,13 @@ export class DuelService {
   }
 
   enter(ws: ClientConnection, roomId: string, token: string | undefined): Challenge | null {
-    if (token !== undefined) ws.trainerId = this.trainers.authenticate(token)?.id ?? null;
+    if (token !== undefined) ws.signIn(this.trainers.authenticate(token));
     const challenge = this.challenges.findById(roomId);
     if (!challenge) {
       ws.send({ t: 'error', error: 'Ese desafío no existe.' });
       return null;
     }
-    ws.roomId = challenge.id;
+    if (!ws.enterRoom(challenge.id)) return null;
     const room = this.presence.room(challenge);
     room.sockets.add(ws);
     if (ws.trainerId === challenge.hostId && challenge.status === 'open') this.lobby.notify();

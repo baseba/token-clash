@@ -3,6 +3,7 @@ export interface Port {
   seat: string | null;
   queue: number[];
   view: number[];
+  rename(name: string): void;
 }
 
 export interface WidePort extends Port {
@@ -16,6 +17,7 @@ export class Ported implements WidePort {
   queue: number[] = [];
   wide: number[] = [];
   private readonly viewList: number[] = [];
+  private nameText = '';
 
   work(): number {
     return this.secret + 1;
@@ -23,6 +25,10 @@ export class Ported implements WidePort {
 
   get view(): number[] {
     return this.viewList;
+  }
+
+  rename(name: string): void {
+    this.nameText = name;
   }
 }
 

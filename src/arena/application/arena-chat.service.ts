@@ -24,6 +24,8 @@ const channelName = (channel: ChatChannel) => (channel.kind === 'room' ? `c:${ch
 
 @Injectable()
 export class ArenaChatService {
+  private readonly lastSaidAt = new WeakMap<ClientConnection, number>();
+
   constructor(
     private readonly chat: ChatService,
     private readonly trainers: TrainersService,
@@ -47,11 +49,11 @@ export class ArenaChatService {
       role: speaker.role,
       side: speaker.side,
       text,
-      lastAt: ws.lastChatAt,
+      lastAt: this.lastSaidAt.get(ws),
       at,
     });
     if (!message) return;
-    ws.lastChatAt = at;
+    this.lastSaidAt.set(ws, at);
     const frame = JSON.stringify({ t: 'chat', message });
     for (const listener of this.audience(speaker.channel)) if (listener.open) listener.send(frame);
   }

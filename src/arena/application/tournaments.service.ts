@@ -125,8 +125,8 @@ export class TournamentsService implements OnModuleInit {
       ws.send({ t: 'error', error: 'Ese torneo no existe.' });
       return null;
     }
-    if (token !== undefined) ws.trainerId = this.trainers.authenticate(token)?.id ?? null;
-    ws.tourId = tournament.id;
+    if (token !== undefined) ws.signIn(this.trainers.authenticate(token));
+    if (!ws.follow(tournament.id)) return null;
     this.presence.followTournament(tournament.id, ws);
     this.broadcast(tournament);
     return tournament;

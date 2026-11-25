@@ -129,6 +129,7 @@ export async function working(vault: Working, decides: Decides): Promise<void> {
   send(vault.first());
   vault.replace(2);
   decides.close();
+  decides.take({ id: 'a' });
   send(await vault.getPromised());
 }
 
@@ -172,6 +173,7 @@ export function ported(port: Port, wide: WidePort): void {
   if (port.seat === 'a') send(1);
   port.queue.push(1);
   port.view.push(1);
+  port.rename('a');
   wide.wide.push(1);
 }
 

@@ -209,8 +209,14 @@ El chat también pasa por la arena. `ArenaChatService` decide en qué canal habl
 la sala, o el del torneo, que comparten todas sus salas), si habla como jugador o espectador, y quién escucha.
 `chat` solo guarda los mensajes de cada canal y no sabe qué es una sala.
 
-El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection`
-(`arena/application/connection.ts`) y el gateway envuelve cada socket en uno.
+El dominio no sabe de WebSockets: la arena habla con un puerto `ClientConnection` (`arena/application/connection.ts`)
+y el gateway envuelve cada socket en uno. Cada página abre su socket. El puerto deja leer quién es y dónde está la
+conexión, y la arena lo cambia solo con métodos que no nombran agregados: `signIn` pide algo con `id`, y `enterRoom` y
+`follow`, el id. Así `realtime` no importa tipos de dominio. La conexión decide adónde puede entrar: `enterRoom` y
+`follow` devuelven `false` si ya está en el lobby, en una sala o en un torneo, y `enterLobby` solo rechaza una
+conexión que ya está en una sala o en el lobby. Por eso la página de un torneo puede abrir el lobby sin dejar de
+seguir el torneo. Lo que lee un solo servicio vive en ese servicio: el último turno que vio cada espectador, en
+`LiveBattleService`, y cuándo habló cada uno por última vez, en `ArenaChatService`.
 
 ## 6. Persistencia
 

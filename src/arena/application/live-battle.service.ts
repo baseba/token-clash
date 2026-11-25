@@ -24,6 +24,7 @@ const aiOnly = (battle: BattleState) => battle.sides.every((side) => aiLevelOf(s
 export class LiveBattleService {
   private readonly logger = new Logger(LiveBattleService.name);
   private readonly timings: ArenaTimings;
+  private readonly seenTurns = new WeakMap<ClientConnection, number>();
 
   constructor(
     config: AppConfig,
@@ -83,7 +84,7 @@ export class LiveBattleService {
   }
 
   seen(ws: ClientConnection, turn: number): void {
-    ws.seenTurn = Math.max(ws.seenTurn ?? 0, turn);
+    this.seenTurns.set(ws, Math.max(this.seenTurns.get(ws) ?? 0, turn));
   }
 
   private nextAiTurn(room: Room, phase: BattlePhase): void {
@@ -94,7 +95,7 @@ export class LiveBattleService {
     const check = () => {
       if (room.phase !== phase) return;
       const waited = now() - since;
-      const watching = [...room.sockets].filter((ws) => ws.open).map((ws) => ws.seenTurn);
+      const watching = [...room.sockets].filter((ws) => ws.open).map((ws) => this.seenTurns.get(ws));
       if (waited >= this.timings.aiVsAiPauseMs && (waited >= this.timings.aiVsAiViewerWaitMs || !viewersBehind(watching, turn)))
         return this.aiTurn(room, phase);
       setTimeout(check, 250).unref();

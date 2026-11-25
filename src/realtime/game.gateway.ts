@@ -14,18 +14,30 @@ import type { ClientMessageOf } from './client-messages.js';
 import { ConnectionLimits } from './connection-limits.js';
 
 class WsConnection implements ClientConnection, RadioListener {
-  trainerId: string | null = null;
-  roomId: string | null = null;
-  tourId: string | null = null;
-  seenTurn?: number;
-  lastChatAt?: number;
-  inLobby = false;
-  alive = true;
+  #trainerId: string | null = null;
+  #roomId: string | null = null;
+  #tourId: string | null = null;
+  private inLobby = false;
+  private alive = true;
 
   constructor(
     readonly socket: WebSocket,
     readonly ip: string,
-  ) {}
+  ) {
+    socket.on('pong', () => (this.alive = true));
+  }
+
+  get trainerId(): string | null {
+    return this.#trainerId;
+  }
+
+  get roomId(): string | null {
+    return this.#roomId;
+  }
+
+  get tourId(): string | null {
+    return this.#tourId;
+  }
 
   get open(): boolean {
     return this.socket.readyState === 1;
@@ -35,8 +47,37 @@ class WsConnection implements ClientConnection, RadioListener {
     this.socket.send(typeof frame === 'string' ? frame : JSON.stringify(frame));
   }
 
+  signIn(trainer: { readonly id: string } | undefined): void {
+    this.#trainerId = trainer?.id ?? null;
+  }
+
   get idle(): boolean {
-    return !this.roomId && !this.tourId && !this.inLobby;
+    return !this.#roomId && !this.#tourId && !this.inLobby;
+  }
+
+  enterRoom(roomId: string): boolean {
+    if (!this.idle) return false;
+    this.#roomId = roomId;
+    return true;
+  }
+
+  follow(tourId: string): boolean {
+    if (!this.idle) return false;
+    this.#tourId = tourId;
+    return true;
+  }
+
+  enterLobby(): boolean {
+    if (this.#roomId || this.inLobby) return false;
+    this.inLobby = true;
+    return true;
+  }
+
+  beat(): void {
+    if (this.alive) {
+      this.alive = false;
+      this.socket.ping();
+    } else this.socket.terminate();
   }
 }
 
@@ -58,16 +99,7 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
 
   afterInit(server: WebSocketServer): void {
     this.heartbeat = setInterval(() => {
-      for (const socket of server.clients) {
-        const conn = this.connections.get(socket);
-        if (!conn) continue;
-        if (!conn.alive) {
-          socket.terminate();
-          continue;
-        }
-        conn.alive = false;
-        socket.ping();
-      }
+      for (const socket of server.clients) this.connections.get(socket)?.beat();
     }, 30_000).unref();
     server.on('close', () => clearInterval(this.heartbeat));
   }
@@ -76,14 +108,13 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
     const conn = new WsConnection(socket, this.limits.ipOf(req));
     this.connections.set(socket, conn);
     this.limits.opened(conn.ip);
-    socket.on('pong', () => (conn.alive = true));
   }
 
   handleDisconnect(socket: WebSocket): void {
     const conn = this.connections.get(socket);
     if (!conn) return;
     this.limits.closed(conn.ip);
-    if (conn.inLobby) this.lobby.unsubscribe(conn);
+    this.lobby.unsubscribe(conn);
     if (conn.tourId) this.tournaments.unfollow(conn);
     if (conn.roomId) this.duels.left(conn);
     this.radio.disconnected(conn);
@@ -96,9 +127,7 @@ export class GameGateway implements OnGatewayInit<WebSocketServer>, OnGatewayCon
   @SubscribeMessage('lobby')
   onLobby(@ConnectedSocket() socket: WebSocket, @MessageBody() msg: ClientMessageOf<'lobby'>): void {
     const connection = this.conn(socket);
-    if (!connection || connection.roomId || connection.inLobby) return;
-    connection.inLobby = true;
-    this.lobby.subscribe(connection, msg.token);
+    if (connection?.enterLobby()) this.lobby.subscribe(connection, msg.token);
   }
 
   @SubscribeMessage('tour')
