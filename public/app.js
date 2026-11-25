@@ -18,6 +18,7 @@ import { fallBackToRaw, UPSTREAM, upstreamURLs } from './upstream.js?v=dev';
 import { glyph } from './glyphs.js?v=dev';
 import { evTotal, MAX_EV, MAX_EV_TOTAL, STAT_KEYS, statValue } from './stat-formula.js?v=dev';
 import { hiddenPowerType } from './natures.js?v=dev';
+import { duelInvite, tournamentInvite } from './share-message.js?v=dev';
 
 const NAV_GLYPH = { home: 'home', collection: 'ball', pokedex: 'dex', profile: 'cap', stats: 'chart', recycling: 'recycle' };
 document.querySelectorAll('.nav a[data-nav]').forEach((link) => link.replaceChildren(glyph(NAV_GLYPH[link.dataset.nav])));
@@ -106,13 +107,56 @@ async function api(path, { method = 'GET', body } = {}) {
   return data;
 }
 
-async function copy(text, okMsg = 'Copiado') {
+function copyWithSelection(text, html) {
+  const area = h('textarea', { readonly: true, 'aria-hidden': 'true', style: { position: 'fixed', top: '0', left: '0', opacity: '0' } }, text);
+  const write = (event) => {
+    event.preventDefault();
+    event.clipboardData.setData('text/plain', text);
+    if (html) event.clipboardData.setData('text/html', html);
+  };
+  document.body.append(area);
+  area.select();
+  document.addEventListener('copy', write);
   try {
-    await navigator.clipboard.writeText(text);
-    toast(okMsg);
-  } catch {
-    toast('No pude copiar; selecciónalo a mano');
+    return document.execCommand('copy');
+  } finally {
+    document.removeEventListener('copy', write);
+    area.remove();
   }
+}
+
+async function writeClipboard(text, html) {
+  if (window.isSecureContext && navigator.clipboard) {
+    try {
+      if (html && typeof ClipboardItem !== 'undefined') await navigator.clipboard.write([new ClipboardItem({ 'text/plain': new Blob([text], { type: 'text/plain' }), 'text/html': new Blob([html], { type: 'text/html' }) })]);
+      else await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return copyWithSelection(text, html);
+    }
+  }
+  return copyWithSelection(text, html);
+}
+
+async function copy(text, okMsg = 'Copiado', html = null) {
+  toast((await writeClipboard(text, html)) ? okMsg : 'No pude copiar; selecciónalo a mano');
+}
+
+function invitePanel(invite, okMsg) {
+  const line = (segments) => segments.map((segment) => (segment.bold ? h('b', null, segment.text) : segment.text));
+  const block = (lines) => h('p', null, lines.map((segments, i) => [i ? h('br') : null, line(segments)]));
+  return h(
+    'div',
+    { class: 'invite' },
+    h('span', { class: 'invite-label' }, glyph('chat'), ' Así llega tu invitación'),
+    h('div', { class: 'invite-msg' }, invite.blocks.map(block), h('p', null, '👉 ', h('a', { href: invite.link, target: '_blank', rel: 'noopener' }, invite.action))),
+    h(
+      'div',
+      { class: 'invite-actions' },
+      h('button', { class: 'btn primary', type: 'button', onclick: () => copy(invite.text, okMsg, invite.html) }, 'Copiar invitación'),
+      h('button', { class: 'btn ghost sm', type: 'button', onclick: () => copy(invite.link, 'Link copiado') }, 'Copiar solo el link'),
+    ),
+  );
 }
 
 function typeChip(t) {
@@ -4897,14 +4941,13 @@ function renderLobby(c, { onAccepted }) {
   const randomHint = h('p', { class: 'muted small' }, `Cuando los dos estén listos, los dados sortean ${PARTY_SIZE} Pokémon de la colección de cada uno, sin repetir, con movimientos y habilidad al azar.`);
 
   if (mine) {
-    const input = h('input', { type: 'text', readonly: true, value: link, 'aria-label': 'Link de la sala', onfocus: (e) => e.target.select() });
     $app.replaceChildren(
       h(
         'section',
         { class: 'card' },
         h('h1', { class: 'with-avatar' }, avatarPic(c.host.avatar, 'lg', c.host.frame), glyph(open ? 'globe' : 'lock'), open ? ' Tu sala está abierta' : ' Tu sala privada está lista'),
-        h('p', { class: 'muted' }, open ? 'Aparece en Salas abiertas del inicio y el primero que entre pelea contigo. También puedes mandar el link. Deja esta página abierta: si la cierras, la sala deja de aparecer.' : 'No aparece en Salas abiertas: mándale este link a quien quieras desafiar. La pelea parte apenas entre; deja esta página abierta para jugar en vivo.'),
-        h('div', { class: 'share' }, input, h('button', { class: 'btn primary', onclick: () => copy(link, 'Link copiado, ¡a provocar!') }, 'Copiar')),
+        h('p', { class: 'muted' }, open ? 'Aparece en Salas abiertas del inicio y el primero que entre pelea contigo. También puedes mandar la invitación. Deja esta página abierta: si la cierras, la sala deja de aparecer.' : 'No aparece en Salas abiertas: copia la invitación y mándasela a quien quieras desafiar. La pelea parte apenas entre; deja esta página abierta para jugar en vivo.'),
+        invitePanel(duelInvite(c, link), 'Invitación copiada, ¡a provocar!'),
         h('div', { class: 'row', style: null }, modeNote, h('span', { class: 'muted pulse' }, glyph('hourglass'), ' Esperando rival…')),
       ),
       random
@@ -5350,7 +5393,7 @@ function tournamentUI(id, justPlayed = null) {
         { class: 'card' },
         h('div', { class: 'nb-head' }, h('h2', null, 'Sala del torneo'), h('p', { class: 'muted small' }, `${T.seats.length}/${T.size} jugadores · ${missing}`)),
         h('p', { class: 'muted' }, 'El torneo parte cuando la sala está llena y todos aprietan «¡Estoy listo!». Las IAs siempre están listas.'),
-        h('div', { class: 'share' }, h('input', { type: 'text', readonly: true, value: link, 'aria-label': 'Link del torneo', onfocus: (e) => e.target.select() }), h('button', { class: 'btn primary', onclick: () => copy(link, 'Link del torneo copiado') }, 'Copiar')),
+        invitePanel(tournamentInvite(T, link), 'Invitación al torneo copiada'),
         T.host
           ? h('div', { class: 'host-tools' }, h('span', { class: 'nb-label' }, 'Rellenar con IA'), levelSel, h('button', { class: 'btn sm', disabled: !free, onclick: () => addAi(1) }, '+ 1 IA'), h('button', { class: 'btn sm', disabled: !free, onclick: () => addAi(free) }, `Llenar ${free || ''} asientos`.trim()))
           : null,

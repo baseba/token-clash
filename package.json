@@ -9,8 +9,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node --disable-warning=ExperimentalWarning dist/src/main.js",
+    "predev": "node scripts/check-node.mjs",
     "dev": "tsc -p tsconfig.json && (tsc -p tsconfig.json --watch --preserveWatchOutput & node --disable-warning=ExperimentalWarning --watch dist/src/main.js)",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "node scripts/check-node.mjs",
     "test": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json && tsc -p tsconfig.tools.json && node dist/tools/no-comments.js && node --disable-warning=ExperimentalWarning --test --test-timeout=120000 'dist/src/**/*.spec.js' 'dist/tools/*.spec.js' 'dist/test/*.e2e-spec.js' 'test/web/*.test.js'",
     "no-comments": "tsc -p tsconfig.tools.json && node dist/tools/no-comments.js",
     "db:generate": "drizzle-kit generate",

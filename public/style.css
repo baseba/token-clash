@@ -144,8 +144,14 @@ input[type=text]:focus, input[type=password]:focus, .btn:focus-visible, .mon:foc
 .rank { width: 1.8rem; font-weight: 900; color: var(--muted); }
 .w { color: var(--good); font-weight: 800; } .l { color: var(--bad); font-weight: 800; }
 
-.share { display: flex; gap: .5rem; }
-.share input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9rem; }
+.invite { display: grid; gap: .75rem; margin: 1rem 0; }
+.invite-label { display: inline-flex; align-items: center; gap: .35rem; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.invite-msg { position: relative; max-width: 30rem; padding: 1rem 1.15rem; border-radius: 18px 18px 18px 6px; background: var(--bg-2); border: 1px solid var(--line); line-height: 1.5; overflow-wrap: anywhere; }
+.invite-msg p { margin: 0; }
+.invite-msg p + p { margin-top: .8rem; }
+.invite-msg b { font-weight: 800; }
+.invite-msg a { font-weight: 700; }
+.invite-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 
 .arena {
   --s: 1; position: relative; overflow: hidden; width: 100%; max-width: min(880px, calc(60vh * 320 / 180)); aspect-ratio: 320 / 180; margin-inline: auto;

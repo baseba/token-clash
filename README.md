@@ -293,6 +293,7 @@ Backend en [NestJS](https://nestjs.com) con TypeScript, organizado por dominios;
 armado y por qué: [ARQUITECTURA.md](ARQUITECTURA.md).
 
 ```sh
+nvm use              # toma la versión de .nvmrc
 npm install
 npm run dev          # compila y levanta http://localhost:8080 (recompila al guardar), datos en ./data
 npm test             # typecheck estricto + más de 200 tests: reglas, motor, IA, persistencia y flujo completo por WebSocket
@@ -300,7 +301,8 @@ npm run build        # TypeScript → dist/
 npm run db:generate  # tras cambiar un *.schema.ts: genera la migración SQL en drizzle/
 ```
 
-Node 22.13 o más (usa `node:sqlite`, que viene con Node: no hay módulos nativos que compilar).
+Node 22.13 o más (usa `node:sqlite`, que viene con Node). `.nvmrc` fija la versión, y `npm run dev` y `npm test` avisan
+antes de partir si la de tu terminal es más vieja (`scripts/check-node.mjs`).
 
 ### Dónde está cada cosa
 
@@ -342,7 +344,7 @@ Por tema:
 | Motor de batalla | `src/combat/domain/battle.ts` (mapa de archivos al principio), `move-rules.ts`, `ability-effects.ts` | WebSocket, por la arena | `public/battle-anims.js`, `public/fx.js` |
 | IA y Skynet | `src/combat/domain/ai.ts`, `src/combat/application/skynet.service.ts`, `src/combat/infrastructure/jev/` | | |
 | Salas y emparejamiento | `src/arena/domain/challenge.ts`, `lobby.ts` | `arena/interface/challenges.controller.ts` | `public/app.js` |
-| Vista previa de un link de sala o torneo (lo que muestra un chat al pegarlo) | qué dice en `src/web/link-preview.ts`, la miniatura en `preview-card.ts` (SVG) y `preview-images.ts` (PNG con resvg y la fuente de `assets/fonts/`); los datos, en `ArenaQueries.sharedDuel` y `sharedTournament` | `/b/:id` y `/t/:id` (etiquetas Open Graph) y `/og/b/:id.png`, `/og/t/:id.png` en `web/web.controller.ts` | |
+| Vista previa de un link de sala o torneo (lo que muestra un chat al pegarlo) | qué dice en `src/web/link-preview.ts`, la miniatura en `preview-card.ts` (SVG) y `preview-images.ts` (PNG con resvg y la fuente de `assets/fonts/`); los datos, en `ArenaQueries.sharedDuel` y `sharedTournament` | `/b/:id` y `/t/:id` (etiquetas Open Graph) y `/og/b/:id.png`, `/og/t/:id.png` en `web/web.controller.ts` | `public/share-message.js` (la invitación que copia el botón «Copiar invitación», con texto plano y HTML) |
 | Pelea en vivo (fases de la sala) | `src/arena/application/duel.service.ts`, `team-preview.service.ts`, `live-battle.service.ts`, `presence.ts`; lo que ve cada cliente, en `room-frames.ts` | `src/realtime/game.gateway.ts`, mensajes en `client-messages.ts` | `public/app.js`, `public/battle-anims.js` |
 | Torneos | `src/arena/domain/tournament.ts`, `arena/application/tournaments.service.ts` | `arena/interface/tournaments.controller.ts` | `public/app.js` |
 | Chat | `src/chat/domain/chat.ts`, canales en `arena/application/arena-chat.service.ts` | WebSocket | `public/app.js` |
