@@ -1,6 +1,6 @@
-import { HELD_ITEMS } from '../../catalog/domain/held-items.js';
-import { abilityInfo } from '../../catalog/domain/abilities.js';
-import type { BattleFighter, BattleState, FighterView, MoveData, PublicMove, PublicVolatiles } from './battle-types.js';
+import { HELD_ITEMS } from '../../../catalog/domain/held-items.js';
+import { abilityInfo } from '../../../catalog/domain/abilities.js';
+import type { BattleFighter, BattleState, FighterView, MoveData, PublicMove, PublicVolatiles } from '../battle-types.js';
 
 function publicMove(move: MoveData): PublicMove {
   return {

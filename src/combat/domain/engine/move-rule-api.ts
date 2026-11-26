@@ -1,8 +1,8 @@
-import { ALL_MOVE_IDS, type BoostKey, type Boosts, effectiveness, type MajorStatus, speciesData, type Stats } from '../../catalog/domain/creatures.js';
-import { moveData, type MoveData } from './moves.js';
-import { MOVE_RULES, type MoveRuleApi } from './rules/move-rules.js';
-import { ABILITIES, type AbilityEffect } from './rules/ability-effects.js';
-import type { BattleEvent, BattleFighter, BattleMove, BattleSide, BattleState, Guard, Hazards, Volatiles } from './battle-types.js';
+import { ALL_MOVE_IDS, type BoostKey, type Boosts, effectiveness, type MajorStatus, speciesData, type Stats } from '../../../catalog/domain/creatures.js';
+import { moveData, type MoveData } from '../moves.js';
+import { MOVE_RULES, type MoveRuleApi } from '../rules/move-rules.js';
+import { ABILITIES, type AbilityEffect } from '../rules/ability-effects.js';
+import type { BattleEvent, BattleFighter, BattleMove, BattleSide, BattleState, Guard, Hazards, Volatiles } from '../battle-types.js';
 import { dragOut, faint } from './switching.js';
 import { addToxicSpikes, clearHazards, cure, currentWeather, grounded, heal, hurt, setTypes, transform } from './effects.js';
 import { activeFighters, activeOf, emit, freshBoosts, hasBench, nameOf, sideIndexOf } from './state.js';
