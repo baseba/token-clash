@@ -9,12 +9,12 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 
 | Dominio | De qué se trata | Dueño de |
 | --- | --- | --- |
-| `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI y Pokémon Showdown), la Pokédex, los artículos de la tienda, los sprites de entrenador y las canciones de la radio con su duración | archivos `src/catalog/data/*.json` y las listas compartidas de `public/` |
+| `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI y Pokémon Showdown), la Pokédex, los artículos de la tienda y los sprites de entrenador | archivos `src/catalog/data/*.json` y las listas compartidas de `public/` |
 | `combat` | Cómo se pelea: motor de batalla, qué movimientos se pueden usar, elegir 3 de 6, sorteo aleatorio, IA, Skynet | nada (es puro) |
 | `trainers` | Quién juega: entrenador, colección, equipo, cuenta y sesiones, importar el save | tablas `trainers`, `roster_entries`, `trainer_sessions` |
 | `arena` | Dónde se pelea: salas, emparejamiento, peleas en vivo, torneos | tablas `challenges`, `tournaments`, `tournament_seats`, `tournament_matches` |
 | `chat` | Mensajes en salas y torneos | memoria (se borra al reiniciar, a propósito) |
-| `radio` | Las estaciones de los entrenadores: la cola que elige el dueño, qué suena y quién escucha | tabla `radio_stations` (los oyentes, en memoria) |
+| `radio` | Las estaciones de los entrenadores: la cola que elige el dueño, qué suena y quién escucha, y las canciones de la radio con su duración | tabla `radio_stations` (los oyentes, en memoria) y `src/radio/data/radio-durations.json` |
 | `tower` | La Torre: subidas con tu colección, pisos y caminos, experiencia, evolución, premios y récords | tabla `tower_runs` |
 | `stats` | La página de stats y los logros | nada: lee de los otros dominios y le pide los cambios a `trainers` |
 
@@ -37,7 +37,6 @@ quedan en la raíz de `src/`: son los dos procesos que arrancan.
      └─────────┴───────────────┘
 
    realtime (WS), HTTP ──▶ radio ──▶ trainers
-                             └─────▶ catalog
 
    HTTP ──▶ tower ──▶ arena (cada piso es una sala contra la IA)
               ├────▶ trainers (tu colección)
@@ -46,8 +45,8 @@ quedan en la raíz de `src/`: son los dos procesos que arrancan.
 
 Las flechas son "usa a". Nunca hay una flecha de vuelta: `trainers` no sabe que existen las salas, `combat` no
 sabe que existen los entrenadores, `catalog` no sabe que existe el motor, y `chat` guarda mensajes por canal sin
-saber qué es una sala. `radio` usa `catalog` (qué canciones hay y cuánto dura cada una) y `trainers` (el nombre
-del DJ), y nadie sabe que existe: escuchar una estación no tiene nada que ver con las salas, y un jugador puede
+saber qué es una sala. `radio` usa solo `trainers` (el nombre del DJ): las canciones y cuánto dura cada una son
+suyas. Nadie sabe que existe: escuchar una estación no tiene nada que ver con las salas, y un jugador puede
 escucharla mientras pelea. `tower` usa `arena` para jugar cada piso: le pide una sala contra la IA con sus
 propios equipos y su puesta en escena (`Staging`: escenario, música, sprite del rival, a dónde volver y la etiqueta del piso) y escucha
 `matchFinished` para avanzar la subida, como un torneo. La arena no sabe que la torre existe.

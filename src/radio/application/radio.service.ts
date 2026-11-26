@@ -1,5 +1,5 @@
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { radioTrackDuration, type RadioTrackId } from '../../catalog/domain/radio-tracks.js';
+import { radioTrackDuration, type RadioTrackId } from '../domain/radio-tracks.js';
 import { now } from '../../shared/domain/clock.js';
 import { notFound } from '../../shared/domain/errors.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';

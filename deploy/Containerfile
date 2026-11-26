@@ -25,6 +25,7 @@ RUN node scripts/sync-battle-anims.js
 COPY scripts/sync-trainers.js ./scripts/sync-trainers.js
 RUN node scripts/sync-trainers.js
 COPY src/catalog/data ./src/catalog/data
+COPY src/radio/data ./src/radio/data
 COPY drizzle ./drizzle
 COPY assets ./assets
 COPY public ./public

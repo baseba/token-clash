@@ -1,5 +1,5 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { RadioTrackId } from '../../catalog/domain/radio-tracks.js';
+import type { RadioTrackId } from '../domain/radio-tracks.js';
 
 export const radioStations = sqliteTable('radio_stations', {
   ownerId: text('owner_id').primaryKey(),

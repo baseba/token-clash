@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { radioTrackDuration } from '../../catalog/domain/radio-tracks.js';
+import { radioTrackDuration } from '../domain/radio-tracks.js';
 import type { TrainersService } from '../../trainers/application/trainers.service.js';
 import { Station } from '../domain/station.js';
 import { StationRepository } from '../domain/station.repository.js';

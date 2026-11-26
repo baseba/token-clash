@@ -93,11 +93,11 @@ test('a domain/ folder never imports platform/: what a domain may share lives in
   assert.deepEqual(show(bad), []);
 });
 
-test('radio uses catalog and trainers only, and no context knows radio exists', () => {
+test('radio uses trainers only, and no context knows radio exists', () => {
   const bad = imports.filter(({ file, target }) => {
     const [from, to] = [contextOf(file), contextOf(target)];
     if (!from || !to || from === to) return false;
-    return to === 'radio' || (from === 'radio' && !['catalog', 'trainers'].includes(to));
+    return to === 'radio' || (from === 'radio' && to !== 'trainers');
   });
   assert.deepEqual(show(bad), []);
 });

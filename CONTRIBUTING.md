@@ -88,8 +88,9 @@ el `git push -u` del paso 5.
   va por ahí: se genera al instalar. La CSP abre a esos hosts solo `img-src` y `connect-src`.
   El navegador guarda esos manifiestos un año bajo la versión del deploy, que se calcula al arrancar:
   después de regenerar uno, reinicia `npm run dev`.
-- Los datos de PokeAPI (`src/catalog/data/*.json`) se commitean: si tocas
-  `scripts/import-pokeapi.mjs`, córrelo (Node 22+) y sube lo que genera.
+- Los archivos de datos se commitean y cada uno vive en el dominio que lo usa: los de PokeAPI en
+  `src/catalog/data/*.json` (si tocas `scripts/import-pokeapi.mjs`, córrelo con Node 22+ y sube lo que genera) y la
+  duración de cada canción de la radio en `src/radio/data/radio-durations.json` (la escribe `npm run radio`).
 - Los cambios a `deploy/*.container`, `*.network`, `*.service`, `*.timer` y `deploy/deploy.sh` no se aplican solos:
   avisa en el PR para que se instalen a mano.
 - El dominio es puro: nada en `*/domain/` importa Nest, Drizzle, `node:http` ni `src/platform/`, y el motor
