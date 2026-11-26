@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { newId, newToken, now, sha256 } from '../../shared/domain/clock.js';
+import { newId, now } from '../../shared/domain/clock.js';
 import { conflict, forbidden } from '../../shared/domain/errors.js';
 import { checkPassword, hashPassword, passwordMatches } from '../domain/credentials.js';
 import { cleanName, nameKey, Trainer } from '../domain/trainer.js';
 import { TrainerRepository } from '../domain/trainer.repository.js';
 import { bearerToken } from './auth-headers.js';
+import { newToken, sha256 } from './session-tokens.js';
 
 const DECOY_PASSWORD_HASH = hashPassword(newToken());
 
