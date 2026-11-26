@@ -48,7 +48,7 @@ class WsConnection implements ClientConnection, RadioListener {
   }
 
   signIn(trainer: { readonly id: string } | undefined): void {
-    this.#trainerId = trainer?.id ?? null;
+    this.#trainerId ??= trainer?.id ?? null;
   }
 
   get idle(): boolean {
