@@ -126,8 +126,9 @@ pelea, un equipo que no repite especie), y para mostrar la regla de dependencia,
 2. **Si A necesita que cambie algo de B, se lo pide a B.** Al terminar una pelea, `arena` no hace
    `UPDATE trainers SET wins = wins + 1`: llama a `TrainersService.recordRankedResult()`. La regla de qué pelea
    cuenta para el ranking (no contra la IA, no en torneos) la decide `arena` (`isHumanDuel`, en `challenge.ts`, la
-   misma que usan el historial y las stats); llevar la cuenta es cosa de `trainers`. Nest hace cumplir esta parte: como `TrainersModule` exporta solo su servicio, inyectar
-   `TrainerRepository` desde `arena` hace que la app no arranque.
+   misma que usan el historial y las stats); llevar la cuenta es cosa de `trainers`. Nest hace cumplir esta parte: como `TrainersModule` exporta sus tres servicios de aplicación
+   (`TrainersService`, `AccountsService` y `ShopService`) y nunca su repositorio, inyectar `TrainerRepository` desde
+   `arena` hace que la app no arranque.
 3. **Entre dominios se referencian por id, sin foreign keys.** `challenges.host_id` es un texto. Así cada dominio
    podría vivir en otra base, y además un id de la arena puede ser una IA (`ai:hard`), que no es un entrenador.
    Las foreign keys existen solo *dentro* de un agregado (`roster_entries → trainers`).
@@ -140,7 +141,8 @@ pelea, un equipo que no repite especie), y para mostrar la regla de dependencia,
 6. **Los modelos de lectura no guardan nada.** `stats` arma la página con consultas de solo lectura
    (`TrainersService.all()`, `ArenaQueries`). En un sistema grande tendría su propia proyección alimentada por
    eventos; acá sería exagerado. Los logros desbloquean entrenadores y artículos de la tienda, pero comprar,
-   equipar y cambiar el look se lo pide a `ShopService` (regla 2).
+   equipar y reemplazar un entrenador que ya no corresponde se lo pide a `ShopService`, y elegir el entrenador del
+   perfil, a `TrainersService` (regla 2).
 
 ## 4. Recorrido de una petición
 
