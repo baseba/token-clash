@@ -188,6 +188,7 @@ test('random battle rolls a party from each collection', async () => {
   assert.equal(ch.data.challenge.mode, 'random');
   assert.deepEqual(ch.data.challenge.hostTeam, []);
   assert.equal(ch.data.challenge.hostTeamSize, 4);
+  assert.match(await (await fetch(`${base}/b/${id}`)).text(), /los dados sortean 6 Pokémon de la colección de cada uno/, 'the share link says how many Pokémon the dice draw');
 
   const host = player(id, a.data.token);
   await new Promise<any>((r) => host.ws.on('open', r));

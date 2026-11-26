@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { SharedDuel, SharedTournament } from '../arena/application/arena-queries.js';
 import { cardVersion, duelPreview, shortName, tournamentPreview, withLinkPreview } from './link-preview.js';
 
-const duel = (overrides: Partial<SharedDuel> = {}): SharedDuel => ({ open: true, mode: 'team', visibility: 'private', host: { name: 'Blue', avatar: 'blue' }, ...overrides });
+const duel = (overrides: Partial<SharedDuel> = {}): SharedDuel => ({ open: true, mode: 'team', visibility: 'private', host: { name: 'Blue', avatar: 'blue' }, partySize: 6, ...overrides });
 const tournament = (overrides: Partial<SharedTournament> = {}): SharedTournament => ({
   status: 'open',
   mode: 'team',
@@ -28,6 +28,10 @@ test('a random public room talks about the dice and the first one in', () => {
   assert.match(preview.description, /los dados sortean 6 Pokémon/);
   assert.match(preview.description, /el primero que entre pelea/);
   assert.equal(preview.card?.badge, 'Sala abierta');
+});
+
+test('the dice draw as many Pokémon as the shared duel says each side brings', () => {
+  assert.match(duelPreview(duel({ mode: 'random', partySize: 3 })).description, /los dados sortean 3 Pokémon/);
 });
 
 test('a room that is no longer open has no card, so the link shows the generic image', () => {
