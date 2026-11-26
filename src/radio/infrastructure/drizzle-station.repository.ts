@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { eq } from 'drizzle-orm';
-import type { Database } from '../../shared/infrastructure/database/database.js';
+import type { Database } from '../../platform/database/database.js';
 import type { Station } from '../domain/station.js';
 import { StationRepository } from '../domain/station.repository.js';
 import { stationToDomain, stationToRow } from './radio.mapper.js';

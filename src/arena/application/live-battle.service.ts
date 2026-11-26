@@ -3,7 +3,7 @@ import { aiLevelOf, chooseAction, JEV_LEVEL } from '../../combat/domain/ai.js';
 import { autoAction, createBattle, forcedAction, forfeit, needsAction, publicState, submit, type Action, type BattleEvent, type BattleState } from '../../combat/domain/battle.js';
 import { chosenEntries, type PreviewState } from '../../combat/domain/team-preview.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
-import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
+import { AppConfig, type ArenaTimings } from '../../platform/config/app-config.js';
 import { now } from '../../shared/domain/clock.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import { ChallengeRepository } from '../domain/arena.repositories.js';

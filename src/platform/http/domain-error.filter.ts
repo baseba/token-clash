@@ -1,6 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger, NotFoundException } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { DomainError, type DomainErrorKind } from '../domain/errors.js';
+import { DomainError, type DomainErrorKind } from '../../shared/domain/errors.js';
 
 const STATUS: Record<DomainErrorKind, number> = { invalid: 400, forbidden: 403, 'not-found': 404, conflict: 409, gone: 410, unavailable: 503 };
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { IncomingMessage } from 'node:http';
-import { AppConfig } from '../shared/config/app-config.js';
-import { clientIp } from '../shared/http/client-ip.js';
+import { AppConfig } from '../platform/config/app-config.js';
+import { clientIp } from '../platform/http/client-ip.js';
 
 export const MAX_SOCKETS_PER_IP = 30;
 

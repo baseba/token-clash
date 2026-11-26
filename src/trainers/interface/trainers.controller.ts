@@ -1,8 +1,8 @@
 import { All, Body, Controller, Get, Headers, HttpCode, Param, Post, Put } from '@nestjs/common';
 import { pokedexOf } from '../../catalog/domain/pokedex.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
-import { HttpError } from '../../shared/http/http-error.js';
-import { RateLimit } from '../../shared/http/rate-limit.guard.js';
+import { HttpError } from '../../platform/http/http-error.js';
+import { RateLimit } from '../../platform/http/rate-limit.guard.js';
 import { AccountsService } from '../application/accounts.service.js';
 import { ShopService } from '../application/shop.service.js';
 import { TrainersService } from '../application/trainers.service.js';

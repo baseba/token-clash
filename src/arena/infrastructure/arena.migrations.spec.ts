@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { drizzle } from 'drizzle-orm/node-sqlite';
 import { migrate } from 'drizzle-orm/node-sqlite/migrator';
-import { MIGRATIONS_DIR, openDatabase } from '../../shared/infrastructure/database/database.js';
+import { MIGRATIONS_DIR, openDatabase } from '../../platform/database/database.js';
 import { parseSave } from '../../trainers/domain/save-file.js';
 import { PROJECT_ROOT } from '../../shared/paths.js';
 import { DrizzleChallengeRepository } from './drizzle-arena.repositories.js';

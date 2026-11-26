@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { eq } from 'drizzle-orm';
-import type { Database } from '../../shared/infrastructure/database/database.js';
+import type { Database } from '../../platform/database/database.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
 import type { Challenge } from '../domain/challenge.js';
 import type { Tournament } from '../domain/tournament.js';

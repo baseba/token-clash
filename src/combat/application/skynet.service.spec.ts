@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AppConfig } from '../../shared/config/app-config.js';
+import { AppConfig } from '../../platform/config/app-config.js';
 import { DomainError } from '../../shared/domain/errors.js';
 import { SkynetService } from './skynet.service.js';
 

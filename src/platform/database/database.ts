@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { drizzle, type NodeSQLiteDatabase } from 'drizzle-orm/node-sqlite';
 import { migrate } from 'drizzle-orm/node-sqlite/migrator';
-import { PROJECT_ROOT } from '../../paths.js';
+import { PROJECT_ROOT } from '../../shared/paths.js';
 
 export type Database = NodeSQLiteDatabase;
 

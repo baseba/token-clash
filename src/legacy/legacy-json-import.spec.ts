@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { importLegacyJson } from './legacy-json-import.js';
-import { openDatabase } from '../shared/infrastructure/database/database.js';
+import { openDatabase } from '../platform/database/database.js';
 import { DrizzleTrainerRepository } from '../trainers/infrastructure/drizzle-trainer.repository.js';
 import { DrizzleChallengeRepository, DrizzleTournamentRepository } from '../arena/infrastructure/drizzle-arena.repositories.js';
 import { parseSave } from '../trainers/domain/save-file.js';

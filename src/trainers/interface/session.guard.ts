@@ -1,7 +1,7 @@
 import { applyDecorators, CanActivate, createParamDecorator, ExecutionContext, Injectable, SetMetadata, UseGuards } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import { HttpError } from '../../shared/http/http-error.js';
+import { HttpError } from '../../platform/http/http-error.js';
 import { bearerToken } from '../application/auth-headers.js';
 import { AccountsService } from '../application/accounts.service.js';
 import type { Trainer } from '../domain/trainer.js';
