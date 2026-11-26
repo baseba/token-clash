@@ -12,7 +12,7 @@ import { evolutionLevel, evolutionPath, expForLevel } from '../domain/growth.js'
 import { natureOf, offerMoves, type Offer } from '../domain/lab.js';
 import { cordEvolution, lockedAbilities, statsWith, stoneEvolution, trainingAfter, type Reward } from '../domain/rewards.js';
 import type { TowerRun } from '../domain/tower-run.js';
-import type { TowerRecord } from './tower.service.js';
+import type { TowerRecord } from './tower-records.js';
 
 const TRAIL_AHEAD = 6;
 
