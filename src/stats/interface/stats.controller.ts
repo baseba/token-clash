@@ -1,7 +1,7 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { ArenaQueries } from '../../arena/application/arena-queries.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
-import { WebAssets } from '../../web/web-assets.js';
+import { DeployVersion } from '../../platform/http/deploy-version.js';
 import { serverStats } from '../application/server-stats.js';
 import { trainerDirectory, trainerProfile } from '../application/trainer-profile.js';
 import { notFound } from '../../shared/domain/errors.js';
@@ -15,13 +15,13 @@ export class StatsController {
   constructor(
     private readonly trainers: TrainersService,
     private readonly arena: ArenaQueries,
-    private readonly assets: WebAssets,
+    private readonly deployVersion: DeployVersion,
   ) {}
 
   @Get()
   stats() {
     const source = { trainers: byId(this.trainers.all()), challenges: byId(this.arena.allChallenges()), tournaments: byId(this.arena.allTournaments()) };
-    return { ...serverStats(source), live: { battles: this.arena.liveBattles(), startedAt: this.startedAt, version: this.assets.version } };
+    return { ...serverStats(source), live: { battles: this.arena.liveBattles(), startedAt: this.startedAt, version: this.deployVersion.value } };
   }
 
   @Get('trainers')
