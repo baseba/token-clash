@@ -37,7 +37,7 @@ test('each move keeps the earliest level in the line and the closest species tha
 test('movedex.json only names the statuses and weathers the engine knows', () => {
   const statuses: Record<MajorStatus, true> = { brn: true, par: true, psn: true, tox: true, slp: true, frz: true };
   const weathers: Record<Weather, true> = { sun: true, rain: true, sand: true, hail: true, snow: true, harshsun: true, heavyrain: true, winds: true };
-  for (const id of ALL_MOVE_IDS()) {
+  for (const id of ALL_MOVE_IDS) {
     const move = moveEntry(id)!;
     for (const status of [move.status, ...(move.secondary ?? []).map((s) => s.status)]) if (status) assert.ok(status in statuses, `${id}: ${status}`);
     if (move.weather) assert.ok(move.weather in weathers, `${id}: ${move.weather}`);
