@@ -1,7 +1,7 @@
-import type { BoostKey, Boosts, MajorStatus } from '../../catalog/domain/creatures.js';
-import { MOVE_RULES, type MoveRuleApi } from './rules/move-rules.js';
-import { isRain, isSun, poisoned, stageMult } from './conditions.js';
-import type { AnyMove, BattleFighter, BattleMove, BattleState } from './battle-types.js';
+import type { BoostKey, Boosts, MajorStatus } from '../../../catalog/domain/creatures.js';
+import { MOVE_RULES, type MoveRuleApi } from '../rules/move-rules.js';
+import { isRain, isSun, poisoned, stageMult } from '../conditions.js';
+import type { AnyMove, BattleFighter, BattleMove, BattleState } from '../battle-types.js';
 import { dragOut, faint } from './switching.js';
 import { asleep, clearHazards, clearScreens, cure, currentWeather, grounded, heal, hurt, setTypes, STAGE_LIMIT, typeEffectiveness, weatherFor } from './effects.js';
 import { clamp, emit, freshBoosts, hasBench, nameOf, sideIndexOf } from './state.js';

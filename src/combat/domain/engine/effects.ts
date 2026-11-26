@@ -1,7 +1,7 @@
-import { type BoostKey, type Boosts, effectiveness, formData, type MajorStatus, statsFor, type Weather } from '../../catalog/domain/creatures.js';
-import type { AbilityHook, BoostChanges, BoostOptions, ChainArgs, ChainHook, Hook, HookArgs } from './rules/ability-effects.js';
-import { isSun, poisoned, stageMult } from './conditions.js';
-import type { AnyMove, BattleFighter, BattleState } from './battle-types.js';
+import { type BoostKey, type Boosts, effectiveness, formData, type MajorStatus, statsFor, type Weather } from '../../../catalog/domain/creatures.js';
+import type { AbilityHook, BoostChanges, BoostOptions, ChainArgs, ChainHook, Hook, HookArgs } from '../rules/ability-effects.js';
+import { isSun, poisoned, stageMult } from '../conditions.js';
+import type { AnyMove, BattleFighter, BattleState } from '../battle-types.js';
 import { activeFighters, clamp, emit, foeOf, nameOf, sideIndexOf } from './state.js';
 import { anyActiveHas, flag, showAbility } from './abilities.js';
 import { publicMoves } from './fighter-view.js';

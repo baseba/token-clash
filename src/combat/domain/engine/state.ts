@@ -1,5 +1,5 @@
-import type { BoostKey } from '../../catalog/domain/creatures.js';
-import type { BattleEvent, BattleFighter, BattleSide, BattleState, Look } from './battle-types.js';
+import type { BoostKey } from '../../../catalog/domain/creatures.js';
+import type { BattleEvent, BattleFighter, BattleSide, BattleState, Look } from '../battle-types.js';
 
 export const freshBoosts = (): Record<BoostKey, number> => ({ atk: 0, def: 0, satk: 0, sdef: 0, spd: 0, acc: 0, eva: 0 });
 export const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
