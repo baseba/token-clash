@@ -1,32 +1,11 @@
-import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
-import { abilityFor, genderFor, natureFor, PERFECT_IVS, natureInfo, type NatureInfo, learnedMoves, moveEntry, moveOrigins, rng, shuffled, species, statsFor, type EntryLike, type Stats } from '../../catalog/domain/creatures.js';
-import type { Gender, Ivs, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { abilityInfo } from '../../catalog/domain/abilities.js';
+import { abilityFor, genderFor, natureFor, PERFECT_IVS, natureInfo, learnedMoves, moveEntry, moveOrigins, rng, shuffled, species, statsFor, type EntryLike } from '../../catalog/domain/creatures.js';
+import type { Ivs, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { isHeldItem } from '../../catalog/domain/held-items.js';
-import { moveData, moveFor, type MoveData } from './moves.js';
+import { moveData, moveFor } from './moves.js';
+import type { Fighter, MoveData } from './battle-types.js';
 
-export interface Fighter {
-  uid: string;
-  name: string;
-  speciesName: string;
-  speciesId: number;
-  types: string[];
-  rarity: Rarity;
-  shiny: boolean;
-  level: number;
-  stats: Stats;
-  moves: MoveData[];
-  sprite: string;
-  floats: boolean;
-  ability: string | null;
-  abilityInfo: AbilityInfo | null;
-  gender: Gender | null;
-  nature: string | null;
-  natureInfo: NatureInfo | null;
-  evs: Ivs;
-  speciesBase: Stats;
-  ivs: Ivs;
-  item?: string | null;
-}
+export type { Fighter };
 
 export const MOVES_PER_FIGHTER = 4;
 export const BATTLE_LEVEL = 100;

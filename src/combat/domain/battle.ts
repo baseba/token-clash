@@ -13,7 +13,7 @@ import { abilityKey, run } from './ability-engine.js';
 export type * from './battle-types.js';
 export { STRUGGLE_MOVE } from './moves.js';
 export { forfeit, TURN_LIMIT } from './turn.js';
-export { type EventView, viewEvents, type PublicMove, type VisibleFighterView, type HiddenFighterView, type FighterView, shownTarget, publicState } from './battle-view.js';
+export { type EventView, viewEvents, shownTarget, publicState } from './battle-view.js';
 
 export const BATTLE_SIZE = 3;
 
