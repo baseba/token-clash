@@ -383,7 +383,7 @@ escritura que lee primero (`+=`, `??=`, `++`) llega a los dos.
   juzgan como cualquier otra. La unidad es el módulo de Nest: cuenta lo que cruza el borde del dominio, en la capa
   que sea, y una llamada de afuera a una capa cuenta como algo que muestra el dominio. Por eso un dominio en capas
   cuenta como escondidos sus handlers y sus métodos de repositorio, y rara vez es superficial. En este repo la regla
-  reporta `src/catalog/domain`, `shared` y carpetas dentro de una capa. El original juzga cada carpeta: es una
+  muerde a `src/catalog/domain` y a las carpetas dentro de una capa. El original juzga cada carpeta: es una
   diferencia, no un arreglo.
 
 **Lo que no ve, a propósito (lista cerrada):**

@@ -67,7 +67,7 @@ src/trainers/
   application/      Casos de uso: orquestan el dominio y los repositorios.
     trainers.service.ts   importar un save, cambiar el equipo, registrar un resultado…
     accounts.service.ts   la cuenta: registrarse, entrar, salir, la contraseña y las sesiones
-    shop.service.ts       comprar, equipar, reciclar y cambiar el look
+    shop.service.ts       comprar, equipar, reciclar y reemplazar un look que ya no está
   infrastructure/   ADAPTADORES: cómo se cumple el puerto con tecnología concreta.
     trainer.schema.ts     las tablas en Drizzle
     trainer.mapper.ts     agregado ⇄ filas
