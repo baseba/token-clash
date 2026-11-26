@@ -12,7 +12,7 @@ const IMMUTABLE = 'public, max-age=31536000, immutable';
 
 export const cacheFor = (rel: string, current: boolean): string => {
   if (/^upstream[/\\]/.test(rel)) return IMMUTABLE;
-  if (/^(trainers|overworlds|tiles)[/\\].+\.png$/.test(rel) && current) return IMMUTABLE;
+  if (/^(trainers|overworlds|tiles|animated)[/\\].+\.png$/.test(rel) && current) return IMMUTABLE;
   if (/^icons[/\\]/.test(rel) && current) return IMMUTABLE;
   return CACHEABLE.has(extname(rel)) && !recolored(rel) ? 'public, max-age=86400' : 'no-cache';
 };

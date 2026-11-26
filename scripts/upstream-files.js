@@ -6,7 +6,7 @@ const CONCURRENCY = 32;
 export async function fetchRetry(url, init = {}, { tries = 4, answers = [404] } = {}) {
   for (let attempt = 1; ; attempt++) {
     try {
-      const response = await fetch(url, { ...init, headers: HEADERS });
+      const response = await fetch(url, { ...init, headers: { ...HEADERS, ...init.headers } });
       if (response.ok || answers.includes(response.status)) return response;
       throw new Error(`${response.status} ${url}`);
     } catch (error) {
@@ -25,6 +25,15 @@ export async function fetchUpstream(upstream, path, init) {
 export async function firstExisting(upstream, paths) {
   for (const path of paths) if ((await fetchUpstream(upstream, path, { method: 'HEAD' })).ok) return path;
   return null;
+}
+
+const FALLBACKS = [['frontShiny'], ['back'], ['backShiny', 'frontShiny', 'back']];
+
+export async function resolveVariants(candidates, firstOf) {
+  const front = await firstOf(candidates.front);
+  if (!front) return null;
+  const rest = await Promise.all(FALLBACKS.map((kinds) => firstOf(kinds.flatMap((kind) => candidates[kind]))));
+  return [front, ...rest.map((path) => path ?? front)];
 }
 
 export async function mapLimit(items, task) {

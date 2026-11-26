@@ -4,7 +4,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PUBLIC_DIR } from '../../shared/paths.js';
 
-const GENERATED = ['trainers', 'overworlds', 'tiles'];
+const GENERATED = ['trainers', 'overworlds', 'tiles', 'animated'];
 const ICONS = 'icons';
 
 @Injectable()

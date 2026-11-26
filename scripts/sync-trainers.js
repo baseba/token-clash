@@ -102,7 +102,7 @@ function crc32(buffer) {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-function chunk(type, data) {
+export function chunk(type, data) {
   const length = Buffer.alloc(4);
   length.writeUInt32BE(data.length);
   const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
@@ -127,7 +127,7 @@ function atlasFrames(atlas) {
   return Array.isArray(frames) ? frames : [];
 }
 
-function opaqueBox({ width, height, rgba }) {
+export function opaqueBox({ width, height, rgba }) {
   const box = { x: width, y: height, w: 0, h: 0 };
   let right = -1;
   let bottom = -1;
@@ -142,7 +142,7 @@ function opaqueBox({ width, height, rgba }) {
   return { ...box, w: right - box.x + 1, h: bottom - box.y + 1 };
 }
 
-function crop(image, { x, y, w, h }) {
+export function crop(image, { x, y, w, h }) {
   const rgba = Buffer.alloc(w * h * 4);
   for (let row = 0; row < h; row++) image.rgba.copy(rgba, row * w * 4, ((y + row) * image.width + x) * 4, ((y + row) * image.width + x + w) * 4);
   return { width: w, height: h, rgba };

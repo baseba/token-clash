@@ -61,8 +61,8 @@ una decisión de arquitectura: pregunta antes. Lo mismo para la pila (Zod, `app-
   `anims`, `radio` y `node scripts/import-pokeapi.mjs`), y lo que generan en `src/*/data/` y `public/upstream/` se
   commitea.
 - Sprites, gritos, sonidos y música los baja el navegador de jsDelivr, fijados a un commit en `public/upstream.js`.
-  Lo que transformamos (animaciones, entrenadores, sprites de mapa, tiles) se genera en `npm install` y no se
-  versiona. La imagen instala con `--ignore-scripts` y corre esos scripts de sync ella misma (`deploy/Containerfile`):
+  Lo que transformamos (animaciones, entrenadores, sprites de mapa, tiles, sprites animados de Pokémon) se genera
+  en `npm install` y no se versiona. La imagen instala con `--ignore-scripts` y corre esos scripts de sync ella misma (`deploy/Containerfile`):
   un script nuevo de `postinstall` también va ahí.
 - El merge a `main` despliega solo cuando el CI pasa y no hay peleas en curso. Cada PR tiene que poder salir a
   producción por sí mismo, y lo que no está commiteado no llega.

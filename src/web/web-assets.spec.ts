@@ -18,6 +18,9 @@ test('a trainer sprite asked for with another version or none is not cached for 
 test('overworld sprites and the Tower tiles are cached for good with the current version, like trainers', () => {
   assert.equal(cacheFor('overworlds/red.png', true), IMMUTABLE);
   assert.equal(cacheFor('tiles/tower.png', true), IMMUTABLE);
+  assert.equal(cacheFor('animated/658-front.png', true), IMMUTABLE);
+  assert.equal(cacheFor('animated/658-front.png', false), 'public, max-age=86400');
+  assert.equal(cacheFor('animated/index.json', true), 'no-cache');
   assert.equal(cacheFor('tiles/tower.png', false), 'public, max-age=86400');
 });
 

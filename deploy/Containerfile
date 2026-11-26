@@ -14,7 +14,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && rm -rf /root/.npm
-# The battle animations are converted, the trainers cropped and recolored, and the trainers' overworld
+# The battle animations are converted, the trainers cropped and recolored, the Essentials sprite strips
+# turned into animated PNGs, and the trainers' overworld
 # sprites normalized and recolored, and the Tower's map tiles rendered, at build time (the server has no egress). Sprites, cries, sounds
 # and music load from jsDelivr in the browser.
 COPY scripts/sync-battle-anims.js scripts/upstream-files.js ./scripts/
@@ -24,6 +25,10 @@ COPY src/catalog/data/movedex.json ./src/catalog/data/movedex.json
 RUN node scripts/sync-battle-anims.js
 COPY scripts/sync-trainers.js ./scripts/sync-trainers.js
 RUN node scripts/sync-trainers.js
+COPY public/creature.js ./public/creature.js
+COPY public/upstream/essentials.json ./public/upstream/essentials.json
+COPY scripts/sync-animated-sprites.js ./scripts/sync-animated-sprites.js
+RUN node scripts/sync-animated-sprites.js
 COPY src/catalog/data ./src/catalog/data
 COPY src/radio/data ./src/radio/data
 COPY drizzle ./drizzle
