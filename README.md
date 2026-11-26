@@ -41,6 +41,25 @@ Node 22.13 o más (usa `node:sqlite`). `npm run dev` y `npm test` avisan si la v
 Para probar sin tu propio save, sube `test/fixtures/export.json`. Las reglas del código están en
 [AGENTS.md](AGENTS.md).
 
+### El parche de PokeTokenBar (`public/poketokenbar/`)
+
+El PokeTokenBar oficial cría solo hasta la #649. `gen6-9.patch` lo abre hasta la #1025: regiones de Kalos a Paldea,
+sprites animados de las mismas tiras de Essentials que usa el juego, y los graduados con la cadena cortada que pasan a
+su forma final nueva. `install.sh` clona el tag oficial, revisa su commit, aplica el parche y compila la app en el Mac
+del jugador; Colección muestra el comando. `test/web/poketokenbar-patch.test.js` revisa que el parche anime las mismas
+especies con los mismos archivos y tiempos que `public/upstream/essentials.json`.
+
+Cuando PokeTokenBar saque una versión nueva, aplica el parche sobre ella y vuelve a exportarlo:
+
+```sh
+git clone https://github.com/chattymin/PokeTokenBar.git && cd PokeTokenBar
+git switch -c gen6-9 v2.5.7 && git am ../token-clash/public/poketokenbar/gen6-9.patch
+git rebase --onto <tag nuevo> v2.5.7 && swift test
+git format-patch --stdout --no-signature <tag nuevo>..HEAD > ../token-clash/public/poketokenbar/gen6-9.patch
+```
+
+y cambia `TAG` y `COMMIT` en `install.sh`.
+
 ### Chequeo de estructura (`npm run deslop`)
 
 `tools/deslop/` es un port de [`deslop-please`](https://github.com/deterministic-machines/deslop-please) a

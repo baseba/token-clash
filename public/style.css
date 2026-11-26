@@ -113,6 +113,7 @@ input[type=text]:focus, input[type=password]:focus, .btn:focus-visible, .mon:foc
 .drop strong { display: block; font-size: 1.05rem; }
 .steps { margin: .75rem 0 0; padding-left: 1.2rem; color: var(--muted); font-size: .9rem; }
 .steps code, .muted code { background: var(--bg-2); padding: .05rem .35rem; border-radius: 6px; color: var(--text); font-size: .85em; word-break: break-all; }
+.install-command { flex: 1; background: var(--bg-2); padding: .5rem .65rem; border-radius: 8px; font-size: .85rem; overflow-wrap: anywhere; }
 .field { display: grid; gap: .35rem; margin-bottom: .9rem; }
 .field label { font-weight: 700; font-size: .9rem; }
 .error { color: var(--bad); font-weight: 700; margin: .5rem 0 0; }
@@ -680,7 +681,7 @@ select:hover, input[type=search]:hover { border-color: #5a4fb0; }
 .tool-text { display: grid; line-height: 1.2; }
 .tool-text b { font-size: .88rem; font-weight: 800; }
 .tool-text small { font-size: .72rem; color: var(--muted); font-weight: 600; }
-.reimport { margin-top: .75rem; }
+.reimport, .fresh-start { margin-top: .75rem; }
 .coll-bar { display: flex; justify-content: space-between; align-items: center; gap: .6rem 1rem; flex-wrap: wrap; margin: .75rem 0; padding: .55rem .55rem .55rem .55rem; border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
 .coll-count { padding-right: .4rem; color: var(--muted); font-size: .85rem; font-weight: 700; white-space: nowrap; }
 .collection-board .collection { margin-top: 0; }
