@@ -310,10 +310,11 @@ antes de partir si la de tu terminal es más vieja (`scripts/check-node.mjs`).
 TypeScript. Revisa `src/` con seis reglas y corre en `npm test`: cualquier diagnóstico hace fallar el test.
 
 Hay una sola excepción, en `tools/deslop/debt.allow`: `shallow-module` en `src::catalog::domain`. El catálogo es
-una biblioteca de consulta que usan seis contextos, y cada uno le pregunta cosas distintas: ningún llamador hace algo
-que se pueda bajar al catálogo. `npm run deslop` y `npm test` pasan ese archivo con `--allow`; para ver también lo
-que excusa, corre `node dist/tools/deslop/main.js` sin `--allow`. Un diagnóstico nuevo se arregla en el código, no
-agregándolo al archivo.
+una biblioteca de consulta que usan cinco dominios y `web`, y cada uno le pregunta cosas distintas: ningún llamador
+hace algo que se pueda bajar al catálogo. `npm run deslop` y `npm test` pasan ese archivo con `--allow`; para ver
+también lo que excusa, corre `node dist/tools/deslop/main.js` sin `--allow`. Un diagnóstico nuevo se arregla en el
+código, no agregándolo al archivo. El día que el catálogo deje de mostrar más de lo que esconde, borra su entrada de
+`debt.allow`: la herramienta solo avisa que una entrada ya no hace falta, no falla.
 
 | Regla | Reporta |
 | --- | --- |

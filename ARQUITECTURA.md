@@ -314,6 +314,10 @@ biblioteca de consulta y sigue mostrando más de lo que esconde. Sus reglas est�
   y al arrancar el servidor cada estación cae en la canción que estaría sonando. El timer de cada estación solo
   avisa a los oyentes en el momento en que empieza la siguiente. Los oyentes sí viven en memoria: tras un reinicio
   cada navegador vuelve a sintonizar solo.
+- **El catálogo es la única excepción del chequeo de estructura.** `src::catalog::domain` muestra más funciones de
+  las que esconde (`shallow-module`): es una biblioteca de consulta que usan cinco dominios y `web`, y ningún
+  refactor honesto lo deja bajo el límite. La excepción está en `tools/deslop/debt.allow`; el motivo y cuándo
+  borrarla, en el README, en [Chequeo de estructura](README.md#chequeo-de-estructura-npm-run-deslop).
 
 ## 9. Cómo agregar algo
 
