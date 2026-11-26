@@ -1,5 +1,5 @@
-import { poisoned } from './conditions.js';
-import type { BattleFighter, BattleState, SideCondition } from './battle-types.js';
+import { poisoned } from '../conditions.js';
+import type { BattleFighter, BattleState, SideCondition } from '../battle-types.js';
 import { computeDamage } from './damage.js';
 import { faint, settle } from './switching.js';
 import { currentWeather, grounded, heal, hurt, SCREEN_KINDS, typeEffectiveness } from './effects.js';

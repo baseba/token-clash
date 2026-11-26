@@ -4,19 +4,19 @@ import { moveAt, type MoveData, STRUGGLE_MOVE } from './moves.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { invalid } from '../../shared/domain/errors.js';
 import type { Action, AnyMove, BattleEvent, BattleFighter, BattleSideInput, BattleState, MoveAction, SwitchAction } from './battle-types.js';
-import { resolveReplacements, resolveSwitchOut, resolveTurn } from './turn.js';
-import { failReason, lastResortReady, moveBlocked } from './use-move.js';
-import { entryOrder, prepareEntry, runEntry, settle } from './switching.js';
-import { asleep } from './effects.js';
-import { activeOf, benchSlots, foeOf, freshBoosts, onField } from './state.js';
-import { run } from './ability-engine.js';
-import { abilityKey } from './abilities.js';
+import { resolveReplacements, resolveSwitchOut, resolveTurn } from './engine/turn.js';
+import { failReason, lastResortReady, moveBlocked } from './engine/use-move.js';
+import { entryOrder, prepareEntry, runEntry, settle } from './engine/switching.js';
+import { asleep } from './engine/effects.js';
+import { activeOf, benchSlots, foeOf, freshBoosts, onField } from './engine/state.js';
+import { run } from './engine/ability-engine.js';
+import { abilityKey } from './engine/abilities.js';
 
 export type * from './battle-types.js';
 export { STRUGGLE_MOVE } from './moves.js';
-export { forfeit, TURN_LIMIT } from './turn.js';
+export { forfeit, TURN_LIMIT } from './engine/turn.js';
 export { type EventView, viewEvents, publicState } from './battle-view.js';
-export { shownTarget } from './fighter-view.js';
+export { shownTarget } from './engine/fighter-view.js';
 
 export const BATTLE_SIZE = 3;
 

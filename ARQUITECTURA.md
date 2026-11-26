@@ -200,10 +200,13 @@ cada cliente en cada fase lo arma `room-frames.ts`: el jugador ve su lado y el e
 lo que ve el público.
 
 El estado de la batalla (`BattleState`) vive solo en memoria: el motor de `combat` es una función
-`submit(battle, lado, acción) → eventos`. Por dentro está repartido en un archivo por pregunta (en qué orden pasa un
-turno, qué hace un movimiento, cuánto daño hace, qué pasa al final del turno…); el mapa está al principio de
-`combat/domain/battle.ts`. Lo único que se guarda es el resultado, en el agregado `Challenge`. Por
-eso un reinicio corta las peleas en curso (quedan como `abandoned`).
+`submit(battle, lado, acción) → eventos`, y su entrada es `combat/domain/battle.ts`. Por dentro está repartido en
+un archivo por pregunta (en qué orden pasa un turno, qué hace un movimiento, cuánto daño hace, qué pasa al final del
+turno…) dentro de `combat/domain/engine/`, y las tablas de movimientos, habilidades y objetos están en
+`combat/domain/rules/`. Las flechas van en un solo sentido: una tabla de `rules/` nunca importa un archivo de
+`engine/`, y un efecto que dispara hooks recibe los triggers en vez de importar el motor de habilidades. Lo único
+que se guarda es el resultado, en el agregado `Challenge`. Por eso un reinicio corta las peleas en curso (quedan
+como `abandoned`).
 
 El chat también pasa por la arena. `ArenaChatService` decide en qué canal habla cada conexión (`ChatChannel`: el de
 la sala, o el del torneo, que comparten todas sus salas), si habla como jugador o espectador, y quién escucha.
