@@ -163,6 +163,7 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   assert.equal(stats.data.recent[0].id, id);
   assert.ok(stats.data.topMons.length >= 1);
   assert.equal(typeof stats.data.live.battles, 'number');
+  assert.equal(stats.data.live.version, versioned[1], 'the stats page reports the same deploy version the assets carry');
   assert.equal(stats.data.totals.activeNow, 1);
   const profile = (await call(`/api/stats/trainers/${a.data.me.id}`)).data.trainer;
   assert.equal(profile.name, 'Ana');
