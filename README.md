@@ -374,6 +374,11 @@ escritura que lee primero (`+=`, `??=`, `++`) llega a los dos.
 - La línea de herencia es de adentro.
 - Un cast directo de un valor a un tipo que no es valor filtra.
 - Las interfaces declaradas con `implements` llevan el trabajo al campo.
+- `shallow-module` juzga como un solo módulo a un dominio partido en capas: una carpeta hija de `src/` con una carpeta
+  `domain`, `application`, `infrastructure` o `interface`. Sus funciones cuentan en el dominio y las capas no se
+  juzgan solas. Los otros dominios le hablan a un dominio por su módulo de Nest, nunca a sus capas
+  ([ARQUITECTURA.md §3](ARQUITECTURA.md#3-reglas-entre-dominios)), así que la profundidad que importa es la del
+  dominio. El original juzga cada carpeta. Una carpeta dentro de una capa se juzga como cualquier otra.
 
 **Lo que no ve, a propósito (lista cerrada):**
 

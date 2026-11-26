@@ -5,6 +5,8 @@ import { type Diagnostic, HELD_IN_MIND, type LongList, ascending, compareText, c
 
 const BREAK_EVEN = 1;
 
+const LAYERS = new Set(['domain', 'application', 'infrastructure', 'interface']);
+
 interface List {
   name: string;
   functions: string[];
@@ -23,9 +25,14 @@ function showsTheSame(tree: Tree, below: Shallow, above: Shallow): boolean {
   return below.total === above.total && below.shown.size === above.shown.size && [...below.shown].every((item) => above.shown.has(item));
 }
 
+function isLayer(tree: Tree, id: NodeId): boolean {
+  const context = tree.parent(id);
+  return context !== undefined && tree.parent(context) === tree.root() && LAYERS.has(tree.node(id).name);
+}
+
 function judgedModules(tree: Tree): Set<NodeId> {
   const parents = new Set(tree.ids().map((id) => tree.parent(id)));
-  return new Set(tree.ids().filter((id) => tree.node(id).kind === 'package' || parents.has(id)));
+  return new Set(tree.ids().filter((id) => (tree.node(id).kind === 'package' || parents.has(id)) && !isLayer(tree, id)));
 }
 
 function typesKnown(model: Model, graph: Graph): Map<ThingId, Set<ThingId>> {
