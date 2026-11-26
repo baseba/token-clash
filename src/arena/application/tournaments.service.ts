@@ -10,7 +10,7 @@ import { TrainersService } from '../../trainers/application/trainers.service.js'
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
 import { Challenge, type BattleMode, type Visibility } from '../domain/challenge.js';
-import { shuffledOrder, tournamentMatchFor, type Seat, Tournament } from '../domain/tournament.js';
+import { tournamentMatchFor, type Seat, Tournament } from '../domain/tournament.js';
 import { ArenaEvents, type MatchFinished } from './arena-events.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
@@ -86,36 +86,28 @@ export class TournamentsService implements OnModuleInit {
   }
 
   leave(tournament: Tournament, trainer: Trainer): void {
-    tournament.assertLobby();
-    if (tournament.hostId === trainer.id) return this.close(tournament);
+    if (tournament.hostId === trainer.id) return this.close(tournament, trainer.id);
     if (!tournament.leave(trainer.id)) throw conflict('No estás en este torneo.');
     this.afterSeatsChange(tournament);
   }
 
   closeByHost(tournament: Tournament, trainer: Trainer): void {
-    tournament.assertHost(trainer.id, 'cerrar el torneo');
-    tournament.assertLobby();
-    this.close(tournament);
+    this.close(tournament, trainer.id);
   }
 
   setReady(tournament: Tournament, trainer: Trainer, ready: boolean): void {
-    tournament.assertLobby();
     tournament.setReady(trainer.id, ready);
     this.afterSeatsChange(tournament);
   }
 
   addAis(tournament: Tournament, trainer: Trainer, { level, count }: { level: string; count: number }): void {
-    tournament.assertHost(trainer.id, 'agregar IAs');
-    tournament.assertLobby();
     this.skynet.assertOffered(level);
-    tournament.addAis(level, count);
+    tournament.addAis(trainer.id, level, count);
     this.afterSeatsChange(tournament);
   }
 
   kick(tournament: Tournament, trainer: Trainer, seat: number): void {
-    tournament.assertHost(trainer.id, 'quitar jugadores');
-    tournament.assertLobby();
-    tournament.kick(seat);
+    tournament.kick(trainer.id, seat);
     this.afterSeatsChange(tournament);
   }
 
@@ -149,13 +141,17 @@ export class TournamentsService implements OnModuleInit {
   }
 
   private afterSeatsChange(tournament: Tournament): void {
-    if (tournament.everyoneReady) return this.start(tournament);
+    const at = now();
+    const started = tournament.startIfReady({ at, firstMatchAt: at + this.timings.bracketDrawMs });
     this.tournaments.save(tournament);
     this.broadcast(tournament);
+    if (!started) return;
+    this.lobby.notify();
+    setTimeout(() => this.startMatch(tournament), this.timings.bracketDrawMs).unref();
   }
 
-  private close(tournament: Tournament): void {
-    tournament.close();
+  private close(tournament: Tournament, trainerId: string): void {
+    tournament.close(trainerId);
     this.tournaments.save(tournament);
     this.broadcast(tournament);
     this.lobby.notify();
@@ -167,24 +163,11 @@ export class TournamentsService implements OnModuleInit {
     const timer = setTimeout(() => {
       this.seatTimers.delete(key);
       if (tournament.status !== 'open' || this.presence.inTournament(tournament.id, trainerId)) return;
-      if (trainerId === tournament.hostId) return this.close(tournament);
+      if (trainerId === tournament.hostId) return this.close(tournament, trainerId);
       if (tournament.leave(trainerId)) this.afterSeatsChange(tournament);
     }, this.timings.seatGraceMs);
     timer.unref();
     this.seatTimers.set(key, timer);
-  }
-
-  private start(tournament: Tournament): void {
-    const at = now();
-    tournament.start({
-      at,
-      order: shuffledOrder(tournament.size),
-      firstMatchAt: at + this.timings.bracketDrawMs,
-    });
-    this.tournaments.save(tournament);
-    this.broadcast(tournament);
-    this.lobby.notify();
-    setTimeout(() => this.startMatch(tournament), this.timings.bracketDrawMs).unref();
   }
 
   private seatTeam(tournament: Tournament, seat: Seat): RosterEntry[] {
@@ -196,11 +179,11 @@ export class TournamentsService implements OnModuleInit {
   }
 
   private startMatch(tournament: Tournament): void {
-    const next = tournament.nextMatch();
+    const next = tournament.startNextMatch(newId());
     if (!next) return;
     const [host, guest] = next.a.ai && !next.b.ai ? [next.b, next.a] : [next.a, next.b];
     const challenge = Challenge.tournamentMatch({
-      id: newId(),
+      id: next.challengeId,
       host: { id: host.id, name: host.name, team: this.seatTeam(tournament, host), ai: host.ai },
       guest: { id: guest.id, name: guest.name, team: this.seatTeam(tournament, guest), ai: guest.ai },
       mode: tournament.mode,
@@ -210,7 +193,6 @@ export class TournamentsService implements OnModuleInit {
       at: now(),
     });
     this.challenges.save(challenge);
-    tournament.matchStarted(next, challenge.id);
     this.tournaments.save(tournament);
     this.previews.startCountdown(this.presence.room(challenge), tournament.label(next));
     this.broadcast(tournament);

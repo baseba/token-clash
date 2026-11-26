@@ -1,5 +1,7 @@
 import type { NodeId, Tree } from './tree.js';
 
+export const SOURCE_EXTENSION = /\.[cm]?[jt]sx?$/;
+
 export type FileId = number & { readonly brand: 'FileId' };
 export type ItemId = number & { readonly brand: 'ItemId' };
 
