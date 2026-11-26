@@ -2222,7 +2222,7 @@ function demoMon(i) {
   return { sprite: ['4', '7', '1'][i], rarity: 'rare' };
 }
 
-const CONTRIBUTING_GUIDE_URL = 'https://github.com/baseba/token-clash/blob/main/README.md#tu-primer-pr';
+const FIRST_PR_GUIDE_URL = 'https://github.com/baseba/token-clash/blob/main/README.md#tu-primer-pr';
 
 function feedbackButton() {
   const dialog = h(
@@ -2235,7 +2235,7 @@ function feedbackButton() {
       'El código es público. ',
       h(
         'a',
-        { href: CONTRIBUTING_GUIDE_URL, target: '_blank', rel: 'noopener' },
+        { href: FIRST_PR_GUIDE_URL, target: '_blank', rel: 'noopener' },
         'Aprende a hacer un fork y subir tu PR',
         h('span', { 'aria-hidden': 'true' }, ' →'),
       ),
