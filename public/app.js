@@ -2222,7 +2222,7 @@ function demoMon(i) {
   return { sprite: ['4', '7', '1'][i], rarity: 'rare' };
 }
 
-const CONTRIBUTING_GUIDE_URL = 'https://github.com/baseba/token-clash/blob/main/CONTRIBUTING.md#tu-primer-pr-paso-a-paso';
+const CONTRIBUTING_GUIDE_URL = 'https://github.com/baseba/token-clash/blob/main/README.md#tu-primer-pr';
 
 function feedbackButton() {
   const dialog = h(
