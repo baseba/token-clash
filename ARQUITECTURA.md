@@ -203,8 +203,10 @@ El estado de la batalla (`BattleState`) vive solo en memoria: el motor de `comba
 `submit(battle, lado, acción) → eventos`, y su entrada es `combat/domain/battle.ts`. Por dentro está repartido en
 un archivo por pregunta (en qué orden pasa un turno, qué hace un movimiento, cuánto daño hace, qué pasa al final del
 turno…) dentro de `combat/domain/engine/`, y las tablas de movimientos, habilidades y objetos están en
-`combat/domain/rules/`. Lo único que se guarda es el resultado, en el agregado `Challenge`. Por eso un reinicio
-corta las peleas en curso (quedan como `abandoned`).
+`combat/domain/rules/`. Las flechas van en un solo sentido: una tabla de `rules/` nunca importa un archivo de
+`engine/`, y un efecto que dispara hooks recibe los triggers en vez de importar el motor de habilidades. Lo único
+que se guarda es el resultado, en el agregado `Challenge`. Por eso un reinicio corta las peleas en curso (quedan
+como `abandoned`).
 
 El chat también pasa por la arena. `ArenaChatService` decide en qué canal habla cada conexión (`ChatChannel`: el de
 la sala, o el del torneo, que comparten todas sus salas), si habla como jugador o espectador, y quién escucha.
