@@ -9,7 +9,7 @@ export const VARIANT_COLOR_NAMES: Readonly<Record<string, string>> = sprites.VAR
 export const VARIANT_KEYS: ReadonlySet<string> = new Set(TRAINER_VARIANTS.map((variant) => variant.key));
 export const STARTER_SPRITES: readonly string[] = sprites.STARTER_SPRITES;
 export const DOWNLOADED_SPRITES: readonly string[] = sprites.DOWNLOADED_SPRITES;
-export const originalTier = (key: string) => sprites.originalTier(key) as 'common' | 'rare' | 'epic' | 'legendary';
+export const originalTier = sprites.originalTier as (key: string) => 'common' | 'rare' | 'epic' | 'legendary';
 export const RETIRED_RECOLORS = sprites.RETIRED_RECOLORS as Readonly<Record<string, 'common' | 'rare' | 'epic' | 'legendary' | 'mythic'>>;
 export const RENAMED_TRAINERS = sprites.RENAMED_TRAINERS as Readonly<Record<string, string>>;
 export const RETIRED_SHOP_TRAINERS = sprites.RETIRED_SHOP_TRAINERS as Readonly<Record<string, 'common' | 'rare' | 'epic' | 'legendary'>>;
@@ -20,5 +20,5 @@ export const VILLAINS: Readonly<Record<'admin' | 'boss' | 'legend' | 'star' | 'p
 export const SPECIALS: readonly string[] = sprites.SPECIALS;
 export const SHOP_TRAINERS: Readonly<Record<string, string>> = sprites.SHOP_TRAINERS;
 export const isShopTrainer = (key: string): boolean => key in sprites.SHOP_TRAINERS;
-export const isTrainerSprite = (key: string): boolean => sprites.isTrainerSprite(key);
-export const trainerSpriteFor = (seed: string, pool: readonly string[] = TRAINER_SPRITES): string => sprites.trainerSpriteFor(seed, [...pool]);
+export const isTrainerSprite = sprites.isTrainerSprite as (key: string) => boolean;
+export const trainerSpriteFor = sprites.trainerSpriteFor as (seed: string, pool?: readonly string[]) => string;
