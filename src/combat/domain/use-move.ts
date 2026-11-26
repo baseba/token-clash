@@ -8,7 +8,7 @@ import { faint } from './switching.js';
 import { activeOf, addVolatile, asleep, boost, clearHazards, clearScreens, cure, currentWeather, emit, foeOf, grounded, heal, hurt, nameOf, onField, setScreen, setStatus, setTerrain, setWeather, sideIndexOf, statusImmune } from './effects.js';
 import { abilityKey, anyActiveHas, flag, run, showAbility } from './ability-engine.js';
 import { makeMoveApi } from './move-rule-api.js';
-import { shownTarget } from './battle-view.js';
+import { shownTarget } from './fighter-view.js';
 
 const CONFUSION_POWER = 40;
 

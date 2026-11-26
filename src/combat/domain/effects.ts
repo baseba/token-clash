@@ -3,7 +3,7 @@ import type { BoostChanges, BoostOptions } from './rules/ability-effects.js';
 import { isSun, poisoned, stageMult } from './conditions.js';
 import type { BattleEvent, BattleFighter, BattleSide, BattleState, Look } from './battle-types.js';
 import { anyActiveHas, chain, flag, run, showAbility } from './ability-engine.js';
-import { publicMoves } from './battle-view.js';
+import { publicMoves } from './fighter-view.js';
 
 export const STAGE_LIMIT = 6;
 const FIELD_TURNS = 5;
