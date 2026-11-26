@@ -111,7 +111,7 @@ test('a battle against the AI names its AI unless it already has a name', () => 
   assert.equal(againstAi().ai, 'hard');
 });
 
-test('AI names come from the list, carry the difficulty and never repeat inside a tournament', () => {
+test('AI names come from the list, carry the difficulty and never repeat a name already taken', () => {
   const taken = [];
   for (let i = 0; i < AI_NAMES.length; i++) {
     const { base, name } = aiName('veryhard', taken);

@@ -5,10 +5,11 @@ import { isFull, type Tournament } from './tournament.js';
 export const HOST_GRACE_MS = 20_000;
 
 type RoomLike = Pick<Challenge, 'status' | 'createdAt' | 'hostId' | 'ai' | 'visibility' | 'mode'>;
-type HostWaiting<T> = (room: T) => boolean;
+type Listing = Pick<Challenge | Tournament, 'createdAt'>;
+type HostWaiting<T> = (listing: T) => boolean;
 
-const hostPresent = <T extends Pick<RoomLike, 'createdAt'>>(room: T, now: number, hostWaiting: HostWaiting<T>) =>
-  now - room.createdAt < HOST_GRACE_MS || hostWaiting(room);
+const hostPresent = <T extends Listing>(listing: T, now: number, hostWaiting: HostWaiting<T>) =>
+  now - listing.createdAt < HOST_GRACE_MS || hostWaiting(listing);
 
 export function openRooms<T extends RoomLike>(challenges: Record<string, T> | T[], { now = Date.now(), hostWaiting = (() => false) as HostWaiting<T> } = {}): T[] {
   return Object.values(challenges)

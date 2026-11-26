@@ -38,7 +38,7 @@ interface Seated {
 
 export const humanCount = (tournament: Pick<Seated, 'seats'>) => tournament.seats.filter((s) => !s.ai).length;
 
-export const isAiSeat = (seat: Partial<Seat> | null | undefined) => !!seat?.ai;
+const isAiSeat = (seat: Partial<Seat> | null | undefined) => !!seat?.ai;
 
 export function pendingArrivals({ players = [], followers = [], present = [] }: { players?: string[]; followers?: string[]; present?: (string | null)[] }): string[] {
   const here = new Set(present);
@@ -57,10 +57,10 @@ export function roundName(size: number, round: number): string {
   return ROUND_NAMES[matches] ?? `Ronda ${round + 1}`;
 }
 
-function nextAiId(tournament: Pick<Seated, 'seats'>, level: AiLevel): { id: string; seatNumber: number } {
+function nextAiId(tournament: Pick<Seated, 'seats'>, level: AiLevel): string {
   let seatNumber = 1;
   while (tournament.seats.some((s) => s.id === aiSeatId(level, seatNumber))) seatNumber += 1;
-  return { id: aiSeatId(level, seatNumber), seatNumber };
+  return aiSeatId(level, seatNumber);
 }
 
 function shuffledOrder(count: number, random = Math.random): number[] {
@@ -219,7 +219,7 @@ export class Tournament implements TournamentState {
     if (isFull(this)) throw conflict('El torneo ya está lleno.');
     const added = Math.max(1, Math.min(this.size - this.seats.length, count));
     for (let i = 0; i < added; i++) {
-      const { id } = nextAiId(this, level);
+      const id = nextAiId(this, level);
       const { base, name } = aiName(level, this.seats.map((seat) => seat.aiBase).filter((b): b is string => !!b));
       this.addSeat({ id, name, aiBase: base, ai: level });
     }

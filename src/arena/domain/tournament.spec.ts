@@ -93,16 +93,16 @@ test('a public tournament search joins one with the same settings and free seats
 });
 
 test('how far each seat got in the bracket, and how many matches are played', () => {
-  const t = fullOfAis(4);
-  assert.equal(t.reachedBy('h'), null);
-  assert.deepEqual(t.progress(), { played: 0, total: 3 });
-  t.startIfReady(startNow());
-  t.matchFinished({ round: 0, index: 0 }, 'ai:easy#1', { now: 0, nextMatchAt: 0 });
-  t.matchFinished({ round: 0, index: 1 }, 'ai:easy#2', { now: 0, nextMatchAt: 0 });
-  assert.equal(t.reachedBy('h'), 'Semifinal');
-  assert.equal(t.reachedBy('ai:easy#2'), 'Final');
-  assert.equal(t.reachedBy('nobody'), null);
-  assert.deepEqual(t.progress(), { played: 2, total: 3 });
+  const fourAis = fullOfAis(4);
+  assert.equal(fourAis.reachedBy('h'), null);
+  assert.deepEqual(fourAis.progress(), { played: 0, total: 3 });
+  fourAis.startIfReady(startNow());
+  fourAis.matchFinished({ round: 0, index: 0 }, 'ai:easy#1', { now: 0, nextMatchAt: 0 });
+  fourAis.matchFinished({ round: 0, index: 1 }, 'ai:easy#2', { now: 0, nextMatchAt: 0 });
+  assert.equal(fourAis.reachedBy('h'), 'Semifinal');
+  assert.equal(fourAis.reachedBy('ai:easy#2'), 'Final');
+  assert.equal(fourAis.reachedBy('nobody'), null);
+  assert.deepEqual(fourAis.progress(), { played: 2, total: 3 });
 });
 
 test('a match waits for its players and for everyone following the tournament to reach the room', async () => {
