@@ -217,11 +217,11 @@ export class Tournament implements TournamentState {
     return seatOf(this, trainerId);
   }
 
-  assertHost(trainerId: string, action: string): void {
+  private assertHost(trainerId: string, action: string): void {
     if (trainerId !== this.hostId) throw forbidden(`Solo el dueño puede ${action}.`);
   }
 
-  assertLobby(): void {
+  private assertLobby(): void {
     if (this.status !== 'open') throw conflict(this.status === 'cancelled' ? 'Este torneo se cerró.' : 'El torneo ya partió.');
   }
 
@@ -231,21 +231,27 @@ export class Tournament implements TournamentState {
   }
 
   leave(trainerId: string): boolean {
+    this.assertLobby();
     const seatIndex = this.seatOf(trainerId);
     if (seatIndex <= 0) return false;
     this.seats.splice(seatIndex, 1);
     return true;
   }
 
-  kick(index: number): void {
+  kick(trainerId: string, index: number): void {
+    this.assertHost(trainerId, 'quitar jugadores');
+    this.assertLobby();
     removeSeat(this, index);
   }
 
   setReady(trainerId: string, ready: boolean): void {
+    this.assertLobby();
     setReady(this, trainerId, ready);
   }
 
-  addAis(level: AiLevel, count: number): void {
+  addAis(trainerId: string, level: AiLevel, count: number): void {
+    this.assertHost(trainerId, 'agregar IAs');
+    this.assertLobby();
     if (this.full) throw conflict('El torneo ya está lleno.');
     const added = Math.max(1, Math.min(this.size - this.seats.length, count));
     for (let i = 0; i < added; i++) {
@@ -255,7 +261,9 @@ export class Tournament implements TournamentState {
     }
   }
 
-  close(): void {
+  close(trainerId: string): void {
+    this.assertHost(trainerId, 'cerrar el torneo');
+    this.assertLobby();
     this.status = 'cancelled';
   }
 
