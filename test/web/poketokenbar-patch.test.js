@@ -54,6 +54,12 @@ test('PokeTokenBar evolves the same graduates into the same species Token Clash 
   assert.equal(`0x${hash('3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90').toString(16).padStart(8, '0')}`, /tokenClashHash\("3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90"\), (0x[0-9a-f]+)\)/.exec(patch)[1]);
 });
 
+test('PokeTokenBar leaves out the same regional-form evolutions Token Clash does', async () => {
+  const { REGIONAL_FORM_EVOLUTIONS } = await import('../../dist/src/catalog/domain/creatures.js');
+  const patched = /static let regionalFormEvolutions: Set<Int> = \[([\d, ]+)\]/.exec(patch)?.[1].split(', ').map(Number);
+  assert.deepEqual(patched, [...REGIONAL_FORM_EVOLUTIONS].sort((a, b) => a - b));
+});
+
 test('the patched PokeTokenBar keeps writing the file the automatic save sync watches', () => {
   const changed = patch.split('\n').filter((line) => /^[+-](?![+-])/.test(line));
   for (const line of changed) assert.doesNotMatch(line, /companion-state\.json|AppStatePaths|PTB_STATE_DIR|Application Support|CFBundleIdentifier/, line);

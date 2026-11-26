@@ -1376,7 +1376,7 @@ function importCard({ onDone, compact: small = false } = {}) {
   );
 }
 
-const POKETOKENBAR_GEN9_GRADUATES = 'Primeape, Farfetch’d, Mr. Mime, Girafarig, Dunsparce, Qwilfish, Ursaring, Corsola, Stantler, Linoone, Basculin y Bisharp';
+const POKETOKENBAR_GEN9_GRADUATES = 'Primeape, Girafarig, Dunsparce, Ursaring, Stantler y Bisharp';
 
 const poketokenbarInstallCommand = (origin) => `curl -fsSL ${origin}/poketokenbar/install.sh | bash -s ${origin}`;
 
