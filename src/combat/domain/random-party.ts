@@ -1,4 +1,5 @@
-import { abilityOptions, usableAbility, shuffled, NATURE_KEYS, type Random } from '../../catalog/domain/creatures.js';
+import { abilityOptions, usableAbility, NATURE_KEYS } from '../../catalog/domain/creatures.js';
+import { shuffled, type Random } from '../../shared/domain/random.js';
 import { usableMovepool, MOVES_PER_FIGHTER } from './fighter.js';
 import { moveData } from './moves.js';
 import { MOVE_RULES } from './rules/move-rules.js';
@@ -6,8 +7,6 @@ import { uniqueSpecies, type Ivs, type RosterEntry } from '../../catalog/domain/
 import { MAX_EV, MAX_EV_TOTAL, STAT_KEYS } from '../../../public/stat-formula.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
 import { PARTY_SIZE, type PreviewState } from './team-preview.js';
-
-export { shuffled };
 
 export const GUARANTEED_ATTACKS = 2;
 const EV_STEP = 4;

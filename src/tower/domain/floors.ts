@@ -1,5 +1,6 @@
 import type { AiLevel } from '../../combat/domain/ai.js';
-import { hash, rng, shuffled, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
+import { speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
+import { hash, rng, shuffled } from '../../shared/domain/random.js';
 import { CLASS_TRAINERS, SIGNATURE, STARTER_IDS, type ClassTrainer } from '../../catalog/domain/trainer-goals.js';
 import { inDex, standInFor } from './species-pool.js';
 import { CHAMPIONS, ELITE_FOUR, GYM_LEADERS, TRAINER_VARIANTS, VILLAINS } from '../../catalog/domain/trainer-sprites.js';

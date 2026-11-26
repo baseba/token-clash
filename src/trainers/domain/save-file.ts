@@ -1,4 +1,5 @@
-import { hash, NATURE_NAMES } from '../../catalog/domain/creatures.js';
+import { NATURE_NAMES } from '../../catalog/domain/creatures.js';
+import { hash } from '../../shared/domain/random.js';
 import { uniqueSpecies, variantKey, type Gender, type Ivs, type Rarity, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { toDuplicate, type Duplicate } from './recycling.js';
 import { invalid } from '../../shared/domain/errors.js';

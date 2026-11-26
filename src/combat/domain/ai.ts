@@ -1,4 +1,5 @@
-import { speciesData, formData, statsFor, PERFECT_IVS, effectiveness, shuffled, rng, type Random, type SpeciesData } from '../../catalog/domain/creatures.js';
+import { speciesData, formData, statsFor, PERFECT_IVS, effectiveness, type SpeciesData } from '../../catalog/domain/creatures.js';
+import { shuffled, rng, type Random } from '../../shared/domain/random.js';
 import { BATTLE_LEVEL, buildFighter, usableMovepool, MOVES_PER_FIGHTER } from './fighter.js';
 import { moveAt, moveData, type MoveData } from './moves.js';
 import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';

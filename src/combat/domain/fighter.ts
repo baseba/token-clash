@@ -1,5 +1,6 @@
 import { abilityInfo } from '../../catalog/domain/abilities.js';
-import { abilityFor, genderFor, natureFor, PERFECT_IVS, natureInfo, learnedMoves, moveEntry, moveOrigins, rng, shuffled, species, statsFor, type EntryLike } from '../../catalog/domain/creatures.js';
+import { abilityFor, genderFor, natureFor, PERFECT_IVS, natureInfo, learnedMoves, moveEntry, moveOrigins, species, statsFor, type EntryLike } from '../../catalog/domain/creatures.js';
+import { rng, shuffled } from '../../shared/domain/random.js';
 import type { Ivs, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { isHeldItem } from '../../catalog/domain/held-items.js';
 import { moveData, moveFor } from './moves.js';

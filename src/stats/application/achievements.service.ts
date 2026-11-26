@@ -2,7 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ArenaQueries } from '../../arena/application/arena-queries.js';
 import { forbidden } from '../../shared/domain/errors.js';
 import { TRAINER_SPRITES } from '../../catalog/domain/trainer-sprites.js';
-import { hash } from '../../catalog/domain/creatures.js';
+import { hash } from '../../shared/domain/random.js';
 import { ShopService } from '../../trainers/application/shop.service.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { EquipKind, Trainer } from '../../trainers/domain/trainer.js';

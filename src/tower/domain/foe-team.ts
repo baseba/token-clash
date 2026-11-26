@@ -1,4 +1,5 @@
-import { effectiveness, finalForms, moveOrigins, shuffled, speciesData, type Random } from '../../catalog/domain/creatures.js';
+import { effectiveness, finalForms, moveOrigins, speciesData } from '../../catalog/domain/creatures.js';
+import { shuffled, type Random } from '../../shared/domain/random.js';
 import type { Ivs, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import type { AiLevel } from '../../combat/domain/ai.js';
 import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';

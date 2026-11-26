@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { moveOrigins, rng, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
+import { moveOrigins, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
+import { rng } from '../../shared/domain/random.js';
 import { moveData } from '../../combat/domain/moves.js';
 import { levelMovesUpTo } from './growth.js';
 import { BRACE_EVS, cordEvolution, statShift, trainingAfter, evsAfter, idealNature, ivsAfter, MAX_IV, MOVE_REWARDS, MUSHROOM_REACH, REWARD_KINDS, REWARD_TIERS, WEIGHTS_IVS, REWARDS_PER_REST, restRewards, stoneEvolution, TIER_ORDER, TWIST_REWARDS, VITAMIN_EVS, vitaminRoom, type RestContext, type Reward } from './rewards.js';

@@ -427,7 +427,7 @@ Por carpeta:
 | `src/stats/` | La página de stats y los logros. No guarda nada: los cambios del entrenador se los pide a `TrainersService` y `ShopService`. |
 | `src/realtime/` | El protocolo WebSocket (`/ws`). |
 | `src/web/` | El frontend estático, los health checks y la vista previa de los links de salas y torneos. |
-| `src/shared/` | Lo que un `domain/` puede importar: los errores de dominio, el reloj (`now`, `newId`) y la raíz del proyecto (`paths.ts`). |
+| `src/shared/` | Lo que un `domain/` puede importar: los errores de dominio, el reloj (`now`, `newId`), la aleatoriedad con semilla (`hash`, `rng`, `shuffled` en `random.ts`) y la raíz del proyecto (`paths.ts`). |
 | `src/platform/` | La plomería de Nest: configuración, HTTP (guards, filtro de errores, middlewares) y la base de datos. Ningún `domain/` la importa. |
 | `src/app/` | La raíz de composición: `app.module.ts` junta los módulos y corre, al abrir la base, la migración única desde `data/db.json` (`legacy-json-import.ts`). `src/main.ts` arranca el servidor y `src/jev-proxy.main.ts`, el proxy de Jev. |
 | `src/architecture.spec.ts` | El test que hace cumplir la regla de dependencia entre capas y dominios. |

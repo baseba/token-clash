@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBattle, submit, validActions, needsAction } from './battle.js';
-import { rng, speciesData } from '../../catalog/domain/creatures.js';
+import { speciesData } from '../../catalog/domain/creatures.js';
+import { rng } from '../../shared/domain/random.js';
 import { buildFighter } from './fighter.js';
 import { AI_LEVELS, AI_POOL_SHARE, AI_PROFILES, LAST_AI_SPECIES, aiFrame, scoreMoves, aiPool, aiTeamPool, buildAiTeam, buildAiRandomParty, aiPicks, chooseAction } from './ai.js';
 import { SHOP_ITEMS } from '../../catalog/domain/shop.js';

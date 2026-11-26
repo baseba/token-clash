@@ -1,4 +1,5 @@
-import { finalForms, hash, speciesData } from '../../catalog/domain/creatures.js';
+import { finalForms, speciesData } from '../../catalog/domain/creatures.js';
+import { hash } from '../../shared/domain/random.js';
 import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';
 import { aiPool, canAttack } from '../../combat/domain/ai.js';
 import { baseStatTotal, evolutionPath } from './growth.js';
