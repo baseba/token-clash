@@ -4,8 +4,10 @@ import { MOVE_RULES, type MoveRuleApi } from './rules/move-rules.js';
 import { ABILITIES, type AbilityEffect } from './rules/ability-effects.js';
 import type { BattleEvent, BattleFighter, BattleMove, BattleSide, BattleState, Guard, Hazards, Volatiles } from './battle-types.js';
 import { dragOut, faint } from './switching.js';
-import { activeFighters, activeOf, addToxicSpikes, addVolatile, boost, clearHazards, cure, currentWeather, emit, freshBoosts, grounded, hasBench, heal, hurt, nameOf, setStatus, setTypes, sideIndexOf, speedOf, transform } from './effects.js';
-import { flag, run, setAbility } from './ability-engine.js';
+import { addToxicSpikes, addVolatile, boost, clearHazards, cure, currentWeather, grounded, heal, hurt, setStatus, setTypes, speedOf, transform } from './effects.js';
+import { activeFighters, activeOf, emit, freshBoosts, hasBench, nameOf, sideIndexOf } from './state.js';
+import { run } from './ability-engine.js';
+import { flag, setAbility } from './abilities.js';
 
 const BATON_PASSED = ['confusion', 'focusEnergy', 'perish', 'leechSeed', 'curse', 'ingrain', 'aquaRing', 'magnetRise', 'substitute', 'trappedBy', 'gastroAcid'] as const;
 const MAX_SPIKES = 3;
