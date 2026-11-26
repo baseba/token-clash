@@ -1,4 +1,4 @@
-import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { uniqueSpecies, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { conflict, type DomainError, forbidden, gone, invalid } from '../../shared/domain/errors.js';
 
 export type ChallengeStatus = 'open' | 'active' | 'finished' | 'cancelled' | 'abandoned' | 'expired';
@@ -204,11 +204,6 @@ export class Challenge implements ChallengeState {
     return true;
   }
 
-  abandon(): void {
-    this.assertActive();
-    this.status = 'abandoned';
-  }
-
   finish(result: { winnerId: string | null; turns: number; final: FinalBattleState; at: number }): void {
     this.assertActive();
     this.status = 'finished';
@@ -222,9 +217,13 @@ export class Challenge implements ChallengeState {
     if (this.status !== 'active') throw conflict('Esta pelea no está en curso.');
   }
 
-  dropRepeatedSpecies(unique: (team: RosterEntry[]) => RosterEntry[]): boolean {
+  recoverAfterRestart(): boolean {
+    if (this.status === 'active') {
+      this.status = 'abandoned';
+      return true;
+    }
     if (this.status !== 'open' || !Array.isArray(this.hostTeam)) return false;
-    const team = unique(this.hostTeam);
+    const team = uniqueSpecies(this.hostTeam);
     if (team.length === this.hostTeam.length) return false;
     this.hostTeam = team;
     return true;
