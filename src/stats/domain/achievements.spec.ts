@@ -233,3 +233,22 @@ test('an original never asks for the same Pokémon one of its recolors is named 
   }
 });
 
+test('a mythical recolor also unlocks with about a third of its region in the Pokédex', () => {
+  const rock = [74, 75, 76, 95, 111, 112, 138, 140, 142, 185, 246, 299, 304, 337, 338].map((id) => entry(id));
+  const kalos = (count: number) => Array.from({ length: count }, (_, i) => entry(650 + i));
+  assert.ok(!isUnlocked(record({ roster: rock }), 'grant_diancie'));
+  assert.ok(isUnlocked(record({ roster: [...rock, entry(719)] }), 'grant_diancie'), 'owning Diancie');
+  assert.ok(!isUnlocked(record({ roster: [...rock, ...kalos(21)] }), 'grant_diancie'));
+  assert.ok(isUnlocked(record({ roster: [...rock, ...kalos(22)] }), 'grant_diancie'), '22 of the 72 Kalos species');
+});
+
+test('an Ultra Beast recolor also unlocks with three other Ultra Beasts, and a Ruinous one with two of the four', () => {
+  const legends = [144, 145, 146].map((id) => entry(id, { rarity: 'legendary' }));
+  assert.ok(isUnlocked(record({ roster: [...legends, entry(793)] }), 'lusamine_nihilego'));
+  assert.ok(!isUnlocked(record({ roster: [...legends, entry(794), entry(795)] }), 'lusamine_nihilego'));
+  assert.ok(isUnlocked(record({ roster: [...legends, entry(794), entry(795), entry(796)] }), 'lusamine_nihilego'), 'any three Ultra Beasts');
+  const rock = [74, 75, 76, 95, 111, 112, 138, 140, 142, 185, 246, 299, 304, 337, 338].map((id) => entry(id));
+  assert.ok(!isUnlocked(record({ roster: [...rock, entry(1002)] }), 'hiker_ting_lu'));
+  assert.ok(isUnlocked(record({ roster: [...rock, entry(1002), entry(1004)] }), 'hiker_ting_lu'), 'two Treasures of Ruin');
+  assert.ok(!isUnlocked(record({ roster: [...rock, entry(1003)] }), 'hiker_ting_lu_shiny'), 'the shiny one still asks for a shiny Ting-Lu');
+});

@@ -291,14 +291,16 @@ function withTitles(variants) {
   });
 }
 
-const BW_SPRITES = 'sprites/pokemon/versions/generation-v/black-white/';
+const SPRITE_DIRS = ['sprites/pokemon/versions/generation-v/black-white/', 'sprites/pokemon/'];
 
 async function pokemonSprite(id, side, shiny) {
   const local = new URL(`../public/sprites/${id}-${side}${shiny ? '-shiny' : ''}.png`, import.meta.url);
   if (existsSync(local)) return decodePng(readFileSync(local));
-  const response = await fetchUpstream(UPSTREAM.sprites, `${BW_SPRITES}${side === 'back' ? 'back/' : ''}${shiny ? 'shiny/' : ''}${id}.png`);
-  if (!response.ok) throw new Error(`No pude bajar el sprite ${side}${shiny ? ' shiny' : ''} de #${id}.`);
-  return decodePng(Buffer.from(await response.arrayBuffer()));
+  for (const dir of SPRITE_DIRS) {
+    const response = await fetchUpstream(UPSTREAM.sprites, `${dir}${side === 'back' ? 'back/' : ''}${shiny ? 'shiny/' : ''}${id}.png`);
+    if (response.ok) return decodePng(Buffer.from(await response.arrayBuffer()));
+  }
+  throw new Error(`No pude bajar el sprite ${side}${shiny ? ' shiny' : ''} de #${id}.`);
 }
 
 async function handmadeMaps() {
