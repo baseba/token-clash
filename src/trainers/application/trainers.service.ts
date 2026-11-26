@@ -32,23 +32,27 @@ export class TrainersService implements OnModuleInit {
     let refunded = 0;
     let moved = 0;
     let recycledUp = 0;
+    let reverted = 0;
     const retiredPrices = {
       ...Object.fromEntries(Object.entries({ ...RETIRED_SHOP_TRAINERS, ...RETIRED_RECOLORS }).map(([key, rarity]) => [`trainer:${key}`, RARITIES[rarity].price])),
       ...Object.fromEntries(Object.entries(RETIRED_BALLS).map(([key, rarity]) => [`ball:${key}`, RARITIES[rarity].price])),
     };
     for (const trainer of this.trainers.all()) {
       const renamed = trainer.renameTrainers(RENAMED_TRAINERS);
+      const devolved = trainer.revertRegionalEvolutions();
       const dropped = trainer.dropRepeatedSpecies();
       const released = trainer.releaseShopLook();
       const refund = trainer.refundRetired(retiredPrices);
       const toppedUp = trainer.topUpRecycled();
-      if (renamed || dropped || released || refund || toppedUp) this.trainers.save(trainer);
+      if (renamed || devolved || dropped || released || refund || toppedUp) this.trainers.save(trainer);
+      if (devolved) reverted += 1;
       if (toppedUp) recycledUp += 1;
       if (renamed) moved += 1;
       if (dropped) fixed += 1;
       if (released) relooked += 1;
       if (refund) refunded += 1;
     }
+    if (reverted) this.logger.log(`Devolví a su forma a los Pokémon que habían evolucionado a una forma regional en ${reverted} entrenador(es).`);
     if (moved) this.logger.log(`Pasé ${moved} entrenador(es) a los nombres nuevos de sus recolores.`);
     if (fixed) this.logger.log(`Quité especies repetidas de ${fixed} entrenador(es).`);
     if (refunded) this.logger.log(`Devolví los tokens de lo que ya no se vende en la tienda a ${refunded} entrenador(es).`);
