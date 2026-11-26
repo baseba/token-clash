@@ -1,7 +1,7 @@
 import type { BattleEvent, BattleState } from './battle-types.js';
 import { needsAction } from './battle.js';
-import { currentWeather } from './effects.js';
-import { fighterView, percentOf } from './fighter-view.js';
+import { currentWeather } from './engine/effects.js';
+import { fighterView, percentOf } from './engine/fighter-view.js';
 
 function inPercent(event: Extract<BattleEvent, { hp: number }>) {
   const hp = percentOf(event.hp, event.max);

@@ -1,5 +1,4 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { uniqueSpecies } from '../../catalog/domain/roster-entry.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { newId, now } from '../../shared/domain/clock.js';
 import { notFound } from '../../shared/domain/errors.js';
@@ -36,13 +35,7 @@ export class ChallengesService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    for (const challenge of this.challenges.all()) {
-      if (challenge.status === 'active') {
-        challenge.abandon();
-        this.challenges.save(challenge);
-      }
-      if (challenge.dropRepeatedSpecies(uniqueSpecies)) this.challenges.save(challenge);
-    }
+    for (const challenge of this.challenges.all()) if (challenge.recoverAfterRestart()) this.challenges.save(challenge);
     this.duels.expireStale(now());
     this.sweep = setInterval(() => this.duels.expireStale(now()), EXPIRY_SWEEP_MS);
     this.sweep.unref();

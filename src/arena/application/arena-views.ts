@@ -8,7 +8,7 @@ import { SkynetService } from '../../combat/application/skynet.service.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import { TournamentRepository } from '../domain/arena.repositories.js';
 import type { Challenge, Staging } from '../domain/challenge.js';
-import { humanCount, reachedRound, roundName, type Tournament } from '../domain/tournament.js';
+import { humanCount, roundName, type Tournament } from '../domain/tournament.js';
 import { Presence, type BattlePhase, type CountdownPlayer } from './presence.js';
 
 const stagingView = ({ aiPicks, ...look }: Staging) => look;
@@ -121,8 +121,7 @@ export class ArenaViews {
       drawAt: tournament.drawAt ?? null,
       nextAt: tournament.nextAt ?? null,
       champion: tournament.champion ?? null,
-      played: tournament.played(),
-      total: tournament.total(),
+      ...tournament.progress(),
       aiLevels: this.skynet.aiLevels,
       serverNow: Date.now(),
     };
@@ -146,8 +145,6 @@ export class ArenaViews {
   }
 
   pastTournament(tournament: Tournament, trainerId: string) {
-    const seat = tournament.seatOf(trainerId);
-    const reached = tournament.bracket ? reachedRound(tournament.bracket, seat) : -1;
     return {
       id: tournament.id,
       size: tournament.size,
@@ -155,8 +152,8 @@ export class ArenaViews {
       status: tournament.status,
       humans: humanCount(tournament),
       createdAt: tournament.createdAt,
-      champion: tournament.champion === seat,
-      reached: reached === -1 ? null : roundName(tournament.size, reached),
+      champion: tournament.champion === tournament.seatOf(trainerId),
+      reached: tournament.reachedBy(trainerId),
     };
   }
 

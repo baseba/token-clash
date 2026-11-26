@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AccountsService } from '../../trainers/application/accounts.service.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
 import type { Challenge } from '../domain/challenge.js';
-import { HOST_GRACE_MS, openRooms } from '../domain/lobby.js';
+import { HOST_GRACE_MS, openRooms, openTournaments } from '../domain/lobby.js';
 import type { Tournament } from '../domain/tournament.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
@@ -29,10 +29,7 @@ export class LobbyService {
   }
 
   listedTournaments(now = Date.now()): Tournament[] {
-    return this.tournaments
-      .all()
-      .filter((T) => T.status === 'open' && T.visibility === 'public' && !T.full && (now - T.createdAt < HOST_GRACE_MS || this.presence.inTournament(T.id, T.hostId)))
-      .sort((a, b) => a.createdAt - b.createdAt);
+    return openTournaments(this.tournaments.all(), { now, hostWaiting: (tournament) => this.presence.inTournament(tournament.id, tournament.hostId) });
   }
 
   list(viewerId: string | null) {
