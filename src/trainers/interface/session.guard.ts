@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { HttpError } from '../../shared/http/http-error.js';
 import { bearerToken } from '../application/auth-headers.js';
-import { TrainersService } from '../application/trainers.service.js';
+import { AccountsService } from '../application/accounts.service.js';
 import type { Trainer } from '../domain/trainer.js';
 
 const SESSION = 'session';
@@ -18,13 +18,13 @@ type WithTrainer = Request & { trainer?: Trainer; sessionToken?: string };
 export class SessionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly trainers: TrainersService,
+    private readonly accounts: AccountsService,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const rule = this.reflector.getAllAndOverride<SessionRule>(SESSION, [context.getHandler(), context.getClass()]) ?? { required: true, message: NO_SESSION };
     const req = context.switchToHttp().getRequest<WithTrainer>();
-    req.trainer = this.trainers.authenticateHeader(req.headers.authorization);
+    req.trainer = this.accounts.authenticateHeader(req.headers.authorization);
     req.sessionToken = req.trainer ? bearerToken(req.headers.authorization) : undefined;
     if (!req.trainer && rule.required) throw new HttpError(401, rule.message);
     return true;

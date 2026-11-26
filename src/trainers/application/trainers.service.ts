@@ -1,22 +1,14 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { newId, newToken, now, sha256 } from '../../shared/domain/clock.js';
-import { conflict, forbidden, invalid } from '../../shared/domain/errors.js';
+import { now } from '../../shared/domain/clock.js';
+import { invalid } from '../../shared/domain/errors.js';
 import { RARITIES, RETIRED_BALLS } from '../../catalog/domain/shop.js';
 import { RENAMED_TRAINERS, RETIRED_RECOLORS, RETIRED_SHOP_TRAINERS } from '../../catalog/domain/trainer-sprites.js';
-import { checkPassword, hashPassword, passwordMatches } from '../domain/credentials.js';
-import { basicCredentials, bearerToken } from './auth-headers.js';
-import type { RecycledRecord } from '../domain/recycling.js';
+import { AccountsService } from './accounts.service.js';
+import { basicCredentials } from './auth-headers.js';
 import type { Ivs } from '../../catalog/domain/roster-entry.js';
 import { parseSave } from '../domain/save-file.js';
-import { cleanName, nameKey, Trainer, type EquipKind } from '../domain/trainer.js';
+import { cleanName, type Trainer } from '../domain/trainer.js';
 import { TrainerRepository } from '../domain/trainer.repository.js';
-
-const DECOY_PASSWORD_HASH = hashPassword(newToken());
-
-export interface Credentials {
-  name: string;
-  password: string;
-}
 
 export interface ProfileChanges {
   name?: string;
@@ -29,7 +21,10 @@ export interface ProfileChanges {
 export class TrainersService implements OnModuleInit {
   private readonly logger = new Logger(TrainersService.name);
 
-  constructor(private readonly trainers: TrainerRepository) {}
+  constructor(
+    private readonly trainers: TrainerRepository,
+    private readonly accounts: AccountsService,
+  ) {}
 
   onModuleInit(): void {
     let fixed = 0;
@@ -69,29 +64,6 @@ export class TrainersService implements OnModuleInit {
     return this.trainers.all();
   }
 
-  replaceLook(trainer: Trainer, key: string | null): void {
-    trainer.replaceLook(key);
-    this.trainers.save(trainer);
-  }
-
-  peekToken(token: string | undefined): Trainer | undefined {
-    return token === undefined ? undefined : this.trainers.findByTokenHash(sha256(token));
-  }
-
-  authenticate(token: string): Trainer | undefined {
-    const trainer = this.peekToken(token);
-    if (trainer) {
-      trainer.lastSeen = now();
-      this.trainers.saveLastSeen(trainer);
-    }
-    return trainer;
-  }
-
-  authenticateHeader(header: string | undefined): Trainer | undefined {
-    const token = bearerToken(header);
-    return token ? this.authenticate(token) : undefined;
-  }
-
   importSave(current: Trainer | undefined, input: { save: string; name?: string; password?: string }): { token: string | null; trainer: Trainer } {
     const parsed = parseSave(input.save);
     const name = cleanName(input.name ?? '');
@@ -99,64 +71,22 @@ export class TrainersService implements OnModuleInit {
     let token: string | null = null;
     if (!trainer) {
       if (!name) throw invalid('Ponte un nombre de entrenador.');
-      this.ensureNameFree(name);
-      checkPassword(input.password ?? '');
-      token = newToken();
-      trainer = Trainer.register({ id: newId(), name, tokenHash: sha256(token), passwordHash: hashPassword(input.password ?? ''), at: now() });
+      ({ token, trainer } = this.accounts.register(name, input.password ?? ''));
     } else if (name) this.rename(trainer, name);
     trainer.importSave(parsed, now());
     this.trainers.save(trainer);
     return { token, trainer };
   }
 
-  private verify(credentials: Credentials): Trainer | undefined {
-    const key = nameKey(credentials.name);
-    const trainer = this.trainers.all().find((candidate) => candidate.hasPassword && nameKey(candidate.name) === key);
-    const matches = passwordMatches(credentials.password, trainer?.passwordHash ?? DECOY_PASSWORD_HASH);
-    return trainer && matches ? trainer : undefined;
-  }
-
-  logIn(credentials: Credentials): { token: string; trainer: Trainer } | undefined {
-    const trainer = this.verify(credentials);
-    if (!trainer) return undefined;
-    const token = newToken();
-    trainer.openSession(sha256(token), now());
-    this.trainers.save(trainer);
-    return { token, trainer };
-  }
-
   syncSave(authorization: string | undefined, save: string): Trainer | undefined {
     const credentials = basicCredentials(authorization);
-    const trainer = credentials && this.verify(credentials);
+    const trainer = credentials && this.accounts.verify(credentials);
     if (!trainer) return undefined;
     return this.importSave(trainer, { save }).trainer;
   }
 
-  logOut(trainer: Trainer, token: string): void {
-    trainer.closeSession(sha256(token), sha256(newToken()));
-    this.trainers.save(trainer);
-  }
-
-  setPassword(trainer: Trainer, input: { password: string; currentPassword?: string }): Trainer {
-    if (trainer.passwordHash && !passwordMatches(input.currentPassword ?? '', trainer.passwordHash)) throw forbidden('Tu contraseña actual no coincide.');
-    if (this.namesake(trainer.name, trainer)) throw conflict(`Otro entrenador también se llama ${trainer.name}: cámbiate el nombre antes de agregar una contraseña, porque con él entras.`);
-    checkPassword(input.password);
-    trainer.setPassword(hashPassword(input.password));
-    this.trainers.save(trainer);
-    return trainer;
-  }
-
-  private namesake(name: string, owner?: Trainer): Trainer | undefined {
-    const key = nameKey(name);
-    return this.trainers.all().find((other) => other !== owner && nameKey(other.name) === key);
-  }
-
-  private ensureNameFree(name: string, owner?: Trainer): void {
-    if (this.namesake(name, owner)) throw conflict(`Ya hay un entrenador que se llama ${cleanName(name)}, elige otro nombre.`);
-  }
-
   private rename(trainer: Trainer, name: string): void {
-    if (cleanName(name)) this.ensureNameFree(name, trainer);
+    if (cleanName(name)) this.accounts.ensureNameFree(name, trainer);
     trainer.rename(name);
   }
 
@@ -165,27 +95,6 @@ export class TrainersService implements OnModuleInit {
     if (changes.avatar !== undefined) trainer.chooseAvatar(changes.avatar);
     if (changes.team) trainer.chooseTeam(changes.team);
     if (changes.nickname) trainer.setNickname(changes.nickname.id, changes.nickname.name);
-    trainer.touch(now());
-    this.trainers.save(trainer);
-    return trainer;
-  }
-
-  buy(trainer: Trainer, itemId: string): Trainer {
-    trainer.buy(itemId);
-    trainer.touch(now());
-    this.trainers.save(trainer);
-    return trainer;
-  }
-
-  recycle(trainer: Trainer, entryId: string): RecycledRecord {
-    const record = trainer.recycle(entryId, now());
-    trainer.touch(now());
-    this.trainers.save(trainer);
-    return record;
-  }
-
-  equip(trainer: Trainer, kind: EquipKind, key: string | null): Trainer {
-    trainer.equip(kind, key);
     trainer.touch(now());
     this.trainers.save(trainer);
     return trainer;

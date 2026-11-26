@@ -6,6 +6,7 @@ import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { newId, now } from '../../shared/domain/clock.js';
 import { conflict, notFound } from '../../shared/domain/errors.js';
+import { AccountsService } from '../../trainers/application/accounts.service.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
@@ -34,6 +35,7 @@ export class TournamentsService implements OnModuleInit {
     private readonly tournaments: TournamentRepository,
     private readonly challenges: ChallengeRepository,
     private readonly trainers: TrainersService,
+    private readonly accounts: AccountsService,
     private readonly previews: TeamPreviewService,
     private readonly lobby: LobbyService,
     private readonly presence: Presence,
@@ -125,7 +127,7 @@ export class TournamentsService implements OnModuleInit {
       ws.send({ t: 'error', error: 'Ese torneo no existe.' });
       return null;
     }
-    if (token !== undefined) ws.signIn(this.trainers.authenticate(token));
+    if (token !== undefined) ws.signIn(this.accounts.authenticate(token));
     if (!ws.follow(tournament.id)) return null;
     this.presence.followTournament(tournament.id, ws);
     this.broadcast(tournament);
