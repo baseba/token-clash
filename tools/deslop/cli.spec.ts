@@ -94,6 +94,13 @@ test('a scope reports only what concerns that crate or module', () => {
   assert.deepEqual(runIn(directory, 'src::nowhere'), { code: 2, stdout: '', stderr: 'deslop-please: src::nowhere: no such crate or module\n' });
 });
 
+test('a scoped run does not count allowed entries outside the scope as fixed', () => {
+  const directory = workspace('tangle');
+  const allow = join(emptyDirectory(), 'debt.allow');
+  runIn(directory, '--update-allow', allow);
+  assert.deepEqual(runIn(directory, 'src::shell', '--allow', allow), { code: 0, stdout: 'deslop-please: ok\n', stderr: '' });
+});
+
 test('help prints the usage and a bad command line prints it as an error', () => {
   for (const word of ['-h', '--help', 'help']) assert.deepEqual(runIn(emptyDirectory(), word), { code: 0, stdout: usage(), stderr: '' });
   assert.deepEqual(runIn(emptyDirectory(), '--release'), { code: 2, stdout: '', stderr: `deslop-please: unexpected argument '--release'\n${usage()}` });

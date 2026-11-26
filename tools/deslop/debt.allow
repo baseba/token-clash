@@ -1,0 +1,2 @@
+# src::catalog::domain es una biblioteca de consulta que usan cinco dominios y web, y cada uno le pregunta cosas distintas: ningún llamador hace algo que se pueda bajar al catálogo.
+shallow-module src::catalog::domain

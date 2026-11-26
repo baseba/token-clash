@@ -100,7 +100,8 @@ function execute(options: Options, directory: string, color: boolean): Run {
   }
   if (options.allow === undefined) return { code: all.length === 0 ? 0 : 1, stdout: render(all, undefined, color), stderr: '' };
   const allow = AllowList.parse(readText(resolve(directory, options.allow), options.allow), options.allow);
-  const fixed: Fixed = { count: allow.fixedCount(all), path: options.allow };
+  const everything = scope === undefined ? all : check(model, undefined);
+  const fixed: Fixed = { count: allow.fixedCount(everything), path: options.allow };
   const reported = all.filter((diagnostic) => !allow.isAllowed(diagnostic));
   return { code: reported.length === 0 ? 0 : 1, stdout: render(reported, fixed, color), stderr: '' };
 }

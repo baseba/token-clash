@@ -68,6 +68,8 @@ sigue las reglas de arriba aunque el archivo vecino no lo haga.
   `*-dtos.spec.ts` de su dominio.
 - Un test no depende de archivos que se descargan al instalar (`public/sprites`, `public/trainers`…). Si los
   necesita, se salta cuando faltan, como el test de `LEGACY_DB`.
+- `npm test` también corre el chequeo de estructura (`node dist/tools/deslop/main.js --allow
+  tools/deslop/debt.allow`); un diagnóstico nuevo se arregla en el código, no en el archivo de excepciones.
 - `src/combat/domain/battle.replays.spec.ts` fija 40 batallas completas. Si un cambio del motor las mueve a propósito,
   actualiza el snapshot con `UPDATE_SNAPSHOTS=1` en un commit propio y explica el cambio en el PR.
 
