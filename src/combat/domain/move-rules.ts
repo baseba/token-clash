@@ -1,13 +1,76 @@
-import type { BoostKey, Boosts } from '../../catalog/domain/creatures.js';
+import type { BoostKey, Boosts, MajorStatus, Stats, Weather } from '../../catalog/domain/creatures.js';
 import { TYPES } from '../../catalog/domain/type-chart.js';
-import type { MoveRuleApi } from './move-rule-api.js';
-import type { BattleFighter, BattleMove, MoveData, SideCondition, Volatiles } from './battle-types.js';
+import type { AbilityEffect } from './ability-effects.js';
+import type { BattleEvent, BattleFighter, BattleMove, BattleSide, BattleState, Guard, Hazards, MoveData, SideCondition, Volatiles } from './battle-types.js';
 import { stageMult } from './conditions.js';
 
 export interface CalledMove {
   key?: string;
   powerMult?: number;
   fail?: string | null;
+}
+
+export interface MoveRuleApi {
+  battle: BattleState;
+  random(): number;
+  turn(): number;
+  emit(event: BattleEvent): number;
+  sideOf(fighter: BattleFighter): number;
+  side(sideIndex: number): BattleSide;
+  actives(): BattleFighter[];
+  name(fighter: BattleFighter): string;
+  hurt(fighter: BattleFighter, amount: number, cause?: string): number;
+  heal(fighter: BattleFighter, amount: number): number;
+  boost(fighter: BattleFighter, changes: Boosts, source?: BattleFighter | null): Boosts;
+  setStatus(fighter: BattleFighter, status: MajorStatus, source?: BattleFighter | null): boolean;
+  cure(fighter: BattleFighter): void;
+  addVolatile(
+    fighter: BattleFighter,
+    kind: string,
+    source?: BattleFighter | null,
+    opts?: { ability?: BattleFighter; move?: { key: string; name: string } },
+  ): boolean;
+  setTypes(fighter: BattleFighter, types: readonly string[]): void;
+  changeAbility(fighter: BattleFighter, key: string | null): void;
+  transform(fighter: BattleFighter, into: BattleFighter): void;
+  dragOut(fighter: BattleFighter): boolean;
+  faint(fighter: BattleFighter): void;
+  weather(): Weather | null;
+  grounded(fighter: BattleFighter): boolean;
+  effectiveness(type: string | null | undefined, types: readonly string[]): number;
+  speed(fighter: BattleFighter): number;
+  flag(fighter: BattleFighter, name: keyof AbilityEffect): boolean;
+  abilityDef(key: string | null): AbilityEffect | undefined;
+  weight(fighter: BattleFighter): number;
+  baseAttack(fighter: BattleFighter): number | undefined;
+  moved(fighter: BattleFighter): boolean;
+  chosen(sideIndex: number): MoveData | null;
+  lastMove(): string | null;
+  nothing(fighter: BattleFighter, reason?: string | null): false;
+  volatile(fighter: BattleFighter, kind: string, extra?: { move?: string; count?: number }): number;
+  volatileEnd(fighter: BattleFighter, kind: string, extra?: { move?: string }): number;
+  sideStart(sideIndex: number, kind: string, extra?: { name?: string }): number;
+  fieldStart(kind: string): number;
+  fieldEnd(kind: string): number;
+  setBoosts(fighter: BattleFighter, boosts: Boosts): void;
+  setStats(fighter: BattleFighter, stats: Partial<Stats>): void;
+  swapBoosts(user: BattleFighter, target: BattleFighter, keys: BoostKey[]): boolean;
+  splitStats(user: BattleFighter, target: BattleFighter, keys: Exclude<keyof Stats, 'hp'>[]): boolean;
+  protect(fighter: BattleFighter, kind: string): boolean;
+  guard(fighter: BattleFighter, kind: Guard): boolean;
+  hazard(fighter: BattleFighter, kind: keyof Hazards | 'toxicspikes'): boolean;
+  clearHazards(sideIndex: number): boolean;
+  courtChange(): boolean;
+  cureTeam(fighter: BattleFighter): boolean;
+  switchOut(fighter: BattleFighter, pass?: { boosts?: boolean; volatiles?: boolean; substitute?: number } | null): void;
+  sacrifice(fighter: BattleFighter, kind: string): boolean;
+  revive(fighter: BattleFighter): boolean;
+  future(fighter: BattleFighter, move: BattleMove): boolean;
+  dropStockpile(fighter: BattleFighter): void;
+  copyMove(me: BattleFighter, foe: BattleFighter, move: BattleMove, options: { permanent?: boolean }): boolean;
+  moveData(key: string): MoveData | null;
+  callMove(fighter: BattleFighter, key: string, opts?: { powerMult?: number; instructed?: boolean }): void;
+  metronomePool(): string[];
 }
 
 export interface MoveRule {
