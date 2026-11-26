@@ -3,10 +3,12 @@ import { aimedTarget, hiddenPowerType, moveAt, moveData, type MoveData, type Mov
 import { MOVE_RULES, type MoveRuleApi } from './rules/move-rules.js';
 import { isSun, stageMult } from './conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState, MoveEvent, OrderReason } from './battle-types.js';
-import { attack, baseDamage, blockedByProtection, bypassesSub, damageRoll, HIDDEN_BY, hiddenFrom, hits, typeEffectiveness } from './damage.js';
+import { attack, baseDamage, blockedByProtection, bypassesSub, damageRoll, HIDDEN_BY, hiddenFrom, hits } from './damage.js';
 import { faint } from './switching.js';
-import { activeOf, addVolatile, asleep, boost, clearHazards, clearScreens, cure, currentWeather, emit, foeOf, grounded, heal, hurt, nameOf, onField, setScreen, setStatus, setTerrain, setWeather, sideIndexOf, statusImmune } from './effects.js';
-import { abilityKey, anyActiveHas, flag, run, showAbility } from './ability-engine.js';
+import { addVolatile, asleep, boost, clearHazards, clearScreens, cure, currentWeather, grounded, heal, hurt, setScreen, setStatus, setTerrain, setWeather, statusImmune, typeEffectiveness } from './effects.js';
+import { activeOf, emit, foeOf, nameOf, onField, sideIndexOf } from './state.js';
+import { run } from './ability-engine.js';
+import { abilityKey, anyActiveHas, flag, showAbility } from './abilities.js';
 import { makeMoveApi } from './move-rule-api.js';
 import { shownTarget } from './fighter-view.js';
 

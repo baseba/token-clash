@@ -1,8 +1,10 @@
-import { type BoostKey, type Boosts, formData, type MajorStatus, statsFor, type Weather } from '../../catalog/domain/creatures.js';
+import { type BoostKey, type Boosts, effectiveness, formData, type MajorStatus, statsFor, type Weather } from '../../catalog/domain/creatures.js';
 import type { BoostChanges, BoostOptions } from './rules/ability-effects.js';
 import { isSun, poisoned, stageMult } from './conditions.js';
-import type { BattleEvent, BattleFighter, BattleSide, BattleState, Look } from './battle-types.js';
-import { anyActiveHas, chain, flag, run, showAbility } from './ability-engine.js';
+import type { AnyMove, BattleFighter, BattleState } from './battle-types.js';
+import { activeFighters, clamp, emit, foeOf, nameOf, sideIndexOf } from './state.js';
+import { chain, run } from './ability-engine.js';
+import { anyActiveHas, flag, showAbility } from './abilities.js';
 import { publicMoves } from './fighter-view.js';
 
 export const STAGE_LIMIT = 6;
@@ -10,24 +12,6 @@ const FIELD_TURNS = 5;
 const PRIMAL = new Set<Weather | null>(['heavyrain', 'harshsun', 'winds']);
 export const SCREEN_KINDS = ['reflect', 'lightscreen', 'auroraveil'];
 const VEIL_WEATHER = new Set<Weather | null>(['hail', 'snow']);
-
-export const freshBoosts = (): Record<BoostKey, number> => ({ atk: 0, def: 0, satk: 0, sdef: 0, spd: 0, acc: 0, eva: 0 });
-export const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
-
-export const emit = (battle: BattleState, event: BattleEvent): number => battle.events.push(event);
-export const activeOf = (battle: BattleState, sideIndex: number): BattleFighter => battle.sides[sideIndex].team[battle.sides[sideIndex].active];
-export const sideIndexOf = (battle: BattleState, fighter: BattleFighter): number => battle.sides.findIndex((side) => side.team.includes(fighter));
-export const onField = (battle: BattleState, fighter: BattleFighter): boolean =>
-  fighter.hp > 0 && activeOf(battle, sideIndexOf(battle, fighter)) === fighter;
-export const activeFighters = (battle: BattleState): BattleFighter[] => [0, 1].map((s) => activeOf(battle, s)).filter((f) => f.hp > 0);
-export const foeOf = (battle: BattleState, fighter: BattleFighter): BattleFighter | null => {
-  const foe = activeOf(battle, 1 - sideIndexOf(battle, fighter));
-  return foe.hp > 0 ? foe : null;
-};
-export const nameOf = (fighter: BattleFighter): string => fighter.volatiles.illusion?.name ?? fighter.name;
-export const hasBench = (battle: BattleState, fighter: BattleFighter): boolean =>
-  battle.sides[sideIndexOf(battle, fighter)].team.some((other) => other !== fighter && other.hp > 0);
-export const benchSlots = (side: BattleSide): number[] => side.team.flatMap((fighter, slot) => (slot !== side.active && fighter.hp > 0 ? [slot] : []));
 
 const MAX_TOXIC_SPIKES = 2;
 const DIRECT_DAMAGE = new Set(['confusion', 'cost', 'painsplit']);
@@ -269,18 +253,6 @@ export function addToxicSpikes(battle: BattleState, sideIndex: number): boolean 
   return true;
 }
 
-export function lookOf(fighter: BattleFighter): Look {
-  return {
-    name: fighter.name,
-    speciesName: fighter.speciesName,
-    sprite: fighter.sprite,
-    floats: fighter.floats,
-    types: fighter.types,
-    shiny: fighter.shiny,
-    rarity: fighter.rarity,
-  };
-}
-
 export function transform(battle: BattleState, fighter: BattleFighter, into: BattleFighter): void {
   fighter.volatiles.transformed = {
     types: fighter.types,
@@ -356,6 +328,28 @@ export function speedOf(battle: BattleState, fighter: BattleFighter): number {
   spd = chain(battle, fighter, 'onSpeed', spd);
   if (fighter.status === 'par' && !flag(battle, fighter, 'ignoresParalysisSpeed')) spd *= 0.5;
   return spd;
+}
+
+export function typeEffectiveness(battle: BattleState, move: AnyMove, attacker: BattleFighter, target: BattleFighter): number {
+  if (!move.type) return 1;
+  if (move.type === 'ground' && !move.hitsAirborne && (target.volatiles.magnetRise || target.volatiles.telekinesis) && !grounded(battle, target)) return 0;
+  let eff = 1;
+  for (const type of defendingTypes(battle, target)) {
+    let multiplier = effectiveness(move.type, [type]);
+    if (move.extraType) multiplier *= effectiveness(move.extraType, [type]);
+    if (multiplier === 0
+      && type === 'flying'
+      && move.type === 'ground'
+      && (move.hitsAirborne || target.volatiles.smackedDown || target.volatiles.ingrain || battle.field.rooms.gravity))
+      multiplier = 1;
+    if (multiplier === 0 && type === 'ghost' && (move.type === 'normal' || move.type === 'fighting') && target.volatiles.foresight) multiplier = 1;
+    if (multiplier === 0 && type === 'dark' && move.type === 'psychic' && target.volatiles.miracleEye) multiplier = 1;
+    if (multiplier === 0 && type === 'ghost' && (move.type === 'normal' || move.type === 'fighting') && flag(battle, attacker, 'hitsGhost'))
+      multiplier = 1;
+    if (multiplier > 1 && type === 'flying' && currentWeather(battle) === 'winds') multiplier = 1;
+    eff *= multiplier;
+  }
+  return eff;
 }
 
 export const asleep = (battle: BattleState, fighter: BattleFighter): boolean => fighter.status === 'slp' || flag(battle, fighter, 'comatose');

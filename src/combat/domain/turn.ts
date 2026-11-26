@@ -3,7 +3,8 @@ import type { BattleEvent, BattleSide, BattleState, Mover, SwitchAction } from '
 import { useMove } from './use-move.js';
 import { residual } from './residual.js';
 import { doSwitch, entryOrder, runEntry, settle, wakeAbilities } from './switching.js';
-import { activeFighters, activeOf, benchSlots, emit, hasBench, nameOf, speedOf } from './effects.js';
+import { speedOf } from './effects.js';
+import { activeFighters, activeOf, benchSlots, emit, hasBench, nameOf } from './state.js';
 import { chain, run } from './ability-engine.js';
 import { conflict } from '../../shared/domain/errors.js';
 
