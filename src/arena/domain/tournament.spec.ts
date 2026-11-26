@@ -137,7 +137,7 @@ test('no match starts while the tournament is not running or once every match ha
   const abandoned = fullOfAis(4);
   abandoned.startIfReady(startNow());
   abandoned.startNextMatch('room1');
-  abandoned.abandon();
+  abandoned.recoverAfterRestart();
   assert.equal(abandoned.startNextMatch('room2'), null);
   assert.deepEqual(abandoned.current, { round: 0, index: 0, challengeId: 'room1' });
   assert.equal(abandoned.bracket![0][1].challengeId, null);
@@ -150,6 +150,20 @@ test('no match starts while the tournament is not running or once every match ha
   assert.equal(decided.status, 'running');
   assert.equal(decided.startNextMatch('room2'), null);
   assert.deepEqual(decided.current, { round: 0, index: 0, challengeId: 'room1' });
+});
+
+test('only a running tournament is cut by a restart', () => {
+  const waiting = lobby();
+  const cancelled = lobby();
+  cancelled.close('h');
+  const finished = tournament(4, { status: 'finished' });
+  const restarted = [waiting, cancelled, finished].map((tournament) => [tournament.recoverAfterRestart(), tournament.status]);
+  assert.deepEqual(restarted, [[false, 'open'], [false, 'cancelled'], [false, 'finished']]);
+  const running = fullOfAis(4);
+  running.startIfReady(startNow());
+  assert.equal(running.recoverAfterRestart(), true);
+  assert.equal(running.status, 'abandoned');
+  assert.equal(running.recoverAfterRestart(), false);
 });
 
 test('a cancelled lobby never starts, even with every seat full and ready', () => {
