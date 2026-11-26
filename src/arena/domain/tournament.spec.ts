@@ -153,9 +153,14 @@ test('seats change only while the lobby is open', () => {
   assert.equal(running.seats.length, 4);
 });
 
-test('someone who is not the host hears that first, even after the tournament started', () => {
+test('someone who is not the host hears that first, even after the tournament started or closed', () => {
   const running = lobby();
   running.addAis('h', 'easy', 2);
   running.start({ at: 0, order: [0, 1, 2, 3], firstMatchAt: 0 });
   assert.equal(refusal(() => running.close('p'))?.[0], 'forbidden');
+  assert.equal(refusal(() => running.kick('p', 1))?.[0], 'forbidden');
+  assert.equal(refusal(() => running.addAis('p', 'easy', 1))?.[0], 'forbidden');
+  const closed = lobby();
+  closed.close('h');
+  assert.deepEqual([refusal(() => closed.close('p')), refusal(() => closed.kick('p', 1)), refusal(() => closed.addAis('p', 'easy', 1))].map((refused) => refused?.[0]), ['forbidden', 'forbidden', 'forbidden']);
 });

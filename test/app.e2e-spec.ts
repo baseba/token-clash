@@ -388,6 +388,7 @@ test('a 4-player tournament filled with AIs plays every match in order until a c
   assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', body: { level: 'easy' } })).status, 401);
   assert.equal((await call(`/api/tournaments/${T.id}/join`, { method: 'POST', token: b.data.token })).status, 200);
   assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: b.data.token, body: { level: 'easy' } })).status, 403);
+  assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: b.data.token, body: { level: 'godlike' } })).status, 400);
   const filled = (await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: a.data.token, body: { level: 'easy', count: 5 } })).data.tournament;
   assert.deepEqual(filled.seats.map((s) => s.ready), [false, false, true, true]);
   assert.ok(filled.seats.slice(2).every((s) => / ai - fácil$/.test(s.name)));
@@ -426,6 +427,9 @@ test('a 4-player tournament filled with AIs plays every match in order until a c
   assert.ok(!mine.tournaments.some((t) => t.id === T.id), 'a tournament with one person stays out of the history');
   const order = seen.map((t) => t.current?.challengeId).filter(Boolean);
   assert.deepEqual([...new Set(order)], end.rounds.flatMap((r) => r.matches.map((m) => m.challengeId)));
+  assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: a.data.token, body: { level: 'easy' } })).status, 409);
+  assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: a.data.token, body: { level: 'godlike' } })).status, 400);
+  assert.equal((await call(`/api/tournaments/${T.id}/ai`, { method: 'POST', token: b.data.token, body: { level: 'godlike' } })).status, 400);
 });
 
 test('public rooms are listed and a matching search joins them; private ones stay hidden', async () => {
