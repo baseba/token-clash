@@ -60,6 +60,11 @@ git format-patch --stdout --no-signature <tag nuevo>..HEAD > ../token-clash/publ
 
 y cambia `TAG` y `COMMIT` en `install.sh`.
 
+Cada cambio al parche lleva una versión nueva en `version.json`: la versión oficial más un número de build
+(`2.5.7.1`, `2.5.7.2`…) y el `sha256` del parche, que el test exige. El instalador la graba en la app junto a la
+dirección de Token Clash, y la app parchada solo ofrece actualizarse cuando `version.json` trae una más nueva: el
+aviso abre Colección con el comando, nunca la versión oficial.
+
 ### Chequeo de estructura (`npm run deslop`)
 
 `tools/deslop/` es un port de [`deslop-please`](https://github.com/deterministic-machines/deslop-please) a

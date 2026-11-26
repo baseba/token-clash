@@ -1031,22 +1031,89 @@ index 0000000..2cbeaa4
 +    }
 +}
 
-From dc147f80659b56f5b303e7be68464977db605ccd Mon Sep 17 00:00:00 2001
+From 977b1697d749d9eeb5f272376765c0bfa960a200 Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Thu, 26 Nov 2026 12:00:00 +0000
-Subject: [PATCH 4/4] fix(update): open the release page instead of running
- brew upgrade
+Subject: [PATCH 4/4] feat(update): offer only Token Clash's builds of the
+ patch
 
-A brew upgrade would replace this build with the official one and drop the new generations.
+The installer bakes Token Clash's address and the patch version (the official version plus a build number) into Info.plist. The update check reads /poketokenbar/version.json from that address instead of the official releases, and its banner opens Collection with the install command, so an update never swaps this build for the official one. build-app.sh also takes extra swift build flags, which the installer uses to build past stale files a partial Command Line Tools update leaves behind.
 ---
- Sources/PokeTokenBar/Core/UpdateChecker.swift | 14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
+ Sources/PokeTokenBar/Core/UpdateChecker.swift | 55 ++++++++++++-------
+ .../TokenClashUpdateTests.swift               | 45 +++++++++++++++
+ .../UpdateCheckerTests.swift                  |  2 +-
+ scripts/build-app.sh                          |  8 ++-
+ 4 files changed, 87 insertions(+), 23 deletions(-)
+ create mode 100644 Tests/PokeTokenBarTests/TokenClashUpdateTests.swift
 
 diff --git a/Sources/PokeTokenBar/Core/UpdateChecker.swift b/Sources/PokeTokenBar/Core/UpdateChecker.swift
-index 3f6bcd2..4d353dc 100644
+index 3f6bcd2..425cb0a 100644
 --- a/Sources/PokeTokenBar/Core/UpdateChecker.swift
 +++ b/Sources/PokeTokenBar/Core/UpdateChecker.swift
-@@ -147,17 +147,9 @@ final class UpdateChecker {
+@@ -44,7 +44,7 @@ final class UpdateChecker {
+             ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
+         self.clock = clock
+         self.defaults = defaults
+-        self.fetchLatest = fetchLatest ?? { await Self.liveLatestRelease(repo: "chattymin/PokeTokenBar") }
++        self.fetchLatest = fetchLatest ?? { await Self.tokenClashLatestRelease(origin: Self.tokenClashOrigin) }
+     }
+ 
+     var settingsNotice: SettingsNotice {
+@@ -72,21 +72,46 @@ final class UpdateChecker {
+         consider(latest: version, url: release.url)
+     }
+ 
+-    /// NSWorkspace.open 으로 가는 릴리스 URL — https + github.com 만 허용(스킴 하이재킹 방지).
+-    nonisolated static func isTrustedReleaseURL(_ string: String) -> Bool {
+-        guard let url = URL(string: string), url.scheme == "https", url.host == "github.com" else { return false }
+-        return true
++    nonisolated static func isTrustedReleaseURL(_ string: String, origin: URL? = tokenClashOrigin) -> Bool {
++        guard let url = URL(string: string) else { return false }
++        if url.scheme == "https", url.host == "github.com" { return true }
++        guard let origin else { return false }
++        return url.scheme == origin.scheme && url.host == origin.host && url.port == origin.port
+     }
+ 
+-    /// Release tag → comparable version, or nil when the tag is not a plain `MAJOR.MINOR.PATCH`
+-    /// (optionally `v`-prefixed). `isNewer` reads non-numeric parts as 0, so a prerelease such as
++    nonisolated static let tokenClashOrigin: URL? =
++        (Bundle.main.object(forInfoDictionaryKey: "TokenClashOrigin") as? String).flatMap(tokenClashOrigin(from:))
++
++    nonisolated static func tokenClashOrigin(from value: String) -> URL? {
++        guard let url = URL(string: value), let host = url.host, !host.isEmpty, url.path.isEmpty || url.path == "/",
++              url.scheme == "https" || (url.scheme == "http" && (host == "localhost" || host == "127.0.0.1"))
++        else { return nil }
++        return url
++    }
++
++    nonisolated static func tokenClashCollectionURL(origin: URL) -> String {
++        origin.appendingPathComponent("coleccion").absoluteString + "#poketokenbar"
++    }
++
++    private nonisolated static func tokenClashLatestRelease(origin: URL?) async -> LatestRelease? {
++        guard let origin else { return nil }
++        let request = URLRequest(url: origin.appendingPathComponent("poketokenbar/version.json"), timeoutInterval: 15)
++        guard let (data, response) = try? await URLSession.shared.data(for: request),
++              (response as? HTTPURLResponse)?.statusCode == 200,
++              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
++              let version = json["version"] as? String else { return nil }
++        return LatestRelease(tag: version, url: tokenClashCollectionURL(origin: origin))
++    }
++
++    /// Release tag → comparable version, or nil when the tag is not a plain `MAJOR.MINOR.PATCH`, or
++    /// `MAJOR.MINOR.PATCH.BUILD` for a Token Clash build (optionally `v`-prefixed). `isNewer` reads non-numeric parts as 0, so a prerelease such as
+     /// `v2.6.0-beta.1` would compare equal to `2.6.0` and garbage would compare as `0.0.0`; neither
+     /// may be applied or counted as a successful check.
+     nonisolated static func normalizedReleaseVersion(_ tag: String) -> String? {
+         var version = Substring(tag.trimmingCharacters(in: .whitespacesAndNewlines))
+         if version.first == "v" || version.first == "V" { version = version.dropFirst() }
+         let parts = version.split(separator: ".", omittingEmptySubsequences: false)
+-        guard parts.count == 3,
++        guard parts.count == 3 || parts.count == 4,
+               parts.allSatisfy({ part in
+                   !part.isEmpty && part.count <= 9 && part.allSatisfy { $0.isASCII && $0.isNumber }
+               }) else { return nil }
+@@ -147,17 +172,9 @@ final class UpdateChecker {
          guard let update = updateTarget, !isUpdating else { return }
          isUpdating = true
          Task { @MainActor in
@@ -1067,3 +1134,100 @@ index 3f6bcd2..4d353dc 100644
          }
      }
  
+diff --git a/Tests/PokeTokenBarTests/TokenClashUpdateTests.swift b/Tests/PokeTokenBarTests/TokenClashUpdateTests.swift
+new file mode 100644
+index 0000000..acd11c2
+--- /dev/null
++++ b/Tests/PokeTokenBarTests/TokenClashUpdateTests.swift
+@@ -0,0 +1,45 @@
++import XCTest
++@testable import PokeTokenBar
++
++final class TokenClashUpdateTests: XCTestCase {
++    func testTheOriginComesFromAnHTTPSAddressOrLocalhost() {
++        XCTAssertEqual(UpdateChecker.tokenClashOrigin(from: "https://tokenclash.example")?.host, "tokenclash.example")
++        XCTAssertEqual(UpdateChecker.tokenClashOrigin(from: "http://localhost:8080")?.port, 8080)
++        XCTAssertNil(UpdateChecker.tokenClashOrigin(from: ""))
++        XCTAssertNil(UpdateChecker.tokenClashOrigin(from: "http://tokenclash.example"))
++        XCTAssertNil(UpdateChecker.tokenClashOrigin(from: "https://tokenclash.example/otra/ruta"))
++        XCTAssertNil(UpdateChecker.tokenClashOrigin(from: "file:///tmp/x"))
++    }
++
++    func testOnlyTokenClashAndGitHubPagesAreOpened() {
++        let origin = URL(string: "https://tokenclash.example")
++        XCTAssertTrue(UpdateChecker.isTrustedReleaseURL("https://tokenclash.example/coleccion#poketokenbar", origin: origin))
++        XCTAssertFalse(UpdateChecker.isTrustedReleaseURL("https://evil.example/coleccion", origin: origin))
++        XCTAssertFalse(UpdateChecker.isTrustedReleaseURL("http://tokenclash.example/coleccion", origin: origin))
++        XCTAssertFalse(UpdateChecker.isTrustedReleaseURL("https://tokenclash.example:8443/coleccion", origin: origin))
++        XCTAssertFalse(UpdateChecker.isTrustedReleaseURL("https://tokenclash.example/coleccion", origin: nil))
++    }
++
++    func testTheUpdateOpensTheCollectionWithThePatchCard() {
++        let origin = URL(string: "https://tokenclash.example")!
++        XCTAssertEqual(UpdateChecker.tokenClashCollectionURL(origin: origin), "https://tokenclash.example/coleccion#poketokenbar")
++    }
++
++    func testAPatchBuildComparesByItsFourthNumber() {
++        XCTAssertEqual(UpdateChecker.normalizedReleaseVersion("2.5.7.3"), "2.5.7.3")
++        XCTAssertNil(UpdateChecker.normalizedReleaseVersion("2.5.7.3.1"))
++        XCTAssertNil(UpdateChecker.normalizedReleaseVersion("2.5.7.x"))
++        XCTAssertTrue(UpdateChecker.isNewer("2.5.7.3", than: "2.5.7.2"))
++        XCTAssertTrue(UpdateChecker.isNewer("2.5.8.1", than: "2.5.7.9"))
++        XCTAssertFalse(UpdateChecker.isNewer("2.5.7.3", than: "2.5.7.3"))
++    }
++
++    @MainActor
++    func testANewerPatchIsOfferedWithTheCollectionLink() async {
++        let checker = UpdateChecker(currentVersion: "2.5.7.1", defaults: UserDefaults(suiteName: "TokenClashUpdateTests.\(UUID().uuidString)")!) {
++            UpdateChecker.LatestRelease(tag: "2.5.7.2", url: "https://github.com/chattymin/PokeTokenBar/releases/tag/v2.5.7")
++        }
++        await checker.check(minInterval: 0)
++        XCTAssertEqual(checker.available?.version, "2.5.7.2")
++    }
++}
+diff --git a/Tests/PokeTokenBarTests/UpdateCheckerTests.swift b/Tests/PokeTokenBarTests/UpdateCheckerTests.swift
+index c4e7855..37ddf96 100644
+--- a/Tests/PokeTokenBarTests/UpdateCheckerTests.swift
++++ b/Tests/PokeTokenBarTests/UpdateCheckerTests.swift
+@@ -112,7 +112,7 @@ final class UpdateCheckerTests: XCTestCase {
+     /// very next attempt fetches again and applies a valid release instead of waiting 30 minutes.
+     @MainActor
+     func testMalformedOrPrereleaseTagIsAFailedCheckAndDoesNotBlockTheNextOne() async {
+-        let badTags = ["", "latest", "v", "v2.5", "2.5.5.1", "v2..5", "2.5.x", "release-2.5.5", "v 2.5.5",
++        let badTags = ["", "latest", "v", "v2.5", "2.5.5.1.1", "v2..5", "2.5.x", "release-2.5.5", "v 2.5.5",
+                        "v2.6.0-beta.1", "2.6.0-rc1", "v2.6.0+build.5", "v2.6.0.beta", "v-2.6.0",
+                        "v1234567890.0.0", "v٢.٥.٥"]
+         for bad in badTags {
+diff --git a/scripts/build-app.sh b/scripts/build-app.sh
+index aa8cc1c..005b2af 100755
+--- a/scripts/build-app.sh
++++ b/scripts/build-app.sh
+@@ -3,7 +3,7 @@
+ set -euo pipefail
+ cd "$(dirname "$0")/.."
+ 
+-VERSION="2.5.7"
++VERSION="${TOKEN_CLASH_VERSION:-2.5.7}"
+ APP_NAME="PokeTokenBar"
+ BUILD_DIR="build"
+ APP="$BUILD_DIR/$APP_NAME.app"
+@@ -19,8 +19,9 @@ fi
+ SLICES=()
+ for arch in "${ARCHS[@]}"; do
+     echo "==> swift build -c release --arch $arch"
+-    swift build -c release --arch "$arch"
+-    SLICES+=("$(swift build -c release --arch "$arch" --show-bin-path)/$APP_NAME")
++    read -r -a EXTRA_FLAGS <<< "${PTB_SWIFT_BUILD_FLAGS:-}"
++    swift build -c release --arch "$arch" ${EXTRA_FLAGS[@]+"${EXTRA_FLAGS[@]}"}
++    SLICES+=("$(swift build -c release --arch "$arch" ${EXTRA_FLAGS[@]+"${EXTRA_FLAGS[@]}"} --show-bin-path)/$APP_NAME")
+ done
+ 
+ echo "==> $APP 조립"
+@@ -44,6 +45,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
+     <key>CFBundlePackageType</key><string>APPL</string>
+     <key>CFBundleShortVersionString</key><string>$VERSION</string>
+     <key>CFBundleVersion</key><string>$VERSION</string>
++    <key>TokenClashOrigin</key><string>${TOKEN_CLASH_ORIGIN:-}</string>
+     <key>LSMinimumSystemVersion</key><string>14.0</string>
+     <key>CFBundleIconFile</key><string>AppIcon</string>
+     <key>LSUIElement</key><true/>

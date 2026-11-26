@@ -65,3 +65,15 @@ test('the patched PokeTokenBar keeps writing the file the automatic save sync wa
   for (const line of changed) assert.doesNotMatch(line, /companion-state\.json|AppStatePaths|PTB_STATE_DIR|Application Support|CFBundleIdentifier/, line);
   assert.doesNotMatch(installer, /companion-state\.json|LaunchAgents|TokenClash/);
 });
+
+test('every patch ships with its own version, which the installer bakes into the app for its update check', async () => {
+  const { createHash } = await import('node:crypto');
+  const release = JSON.parse(readFileSync(new URL('../../public/poketokenbar/version.json', import.meta.url), 'utf8'));
+  const tag = /^TAG="v([\d.]+)"$/m.exec(installer)[1];
+  assert.match(release.version, new RegExp(`^${tag.replaceAll('.', '\\.')}\\.\\d+$`), 'the official version plus a build number');
+  assert.equal(release.patch, createHash('sha256').update(patch).digest('hex'), 'a changed patch needs a new version in version.json');
+  assert.match(installer, /TOKEN_CLASH_ORIGIN="\$ORIGIN" TOKEN_CLASH_VERSION="\$VERSION"/);
+  assert.match(patch, /^\+VERSION="\$\{TOKEN_CLASH_VERSION:-/m);
+  assert.match(patch, /<key>TokenClashOrigin<\/key><string>\$\{TOKEN_CLASH_ORIGIN:-\}<\/string>/);
+  assert.match(patch, /poketokenbar\/version\.json/);
+});
