@@ -29,23 +29,23 @@ const refusal = (run: () => void) => {
 };
 
 test('AIs sit down ready, humans have to press ready, and the room starts only when full', () => {
-  const t = Tournament.restore(tournament(4, { status: 'open' }));
-  addSeat(t, { id: 'p', name: 'Pía', ai: null });
-  addSeat(t, { ...nextAiId(t, 'hard'), name: 'IA', ai: 'hard' });
-  addSeat(t, { id: nextAiId(t, 'hard').id, name: 'IA 2', ai: 'hard' });
-  assert.deepEqual(t.seats.map((s) => [s.id, s.ready]), [['h', false], ['p', false], ['ai:hard#1', true], ['ai:hard#2', true]]);
-  assert.throws(() => addSeat(t, { id: 'x', name: 'X' } as any), /lleno/);
-  setReady(t, 'h', true);
-  assert.equal(t.startIfReady(startNow()), false);
-  removeSeat(t, 3);
-  setReady(t, 'p', true);
-  assert.equal(t.startIfReady(startNow()), false);
-  assert.throws(() => removeSeat(t, 0), /no se puede quitar/);
-  assert.throws(() => addSeat(t, { id: 'p', name: 'Pía' } as any), /Ya estás/);
-  addSeat(t, { id: nextAiId(t, 'hard').id, name: 'IA 3', ai: 'hard' });
-  assert.equal(t.startIfReady(startNow()), true);
-  assert.equal(t.status, 'running');
-  assert.equal(t.startIfReady(startNow()), false);
+  const filling = Tournament.restore(tournament(4, { status: 'open' }));
+  addSeat(filling, { id: 'p', name: 'Pía', ai: null });
+  addSeat(filling, { ...nextAiId(filling, 'hard'), name: 'IA', ai: 'hard' });
+  addSeat(filling, { id: nextAiId(filling, 'hard').id, name: 'IA 2', ai: 'hard' });
+  assert.deepEqual(filling.seats.map((s) => [s.id, s.ready]), [['h', false], ['p', false], ['ai:hard#1', true], ['ai:hard#2', true]]);
+  assert.throws(() => addSeat(filling, { id: 'x', name: 'X' } as any), /lleno/);
+  setReady(filling, 'h', true);
+  assert.equal(filling.startIfReady(startNow()), false);
+  removeSeat(filling, 3);
+  setReady(filling, 'p', true);
+  assert.equal(filling.startIfReady(startNow()), false);
+  assert.throws(() => removeSeat(filling, 0), /no se puede quitar/);
+  assert.throws(() => addSeat(filling, { id: 'p', name: 'Pía' } as any), /Ya estás/);
+  addSeat(filling, { id: nextAiId(filling, 'hard').id, name: 'IA 3', ai: 'hard' });
+  assert.equal(filling.startIfReady(startNow()), true);
+  assert.equal(filling.status, 'running');
+  assert.equal(filling.startIfReady(startNow()), false);
 });
 
 test('several AIs of the same level keep their level but get distinct ids', () => {
@@ -127,13 +127,46 @@ test('an AI-only battle waits for viewers still playing the previous turn', asyn
 });
 
 test('the match being played is named by its place in the bracket and its room, without the seats', () => {
-  const t = fullOfAis(4);
-  t.startIfReady(startNow());
-  const next = t.startNextMatch('room1')!;
+  const started = fullOfAis(4);
+  started.startIfReady(startNow());
+  const next = started.startNextMatch('room1')!;
   assert.equal(next.a.id, 'h');
-  assert.deepEqual(t.current, { round: 0, index: 0, challengeId: 'room1' });
-  assert.equal(t.bracket![0][0].challengeId, 'room1');
-  assert.equal(t.nextAt, null);
+  assert.deepEqual(started.current, { round: 0, index: 0, challengeId: 'room1' });
+  assert.equal(started.bracket![0][0].challengeId, 'room1');
+  assert.equal(started.nextAt, null);
+});
+
+test('no match starts while the tournament is not running or once every match has a winner', () => {
+  const lobbyOnly = fullOfAis(4);
+  assert.equal(lobbyOnly.startNextMatch('room1'), null);
+  assert.equal(lobbyOnly.current, undefined);
+  const abandoned = fullOfAis(4);
+  abandoned.startIfReady(startNow());
+  abandoned.startNextMatch('room1');
+  abandoned.abandon();
+  assert.equal(abandoned.startNextMatch('room2'), null);
+  assert.deepEqual(abandoned.current, { round: 0, index: 0, challengeId: 'room1' });
+  assert.equal(abandoned.bracket![0][1].challengeId, null);
+  const decided = fullOfAis(4);
+  decided.startIfReady(startNow());
+  decided.startNextMatch('room1');
+  recordWinner(decided.bracket!, { round: 0, index: 0 }, 0);
+  recordWinner(decided.bracket!, { round: 0, index: 1 }, 2);
+  recordWinner(decided.bracket!, { round: 1, index: 0 }, 0);
+  assert.equal(decided.status, 'running');
+  assert.equal(decided.startNextMatch('room2'), null);
+  assert.deepEqual(decided.current, { round: 0, index: 0, challengeId: 'room1' });
+});
+
+test('a cancelled lobby never starts, even with every seat full and ready', () => {
+  const cancelled = lobby();
+  cancelled.addAis('h', 'easy', 2);
+  cancelled.setReady('h', true);
+  cancelled.setReady('p', true);
+  cancelled.close('h');
+  assert.equal(cancelled.startIfReady(startNow()), false);
+  assert.equal(cancelled.status, 'cancelled');
+  assert.equal(cancelled.bracket, undefined);
 });
 
 test('only the host closes the tournament, kicks a seat or adds AIs', () => {
