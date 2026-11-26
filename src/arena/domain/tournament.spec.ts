@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AI_NAMES, aiName, reachedRound, addSeat, removeSeat, setReady, allReady, nextAiId, shuffledOrder, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor, Tournament } from './tournament.js';
+import { AI_NAMES, aiName, reachedRound, addSeat, removeSeat, setReady, nextAiId, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor, Tournament } from './tournament.js';
 import { aiLevelOf } from '../../combat/domain/ai.js';
 import { DomainError } from '../../shared/domain/errors.js';
 
@@ -10,6 +10,14 @@ const lobby = () => {
   created.join({ id: 'p', name: 'Pía' });
   return created;
 };
+const inSeatOrder = () => 0.99;
+const fullOfAis = (size: number) => {
+  const filled = Tournament.create({ id: 't', host: { id: 'h', name: 'Host' }, mode: 'team', size, visibility: 'private', at: 0 });
+  filled.addAis('h', 'easy', size - 1);
+  filled.setReady('h', true);
+  return filled;
+};
+const startNow = (random: () => number = inSeatOrder) => ({ at: 0, firstMatchAt: 0, random });
 const refusal = (run: () => void) => {
   try {
     run();
@@ -21,20 +29,23 @@ const refusal = (run: () => void) => {
 };
 
 test('AIs sit down ready, humans have to press ready, and the room starts only when full', () => {
-  const t = tournament();
+  const t = Tournament.restore(tournament(4, { status: 'open' }));
   addSeat(t, { id: 'p', name: 'Pía', ai: null });
   addSeat(t, { ...nextAiId(t, 'hard'), name: 'IA', ai: 'hard' });
   addSeat(t, { id: nextAiId(t, 'hard').id, name: 'IA 2', ai: 'hard' });
   assert.deepEqual(t.seats.map((s) => [s.id, s.ready]), [['h', false], ['p', false], ['ai:hard#1', true], ['ai:hard#2', true]]);
   assert.throws(() => addSeat(t, { id: 'x', name: 'X' } as any), /lleno/);
   setReady(t, 'h', true);
-  assert.equal(allReady(t), false);
-  setReady(t, 'p', true);
-  assert.equal(allReady(t), true);
+  assert.equal(t.startIfReady(startNow()), false);
   removeSeat(t, 3);
-  assert.equal(allReady(t), false);
+  setReady(t, 'p', true);
+  assert.equal(t.startIfReady(startNow()), false);
   assert.throws(() => removeSeat(t, 0), /no se puede quitar/);
   assert.throws(() => addSeat(t, { id: 'p', name: 'Pía' } as any), /Ya estás/);
+  addSeat(t, { id: nextAiId(t, 'hard').id, name: 'IA 3', ai: 'hard' });
+  assert.equal(t.startIfReady(startNow()), true);
+  assert.equal(t.status, 'running');
+  assert.equal(t.startIfReady(startNow()), false);
 });
 
 test('several AIs of the same level keep their level but get distinct ids', () => {
@@ -44,8 +55,12 @@ test('several AIs of the same level keep their level but get distinct ids', () =
 
 test('the bracket plays round by round and the last winner is the champion', () => {
   const seq = [0.1, 0.7, 0.3, 0.9, 0.5, 0.2, 0.8];
-  const order = shuffledOrder(8, () => seq.shift());
+  const drawn = fullOfAis(8);
+  drawn.startIfReady({ at: 5, firstMatchAt: 9, random: () => seq.shift()! });
+  const order = drawn.bracket![0].flatMap((m) => [m.a, m.b]);
   assert.deepEqual([...order].sort(), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(order, [3, 5, 7, 2, 6, 1, 4, 0]);
+  assert.deepEqual([drawn.startedAt, drawn.drawAt, drawn.nextAt], [5, 5, 9]);
   const bracket = createBracket([0, 1, 2, 3, 4, 5, 6, 7]);
   assert.deepEqual(bracket.map((r) => r.length), [4, 2, 1]);
   assert.equal(totalMatches(bracket), 7);
@@ -112,13 +127,13 @@ test('an AI-only battle waits for viewers still playing the previous turn', asyn
 });
 
 test('the match being played is named by its place in the bracket and its room, without the seats', () => {
-  const t = Tournament.create({ id: 't', host: { id: 'h', name: 'Host' }, mode: 'team', size: 4, visibility: 'private', at: 0 });
-  t.addAis('h', 'easy', 3);
-  t.start({ at: 0, order: [0, 1, 2, 3], firstMatchAt: 0 });
-  const next = t.nextMatch()!;
+  const t = fullOfAis(4);
+  t.startIfReady(startNow());
+  const next = t.startNextMatch('room1')!;
   assert.equal(next.a.id, 'h');
-  t.matchStarted(next, 'room1');
   assert.deepEqual(t.current, { round: 0, index: 0, challengeId: 'room1' });
+  assert.equal(t.bracket![0][0].challengeId, 'room1');
+  assert.equal(t.nextAt, null);
 });
 
 test('only the host closes the tournament, kicks a seat or adds AIs', () => {
@@ -148,7 +163,9 @@ test('seats change only while the lobby is open', () => {
   assert.deepEqual(lobbyActions(closed), Array(5).fill(['conflict', 'Este torneo se cerró.']));
   const running = lobby();
   running.addAis('h', 'easy', 2);
-  running.start({ at: 0, order: [0, 1, 2, 3], firstMatchAt: 0 });
+  running.setReady('h', true);
+  running.setReady('p', true);
+  running.startIfReady(startNow());
   assert.deepEqual(lobbyActions(running), Array(5).fill(['conflict', 'El torneo ya partió.']));
   assert.equal(running.seats.length, 4);
 });
@@ -156,6 +173,8 @@ test('seats change only while the lobby is open', () => {
 test('someone who is not the host hears that first, even after the tournament started', () => {
   const running = lobby();
   running.addAis('h', 'easy', 2);
-  running.start({ at: 0, order: [0, 1, 2, 3], firstMatchAt: 0 });
+  running.setReady('h', true);
+  running.setReady('p', true);
+  running.startIfReady(startNow());
   assert.equal(refusal(() => running.close('p'))?.[0], 'forbidden');
 });

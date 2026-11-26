@@ -60,7 +60,7 @@ export function viewersBehind(seenTurns: (number | undefined)[], turn: number): 
 }
 
 export const isFull = (tournament: Seated) => tournament.seats.length >= tournament.size;
-export const allReady = (tournament: Seated) => isFull(tournament) && tournament.seats.every((s) => s.ready);
+const allReady = (tournament: Seated) => isFull(tournament) && tournament.seats.every((s) => s.ready);
 export const seatOf = (tournament: Pick<Seated, 'seats'>, trainerId: string | null | undefined) =>
   tournament.seats.findIndex((s) => s.id === trainerId);
 
@@ -92,7 +92,7 @@ export function nextAiId(tournament: Pick<Seated, 'seats'>, level: AiLevel): { i
   return { id: aiSeatId(level, seatNumber), seatNumber };
 }
 
-export function shuffledOrder(count: number, random = Math.random): number[] {
+function shuffledOrder(count: number, random = Math.random): number[] {
   const order = Array.from({ length: count }, (_, i) => i);
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
@@ -209,10 +209,6 @@ export class Tournament implements TournamentState {
     return isFull(this);
   }
 
-  get everyoneReady(): boolean {
-    return allReady(this);
-  }
-
   seatOf(trainerId: string | null | undefined): number {
     return seatOf(this, trainerId);
   }
@@ -271,26 +267,25 @@ export class Tournament implements TournamentState {
     this.status = 'abandoned';
   }
 
-  start({ at, order, firstMatchAt }: { at: number; order: number[]; firstMatchAt: number }): void {
+  startIfReady({ at, firstMatchAt, random = Math.random }: { at: number; firstMatchAt: number; random?: () => number }): boolean {
+    if (this.status !== 'open' || !allReady(this)) return false;
     this.status = 'running';
     this.startedAt = at;
-    this.bracket = createBracket(order);
+    this.bracket = createBracket(shuffledOrder(this.size, random));
     this.drawAt = at;
     this.nextAt = firstMatchAt;
+    return true;
   }
 
-  nextMatch(): (MatchRef & { a: Seat; b: Seat }) | null {
+  startNextMatch(challengeId: string): (MatchRef & { a: Seat; b: Seat; challengeId: string }) | null {
     if (this.status !== 'running' || !this.bracket) return null;
     const at = nextMatch(this.bracket);
     if (!at) return null;
     const match = this.bracket[at.round][at.index];
-    return { ...at, a: this.seats[match.a!], b: this.seats[match.b!] };
-  }
-
-  matchStarted({ round, index }: MatchRef, challengeId: string): void {
-    this.bracket![round][index].challengeId = challengeId;
-    this.current = { round, index, challengeId };
+    match.challengeId = challengeId;
+    this.current = { ...at, challengeId };
     this.nextAt = null;
+    return { ...at, a: this.seats[match.a!], b: this.seats[match.b!], challengeId };
   }
 
   matchFinished(at: MatchRef, winnerId: string | null, { now, nextMatchAt, random = Math.random }: { now: number; nextMatchAt: number; random?: () => number }): number | null {
