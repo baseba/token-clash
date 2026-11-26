@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readSources } from '../test/source-files.js';
+import { readSources, specifiersOf } from '../test/source-files.js';
 import { PROJECT_ROOT } from './shared/paths.js';
 
 const sources = readSources();
@@ -23,14 +23,16 @@ test('a domain/ folder never calls Math.random(): the randomness comes in as a p
 });
 
 test('no catch in src/ swallows an error with an empty block', () => {
-  const bad = sources.filter(({ code }) => /\bcatch\s*(\([^)]*\))?\s*\{\s*\}/.test(code)).map(({ file }) => file);
+  const emptyCatch = /\bcatch\s*(\([^)]*\))?\s*\{\s*\}/;
+  const emptyCatchCallback = /\.catch\(\s*(\([^)]*\)|\w+)\s*=>\s*\{\s*\}\s*\)/;
+  const bad = sources.filter(({ code }) => emptyCatch.test(code) || emptyCatchCallback.test(code)).map(({ file }) => file);
   assert.deepEqual(bad, []);
 });
 
 test('domain/ and application/ say no with a DomainError: they never throw anything else', () => {
   const bad = sources
     .filter(({ file }) => ['domain', 'application'].includes(layerOf(file)))
-    .flatMap(({ file, code }) => [...code.matchAll(/\bthrow\s+new\s+(\w+)/g)].filter((m) => m[1] !== 'DomainError').map((m) => `${file} throws ${m[1]}`));
+    .flatMap(({ file, code }) => [...code.matchAll(/\bthrow\s+(?:new\s+)?([A-Z]\w*)/g)].filter((m) => m[1] !== 'DomainError').map((m) => `${file} throws ${m[1]}`));
   assert.deepEqual(bad, []);
 });
 
@@ -63,14 +65,23 @@ test('every exported DTO is named in the *-dtos.spec.ts of its folder', () => {
   assert.deepEqual(bad, []);
 });
 
+function testsReading(code: string, naming: RegExp): string[] {
+  const tests = [...code.matchAll(/^([ \t]*)(?:test|it)\([\s\S]*?^\1\}\);?$/gm)].map((m) => m[0]);
+  const outside = tests.reduce((rest, body) => rest.replace(body, ''), code);
+  const constants = [...outside.matchAll(/^\s*const (\w+)\s*=([^;]*)/gm)].filter((m) => naming.test(m[2])).map((m) => m[1]);
+  const reads = (body: string) => naming.test(body) || constants.some((name) => new RegExp(`\\b${name}\\b`).test(body));
+  return tests.filter(reads);
+}
+
 test('a test that reads a folder downloaded at install skips when the folder is missing', () => {
   const downloaded = readFileSync(join(PROJECT_ROOT, '.gitignore'), 'utf8').split('\n').map((line) => /^public\/([\w-]+)\/?$/.exec(line.trim())?.[1]).filter((name) => name !== undefined);
   assert.ok(downloaded.includes('anims'));
-  const naming = new RegExp(`public/(${downloaded.join('|')})(?=[/'"\`])`);
+  const quote = `['"\`]`;
+  const naming = new RegExp(`(?:public/|PUBLIC_DIR\\s*,\\s*${quote}|${quote}public${quote}\\s*,\\s*${quote})(${downloaded.join('|')})(?=[/'"\`])`);
   const testFiles = [...projectFiles('src', (name) => name.endsWith('.spec.ts')), ...projectFiles('tools', (name) => name.endsWith('.spec.ts')), ...projectFiles('test', (name) => /\.(e2e-spec\.ts|test\.js)$/.test(name))];
-  const readers = testFiles.filter((path) => naming.test(readFileSync(join(PROJECT_ROOT, path), 'utf8')));
-  assert.ok(readers.includes(join('test', 'web', 'battle-anims.test.js')));
-  assert.deepEqual(readers.filter((path) => !/\bskip:/.test(readFileSync(join(PROJECT_ROOT, path), 'utf8'))), []);
+  const readers = testFiles.flatMap((path) => testsReading(readFileSync(join(PROJECT_ROOT, path), 'utf8'), naming).map((body) => ({ path, body })));
+  assert.ok(readers.some(({ path }) => path === join('test', 'web', 'battle-anims.test.js')));
+  assert.deepEqual(readers.filter(({ body }) => !/\bskip\s*:|\.skip\(/.test(body)).map(({ path, body }) => `${path}: ${body.split('\n')[0].trim()}`), []);
 });
 
 test('the dependencies are the agreed ones: adding one is a decision, not a side effect', () => {
@@ -83,7 +94,7 @@ test('the browser code imports only files of public/: no package, no CDN, no bui
   const browserFiles = readdirSync(join(PROJECT_ROOT, 'public')).filter((name) => name.endsWith('.js'));
   const bad = browserFiles.flatMap((name) => {
     const code = readFileSync(join(PROJECT_ROOT, 'public', name), 'utf8');
-    return [...code.matchAll(/^\s*(?:import|export)\b[^'"]*?from\s+'([^']+)'/gm), ...code.matchAll(/\bimport\(\s*'([^']+)'\s*\)/g)].map((m) => m[1]).filter((specifier) => !specifier.startsWith('./')).map((specifier) => `public/${name} → ${specifier}`);
+    return specifiersOf(code).filter((specifier) => !specifier.startsWith('./')).map((specifier) => `public/${name} → ${specifier}`);
   });
   assert.deepEqual(bad, []);
 });
