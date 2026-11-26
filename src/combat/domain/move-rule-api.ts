@@ -3,24 +3,14 @@ import { moveData, type MoveData } from './moves.js';
 import { MOVE_RULES, type MoveRuleApi } from './rules/move-rules.js';
 import { ABILITIES, type AbilityEffect } from './rules/ability-effects.js';
 import type { BattleEvent, BattleFighter, BattleMove, BattleSide, BattleState, Guard, Hazards, Volatiles } from './battle-types.js';
-import { runCalled } from './use-move.js';
 import { dragOut, faint } from './switching.js';
 import { activeFighters, activeOf, addToxicSpikes, addVolatile, boost, clearHazards, cure, currentWeather, emit, freshBoosts, grounded, hasBench, heal, hurt, nameOf, setStatus, setTypes, sideIndexOf, speedOf, transform } from './effects.js';
 import { flag, run, setAbility } from './ability-engine.js';
 
-const moveApis = new WeakMap<BattleState, MoveRuleApi>();
 const BATON_PASSED = ['confusion', 'focusEnergy', 'perish', 'leechSeed', 'curse', 'ingrain', 'aquaRing', 'magnetRise', 'substitute', 'trappedBy', 'gastroAcid'] as const;
 const MAX_SPIKES = 3;
 
-export function moveApi(battle: BattleState): MoveRuleApi {
-  let api = moveApis.get(battle);
-  if (api) return api;
-  api = makeMoveApi(battle);
-  moveApis.set(battle, api);
-  return api;
-}
-
-function makeMoveApi(battle: BattleState): MoveRuleApi {
+export function makeMoveApi(battle: BattleState, callMove: MoveRuleApi['callMove']): MoveRuleApi {
   const sideOf = (fighter: BattleFighter) => sideIndexOf(battle, fighter);
   const stallFails = (fighter: BattleFighter): boolean => {
     const stalls = fighter.volatiles.stall ?? 0;
@@ -217,7 +207,7 @@ function makeMoveApi(battle: BattleState): MoveRuleApi {
       return true;
     },
     moveData,
-    callMove: (fighter: BattleFighter, key: string, opts?: { powerMult?: number; instructed?: boolean }) => runCalled(battle, fighter, key, opts),
+    callMove,
     metronomePool: () => METRONOME_POOL(),
   };
   return api;
