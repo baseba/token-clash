@@ -1,5 +1,5 @@
 import { moveEntry } from '../../catalog/domain/creatures.js';
-import { IMPOSSIBLE_MOVES, MOVE_RULES } from './move-rules.js';
+import { FULL_FRIENDSHIP_POWER, IMPOSSIBLE_MOVES, MOVE_RULES } from './rules/move-rules.js';
 import { hiddenPowerType } from '../../../public/natures.js';
 import type { MoveData, MoveTarget } from './battle-types.js';
 
@@ -34,7 +34,6 @@ export const STRUGGLE: MoveData = {
 
 export const aimedTarget = (move: MoveData, aim: MoveTarget | null | undefined): string => (move.aimable ? aim ?? move.aimable : move.target);
 
-export const FULL_FRIENDSHIP_POWER = 102;
 const HIDDEN_POWER = 60;
 
 export { hiddenPowerType };

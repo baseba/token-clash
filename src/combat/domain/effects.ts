@@ -1,5 +1,5 @@
 import { type BoostKey, type Boosts, formData, type MajorStatus, statsFor, type Weather } from '../../catalog/domain/creatures.js';
-import type { BoostChanges } from './ability-effects.js';
+import type { BoostChanges, BoostOptions } from './rules/ability-effects.js';
 import { isSun, poisoned, stageMult } from './conditions.js';
 import type { BattleEvent, BattleFighter, BattleSide, BattleState, Look } from './battle-types.js';
 import { anyActiveHas, chain, flag, run, showAbility } from './ability-engine.js';
@@ -28,12 +28,6 @@ export const nameOf = (fighter: BattleFighter): string => fighter.volatiles.illu
 export const hasBench = (battle: BattleState, fighter: BattleFighter): boolean =>
   battle.sides[sideIndexOf(battle, fighter)].team.some((other) => other !== fighter && other.hp > 0);
 export const benchSlots = (side: BattleSide): number[] => side.team.flatMap((fighter, slot) => (slot !== side.active && fighter.hp > 0 ? [slot] : []));
-
-export interface BoostOptions {
-  cap?: number;
-  ability?: BattleFighter;
-  effect?: string;
-}
 
 const MAX_TOXIC_SPIKES = 2;
 const DIRECT_DAMAGE = new Set(['confusion', 'cost', 'painsplit']);

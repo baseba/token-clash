@@ -1,14 +1,76 @@
-import type { BoostKey, Boosts } from '../../catalog/domain/creatures.js';
-import { TYPES } from '../../catalog/domain/type-chart.js';
-import type { MoveRuleApi } from './move-rule-api.js';
-import type { BattleFighter, BattleMove, MoveData, SideCondition, Volatiles } from './battle-types.js';
-import { stageMult } from './conditions.js';
-import { FULL_FRIENDSHIP_POWER, moveData } from './moves.js';
+import type { BoostKey, Boosts, MajorStatus, Stats, Weather } from '../../../catalog/domain/creatures.js';
+import { TYPES } from '../../../catalog/domain/type-chart.js';
+import type { AbilityEffect } from './ability-effects.js';
+import type { BattleEvent, BattleFighter, BattleMove, BattleSide, BattleState, Guard, Hazards, MoveData, SideCondition, Volatiles } from '../battle-types.js';
+import { stageMult } from '../conditions.js';
 
 export interface CalledMove {
   key?: string;
   powerMult?: number;
   fail?: string | null;
+}
+
+export interface MoveRuleApi {
+  battle: BattleState;
+  random(): number;
+  turn(): number;
+  emit(event: BattleEvent): number;
+  sideOf(fighter: BattleFighter): number;
+  side(sideIndex: number): BattleSide;
+  actives(): BattleFighter[];
+  name(fighter: BattleFighter): string;
+  hurt(fighter: BattleFighter, amount: number, cause?: string): number;
+  heal(fighter: BattleFighter, amount: number): number;
+  boost(fighter: BattleFighter, changes: Boosts, source?: BattleFighter | null): Boosts;
+  setStatus(fighter: BattleFighter, status: MajorStatus, source?: BattleFighter | null): boolean;
+  cure(fighter: BattleFighter): void;
+  addVolatile(
+    fighter: BattleFighter,
+    kind: string,
+    source?: BattleFighter | null,
+    opts?: { ability?: BattleFighter; move?: { key: string; name: string } },
+  ): boolean;
+  setTypes(fighter: BattleFighter, types: readonly string[]): void;
+  changeAbility(fighter: BattleFighter, key: string | null): void;
+  transform(fighter: BattleFighter, into: BattleFighter): void;
+  dragOut(fighter: BattleFighter): boolean;
+  faint(fighter: BattleFighter): void;
+  weather(): Weather | null;
+  grounded(fighter: BattleFighter): boolean;
+  effectiveness(type: string | null | undefined, types: readonly string[]): number;
+  speed(fighter: BattleFighter): number;
+  flag(fighter: BattleFighter, name: keyof AbilityEffect): boolean;
+  abilityDef(key: string | null): AbilityEffect | undefined;
+  weight(fighter: BattleFighter): number;
+  baseAttack(fighter: BattleFighter): number | undefined;
+  moved(fighter: BattleFighter): boolean;
+  chosen(sideIndex: number): MoveData | null;
+  lastMove(): string | null;
+  nothing(fighter: BattleFighter, reason?: string | null): false;
+  volatile(fighter: BattleFighter, kind: string, extra?: { move?: string; count?: number }): number;
+  volatileEnd(fighter: BattleFighter, kind: string, extra?: { move?: string }): number;
+  sideStart(sideIndex: number, kind: string, extra?: { name?: string }): number;
+  fieldStart(kind: string): number;
+  fieldEnd(kind: string): number;
+  setBoosts(fighter: BattleFighter, boosts: Boosts): void;
+  setStats(fighter: BattleFighter, stats: Partial<Stats>): void;
+  swapBoosts(user: BattleFighter, target: BattleFighter, keys: BoostKey[]): boolean;
+  splitStats(user: BattleFighter, target: BattleFighter, keys: Exclude<keyof Stats, 'hp'>[]): boolean;
+  protect(fighter: BattleFighter, kind: string): boolean;
+  guard(fighter: BattleFighter, kind: Guard): boolean;
+  hazard(fighter: BattleFighter, kind: keyof Hazards | 'toxicspikes'): boolean;
+  clearHazards(sideIndex: number): boolean;
+  courtChange(): boolean;
+  cureTeam(fighter: BattleFighter): boolean;
+  switchOut(fighter: BattleFighter, pass?: { boosts?: boolean; volatiles?: boolean; substitute?: number } | null): void;
+  sacrifice(fighter: BattleFighter, kind: string): boolean;
+  revive(fighter: BattleFighter): boolean;
+  future(fighter: BattleFighter, move: BattleMove): boolean;
+  dropStockpile(fighter: BattleFighter): void;
+  copyMove(me: BattleFighter, foe: BattleFighter, move: BattleMove, options: { permanent?: boolean }): boolean;
+  moveData(key: string): MoveData | null;
+  callMove(fighter: BattleFighter, key: string, opts?: { powerMult?: number; instructed?: boolean }): void;
+  metronomePool(): string[];
 }
 
 export interface MoveRule {
@@ -38,12 +100,13 @@ const NO_ENCORE = new Set(['encore', 'transform', 'mimic', 'sketch', 'struggle',
 const STATS: BoostKey[] = ['atk', 'def', 'satk', 'sdef', 'spd', 'acc', 'eva'];
 const NATURE_POWER: Record<string, string> = { electric: 'thunderbolt', grassy: 'energy-ball', misty: 'moonblast', psychic: 'psychic' };
 const CAMOUFLAGE: Record<string, string> = { electric: 'electric', grassy: 'grass', misty: 'fairy', psychic: 'psychic' };
+export const FULL_FRIENDSHIP_POWER = 102;
 const MAGNITUDES: [number, number, number][] = [[4, 10, 0.05], [5, 30, 0.15], [6, 50, 0.35], [7, 70, 0.65], [8, 90, 0.85], [9, 110, 0.95], [10, 150, 1]];
 
 const pick = <T>(api: MoveRuleApi, list: readonly T[]): T => list[Math.floor(api.random() * list.length)];
 const positive = (boosts: Boosts): number => (Object.values(boosts) as number[]).reduce((sum, v) => sum + Math.max(0, v), 0);
-const lastMoveOf = (fighter: BattleFighter | null | undefined): MoveData | null =>
-  (fighter?.volatiles.lastMove ? moveData(fighter.volatiles.lastMove) : null);
+const lastMoveOf = (api: MoveRuleApi, fighter: BattleFighter | null | undefined): MoveData | null =>
+  (fighter?.volatiles.lastMove ? api.moveData(fighter.volatiles.lastMove) : null);
 const benchAlive = (api: MoveRuleApi, fighter: BattleFighter): boolean => api.side(api.sideOf(fighter)).team.some((o) => o !== fighter && o.hp > 0);
 const stockpiled = (fighter: BattleFighter): number => fighter.volatiles.stockpile?.count ?? 0;
 
@@ -302,7 +365,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
     useOn(api, me, foe) {
       const last = foe.volatiles.lastMove;
       if (!last || NO_ENCORE.has(last) || foe.volatiles.encore || !foe.moves.some((m) => m.key === last)) return api.nothing(me);
-      return setVol(api, foe, 'encore', { key: last, turns: 3 }, 'encore', { move: moveData(last)?.name });
+      return setVol(api, foe, 'encore', { key: last, turns: 3 }, 'encore', { move: api.moveData(last)?.name });
     },
   },
   disable: {
@@ -317,7 +380,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
       if (!last || !(foe.pp[last] > 0)) return api.nothing(me);
       const lost = Math.min(4, foe.pp[last]);
       foe.pp[last] -= lost;
-      api.emit({ t: 'pp', side: api.sideOf(foe), name: api.name(foe), move: moveData(last)?.name, lost });
+      api.emit({ t: 'pp', side: api.sideOf(foe), name: api.name(foe), move: api.moveData(last)?.name, lost });
       return true;
     },
   },
@@ -460,7 +523,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   },
   'conversion-2': {
     useOn(api, me, foe) {
-      const last = lastMoveOf(foe);
+      const last = lastMoveOf(api, foe);
       if (!last?.type) return api.nothing(me);
       const resist = Object.keys(TYPES).filter((t) => api.effectiveness(last.type, [t]) < 1 && !(me.types.length === 1 && me.types[0] === t));
       if (!resist.length) return api.nothing(me);
@@ -703,13 +766,13 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   copycat: {
     call(api) {
       const last = api.lastMove();
-      const move = last && moveData(last);
+      const move = last && api.moveData(last);
       return move && move.supported && !move.flags.includes('failcopycat') ? { key: last } : { fail: null };
     },
   },
   'mirror-move': {
     call(api, me, foe) {
-      const move = lastMoveOf(foe);
+      const move = lastMoveOf(api, foe);
       return move && move.supported && move.flags.includes('mirror') ? { key: move.key } : { fail: null };
     },
   },
@@ -724,7 +787,7 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   'nature-power': { call: (api) => ({ key: NATURE_POWER[api.battle.field.terrain as string] ?? 'tri-attack' }) },
   instruct: {
     useOn(api, me, foe) {
-      const last = lastMoveOf(foe);
+      const last = lastMoveOf(api, foe);
       if (!last
         || !last.supported
         || last.flags.includes('failinstruct')

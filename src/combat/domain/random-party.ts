@@ -1,7 +1,7 @@
 import { abilityOptions, usableAbility, shuffled, NATURE_KEYS, type Random } from '../../catalog/domain/creatures.js';
 import { usableMovepool, MOVES_PER_FIGHTER } from './fighter.js';
 import { moveData } from './moves.js';
-import { MOVE_RULES } from './move-rules.js';
+import { MOVE_RULES } from './rules/move-rules.js';
 import { uniqueSpecies, type Ivs, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { MAX_EV, MAX_EV_TOTAL, STAT_KEYS } from '../../../public/stat-formula.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
