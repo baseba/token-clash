@@ -1,10 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, normalize, relative } from 'node:path';
-import { PROJECT_ROOT } from './shared/paths.js';
+import { readdirSync } from 'node:fs';
+import { type Import, importsOf, readSources, SRC, valueImportsOf } from '../test/source-files.js';
 
-const SRC = join(PROJECT_ROOT, 'src');
 const USES: Record<string, readonly string[]> = {
   catalog: [],
   combat: ['catalog'],
@@ -26,27 +24,9 @@ const LAYER_USES: Record<string, readonly string[]> = {
   interface: ['application', 'domain'],
 };
 
-interface Import {
-  file: string;
-  target: string;
-}
-
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) return sourceFiles(path);
-    return entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts') ? [path] : [];
-  });
-}
-
-function importsOf(path: string): Import[] {
-  const file = relative(SRC, path);
-  const code = readFileSync(path, 'utf8');
-  const specifiers = [...code.matchAll(/^\s*(?:import|export)\b[^'"]*?from\s+'([^']+)'/gm), ...code.matchAll(/\bimport\(\s*'([^']+)'\s*\)/g)].map((m) => m[1]);
-  return specifiers.map((spec) => ({ file, target: spec.startsWith('.') ? normalize(join(dirname(file), spec)).replace(/\.js$/, '.ts') : spec }));
-}
-
-const imports = sourceFiles(SRC).flatMap(importsOf);
+const sources = readSources();
+const imports = sources.flatMap(importsOf);
+const valueImports = sources.flatMap(valueImportsOf);
 
 const contextOf = (path: string) => CONTEXTS.find((context) => path.startsWith(`${context}/`));
 const folderOf = (path: string) => path.split('/')[0];
@@ -133,4 +113,31 @@ test('inside a context, each layer imports only the layers its row in LAYER_USES
 test('the move and ability rules never import the engine that runs them', () => {
   const bad = imports.filter(({ file, target }) => file.startsWith('combat/domain/rules/') && target.startsWith('combat/domain/engine/'));
   assert.deepEqual(show(bad), []);
+});
+
+test('no module exports a repository: other contexts ask its application services', () => {
+  const exported = sources.filter(({ file }) => file.endsWith('.module.ts')).flatMap(({ file, code }) => [...code.matchAll(/\bexports:\s*\[([^\]]*)\]/g)].flatMap((m) => m[1].split(',').map((name) => `${file} exports ${name.trim()}`)));
+  assert.ok(exported.includes('trainers/trainers.module.ts exports TrainersService'));
+  assert.deepEqual(exported.filter((line) => /Repositor(y|ies)$/.test(line)), []);
+});
+
+test('a foreign key points at a table of its own schema file: other contexts are referenced by id', () => {
+  const references = sources.filter(({ file }) => file.endsWith('.schema.ts')).flatMap(({ file, code }) => [...code.matchAll(/\.references\(\s*\(\)\s*=>\s*(\w+)\./g)].map((m) => ({ file, table: m[1], local: new RegExp(`^export const ${m[1]} =`, 'm').test(code) })));
+  assert.ok(references.length > 0);
+  assert.deepEqual(references.filter(({ local }) => !local).map(({ file, table }) => `${file} → ${table}`), []);
+});
+
+test('only the Jev client leaves the server: nobody else fetches or opens a socket', () => {
+  const networkModules = ['http', 'https', 'http2', 'net', 'tls', 'dns', 'dgram', 'undici', 'ws'];
+  const jev = (file: string) => file.startsWith('combat/infrastructure/jev/');
+  const mayConnect = (file: string, module: string) => jev(file) || (isPackage(module, 'ws') && file.startsWith('realtime/'));
+  const fetching = sources.filter(({ file, code }) => !jev(file) && /(?<![-\w'"])fetch\b(?![-'"])/.test(code)).map(({ file }) => `${file} uses fetch`);
+  const socketClients = sources.filter(({ file, code }) => !jev(file) && /\bnew\s+(?:globalThis\.)?WebSocket\s*\(/.test(code)).map(({ file }) => `${file} opens a WebSocket`);
+  const connecting = valueImports.filter(({ file, target }) => {
+    const module = target.replace(/^node:/, '');
+    return networkModules.some((name) => isPackage(module, name)) && !mayConnect(file, module);
+  });
+  assert.ok(valueImports.some((i) => i.file === 'combat/infrastructure/jev/jev-proxy.ts' && i.target === 'node:http'));
+  assert.ok(!valueImports.some((i) => i.file === 'platform/http/client-ip.ts' && i.target === 'node:http'));
+  assert.deepEqual([...fetching, ...socketClients, ...show(connecting)], []);
 });
