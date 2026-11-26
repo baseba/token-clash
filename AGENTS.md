@@ -18,7 +18,8 @@ explica [cómo está armado](README.md#cómo-está-armado), el deploy y tu prime
 - `src/architecture.spec.ts`: qué carpeta de `src/` usa a cuál (`USES`) y qué capa importa a cuál (`LAYER_USES`);
   `domain/` sin Nest, Drizzle ni HTTP; nadie entra a la `infrastructure/` ni al repositorio de otro dominio; solo
   `infrastructure/` usa Drizzle; ningún módulo exporta su repositorio; las foreign keys no salen de su schema; solo
-  el cliente de Jev sale a la red;
+  el cliente de Jev sale a la red: nadie más usa `fetch` ni abre un socket o un `WebSocket`, y `realtime/` solo los
+  sirve;
 - `src/conventions.spec.ts`: `domain/` nunca llama a `Math.random()`; ningún `catch` vacío; `domain/` y
   `application/` solo lanzan `DomainError`; las excepciones de Nest quedan en `platform/http/` y `web/`; cada
   `@Body()` y `@Query()` tiene schema; un DTO toma sus enums del dominio y aparece en el `*-dtos.spec.ts` de su
