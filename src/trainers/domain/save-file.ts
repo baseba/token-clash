@@ -1,4 +1,4 @@
-import { NATURE_NAMES } from '../../catalog/domain/creatures.js';
+import { finalForms, NATURE_NAMES, speciesData } from '../../catalog/domain/creatures.js';
 import { hash } from '../../shared/domain/random.js';
 import { uniqueSpecies, variantKey, type Gender, type Ivs, type Rarity, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { toDuplicate, type Duplicate } from './recycling.js';
@@ -12,6 +12,7 @@ const ABILITY_KEY = /^[a-z0-9-]{1,40}$/;
 const GENDERS = new Set(['male', 'female']);
 const MOVE_KEY = /^[a-z0-9-]{1,40}$/;
 const MAX_LEARNED = 120;
+const GRADUATED_LEVEL = 100;
 
 export interface ParsedSave {
   roster: RosterEntry[];
@@ -91,6 +92,16 @@ function entryFrom(raw: Json, { finalID, baseID, defaultLevel, fallbackId, chain
   };
 }
 
+export function evolvedGraduate(entry: RosterEntry, chain: unknown): RosterEntry {
+  const endOfSavedChain = Array.isArray(chain) && chain[chain.length - 1] === entry.finalID;
+  if (entry.level !== GRADUATED_LEVEL || !endOfSavedChain) return entry;
+  const later = finalForms(entry.finalID).filter((id) => id !== entry.finalID);
+  if (!later.length) return entry;
+  const finalID = later[hash(entry.id) % later.length];
+  const species = speciesData(finalID);
+  return { ...entry, finalID, ...(species?.stage != null && species.chainLen != null ? { stage: species.stage, chainLen: species.chainLen } : {}) };
+}
+
 export interface CaughtCandidate {
   entry: RosterEntry;
   caught: number;
@@ -143,16 +154,14 @@ export function parseSave(text: string): ParsedSave {
   const dex = Array.isArray(state.dex) ? state.dex : [];
   dex.forEach((seen: unknown, i: number) => {
     if (!isObject(seen) || seen.releasedAt) return;
-    add(
-      entryFrom(seen, {
-        finalID: seen.finalID,
-        baseID: seen.baseID,
-        defaultLevel: 100,
-        fallbackId: `dex-${i}-${seen.finalID}`,
-        chain: seen.chainOrder,
-      }),
-      seen.caughtAt,
-    );
+    const entry = entryFrom(seen, {
+      finalID: seen.finalID,
+      baseID: seen.baseID,
+      defaultLevel: 100,
+      fallbackId: `dex-${i}-${seen.finalID}`,
+      chain: seen.chainOrder,
+    });
+    add(entry && evolvedGraduate(entry, seen.chainOrder), seen.caughtAt);
   });
 
   const active = state.active;
