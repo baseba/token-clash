@@ -5,6 +5,7 @@ import { residual } from './residual.js';
 import { doSwitch, entryOrder, runEntry, settle, wakeAbilities } from './switching.js';
 import { activeFighters, activeOf, benchSlots, emit, hasBench, nameOf } from './state.js';
 import { chain, run, speedOf } from './ability-engine.js';
+import { movePriority } from './effects.js';
 import { conflict } from '../../../shared/domain/errors.js';
 
 export const TURN_LIMIT = 100;
@@ -69,7 +70,7 @@ export function resolveTurn(battle: BattleState): BattleEvent[] {
       return {
         ...action,
         fighter,
-        prio: chain(battle, fighter, 'onModifyPriority', move.priority, move),
+        prio: chain(battle, fighter, 'onModifyPriority', movePriority(battle, fighter, move), move),
         frac: frac ?? 0,
         spd: speedOf(battle, fighter),
         tie: battle.random(),

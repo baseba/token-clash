@@ -6,6 +6,8 @@ import type { MoveData, MoveTarget } from './battle-types.js';
 export type { MoveData, MoveTarget };
 
 const SUPPORTED_VOLATILES = new Set(['confusion', 'attract', 'leechseed']);
+const IGNORES_ABILITY = new Set(['sunsteel-strike', 'moongeist-beam', 'photon-geyser']);
+const CHECKS_EACH_HIT = new Set(['triple-axel', 'population-bomb']);
 const SPECIAL_STATUS_MOVES = new Set(['rest', 'synthesis', 'morning-sun', 'moonlight', 'shore-up']);
 const GRASSY_HALVED = new Set(['earthquake', 'bulldoze', 'magnitude']);
 const SCREEN_MOVES: Record<string, string> = { reflect: 'reflect', 'light-screen': 'lightscreen', 'aurora-veil': 'auroraveil' };
@@ -67,6 +69,8 @@ export function moveData(id: string): MoveData | null {
   if (!raw) return null;
   const move: MoveData = { key: id, id, ...raw, flags: [...(raw.flags ?? [])], kind: raw.category === 'status' ? 'status' : 'attack', supported: false };
   if (GRASSY_HALVED.has(id)) move.weakenedByGrassyTerrain = true;
+  if (IGNORES_ABILITY.has(id)) move.ignoresAbility = true;
+  if (CHECKS_EACH_HIT.has(id)) move.checksEachHit = true;
   if (id === 'foul-play') move.usesTargetAttack = true;
   if (id === 'toxic') move.status = 'tox';
   if (SCREEN_MOVES[id]) move.screen = SCREEN_MOVES[id];

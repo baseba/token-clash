@@ -142,7 +142,8 @@ test('a team always finishes drawing, even when its theme has fewer distinct for
   assert.equal(new Set(team.map((mon) => mon.finalID)).size, team.length);
 });
 
-test('every rival of a climb brings Pokémon of generations 1 to 5, aces included', () => {
+test('the rivals of a climb bring Pokémon of every generation, aces included', () => {
+  const later = new Set<number>();
   for (let run = 0; run < 12; run++) {
     const seed = `gen-${run}`;
     for (let floorNumber = 1; floorNumber <= 50; floorNumber++) {
@@ -150,9 +151,11 @@ test('every rival of a climb brings Pokémon of generations 1 to 5, aces include
         const floor = floorAt(floorNumber, 50, 'hard', seed, room);
         const team = foeTeam(floor, 'hard', rng(`${seed}:${floorNumber}:${room}`));
         assert.ok(team.every((mon) => mon.finalID <= DEX_LIMIT && mon.baseID <= DEX_LIMIT), `${seed} ${floorNumber} ${room}: ${team.map((mon) => mon.finalID)}`);
+        for (const mon of team) if (mon.finalID > 649) later.add(mon.finalID);
       }
     }
   }
+  assert.ok(later.size >= 40, `${later.size} species after the fifth generation`);
 });
 
 test('the same rival on the same floor brings different teams from one climb to the next', () => {

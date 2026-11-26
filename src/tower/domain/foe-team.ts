@@ -2,7 +2,6 @@ import { effectiveness, finalForms, moveOrigins, speciesData } from '../../catal
 import { shuffled, type Random } from '../../shared/domain/random.js';
 import type { Ivs, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import type { AiLevel } from '../../combat/domain/ai.js';
-import { DEX_LIMIT } from '../../catalog/domain/pokedex.js';
 import { MOVES_PER_FIGHTER } from '../../combat/domain/fighter.js';
 import { isLeader, type Floor, type Strength } from './floors.js';
 import { moveData } from '../../combat/domain/moves.js';
@@ -154,7 +153,7 @@ export function foeTeam(floor: Floor, difficulty: AiLevel, random: Random, party
     forms.add(form);
     finals.push(id);
   };
-  const themed = floor.species.map((id) => shuffled(finalForms(id, DEX_LIMIT), random)[0] ?? id).filter((id) => speciesData(id));
+  const themed = floor.species.map((id) => shuffled(finalForms(id), random)[0] ?? id).filter((id) => speciesData(id));
   for (const id of shuffled(themed, random).slice(0, 1 + Math.floor(random() * OWN_SPECIES))) add(id);
   const options = candidates(floor);
   const lean = LEAN[isLeader(floor) ? 'leader' : floor.strength];
