@@ -5,7 +5,7 @@ import type { ItemId } from '../model/model.js';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Sample } from '../testing/sample.js';
-import { keys as keysIn, runIn, variantKeys, workspace } from '../testing/workspace.js';
+import { keys as keysIn, project, runIn, variantKeys, workspace } from '../testing/workspace.js';
 import { checkShallow } from './shallow.js';
 
 function store(shown: number, hidden: number): Sample {
@@ -66,28 +66,118 @@ test('a module that shows more than it hides and more than seven is shallow', ()
 
 function passedThrough(): Sample {
   const sample = new Sample();
-  const domain = sample.module('catalog::domain');
-  sample.module('catalog::domain::species');
+  const pokedex = sample.module('catalog::pokedex');
+  sample.module('catalog::pokedex::species');
   const run = sample.item(sample.module('app'), 'run', 'function');
-  const type = sample.item(domain, 'Species', 'type');
-  for (let i = 0; i < 8; i += 1) sample.refer(run, sample.member(type, domain, `Species::m${i}`, 'function'));
+  const type = sample.item(pokedex, 'Species', 'type');
+  for (let i = 0; i < 8; i += 1) sample.refer(run, sample.member(type, pokedex, `Species::m${i}`, 'function'));
   return sample;
 }
 
 test('a module that shows what a module inside it shows, and has no more functions, is reported once, at the module inside', () => {
-  assert.deepEqual(keys(passedThrough()), ['p::catalog::domain']);
+  assert.deepEqual(keys(passedThrough()), ['p::catalog::pokedex']);
 });
 
 test('a module that hides a function of its own, or shows one more, is reported beside the shallow module inside it', () => {
   const hiding = passedThrough();
   const helper = hiding.item(hiding.module('catalog::data'), 'load', 'function');
   hiding.refer(named(hiding, 'Species::m0'), helper);
-  assert.deepEqual(keys(hiding), ['p::catalog', 'p::catalog::domain']);
+  assert.deepEqual(keys(hiding), ['p::catalog', 'p::catalog::pokedex']);
   assert.equal(diagnose(hiding)[0].message, '`p::catalog` is shallow: it shows 8 of its 9 functions');
   const showing = passedThrough();
   showing.refer(named(showing, 'run'), showing.item(showing.module('catalog::data'), 'load', 'function'));
-  assert.deepEqual(keys(showing), ['p::catalog', 'p::catalog::domain']);
+  assert.deepEqual(keys(showing), ['p::catalog', 'p::catalog::pokedex']);
   assert.equal(diagnose(showing)[0].message, '`p::catalog` is shallow: it shows 9 of its 9 functions');
+});
+
+function splitInFolders(parent: string, layer: string, outsideCalls: number): Sample {
+  const sample = new Sample();
+  const rules = sample.module(`${parent}::${layer}::rules`);
+  const service = sample.module(`${parent}::application::service`);
+  const run = sample.item(sample.module('app'), 'run', 'function');
+  const tournament = sample.item(rules, 'Tournament', 'type');
+  const tournaments = sample.item(service, 'Tournaments', 'type');
+  for (let i = 0; i < 8; i += 1) {
+    const rule = sample.member(tournament, rules, `Tournament::m${i}`, 'function');
+    const useCase = sample.member(tournaments, service, `Tournaments::m${i}`, 'function');
+    sample.refer(useCase, rule);
+    if (i < outsideCalls) sample.refer(run, useCase);
+  }
+  return sample;
+}
+
+function withNestModule(sample: Sample, context: string): Sample {
+  sample.module(`${context}::${context}.module`);
+  return sample;
+}
+
+function layered(parent: string, layer: string, outsideCalls: number): Sample {
+  return withNestModule(splitInFolders(parent, layer, outsideCalls), parent.split('::')[0]);
+}
+
+function calledInItsDomain(unusedLayer: string, unused: number): Sample {
+  const sample = withNestModule(new Sample(), 'arena');
+  const rules = sample.module('arena::domain::rules');
+  const unusedModule = sample.module(`arena::${unusedLayer}::store`);
+  const run = sample.item(sample.module('app'), 'run', 'function');
+  const tournament = sample.item(rules, 'Tournament', 'type');
+  for (let i = 0; i < 8; i += 1) sample.refer(run, sample.member(tournament, rules, `Tournament::m${i}`, 'function'));
+  for (let i = 0; i < unused; i += 1) sample.item(unusedModule, `save${i}`, 'function');
+  return sample;
+}
+
+test('a context split into layers is judged as one module, and a function its other layers use is not one it shows', () => {
+  assert.deepEqual(keys(layered('arena', 'domain', 8)), ['p::arena']);
+  assert.equal(diagnose(layered('arena', 'domain', 8))[0].message, '`p::arena` is shallow: it shows 8 of its 16 functions');
+});
+
+test('a call from another context into a layer counts as shown by the context', () => {
+  assert.deepEqual(keys(calledInItsDomain('infrastructure', 8)), ['p::arena']);
+  assert.equal(diagnose(calledInItsDomain('infrastructure', 8))[0].message, '`p::arena` is shallow: it shows 8 of its 16 functions');
+  assert.deepEqual(keys(calledInItsDomain('infrastructure', 9)), []);
+  assert.deepEqual(keys(calledInItsDomain('interface', 9)), []);
+});
+
+test('a layer is not judged on its own, however much it shows to the other layers', () => {
+  for (const layer of ['domain', 'infrastructure', 'interface']) {
+    assert.deepEqual(keys(layered('arena', layer, 7)), [], layer);
+    assert.deepEqual(keys(layered('arena', layer, 0)), [], layer);
+  }
+});
+
+test('a folder that is not a layer is judged on its own, as before', () => {
+  assert.deepEqual(keys(layered('arena', 'pokedex', 7)), ['p::arena::pokedex']);
+});
+
+test('a folder named like a layer is judged on its own when it is not a direct child of a context', () => {
+  assert.deepEqual(keys(layered('arena::kernel', 'domain', 7)), ['p::arena::kernel::domain']);
+  const nestedModule = splitInFolders('arena::kernel', 'domain', 7);
+  nestedModule.module('arena::kernel::kernel.module');
+  assert.deepEqual(keys(nestedModule), ['p::arena::kernel::domain']);
+  const atTheRoot = splitInFolders('', 'domain', 7);
+  atTheRoot.module('app.module');
+  assert.deepEqual(keys(atTheRoot), ['p::domain']);
+});
+
+test('a context without a Nest module is not split into layers, so its domain is judged on its own', () => {
+  assert.deepEqual(keys(splitInFolders('catalog', 'domain', 7)), ['p::catalog::domain']);
+});
+
+test('a folder inside a layer is judged on its own when it has modules inside it', () => {
+  const sample = layered('combat', 'domain', 0);
+  sample.module('combat::domain::rules::moves');
+  assert.deepEqual(keys(sample), ['p::combat::domain::rules']);
+});
+
+test('a layered context in a project is reported as one module', () => {
+  const indexes = Array.from({ length: 8 }, (_unused, index) => index);
+  const directory = project({
+    'src/arena/arena.module.ts': 'export class ArenaModule {}\n',
+    'src/arena/domain/rules.ts': indexes.map((index) => `export function rule${index}(): number {\n  return ${index};\n}\n`).join('\n'),
+    'src/arena/application/service.ts': `import { ${indexes.map((index) => `rule${index}`).join(', ')} } from '../domain/rules.js';\n\n${indexes.map((index) => `export function useCase${index}(): number {\n  return rule${index}() + 1;\n}\n`).join('\n')}`,
+    'src/main.ts': `import { ${indexes.map((index) => `useCase${index}`).join(', ')} } from './arena/application/service.js';\n\nexport function run(): number {\n  return ${indexes.map((index) => `useCase${index}()`).join(' + ')};\n}\n`,
+  });
+  assert.deepEqual(keysIn(directory), ['shallow-module src::arena']);
 });
 
 test('seven is a limit on each list, not on their sum', () => {
