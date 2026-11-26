@@ -35,11 +35,11 @@ const isPackage = (target: string, name: string) => target === name || target.st
 const usesDrizzle = (target: string) => isPackage(target, 'drizzle-orm') || isPackage(target, '@nestjs/drizzle');
 const isPlumbing = (target: string) => isPackage(target, '@nestjs') || usesDrizzle(target) || target === 'node:http';
 const isRepositoryPort = (target: string) => /\/domain\/[^/]+\.repositor(y|ies)\.ts$/.test(target);
-const isWiring = (file: string) => !file.includes('/') || file.startsWith('legacy/');
+const isWiring = (file: string) => !file.includes('/') || file.startsWith('app/');
 const show = (list: Import[]) => list.map(({ file, target }) => `${file} → ${target}`);
 
 test('the scanner sees the imports it checks', () => {
-  assert.ok(imports.some((i) => i.file === 'legacy/legacy-json-import.ts' && i.target === 'drizzle-orm'));
+  assert.ok(imports.some((i) => i.file === 'app/legacy-json-import.ts' && i.target === 'drizzle-orm'));
   assert.ok(imports.some((i) => i.file === 'arena/domain/lobby.ts' && i.target === 'shared/domain/errors.ts'));
   assert.ok(imports.some((i) => i.file === 'shared/domain/clock.ts' && i.target === 'node:crypto'));
   assert.ok(imports.some((i) => i.file === 'platform/http/domain-error.filter.ts' && i.target === 'shared/domain/errors.ts'));

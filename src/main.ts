@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { AppModule } from './app.module.js';
+import { AppModule } from './app/app.module.js';
 import { GameWsAdapter } from './realtime/game-ws.adapter.js';
 import { AppConfig } from './platform/config/app-config.js';
 import { useJsonBody } from './platform/http/json-body.js';

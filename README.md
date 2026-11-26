@@ -429,7 +429,7 @@ Por carpeta:
 | `src/web/` | El frontend estático, los health checks y la vista previa de los links de salas y torneos. |
 | `src/shared/` | Lo que un `domain/` puede importar: los errores de dominio, el reloj (`now`, `newId`) y la raíz del proyecto (`paths.ts`). |
 | `src/platform/` | La plomería de Nest: configuración, HTTP (guards, filtro de errores, middlewares) y la base de datos. Ningún `domain/` la importa. |
-| `src/legacy/` | La migración única desde `data/db.json`. La corre `app.module.ts` al abrir la base. |
+| `src/app/` | La raíz de composición: `app.module.ts` junta los módulos y corre, al abrir la base, la migración única desde `data/db.json` (`legacy-json-import.ts`). `src/main.ts` arranca el servidor y `src/jev-proxy.main.ts`, el proxy de Jev. |
 | `src/architecture.spec.ts` | El test que hace cumplir la regla de dependencia entre capas y dominios. |
 | `drizzle/` | Migraciones SQL generadas por drizzle-kit; la app las aplica al arrancar. |
 | `src/**/*.spec.ts` | Tests unitarios (`node:test`), al lado del código que prueban. |
@@ -518,7 +518,7 @@ Todo vive en `DATA_DIR/token-clash.db` (SQLite, modo WAL). Nada se borra: los de
 Hasta la versión 0.1 los datos estaban en `data/db.json`: el primer arranque con SQLite lo importa entero en una
 transacción y lo deja intacto como respaldo (si un deploy vuelve a la imagen anterior, esa sigue encontrando sus datos).
 No se vuelve a importar. Para comprobar una copia real sin tocar nada:
-`LEGACY_DB=/ruta/a/db.json node --test dist/src/legacy/legacy-json-import.spec.js` (tras `npm test`).
+`LEGACY_DB=/ruta/a/db.json node --test dist/src/app/legacy-json-import.spec.js` (tras `npm test`).
 
 Las batallas en curso viven en memoria: reiniciar el servicio corta las peleas activas (quedan como "cortadas").
 

@@ -18,11 +18,13 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 | `tower` | La Torre: subidas con tu colección, pisos y caminos, experiencia, evolución, premios y récords | tabla `tower_runs` |
 | `stats` | La página de stats y los logros | nada: lee de los otros dominios y le pide los cambios a `trainers` |
 
-Más cuatro piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
+Más cinco piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
 (archivos estáticos, health checks y la vista previa de los links, que lee la arena con `ArenaQueries`), `shared` (lo
-que un `domain/` puede importar: los errores de dominio, el reloj y la raíz del proyecto) y `platform` (la plomería de
-Nest: configuración, HTTP y base de datos). Un `domain/` nunca importa `platform/`, `shared/` no importa Nest,
-Drizzle ni `node:http`, y ni `shared` ni `platform` importan un dominio: las flechas solo entran.
+que un `domain/` puede importar: los errores de dominio, el reloj y la raíz del proyecto), `platform` (la plomería de
+Nest: configuración, HTTP y base de datos) y `app` (la raíz de composición: `app.module.ts`, que junta los módulos, y
+la importación única de `data/db.json`). Un `domain/` nunca importa `platform/`, `shared/` no importa Nest, Drizzle
+ni `node:http`, y ni `shared` ni `platform` importan un dominio: las flechas solo entran. `main.ts` y `jev-proxy.main.ts`
+quedan en la raíz de `src/`: son los dos procesos que arrancan.
 
 ```
            realtime (WS)   web          HTTP controllers de cada dominio
@@ -108,7 +110,7 @@ directamente: hay un solo Jev, y sus tests le pasan un `fetch` falso.
 
 La estructura que recomiendan Nest y la mayoría de las guías es *por feature*: una carpeta por tema con su
 `dto/`, `entities/`, controller, service y module, todo al mismo nivel. Acá el primer nivel es igual (una carpeta por
-dominio, cada una con su `*.module.ts`, más `shared/` y `platform/`), pero adentro hay capas. Las diferencias:
+dominio, cada una con su `*.module.ts`, más `shared/`, `platform/` y `app/`), pero adentro hay capas. Las diferencias:
 
 | Guía por feature | Acá | Por qué |
 | --- | --- | --- |
@@ -123,7 +125,7 @@ pelea, un equipo que no repite especie), y para mostrar la regla de dependencia,
 ## 3. Reglas entre dominios
 
 1. **Cada dominio es dueño de sus tablas.** Nadie más las lee ni las escribe. Solo los `infrastructure/` (y
-   `platform/database/`, que abre la base) usan Drizzle, y nadie importa la `infrastructure/` ni el repositorio de
+   `platform/database/`, que abre la base, y la importación única de `app/`) usan Drizzle, y nadie importa la `infrastructure/` ni el repositorio de
    otro dominio: lo revisa `src/architecture.spec.ts`. Nest no lo impide, porque `DatabaseModule` es global y cualquier módulo podría
    inyectar la base; una consulta escrita a mano contra una tabla ajena tampoco la ve el test, queda a la revisión.
 2. **Si A necesita que cambie algo de B, se lo pide a B.** Al terminar una pelea, `arena` no hace
@@ -237,10 +239,10 @@ cuándo habló cada uno por última vez, en `ArenaChatService`.
   un `Challenge` o un `Tournament` y deben ver cada cambio. Con unas decenas de jugadores, todo cabe en memoria; si
   algún día no cabe, solo cambian los repositorios.
 - **Driver:** `node:sqlite`, el que trae Node. No hay módulos nativos que compilar en la imagen de Alpine.
-- **Migración desde JSON:** `src/legacy/legacy-json-import.ts` importa `data/db.json` una sola vez, en una
+- **Migración desde JSON:** `src/app/legacy-json-import.ts` importa `data/db.json` una sola vez, en una
   transacción y con los mappers de cada dominio. `legacy-json-import.spec.ts` comprueba que leerlo de vuelta da
-  exactamente los mismos datos. La corre `app.module.ts`, que se la pasa a `DatabaseModule.forRoot({ afterOpen })`:
-  así `platform` no conoce `legacy`, y la importación pasa recién abierta y migrada la base, antes de que Nest entregue
+  exactamente los mismos datos. La corre `app/app.module.ts`, que se la pasa a `DatabaseModule.forRoot({ afterOpen })`:
+  así `platform` no conoce la importación, y la importación pasa recién abierta y migrada la base, antes de que Nest entregue
   la base a algún repositorio (los repositorios cargan sus tablas al construirse). `test/legacy-import.e2e-spec.ts`
   levanta la app con un `db.json` y lo comprueba.
 - **Datos viejos, normalizados una vez:** las salas anteriores a los modos o a la visibilidad no tenían esos campos.
@@ -258,7 +260,7 @@ cuándo habló cada uno por última vez, en `ArenaChatService`.
 | --- | --- | --- |
 | Reglas puras (save, torneo, lobby, chat, stats, motor, IA, estaciones de radio), DTOs y mensajes del socket | `*.spec.ts` al lado de cada archivo | funciones, sin Nest ni base de datos |
 | Reglas de dependencia | `src/architecture.spec.ts` | lee los imports de cada archivo |
-| Persistencia y migraciones | `src/legacy/legacy-json-import.spec.ts`, `src/arena/infrastructure/arena.migrations.spec.ts` | SQLite real en un directorio temporal |
+| Persistencia y migraciones | `src/app/legacy-json-import.spec.ts`, `src/arena/infrastructure/arena.migrations.spec.ts` | SQLite real en un directorio temporal |
 | Todo junto | `test/app.e2e-spec.ts` | levanta la app compilada y juega peleas y torneos por HTTP y WebSocket, y la reinicia |
 | La importación de `db.json` al arrancar | `test/legacy-import.e2e-spec.ts` | levanta la app con un `db.json` en el directorio de datos, lee lo importado por HTTP y la reinicia |
 | Las salas por dentro | `test/rooms.e2e-spec.ts` | los frames que ve cada cliente en cada fase, quién se va y vuelve, y quién escucha cada mensaje del chat |
