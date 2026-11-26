@@ -661,6 +661,8 @@ export const MOVE_RULES: Record<string, MoveRule> = {
   },
 
   'crush-grip': { power: (api, me, target) => Math.max(1, Math.floor((120 * target.hp) / target.stats.hp)) },
+  'hard-press': { power: (api, me, target) => Math.max(1, Math.floor((100 * target.hp) / target.stats.hp)) },
+  'triple-axel': { hitPower: (api, me, hit) => 20 * (hit + 1) },
   'wring-out': { power: (api, me, target) => Math.max(1, Math.floor((120 * target.hp) / target.stats.hp)) },
   flail: { power: (api, me) => fixedRatio(Math.floor((48 * me.hp) / me.stats.hp), [[33, 20], [17, 40], [10, 80], [5, 100], [2, 150], [0, 200]]) },
   reversal: { power: (api, me) => fixedRatio(Math.floor((48 * me.hp) / me.stats.hp), [[33, 20], [17, 40], [10, 80], [5, 100], [2, 150], [0, 200]]) },

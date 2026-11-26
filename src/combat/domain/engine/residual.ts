@@ -25,6 +25,10 @@ function statusDamage(battle: BattleState, fighter: BattleFighter): void {
 export function residual(battle: BattleState): void {
   const order = () => activeFighters(battle).sort((x, y) => speedOf(battle, y) - speedOf(battle, x));
   const weather = currentWeather(battle);
+  if (battle.field.ionDeluge === battle.turn) {
+    delete battle.field.ionDeluge;
+    emit(battle, { t: 'fieldEnd', kind: 'iondeluge' });
+  }
   for (const fighter of order()) {
     if (weather === 'sand' && !fighter.types.some((t) => SAND_PROOF.includes(t)) && !abilityDef(battle, fighter)?.weatherImmune?.includes('sand'))
       hurt(battle, fighter, fighter.stats.hp / 16, 'sand');
@@ -67,7 +71,8 @@ export function residual(battle: BattleState): void {
       delete fighter.volatiles.yawn;
       setStatus(battle, fighter, 'slp', null);
     }
-    for (const [key, kind] of [['taunt', 'taunt'], ['encore', 'encore'], ['healBlock', 'healblock'], ['telekinesis', 'telekinesis'], ['magnetRise', 'magnetrise']] as const) {
+    if (fighter.hp > 0 && fighter.volatiles.syrupBomb) boost(battle, fighter, { spd: -1 }, null);
+    for (const [key, kind] of [['taunt', 'taunt'], ['encore', 'encore'], ['healBlock', 'healblock'], ['telekinesis', 'telekinesis'], ['magnetRise', 'magnetrise'], ['throatChop', 'throatchop'], ['syrupBomb', 'syrupbomb']] as const) {
       const effect = fighter.volatiles[key];
       if (!effect) continue;
       if (--effect.turns <= 0 || ('key' in effect && !(fighter.pp[effect.key] > 0))) {

@@ -38,6 +38,8 @@ export function boostWithTriggers(triggers: AbilityTriggers, battle: BattleState
   if (changed.length && opts.ability) showAbility(battle, opts.ability);
   for (const [stat, by] of changed) {
     fighter.boosts[stat] += by;
+    if (by > 0) fighter.raisedOnTurn = battle.turn;
+    else fighter.loweredOnTurn = battle.turn;
     emit(battle, { t: 'boost', side: sideIndexOf(battle, fighter), stat, by, stage: fighter.boosts[stat] });
   }
   if (source && source !== fighter && ((Object.values(applied) as number[]).some((v) => v < 0) || opts.effect === 'intimidate'))
@@ -125,6 +127,7 @@ export function addVolatileWithTriggers(
   if (kind === 'disable' && (fighter.volatiles.disabled || !opts.move?.key)) return false;
   if (kind === 'perish' && fighter.volatiles.perish) return false;
   if (kind === 'leechseed' && (fighter.volatiles.leechSeed || fighter.types.includes('grass'))) return false;
+  if (kind === 'tarshot' && fighter.volatiles.tarShot) return false;
   if (triggers.run(fighter, 'onSetStatus', kind, source) === false) return false;
   if (opts.ability) showAbility(battle, opts.ability);
   const sideIndex = sideIndexOf(battle, fighter);
@@ -135,6 +138,7 @@ export function addVolatileWithTriggers(
   else if (kind === 'perish') fighter.volatiles.perish = 4;
   else if (kind === 'charge') fighter.volatiles.charge = true;
   else if (kind === 'leechseed') fighter.volatiles.leechSeed = true;
+  else if (kind === 'tarshot') fighter.volatiles.tarShot = true;
   if (kind !== 'flinch')
     emit(battle, { t: 'volatile', side: sideIndex, name: nameOf(fighter), kind, ...(kind === 'disable' ? { move: opts.move!.name } : {}) });
   return true;
@@ -343,6 +347,7 @@ export function typeEffectiveness(battle: BattleState, move: AnyMove, attacker: 
   for (const type of defendingTypes(battle, target)) {
     let multiplier = effectiveness(move.type, [type]);
     if (move.extraType) multiplier *= effectiveness(move.extraType, [type]);
+    if (move.id === 'freeze-dry' && type === 'water') multiplier = 2;
     if (multiplier === 0
       && type === 'flying'
       && move.type === 'ground'
@@ -355,7 +360,10 @@ export function typeEffectiveness(battle: BattleState, move: AnyMove, attacker: 
     if (multiplier > 1 && type === 'flying' && currentWeather(battle) === 'winds') multiplier = 1;
     eff *= multiplier;
   }
-  return eff;
+  return move.type === 'fire' && target.volatiles.tarShot ? eff * 2 : eff;
 }
+
+export const movePriority = (battle: BattleState, fighter: BattleFighter, move: AnyMove): number =>
+  move.priority + (move.id === 'grassy-glide' && battle.field.terrain === 'grassy' && grounded(battle, fighter) ? 1 : 0);
 
 export const asleep = (battle: BattleState, fighter: BattleFighter): boolean => fighter.status === 'slp' || flag(battle, fighter, 'comatose');

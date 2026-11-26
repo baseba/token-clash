@@ -69,7 +69,10 @@ function basePower(battle: BattleState, me: BattleFighter, target: BattleFighter
     case 'hex':
       return target.status || flag(battle, target, 'comatose') ? power * 2 : power;
     case 'venoshock':
+    case 'barb-barrage':
       return poisoned(target.status) ? power * 2 : power;
+    case 'lash-out':
+      return me.loweredOnTurn === battle.turn ? power * 2 : power;
     case 'brine':
       return target.hp * 2 <= target.stats.hp ? power * 2 : power;
     case 'acrobatics':
@@ -147,15 +150,60 @@ function afterHit(battle: BattleState, me: BattleFighter, target: BattleFighter,
       target.volatiles.saltCure = true;
       emit(battle, { t: 'volatile', side: 1 - sideIndex, name: nameOf(target), kind: 'saltcure' });
     }
+    afterHitOnTarget(battle, me, target, move);
   }
+  if (move.id === 'stone-axe') setStealthRock(battle, 1 - sideIndex);
   if (move.id === 'fell-stinger' && target.hp <= 0 && me.hp > 0) boost(battle, me, { atk: 3 }, me);
   afterSelf(battle, me, move);
   if (move.forceSwitch && target.hp > 0 && total > 0) dragOut(battle, target);
 }
 
+const DIRE_CLAW_CHANCE = 0.5;
+const DIRE_CLAW_STATUSES: MajorStatus[] = ['psn', 'par', 'slp'];
+const THROAT_CHOP_TURNS = 2;
+const PSYCHIC_NOISE_TURNS = 2;
+const SYRUP_BOMB_TURNS = 3;
+
+function afterHitOnTarget(battle: BattleState, me: BattleFighter, target: BattleFighter, move: BattleMove): void {
+  const targetSide = sideIndexOf(battle, target);
+  const raisedNow = target.raisedOnTurn === battle.turn;
+  const mark = (kind: string) => emit(battle, { t: 'volatile', side: targetSide, name: nameOf(target), kind });
+  if (move.id === 'burning-jealousy' && raisedNow) setStatus(battle, target, 'brn', me);
+  if (move.id === 'alluring-voice' && raisedNow) addVolatile(battle, target, 'confusion', me);
+  if (move.id === 'dire-claw' && battle.random() < DIRE_CLAW_CHANCE) setStatus(battle, target, DIRE_CLAW_STATUSES[Math.floor(battle.random() * DIRE_CLAW_STATUSES.length)], me);
+  if (move.id === 'sparkling-aria' && target.status === 'brn') cure(battle, target);
+  if (move.id === 'throat-chop' && !target.volatiles.throatChop) {
+    target.volatiles.throatChop = { turns: THROAT_CHOP_TURNS };
+    mark('throatchop');
+  }
+  if (move.id === 'psychic-noise' && !target.volatiles.healBlock) {
+    target.volatiles.healBlock = { turns: PSYCHIC_NOISE_TURNS };
+    mark('healblock');
+  }
+  if (move.id === 'syrup-bomb' && !target.volatiles.syrupBomb) {
+    target.volatiles.syrupBomb = { turns: SYRUP_BOMB_TURNS };
+    mark('syrupbomb');
+  }
+  if (move.id === 'core-enforcer' && battle.moved.has(target) && !target.volatiles.gastroAcid && !abilityDef(battle, target)?.unsuppressable) {
+    target.volatiles.gastroAcid = true;
+    mark('gastroacid');
+  }
+}
+
+function setStealthRock(battle: BattleState, sideIndex: number): void {
+  const hazards = battle.sides[sideIndex].hazards;
+  if (hazards.stealthrock) return;
+  hazards.stealthrock = true;
+  emit(battle, { t: 'sideStart', side: sideIndex, kind: 'stealthrock' });
+}
+
 function afterSelf(battle: BattleState, me: BattleFighter, move: BattleMove): void {
   if (move.losesType && me.hp > 0) setTypes(battle, me, me.types.filter((t) => t !== move.losesType));
-  if (move.id === 'steel-roller' && battle.field.terrain) clearTerrain(battle);
+  if ((move.id === 'steel-roller' || move.id === 'ice-spinner') && battle.field.terrain) clearTerrain(battle);
+  if (move.id === 'plasma-fists' && battle.field.ionDeluge !== battle.turn) {
+    battle.field.ionDeluge = battle.turn;
+    emit(battle, { t: 'fieldStart', kind: 'iondeluge' });
+  }
   if (move.id === 'glaive-rush') me.volatiles.glaiveRush = battle.turn;
   if (move.selfSwitch && me.hp > 0 && hasBench(battle, me)) me.volatiles.switchNow = true;
 }
@@ -362,7 +410,7 @@ export function attack(battle: BattleState, me: BattleFighter, target: BattleFig
   const rules = MOVE_RULES[move.id];
   const typeEff = typeEffectiveness(battle, move, me, target);
   const crash = () => move.crashes && me.hp > 0 && hurt(battle, me, me.stats.hp / 2, 'crash');
-  battle.moldBreaker = flag(battle, me, 'moldBreaker') ? { target } : null;
+  battle.moldBreaker = flag(battle, me, 'moldBreaker') || move.ignoresAbility ? { target } : null;
   try {
     if (run(battle, target, 'onTryHit', move, me)) {
       crash();
@@ -397,6 +445,7 @@ export function attack(battle: BattleState, me: BattleFighter, target: BattleFig
     let landed = 0;
     let toSub = false;
     for (let i = 0; i < count && target.hp > 0 && me.hp > 0; i++) {
+      if (i > 0 && move.checksEachHit && !flag(battle, me, 'maxHits') && !hits(battle, me, target, move)) break;
       const hitPower = rules?.hitPower ? rules.hitPower(api, me, i) : i > 0 && !move.multihit ? move.power * 0.25 : move.power;
       const { dmg, crit } = fixed !== undefined
         ? { dmg: fixed, crit: false }

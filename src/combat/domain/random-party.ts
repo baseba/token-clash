@@ -12,7 +12,7 @@ export const GUARANTEED_ATTACKS = 2;
 const EV_STEP = 4;
 
 const SITUATIONAL_ATTACKS = new Set([
-  'dream-eater', 'snore', 'sucker-punch', 'thunderclap', 'focus-punch', 'shell-trap', 'last-resort', 'steel-roller',
+  'dream-eater', 'snore', 'sucker-punch', 'thunderclap', 'focus-punch', 'shell-trap', 'last-resort', 'steel-roller', 'upper-hand', 'poltergeist',
   'synchronoise', 'spit-up', 'endeavor', 'counter', 'mirror-coat', 'metal-burst', 'comeuppance', 'bide',
 ]);
 

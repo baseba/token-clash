@@ -207,6 +207,9 @@ const VOLATILE_INFO = {
   bound: (v) => ({ icon: 'chain', name: 'Apresado', desc: `${v} le quita 1/8 de sus PS cada turno y no lo deja cambiar, por 4 o 5 turnos.` }),
   trapped: () => ({ icon: 'chain', name: 'Atrapado', desc: 'No puede cambiar mientras quien lo atrapó siga en combate.' }),
   saltcure: () => ({ icon: 'crystal', name: 'Salazón', desc: 'Pierde 1/8 de sus PS cada turno (1/4 si es de tipo Agua o Acero).' }),
+  tarshot: () => ({ icon: 'drop', name: 'Alquitranado', desc: 'Los ataques de Fuego le hacen el doble de daño.' }),
+  syrupbomb: (v) => ({ icon: 'drop', name: 'Caramelizado', desc: `Su Velocidad baja al final de cada turno (${v} turnos).` }),
+  throatchop: (v) => ({ icon: 'block', name: 'Garganta lastimada', desc: `No puede usar movimientos de sonido (${v} turnos).` }),
   smackdown: () => ({ icon: 'down', name: 'En el suelo', desc: 'Lo derribaron: los ataques de Tierra le afectan.' }),
   noRetreat: () => ({ icon: 'flag', name: 'Bastión Final', desc: 'No puede cambiar de Pokémon.' }),
   substitute: () => ({ icon: 'doll', name: 'Sustituto', desc: 'Un muñeco recibe los ataques en su lugar y bloquea los movimientos de estado del rival.' }),
@@ -234,6 +237,8 @@ const NOTHING_WHY = {
   genderless: 'uno de los dos no tiene género',
   notFirstTurn: 'solo funciona en su primer turno en combate',
   suckerPunch: 'el rival no iba a atacar',
+  upperHand: 'el rival no iba a usar un ataque con prioridad',
+  noItem: 'el rival no lleva ningún objeto',
   lostFocus: 'perdió la concentración al recibir un golpe',
   shellTrap: 'no recibió un golpe físico',
   lastResort: 'todavía no usa sus otros movimientos',
@@ -303,6 +308,7 @@ const CANT = {
   torment: (ev) => `no puede usar ${ev.move} dos veces seguidas.`,
   twice: (ev) => `no puede usar ${ev.move} dos veces seguidas.`,
   healBlock: (ev) => `no puede curarse: no usa ${ev.move}.`,
+  throatChop: (ev) => `tiene la garganta lastimada: no usa ${ev.move}.`,
   gravity: (ev) => `no puede usar ${ev.move} con la gravedad.`,
   imprison: (ev) => `no puede usar ${ev.move}: está sellado.`,
 };
@@ -335,6 +341,7 @@ const ROOM = {
   mudsport: { icon: 'mud', name: 'Chapoteo Lodo', start: 'Los ataques Eléctricos se debilitan.', end: 'El efecto de Chapoteo Lodo termina.' },
   watersport: { icon: 'drop', name: 'Hidrochorro', start: 'Los ataques de Fuego se debilitan.', end: 'El efecto de Hidrochorro termina.' },
   fairylock: { icon: 'lock', name: 'Cerrojo Feérico', start: 'Nadie podrá huir durante el próximo turno.', end: 'El cerrojo feérico se abre.' },
+  iondeluge: { icon: 'bolt', name: 'Diluvio de plasma', start: 'Cae un diluvio de plasma: los ataques Normales se vuelven Eléctricos.', end: 'El diluvio de plasma se disipa.' },
 };
 const HURT = { leechseed: ' por las drenadoras', brn: ' por la quemadura', psn: ' por el veneno', tox: ' por el veneno', sand: ' por la tormenta de arena', hail: ' por el granizo', recoil: ' por el retroceso', ooze: ' por el lodo líquido', bound: ' por estar apresado', saltcure: ' por la salazón', crash: ' al estrellarse', cost: ' para potenciarse', stealthrock: ' por las rocas puntiagudas', spikes: ' por las púas', curse: ' por la maldición', nightmare: ' por la pesadilla', future: ' por el ataque anticipado', painsplit: ' al compartir el dolor', spikyshield: ' al chocar con el escudo de púas', ability: '' };
 const VOLATILE = {
@@ -347,6 +354,9 @@ const VOLATILE = {
   bound: (ev) => `queda apresado por ${ev.move}.`,
   trapped: () => 'ya no puede huir.',
   saltcure: () => 'queda en salazón.',
+  tarshot: () => 'queda cubierto de alquitrán: el Fuego le hace más daño.',
+  syrupbomb: () => 'queda cubierto de caramelo pegajoso.',
+  throatchop: () => 'queda con la garganta lastimada.',
   smackdown: () => 'cae al suelo.',
   substitute: () => 'crea un sustituto.',
   taunt: () => 'cae en la provocación.',
@@ -386,6 +396,8 @@ const VOLATILE_END = {
   taunt: () => 'ya no está provocado.',
   encore: () => 'ya no tiene que repetir el movimiento.',
   healblock: () => 'puede volver a curarse.',
+  throatchop: () => 'puede volver a usar movimientos de sonido.',
+  syrupbomb: () => 'se libra del caramelo.',
   telekinesis: () => 'deja de flotar.',
   magnetrise: () => 'deja de levitar.',
   airborne: () => 'cae al suelo por la gravedad.',
