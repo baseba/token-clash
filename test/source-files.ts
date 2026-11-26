@@ -30,13 +30,17 @@ function isTypeOnly(clause: string): boolean {
   return names.length > 0 && names.every((name) => /^type\b/.test(name));
 }
 
+const IMPORT_FROM = /^\s*(?:import|export)\b[^'"]*?from\s+'([^']+)'/gm;
+const DYNAMIC_IMPORT = /\bimport\(\s*'([^']+)'\s*\)/g;
+
+export const specifiersOf = (code: string): string[] => [...code.matchAll(IMPORT_FROM), ...code.matchAll(DYNAMIC_IMPORT)].map((m) => m[1]);
+
 export function importsOf({ file, code }: SourceFile): Import[] {
-  const specifiers = [...code.matchAll(/^\s*(?:import|export)\b[^'"]*?from\s+'([^']+)'/gm), ...code.matchAll(/\bimport\(\s*'([^']+)'\s*\)/g)].map((m) => m[1]);
-  return specifiers.map((spec) => ({ file, target: spec.startsWith('.') ? normalize(join(dirname(file), spec)).replace(/\.js$/, '.ts') : spec }));
+  return specifiersOf(code).map((spec) => ({ file, target: spec.startsWith('.') ? normalize(join(dirname(file), spec)).replace(/\.js$/, '.ts') : spec }));
 }
 
 export function valueImportsOf({ file, code }: SourceFile): Import[] {
   const staticImports = [...code.matchAll(/^\s*(?:import|export)\s+([^'"]*?)\s*from\s+'([^']+)'/gm)].filter((m) => !isTypeOnly(m[1].trim())).map((m) => m[2]);
-  const dynamicImports = [...code.matchAll(/\bimport\(\s*'([^']+)'\s*\)/g)].map((m) => m[1]);
+  const dynamicImports = [...code.matchAll(DYNAMIC_IMPORT)].map((m) => m[1]);
   return [...staticImports, ...dynamicImports].map((target) => ({ file, target }));
 }
