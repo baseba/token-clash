@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomParty } from '../../combat/domain/random-party.js';
 import { aiTrainerId, buildAiRandomParty, buildAiTeam, type AiLevel } from '../../combat/domain/ai.js';
-import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
+import { AppConfig, type ArenaTimings } from '../../platform/config/app-config.js';
 import { newId, now } from '../../shared/domain/clock.js';
 import { conflict } from '../../shared/domain/errors.js';
 import { AccountsService } from '../../trainers/application/accounts.service.js';

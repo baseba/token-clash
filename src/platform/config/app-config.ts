@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { z } from 'zod';
-import { PROJECT_ROOT } from '../paths.js';
+import { PROJECT_ROOT } from '../../shared/paths.js';
 
 export interface ArenaTimings {
   turnLimitMs: number;

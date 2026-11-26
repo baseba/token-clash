@@ -1,6 +1,6 @@
 import { StandardSchemaValidationPipe } from '@nestjs/common';
 import { z } from 'zod';
-import { invalid } from '../domain/errors.js';
+import { invalid } from '../../shared/domain/errors.js';
 
 const spanish = z.locales.es().localeError;
 z.config({

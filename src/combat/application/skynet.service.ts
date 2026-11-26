@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AppConfig } from '../../shared/config/app-config.js';
+import { AppConfig } from '../../platform/config/app-config.js';
 import { invalid, unavailable } from '../../shared/domain/errors.js';
 import { AI_LEVELS, JEV_LEVEL, type AiLevel } from '../domain/ai.js';
 import type { Action, BattleState } from '../domain/battle.js';

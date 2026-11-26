@@ -383,7 +383,7 @@ escritura que lee primero (`+=`, `??=`, `++`) llega a los dos.
   juzgan como cualquier otra. La unidad es el módulo de Nest: cuenta lo que cruza el borde del dominio, en la capa
   que sea, y una llamada de afuera a una capa cuenta como algo que muestra el dominio. Por eso un dominio en capas
   cuenta como escondidos sus handlers y sus métodos de repositorio, y rara vez es superficial. En este repo la regla
-  reporta `src/catalog/domain`, `shared` y carpetas dentro de una capa. El original juzga cada carpeta: es una
+  muerde a `src/catalog/domain` y a las carpetas dentro de una capa. El original juzga cada carpeta: es una
   diferencia, no un arreglo.
 
 **Lo que no ve, a propósito (lista cerrada):**
@@ -427,8 +427,9 @@ Por carpeta:
 | `src/stats/` | La página de stats y los logros. No guarda nada: los cambios del entrenador se los pide a `TrainersService` y `ShopService`. |
 | `src/realtime/` | El protocolo WebSocket (`/ws`). |
 | `src/web/` | El frontend estático, los health checks y la vista previa de los links de salas y torneos. |
-| `src/shared/` | Configuración, errores de dominio, HTTP (guards, filtro de errores) y la base de datos. |
-| `src/legacy/` | La migración única desde `data/db.json`. La corre `app.module.ts` al abrir la base. |
+| `src/shared/` | Lo que un `domain/` puede importar: los errores de dominio, el reloj (`now`, `newId`) y la raíz del proyecto (`paths.ts`). |
+| `src/platform/` | La plomería de Nest: configuración, HTTP (guards, filtro de errores, middlewares) y la base de datos. Ningún `domain/` la importa. |
+| `src/app/` | La raíz de composición: `app.module.ts` junta los módulos y corre, al abrir la base, la migración única desde `data/db.json` (`legacy-json-import.ts`). `src/main.ts` arranca el servidor y `src/jev-proxy.main.ts`, el proxy de Jev. |
 | `src/architecture.spec.ts` | El test que hace cumplir la regla de dependencia entre capas y dominios. |
 | `drizzle/` | Migraciones SQL generadas por drizzle-kit; la app las aplica al arrancar. |
 | `src/**/*.spec.ts` | Tests unitarios (`node:test`), al lado del código que prueban. |
@@ -463,15 +464,15 @@ Por tema:
 | La Torre | `src/tower/domain/tower-run.ts` (la subida y sus estados), `floors.ts` (qué hay en cada piso), `growth.ts` (experiencia, evolución y movimientos), `lab.ts` (ofertas de tu colección), `foe-team.ts` (el equipo rival y cómo elige sus 3), `species-pool.ts` (las especies de 1ª a 5ª generación que traen los rivales y el reemplazo de un as posterior), `rewards.ts` (premios y sus rarezas), `score.ts` (puntos de cada piso); los objetos equipados en `src/catalog/domain/held-items.ts` (qué son) y `src/combat/domain/rules/item-effects.ts` (qué hacen en batalla, con los hooks de las habilidades); salas del camino en `floors.ts` (`roomsAt`); personajes, escenarios y música en `public/tower-cast.js` (tipados en `src/catalog/domain/tower-cast.ts`); lo que dice cada entrenador al verte, al perder y al ganarte en `src/catalog/domain/tower-lines.ts` y `boss-lines.ts` (solo el servidor) | `/api/tower/...` en `tower/interface/tower.controller.ts`; cada piso es una sala contra la IA con `staging` (`DuelService.startStaged`) | `public/app.js` (página `/torre`), `public/tower-map.js` (el mapa de cada piso y sus transiciones), `public/tower-tiles.js` (cómo se arma cada mapa y sus tiles), `public/overworld.js` (sprites de mapa) |
 | Tipos y efectividad | `public/types.js` (lo comparten servidor y navegador) | | |
 | Escenario de batalla y sprites de Pokémon | | | `public/backgrounds.js`, `public/creature.js` (URL de cada sprite según `public/upstream/sprites.json`) |
-| Archivos externos (jsDelivr y respaldo en GitHub) | | | `public/upstream.js` (commits fijados, URLs y respaldo), `public/upstream/*.json`; la CSP que los permite está en `src/shared/http/security-headers.middleware.ts` |
+| Archivos externos (jsDelivr y respaldo en GitHub) | | | `public/upstream.js` (commits fijados, URLs y respaldo), `public/upstream/*.json`; la CSP que los permite está en `src/platform/http/security-headers.middleware.ts` |
 | Reciclaje de repetidos | `src/trainers/domain/recycling.ts` (cuánto vale cada uno), `Trainer.recycle` en `trainer.ts`; los repetidos salen de `save-file.ts` | `GET` y `POST /api/me/recycling` en `trainers/interface/trainers.controller.ts` | `public/app.js` |
 | Efectos al abrir la Poké Ball | | | `public/ball-fx.js` (efecto por Ball y rareza), `public/ball-burst.js` (los dibuja en un canvas) |
 | Música, radio y sonidos | duración de cada pista en `src/catalog/domain/radio-tracks.ts` (la mide `scripts/sync-radio.js`) | | `public/music.js`, `public/radio.js`, `public/fx.js` |
 | Estaciones de radio | `src/radio/domain/station.ts` (la cola y qué suena), `src/radio/application/radio.service.ts` (timers y oyentes) | `radio/interface/radio.controller.ts` (`/api/radio/...`), WebSocket `{ t: 'radio' }` en `src/realtime/game.gateway.ts` | `public/radio-station.js` (las pestañas y el socket de la estación), `public/music.js` |
 | Notificaciones | | | `public/notify.js` |
-| Configuración y variables de entorno | `src/shared/config/app-config.ts` | | |
-| Seguridad HTTP y límites | `src/shared/http/` | | |
-| Base de datos | `*/infrastructure/*.schema.ts`, `src/shared/infrastructure/database/` | | |
+| Configuración y variables de entorno | `src/platform/config/app-config.ts` | | |
+| Seguridad HTTP y límites | `src/platform/http/` | | |
+| Base de datos | `*/infrastructure/*.schema.ts`, `src/platform/database/` | | |
 | CI | `.github/workflows/ci.yml` (`npm test` y la imagen) | | |
 
 
@@ -517,7 +518,7 @@ Todo vive en `DATA_DIR/token-clash.db` (SQLite, modo WAL). Nada se borra: los de
 Hasta la versión 0.1 los datos estaban en `data/db.json`: el primer arranque con SQLite lo importa entero en una
 transacción y lo deja intacto como respaldo (si un deploy vuelve a la imagen anterior, esa sigue encontrando sus datos).
 No se vuelve a importar. Para comprobar una copia real sin tocar nada:
-`LEGACY_DB=/ruta/a/db.json node --test dist/src/legacy/legacy-json-import.spec.js` (tras `npm test`).
+`LEGACY_DB=/ruta/a/db.json node --test dist/src/app/legacy-json-import.spec.js` (tras `npm test`).
 
 Las batallas en curso viven en memoria: reiniciar el servicio corta las peleas activas (quedan como "cortadas").
 

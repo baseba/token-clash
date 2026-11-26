@@ -1,8 +1,8 @@
 import { Controller, Get, NotFoundException, Param, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ArenaQueries } from '../arena/application/arena-queries.js';
-import { AppConfig } from '../shared/config/app-config.js';
-import { isLoopback } from '../shared/http/client-ip.js';
+import { AppConfig } from '../platform/config/app-config.js';
+import { isLoopback } from '../platform/http/client-ip.js';
 import { cardVersion, duelPreview, tournamentPreview, withLinkPreview, type LinkPreview } from './link-preview.js';
 import { CARD_HEIGHT, CARD_WIDTH } from './preview-card.js';
 import { PreviewImages } from './preview-images.js';

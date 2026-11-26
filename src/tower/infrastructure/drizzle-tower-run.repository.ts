@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
-import type { Database } from '../../shared/infrastructure/database/database.js';
+import type { Database } from '../../platform/database/database.js';
 import { TowerRunRepository } from '../domain/tower-run.repository.js';
 import type { TowerRun } from '../domain/tower-run.js';
 import { towerRunToDomain, towerRunToRow } from './tower.mapper.js';

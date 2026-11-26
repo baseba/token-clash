@@ -3,7 +3,7 @@ import { aiLevelOf, buildAiRandomParty, buildAiTeam } from '../../combat/domain/
 import { randomParty } from '../../combat/domain/random-party.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
+import { AppConfig, type ArenaTimings } from '../../platform/config/app-config.js';
 import { newId, now } from '../../shared/domain/clock.js';
 import { conflict, notFound } from '../../shared/domain/errors.js';
 import { AccountsService } from '../../trainers/application/accounts.service.js';

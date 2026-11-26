@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { aiLevelOf, aiPicks, aiRerollCandidates, aiRerollIndex, type AiLevel } from '../../combat/domain/ai.js';
 import { reroll } from '../../combat/domain/random-party.js';
 import { canReroll, createPreview, fillMissing, pick, picksNeeded, previewReady } from '../../combat/domain/team-preview.js';
-import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
+import { AppConfig, type ArenaTimings } from '../../platform/config/app-config.js';
 import { now } from '../../shared/domain/clock.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import { pendingArrivals, type TournamentLabel } from '../domain/tournament.js';
