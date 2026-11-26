@@ -1,41 +1,9 @@
-import { moveEntry, type MoveEntry } from '../../catalog/domain/creatures.js';
+import { moveEntry } from '../../catalog/domain/creatures.js';
 import { IMPOSSIBLE_MOVES, MOVE_RULES } from './move-rules.js';
 import { hiddenPowerType } from '../../../public/natures.js';
+import type { MoveData, MoveTarget } from './battle-types.js';
 
-export type MoveTarget = 'foe' | 'self';
-
-export interface MoveData extends MoveEntry {
-  key: string;
-  id: string;
-  kind: 'attack' | 'status';
-  supported: boolean;
-  weakenedByGrassyTerrain?: boolean;
-  usesTargetAttack?: boolean;
-  screen?: string;
-  breaksScreens?: boolean;
-  clearsScreens?: boolean;
-  firstTurnOnly?: boolean;
-  rampage?: boolean;
-  binds?: boolean;
-  traps?: boolean;
-  selfSwitch?: boolean;
-  forceSwitch?: boolean;
-  leavesOne?: boolean;
-  crashes?: boolean;
-  ignoresDefBoosts?: boolean;
-  hitsPhysicalDef?: boolean;
-  losesType?: string;
-  selfCost?: number;
-  usesDefense?: boolean;
-  extraType?: string;
-  recoilMaxHp?: number;
-  usableAsleep?: boolean;
-  grounds?: boolean;
-  hitsAirborne?: boolean;
-  curls?: boolean;
-  thaws?: boolean;
-  aimable?: MoveTarget;
-}
+export type { MoveData, MoveTarget };
 
 const SUPPORTED_VOLATILES = new Set(['confusion', 'attract', 'leechseed']);
 const SPECIAL_STATUS_MOVES = new Set(['rest', 'synthesis', 'morning-sun', 'moonlight', 'shore-up']);

@@ -1,9 +1,161 @@
 import type { AbilityInfo } from '../../catalog/domain/abilities.js';
-import type { BoostKey, MajorStatus, MoveCategory, StatKey, Stats, Weather } from '../../catalog/domain/creatures.js';
-import type { Fighter } from './fighter.js';
-import type { MoveData, MoveTarget } from './moves.js';
-import type { Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
-import type { FighterView, PublicMove } from './battle-view.js';
+import type { BoostKey, Boosts, MajorStatus, MoveCategory, MoveEntry, MoveSecondary, NatureInfo, StatKey, Stats, Weather } from '../../catalog/domain/creatures.js';
+import type { Gender, Ivs, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
+
+export type MoveTarget = 'foe' | 'self';
+
+export interface MoveData extends MoveEntry {
+  key: string;
+  id: string;
+  kind: 'attack' | 'status';
+  supported: boolean;
+  weakenedByGrassyTerrain?: boolean;
+  usesTargetAttack?: boolean;
+  screen?: string;
+  breaksScreens?: boolean;
+  clearsScreens?: boolean;
+  firstTurnOnly?: boolean;
+  rampage?: boolean;
+  binds?: boolean;
+  traps?: boolean;
+  selfSwitch?: boolean;
+  forceSwitch?: boolean;
+  leavesOne?: boolean;
+  crashes?: boolean;
+  ignoresDefBoosts?: boolean;
+  hitsPhysicalDef?: boolean;
+  losesType?: string;
+  selfCost?: number;
+  usesDefense?: boolean;
+  extraType?: string;
+  recoilMaxHp?: number;
+  usableAsleep?: boolean;
+  grounds?: boolean;
+  hitsAirborne?: boolean;
+  curls?: boolean;
+  thaws?: boolean;
+  aimable?: MoveTarget;
+}
+
+export interface Fighter {
+  uid: string;
+  name: string;
+  speciesName: string;
+  speciesId: number;
+  types: string[];
+  rarity: Rarity;
+  shiny: boolean;
+  level: number;
+  stats: Stats;
+  moves: MoveData[];
+  sprite: string;
+  floats: boolean;
+  ability: string | null;
+  abilityInfo: AbilityInfo | null;
+  gender: Gender | null;
+  nature: string | null;
+  natureInfo: NatureInfo | null;
+  evs: Ivs;
+  speciesBase: Stats;
+  ivs: Ivs;
+  item?: string | null;
+}
+
+export interface PublicMove {
+  name: string;
+  type: string | null;
+  power: number;
+  accuracy: number | null;
+  priority: number;
+  kind: 'attack' | 'status';
+  category: MoveCategory;
+  desc: string;
+  key: string;
+  contact: boolean;
+  pp: number;
+  target: string;
+  aimable?: MoveTarget;
+  boosts?: Boosts;
+  status?: MajorStatus;
+  heal?: number;
+  weather?: Weather;
+  screen?: string;
+  breaksScreens?: boolean;
+  fixedDamage?: number | string;
+  ohko?: boolean;
+  charge?: boolean;
+  recharge?: boolean;
+  secondary?: MoveSecondary[];
+  self?: Boosts;
+  recoil?: number;
+  drain?: number;
+  crit?: number;
+  multihit?: boolean;
+}
+
+export interface PublicVolatiles {
+  confusion?: boolean;
+  attract?: boolean;
+  perish?: number;
+  charge?: boolean;
+  flashFire?: boolean;
+  disabled?: string;
+  slowStart?: number;
+  bound?: string;
+  trapped?: boolean;
+  saltcure?: boolean;
+  smackdown?: boolean;
+  noRetreat?: boolean;
+  substitute?: boolean;
+  taunt?: number;
+  encore?: string;
+  torment?: boolean;
+  healblock?: number;
+  yawn?: boolean;
+  nightmare?: boolean;
+  curse?: boolean;
+  focusenergy?: boolean;
+  ingrain?: boolean;
+  aquaring?: boolean;
+  magnetrise?: number;
+  telekinesis?: number;
+  foresight?: boolean;
+  miracleeye?: boolean;
+  stockpile?: number;
+  gastroacid?: boolean;
+  uproar?: boolean;
+  imprison?: boolean;
+}
+
+export interface VisibleFighterView {
+  uid: string;
+  hidden?: false;
+  name: string;
+  speciesName: string;
+  types: string[];
+  rarity: Rarity;
+  shiny: boolean;
+  level: number;
+  stats: Pick<Stats, 'hp'> & Partial<Stats>;
+  hp: number;
+  hpPercent?: true;
+  boosts: Record<BoostKey, number>;
+  pp: Record<string, number>;
+  gender: Gender | null;
+  sprite: string;
+  floats: boolean;
+  status: string | null;
+  volatiles: PublicVolatiles;
+  abilityInfo: AbilityInfo | null;
+  moves: PublicMove[];
+  speciesBase?: Stats;
+  evs?: Ivs;
+  natureInfo?: NatureInfo | null;
+}
+
+export type HiddenFighterView = { uid: string; hidden: true } & { [K in Exclude<keyof VisibleFighterView, 'uid' | 'hidden'>]?: undefined };
+
+export type FighterView = VisibleFighterView | HiddenFighterView;
 
 export interface MoveAction {
   type: 'move';

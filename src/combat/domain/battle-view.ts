@@ -1,13 +1,10 @@
 import { HELD_ITEMS } from '../../catalog/domain/held-items.js';
-import type { BoostKey, NatureInfo, Stats } from '../../catalog/domain/creatures.js';
-import type { MoveData } from './moves.js';
-import { abilityInfo, type AbilityInfo } from '../../catalog/domain/abilities.js';
-import type { Gender, Ivs, Rarity } from '../../catalog/domain/roster-entry.js';
-import type { BattleEvent, BattleFighter, BattleState } from './battle-types.js';
+import { abilityInfo } from '../../catalog/domain/abilities.js';
+import type { BattleEvent, BattleFighter, BattleState, FighterView, MoveData, PublicMove, PublicVolatiles } from './battle-types.js';
 import { needsAction } from './battle.js';
 import { currentWeather } from './effects.js';
 
-function publicMove(move: MoveData) {
+function publicMove(move: MoveData): PublicMove {
   return {
     name: move.name,
     type: move.type,
@@ -45,7 +42,7 @@ export function publicMoves(fighter: BattleFighter, known: Set<string> | null = 
   return fighter.moves.filter((m) => !known || known.has(m.key)).map(publicMove);
 }
 
-function publicVolatiles(fighter: BattleFighter) {
+function publicVolatiles(fighter: BattleFighter): PublicVolatiles {
   const volatiles = fighter.volatiles;
   return {
     ...(volatiles.confusion ? { confusion: true } : {}),
@@ -107,38 +104,6 @@ export type EventView = ReturnType<typeof viewEvent>;
 export function viewEvents(events: BattleEvent[], viewer: number | null = null): EventView[] {
   return events.map((e) => viewEvent(e, viewer));
 }
-
-export type PublicMove = ReturnType<typeof publicMove>;
-
-export interface VisibleFighterView {
-  uid: string;
-  hidden?: false;
-  name: string;
-  speciesName: string;
-  types: string[];
-  rarity: Rarity;
-  shiny: boolean;
-  level: number;
-  stats: Pick<Stats, 'hp'> & Partial<Stats>;
-  hp: number;
-  hpPercent?: true;
-  boosts: Record<BoostKey, number>;
-  pp: Record<string, number>;
-  gender: Gender | null;
-  sprite: string;
-  floats: boolean;
-  status: string | null;
-  volatiles: ReturnType<typeof publicVolatiles>;
-  abilityInfo: AbilityInfo | null;
-  moves: PublicMove[];
-  speciesBase?: Stats;
-  evs?: Ivs;
-  natureInfo?: NatureInfo | null;
-}
-
-export type HiddenFighterView = { uid: string; hidden: true } & { [K in Exclude<keyof VisibleFighterView, 'uid' | 'hidden'>]?: undefined };
-
-export type FighterView = VisibleFighterView | HiddenFighterView;
 
 const heldItemView = (key: string) => ({ key, name: HELD_ITEMS[key]?.name ?? key, desc: HELD_ITEMS[key]?.desc ?? '' });
 
