@@ -21,8 +21,8 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 Más cuatro piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
 (archivos estáticos, health checks y la vista previa de los links, que lee la arena con `ArenaQueries`), `shared` (lo
 que un `domain/` puede importar: los errores de dominio, el reloj y la raíz del proyecto) y `platform` (la plomería de
-Nest: configuración, HTTP y base de datos). Un `domain/` nunca importa `platform/`, y ninguna de las dos importa un
-dominio: las flechas solo entran.
+Nest: configuración, HTTP y base de datos). Un `domain/` nunca importa `platform/`, `shared/` no importa Nest,
+Drizzle ni `node:http`, y ni `shared` ni `platform` importan un dominio: las flechas solo entran.
 
 ```
            realtime (WS)   web          HTTP controllers de cada dominio

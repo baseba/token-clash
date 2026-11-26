@@ -33,6 +33,7 @@ const contextOf = (path: string) => CONTEXTS.find((context) => path.startsWith(`
 const layerOf = (path: string) => path.split('/')[1];
 const isPackage = (target: string, name: string) => target === name || target.startsWith(`${name}/`);
 const usesDrizzle = (target: string) => isPackage(target, 'drizzle-orm') || isPackage(target, '@nestjs/drizzle');
+const isPlumbing = (target: string) => isPackage(target, '@nestjs') || usesDrizzle(target) || target === 'node:http';
 const isRepositoryPort = (target: string) => /\/domain\/[^/]+\.repositor(y|ies)\.ts$/.test(target);
 const isWiring = (file: string) => !file.includes('/') || file.startsWith('legacy/');
 const show = (list: Import[]) => list.map(({ file, target }) => `${file} → ${target}`);
@@ -40,12 +41,15 @@ const show = (list: Import[]) => list.map(({ file, target }) => `${file} → ${t
 test('the scanner sees the imports it checks', () => {
   assert.ok(imports.some((i) => i.file === 'legacy/legacy-json-import.ts' && i.target === 'drizzle-orm'));
   assert.ok(imports.some((i) => i.file === 'arena/domain/lobby.ts' && i.target === 'shared/domain/errors.ts'));
+  assert.ok(imports.some((i) => i.file === 'shared/domain/clock.ts' && i.target === 'node:crypto'));
+  assert.ok(imports.some((i) => i.file === 'platform/http/domain-error.filter.ts' && i.target === 'shared/domain/errors.ts'));
+  assert.ok(imports.some((i) => i.file === 'platform/http/client-ip.ts' && i.target === 'node:http'));
 });
 
 test('a domain/ folder is plain TypeScript: no Nest, no Drizzle, no HTTP, no other layer', () => {
   const bad = imports.filter(({ file, target }) => {
     if (!contextOf(file) || layerOf(file) !== 'domain') return false;
-    return isPackage(target, '@nestjs') || usesDrizzle(target) || target === 'node:http' || /^[a-z]+\/(application|infrastructure|interface)\//.test(target);
+    return isPlumbing(target) || /^[a-z]+\/(application|infrastructure|interface)\//.test(target);
   });
   assert.deepEqual(show(bad), []);
 });
@@ -71,6 +75,11 @@ test('catalog depends on no other context: it serves data, and combat decides wh
 
 test('shared/ depends on nothing else in src: the arrows point into it, never out', () => {
   const bad = imports.filter(({ file, target }) => file.startsWith('shared/') && target.endsWith('.ts') && !target.startsWith('shared/') && !target.startsWith('../'));
+  assert.deepEqual(show(bad), []);
+});
+
+test('shared/ is what a domain/ may import: no Nest, no Drizzle, no HTTP', () => {
+  const bad = imports.filter(({ file, target }) => file.startsWith('shared/') && isPlumbing(target));
   assert.deepEqual(show(bad), []);
 });
 
