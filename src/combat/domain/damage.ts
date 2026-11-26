@@ -1,11 +1,10 @@
 import { type BoostKey, type Boosts, effectiveness, type MajorStatus } from '../../catalog/domain/creatures.js';
-import { MOVE_RULES } from './rules/move-rules.js';
+import { MOVE_RULES, type MoveRuleApi } from './rules/move-rules.js';
 import { isRain, isSun, poisoned, stageMult } from './conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState } from './battle-types.js';
 import { dragOut, faint } from './switching.js';
 import { addVolatile, asleep, boost, clamp, defendingTypes, clearHazards, clearScreens, clearTerrain, cure, currentWeather, emit, freshBoosts, grounded, hasBench, heal, hurt, nameOf, setStatus, setTypes, sideIndexOf, STAGE_LIMIT, weatherFor } from './effects.js';
 import { abilityDef, anyActiveHas, chain, flag, mul, otherActiveHas, run, showAbility } from './ability-engine.js';
-import { moveApi } from './move-rule-api.js';
 
 const accuracyMult = (stage: number): number => (stage >= 0 ? (3 + stage) / 3 : 3 / (3 - stage));
 
@@ -364,7 +363,7 @@ function fixedDamage(me: BattleFighter, target: BattleFighter, move: AnyMove): n
   return Number(move.fixedDamage);
 }
 
-export function attack(battle: BattleState, me: BattleFighter, target: BattleFighter | null, move: BattleMove): number | undefined {
+export function attack(battle: BattleState, me: BattleFighter, target: BattleFighter | null, move: BattleMove, api: MoveRuleApi): number | undefined {
   const sideIndex = sideIndexOf(battle, me);
   if (!target) {
     emit(battle, { t: 'notarget', side: sideIndex });
@@ -403,22 +402,22 @@ export function attack(battle: BattleState, me: BattleFighter, target: BattleFig
       crash();
       return;
     }
-    const fixed = rules?.damage ? rules.damage(moveApi(battle), me, target, move) : undefined;
+    const fixed = rules?.damage ? rules.damage(api, me, target, move) : undefined;
     if (fixed === null) {
       emit(battle, { t: 'nothing', side: sideIndex });
       return 0;
     }
     if (move.breaksScreens) clearScreens(battle, sideIndexOf(battle, target), 'broken');
-    move.power = rules?.power ? rules.power(moveApi(battle), me, target, move) : basePower(battle, me, target, move);
+    move.power = rules?.power ? rules.power(api, me, target, move) : basePower(battle, me, target, move);
     if (move.id === 'spectral-thief') stealBoosts(battle, me, target);
     const eff = chain(battle, target, 'onEffectiveness', typeEff || 1, move, me);
-    const count = rules?.hits ? rules.hits(moveApi(battle), me) : rollHits(battle, me, move);
+    const count = rules?.hits ? rules.hits(api, me) : rollHits(battle, me, move);
     let total = 0;
     let lastHit = 0;
     let landed = 0;
     let toSub = false;
     for (let i = 0; i < count && target.hp > 0 && me.hp > 0; i++) {
-      const hitPower = rules?.hitPower ? rules.hitPower(moveApi(battle), me, i) : i > 0 && !move.multihit ? move.power * 0.25 : move.power;
+      const hitPower = rules?.hitPower ? rules.hitPower(api, me, i) : i > 0 && !move.multihit ? move.power * 0.25 : move.power;
       const { dmg, crit } = fixed !== undefined
         ? { dmg: fixed, crit: false }
         : move.ohko || move.fixedDamage
@@ -481,7 +480,7 @@ export function attack(battle: BattleState, me: BattleFighter, target: BattleFig
       delete me.volatiles.bound;
       delete me.volatiles.leechSeed;
     }
-    rules?.hit?.(moveApi(battle), me, target, move, total);
+    rules?.hit?.(api, me, target, move, total);
     return total;
   } finally {
     battle.moldBreaker = null;

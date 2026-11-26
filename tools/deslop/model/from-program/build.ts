@@ -1,4 +1,4 @@
-import type { CodeFile, Model } from '../model.js';
+import { type CodeFile, type Model, SOURCE_EXTENSION } from '../model.js';
 import { type NodeId, Tree } from '../tree.js';
 import { collectItems } from './items.js';
 import { PACKAGE, type Project } from './load.js';
@@ -12,7 +12,7 @@ function countLines(text: string): number {
 
 function moduleOf(tree: Tree, path: string): NodeId {
   const names = path
-    .replace(/\.[cm]?[jt]sx?$/, '')
+    .replace(SOURCE_EXTENSION, '')
     .split('/')
     .slice(1);
   return names.reduce((parent, name) => tree.child(parent, name), tree.root());
