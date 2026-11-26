@@ -17,7 +17,7 @@ import { TowerRecords } from './tower-records.js';
 export class TowerService implements OnModuleInit {
   constructor(
     private readonly runs: TowerRunRepository,
-    private readonly records: TowerRecords,
+    private readonly towerRecords: TowerRecords,
     private readonly trainers: TrainersService,
     private readonly duels: DuelService,
     private readonly arena: ArenaQueries,
@@ -31,7 +31,7 @@ export class TowerService implements OnModuleInit {
 
   start(trainer: Trainer, input: { difficulty: string; length: number | null }): TowerRun {
     this.skynet.assertOffered(input.difficulty);
-    if (this.records.current(trainer.id)) throw conflict('Ya tienes una subida en curso: termínala o abandónala primero.');
+    if (this.towerRecords.current(trainer.id)) throw conflict('Ya tienes una subida en curso: termínala o abandónala primero.');
     const run = TowerRun.start({ id: newId(), trainerId: trainer.id, difficulty: input.difficulty, length: input.length, roster: trainer.roster, at: now() });
     this.runs.save(run);
     return run;
@@ -84,14 +84,14 @@ export class TowerService implements OnModuleInit {
   }
 
   private open(trainer: Trainer): TowerRun {
-    const run = this.records.current(trainer.id);
+    const run = this.towerRecords.current(trainer.id);
     if (!run) throw notFound('No tienes una subida en curso.');
     return run;
   }
 
   private battleFinished({ challenge, winnerSide }: MatchFinished): void {
     if (!challenge.staging || challenge.guestId !== aiTrainerId(challenge.ai as AiLevel)) return;
-    const run = this.records.current(challenge.hostId);
+    const run = this.towerRecords.current(challenge.hostId);
     const roster = this.trainers.byId(challenge.hostId)?.roster ?? [];
     if (run?.battleFinished(challenge.id, winnerSide === 0, { at: now(), roster })) this.runs.save(run);
   }
