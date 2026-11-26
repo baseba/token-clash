@@ -224,6 +224,15 @@ Los datos y recursos de terceros son de sus autores, con sus licencias; aquí so
 
 - Datos y sprites: [PokeAPI](https://pokeapi.co/) (especies, stats, tipos, habilidades y movimientos que aprende
   cada una, en `src/catalog/data/`); gritos: [PokeAPI/cries](https://github.com/PokeAPI/cries).
+- Sprites animados de 6ª a 9ª generación: el pack del [Animated Pokemon System](https://eeveeexpo.com/resources/1544/)
+  de Lucidious89 (basado en el Generation 8 Pack de Golisopod User y en EBDX de Luka S.J.), que tomamos de la copia de
+  [rh-hideout-chinese/pokemon-engine](https://github.com/rh-hideout-chinese/pokemon-engine) fijada a un commit. Los
+  sprites son de los colaboradores de los Smogon X/Y, Sun/Moon, Sword/Shield y Scarlet/Violet Sprite Projects, de los
+  autores del plugin "Sprites Animados" (Tenshi of War, DPertierra, Skyflyer y los demás que lista el pack) y de
+  Lucidious89, Regis, Rod, Kayzering y LcorpOfficial; el frente de Xerneas, que el pack trae quieto, es el de
+  [Pokémon Showdown](https://play.pokemonshowdown.com/sprites/) (material de Nintendo, Creatures y GAME FREAK).
+  `npm run sprites` los ubica (`public/upstream/essentials.json`) y `npm install` los baja y convierte en PNG
+  animados en `public/animated/`; no se versionan.
 - Movimientos y su texto: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) (MIT), de donde salen los
   datos de combate de cada movimiento.
 - Música: las pistas de [PokeRogue](https://github.com/pagefaultgames/pokerogue-assets) (las

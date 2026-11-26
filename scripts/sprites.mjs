@@ -2,7 +2,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { UPSTREAM } from '../public/upstream.js';
-import { fetchRetry, firstExisting, manifestJSON, mapLimit } from './upstream-files.js';
+import { essentialsManifest, withShowdownStills } from './essentials-sprites.mjs';
+import { fetchRetry, firstExisting, manifestJSON, mapLimit, resolveVariants } from './upstream-files.js';
 
 const API = 'https://pokeapi.co/api/v2';
 const PNG_DIR = 'sprites/pokemon/';
@@ -11,15 +12,7 @@ const LAST_BW_SPECIES = 649;
 const API_SPRITE = /^https:\/\/raw\.githubusercontent\.com\/PokeAPI\/sprites\/[^/]+\/(.+)$/;
 const DATA = new URL('../src/catalog/data/pokeapi.json', import.meta.url);
 const MANIFEST = new URL('../public/upstream/sprites.json', import.meta.url);
-
-const FALLBACKS = [['frontShiny'], ['back'], ['backShiny', 'frontShiny', 'back']];
-
-export async function resolveVariants(candidates, firstOf) {
-  const front = await firstOf(candidates.front);
-  if (!front) return null;
-  const rest = await Promise.all(FALLBACKS.map((kinds) => firstOf(kinds.flatMap((kind) => candidates[kind]))));
-  return [front, ...rest.map((path) => path ?? front)];
-}
+const ESSENTIALS_MANIFEST = new URL('../public/upstream/essentials.json', import.meta.url);
 
 const fromStem = (dir, ext, stem) => ({
   front: [`${dir}${stem}.${ext}`],
@@ -94,6 +87,10 @@ export async function syncSprites({ log = (msg) => process.stderr.write(`${msg}\
   for (const { slug } of targets) manifest[resolved.get(slug).dir][slug] = resolved.get(slug).files;
   writeFileSync(MANIFEST, manifestJSON(manifest));
   log(`Sprites listos en public/upstream/sprites.json: ${Object.keys(manifest[GIF_DIR]).length} animados de Negro/Blanco y ${Object.keys(manifest[PNG_DIR]).length} PNG.`);
+  log(`Sprites animados: buscando los ${Object.keys(manifest[PNG_DIR]).length} sin GIF en ${UPSTREAM.essentials.repo}@${UPSTREAM.essentials.commit.slice(0, 7)}.`);
+  const essentials = await withShowdownStills(await essentialsManifest(Object.keys(manifest[PNG_DIR])), log);
+  writeFileSync(ESSENTIALS_MANIFEST, manifestJSON(essentials));
+  log(`Sprites animados listos en public/upstream/essentials.json: ${Object.keys(essentials).length}.`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

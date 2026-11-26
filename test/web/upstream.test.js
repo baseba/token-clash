@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolveVariants } from '../../scripts/sprites.mjs';
+import { resolveVariants } from '../../scripts/upstream-files.js';
 import { ASSET_ORIGINS, fallBackToRaw, fetchFirst, rawFallback, UPSTREAM, upstreamManifest, upstreamURLs } from '../../public/upstream.js';
 
 const pokerogue = { repo: 'pagefaultgames/pokerogue-assets', commit: 'b7ce1013491141864da412fa733d5ac585b5d453' };
@@ -72,7 +72,8 @@ test('a manifest that fails to load is asked for again on the next call', async 
 });
 
 const readManifest = (url) => JSON.parse(readFileSync(new URL(`../../public${url.split('?')[0]}`, import.meta.url), 'utf8'));
-globalThis.fetch = async (url) => ({ ok: true, json: async () => readManifest(url) });
+const installed = { sprites: {} };
+globalThis.fetch = async (url) => (url.startsWith('/animated/') ? { ok: true, json: async () => installed } : { ok: true, json: async () => readManifest(url) });
 
 const pokeapi = JSON.parse(readFileSync(new URL('../../src/catalog/data/pokeapi.json', import.meta.url), 'utf8'));
 const creatures = [...Object.keys(pokeapi.species), ...Object.values(pokeapi.forms).map((form) => form.sprite)];
@@ -87,6 +88,25 @@ test('every species, form and the substitute has its four sprites on jsDelivr', 
   assert.match(spriteURL({ sprite: '25', shiny: true }, { back: true }), /\/sprites\/pokemon\/versions\/generation-v\/black-white\/animated\/back\/shiny\/25\.gif$/, 'Black/White species animate');
   assert.match(spriteURL({ sprite: 906 }), /\/sprites\/pokemon\/906\.png$/, 'later species are still PNGs');
   assert.equal(spriteURL({ sprite: 'missingno' }), '');
+});
+
+test('a species whose animated sprite was converted at install loads it from the game, and the rest stay on jsDelivr', async () => {
+  const { creatureHTML, loadSprites, spriteURL } = await import('../../public/creature.js');
+  installed.sprites = { 658: ['658-front.png', '658-front-shiny.png', '658-back.png', '658-back-shiny.png'], 716: ['716-front.gif', '716-front-shiny.gif', '716-back.png', '716-back-shiny.png'], 'minior-red': ['minior-red-front.png', 'minior-red-front-shiny.png', 'minior-red-back.png', 'minior-red-back-shiny.png'] };
+  try {
+    await loadSprites();
+    assert.equal(spriteURL({ sprite: '658' }), '/animated/658-front.png?v=dev');
+    assert.equal(spriteURL({ sprite: 658, shiny: true }, { back: true }), '/animated/658-back-shiny.png?v=dev');
+    assert.equal(spriteURL({ sprite: 'minior-red' }, { back: true }), '/animated/minior-red-back.png?v=dev');
+    assert.equal(spriteURL({ sprite: 716, shiny: true }), '/animated/716-front-shiny.gif?v=dev', 'a copied Showdown GIF keeps its own file');
+    assert.equal(spriteURL({ sprite: 716 }, { back: true }), '/animated/716-back.png?v=dev');
+    assert.match(spriteURL({ sprite: '906' }), jsdelivr('PokeAPI/sprites'));
+    assert.match(creatureHTML({ sprite: '658', floats: true }), /class="creature animated"/, 'an animated sprite does not also bob');
+    assert.match(creatureHTML({ sprite: '906', floats: true }), /class="creature floats"/);
+  } finally {
+    installed.sprites = {};
+    await loadSprites();
+  }
 });
 
 test('a missing sprite falls back to the closest one: back shiny to front shiny, then back, then front', async () => {

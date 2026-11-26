@@ -1,0 +1,1575 @@
+{
+  "650": {
+    "files": ["Front/CHESPIN.png","Front shiny/CHESPIN.png","Back/CHESPIN.png","Back shiny/CHESPIN.png"],
+    "delays": [90,90]
+  },
+  "651": {
+    "files": ["Front/QUILLADIN.png","Front shiny/QUILLADIN.png","Back/QUILLADIN.png","Back shiny/QUILLADIN.png"],
+    "delays": [90,90]
+  },
+  "652": {
+    "files": ["Front/CHESNAUGHT.png","Front shiny/CHESNAUGHT.png","Back/CHESNAUGHT.png","Back shiny/CHESNAUGHT.png"],
+    "delays": [90,90]
+  },
+  "653": {
+    "files": ["Front/FENNEKIN.png","Front shiny/FENNEKIN.png","Back/FENNEKIN.png","Back shiny/FENNEKIN.png"],
+    "delays": [90,90]
+  },
+  "654": {
+    "files": ["Front/BRAIXEN.png","Front shiny/BRAIXEN.png","Back/BRAIXEN.png","Back shiny/BRAIXEN.png"],
+    "delays": [90,90]
+  },
+  "655": {
+    "files": ["Front/DELPHOX.png","Front shiny/DELPHOX.png","Back/DELPHOX.png","Back shiny/DELPHOX.png"],
+    "delays": [90,90]
+  },
+  "656": {
+    "files": ["Front/FROAKIE.png","Front shiny/FROAKIE.png","Back/FROAKIE.png","Back shiny/FROAKIE.png"],
+    "delays": [90,90]
+  },
+  "657": {
+    "files": ["Front/FROGADIER.png","Front shiny/FROGADIER.png","Back/FROGADIER.png","Back shiny/FROGADIER.png"],
+    "delays": [90,90]
+  },
+  "658": {
+    "files": ["Front/GRENINJA.png","Front shiny/GRENINJA.png","Back/GRENINJA.png","Back shiny/GRENINJA.png"],
+    "delays": [90,90]
+  },
+  "659": {
+    "files": ["Front/BUNNELBY.png","Front shiny/BUNNELBY.png","Back/BUNNELBY.png","Back shiny/BUNNELBY.png"],
+    "delays": [90,90]
+  },
+  "660": {
+    "files": ["Front/DIGGERSBY.png","Front shiny/DIGGERSBY.png","Back/DIGGERSBY.png","Back shiny/DIGGERSBY.png"],
+    "delays": [90,90]
+  },
+  "661": {
+    "files": ["Front/FLETCHLING.png","Front shiny/FLETCHLING.png","Back/FLETCHLING.png","Back shiny/FLETCHLING.png"],
+    "delays": [90,90]
+  },
+  "662": {
+    "files": ["Front/FLETCHINDER.png","Front shiny/FLETCHINDER.png","Back/FLETCHINDER.png","Back shiny/FLETCHINDER.png"],
+    "delays": [90,90]
+  },
+  "663": {
+    "files": ["Front/TALONFLAME.png","Front shiny/TALONFLAME.png","Back/TALONFLAME.png","Back shiny/TALONFLAME.png"],
+    "delays": [90,90]
+  },
+  "664": {
+    "files": ["Front/SCATTERBUG.png","Front shiny/SCATTERBUG.png","Back/SCATTERBUG.png","Back shiny/SCATTERBUG.png"],
+    "delays": [90,90]
+  },
+  "665": {
+    "files": ["Front/SPEWPA.png","Front shiny/SPEWPA.png","Back/SPEWPA.png","Back shiny/SPEWPA.png"],
+    "delays": [90,90]
+  },
+  "666": {
+    "files": ["Front/VIVILLON.png","Front shiny/VIVILLON.png","Back/VIVILLON.png","Back shiny/VIVILLON.png"],
+    "delays": [90,90]
+  },
+  "667": {
+    "files": ["Front/LITLEO.png","Front shiny/LITLEO.png","Back/LITLEO.png","Back shiny/LITLEO.png"],
+    "delays": [90,90]
+  },
+  "668": {
+    "files": ["Front/PYROAR.png","Front shiny/PYROAR.png","Back/PYROAR.png","Back shiny/PYROAR.png"],
+    "delays": [90,90]
+  },
+  "669": {
+    "files": ["Front/FLABEBE.png","Front shiny/FLABEBE.png","Back/FLABEBE.png","Back shiny/FLABEBE.png"],
+    "delays": [90,90]
+  },
+  "670": {
+    "files": ["Front/FLOETTE.png","Front shiny/FLOETTE.png","Back/FLOETTE.png","Back shiny/FLOETTE.png"],
+    "delays": [90,90]
+  },
+  "671": {
+    "files": ["Front/FLORGES.png","Front shiny/FLORGES.png","Back/FLORGES.png","Back shiny/FLORGES.png"],
+    "delays": [90,90]
+  },
+  "672": {
+    "files": ["Front/SKIDDO.png","Front shiny/SKIDDO.png","Back/SKIDDO.png","Back shiny/SKIDDO.png"],
+    "delays": [90,90]
+  },
+  "673": {
+    "files": ["Front/GOGOAT.png","Front shiny/GOGOAT.png","Back/GOGOAT.png","Back shiny/GOGOAT.png"],
+    "delays": [90,90]
+  },
+  "674": {
+    "files": ["Front/PANCHAM.png","Front shiny/PANCHAM.png","Back/PANCHAM.png","Back shiny/PANCHAM.png"],
+    "delays": [90,90]
+  },
+  "675": {
+    "files": ["Front/PANGORO.png","Front shiny/PANGORO.png","Back/PANGORO.png","Back shiny/PANGORO.png"],
+    "delays": [90,135]
+  },
+  "676": {
+    "files": ["Front/FURFROU.png","Front shiny/FURFROU.png","Back/FURFROU.png","Back shiny/FURFROU.png"],
+    "delays": [90,90]
+  },
+  "677": {
+    "files": ["Front/ESPURR.png","Front shiny/ESPURR.png","Back/ESPURR.png","Back shiny/ESPURR.png"],
+    "delays": [90,90]
+  },
+  "678": {
+    "files": ["Front/MEOWSTIC.png","Front shiny/MEOWSTIC.png","Back/MEOWSTIC.png","Back shiny/MEOWSTIC.png"],
+    "delays": [90,90]
+  },
+  "679": {
+    "files": ["Front/HONEDGE.png","Front shiny/HONEDGE.png","Back/HONEDGE.png","Back shiny/HONEDGE.png"],
+    "delays": [90,90]
+  },
+  "680": {
+    "files": ["Front/DOUBLADE.png","Front shiny/DOUBLADE.png","Back/DOUBLADE.png","Back shiny/DOUBLADE.png"],
+    "delays": [90,90]
+  },
+  "681": {
+    "files": ["Front/AEGISLASH.png","Front shiny/AEGISLASH.png","Back/AEGISLASH.png","Back shiny/AEGISLASH.png"],
+    "delays": [90,90]
+  },
+  "682": {
+    "files": ["Front/SPRITZEE.png","Front shiny/SPRITZEE.png","Back/SPRITZEE.png","Back shiny/SPRITZEE.png"],
+    "delays": [90,90]
+  },
+  "683": {
+    "files": ["Front/AROMATISSE.png","Front shiny/AROMATISSE.png","Back/AROMATISSE.png","Back shiny/AROMATISSE.png"],
+    "delays": [90,90]
+  },
+  "684": {
+    "files": ["Front/SWIRLIX.png","Front shiny/SWIRLIX.png","Back/SWIRLIX.png","Back shiny/SWIRLIX.png"],
+    "delays": [90,90]
+  },
+  "685": {
+    "files": ["Front/SLURPUFF.png","Front shiny/SLURPUFF.png","Back/SLURPUFF.png","Back shiny/SLURPUFF.png"],
+    "delays": [90,90]
+  },
+  "686": {
+    "files": ["Front/INKAY.png","Front shiny/INKAY.png","Back/INKAY.png","Back shiny/INKAY.png"],
+    "delays": [90,90]
+  },
+  "687": {
+    "files": ["Front/MALAMAR.png","Front shiny/MALAMAR.png","Back/MALAMAR.png","Back shiny/MALAMAR.png"],
+    "delays": [90,90]
+  },
+  "688": {
+    "files": ["Front/BINACLE.png","Front shiny/BINACLE.png","Back/BINACLE.png","Back shiny/BINACLE.png"],
+    "delays": [90,90]
+  },
+  "689": {
+    "files": ["Front/BARBARACLE.png","Front shiny/BARBARACLE.png","Back/BARBARACLE.png","Back shiny/BARBARACLE.png"],
+    "delays": [90,90]
+  },
+  "690": {
+    "files": ["Front/SKRELP.png","Front shiny/SKRELP.png","Back/SKRELP.png","Back shiny/SKRELP.png"],
+    "delays": [90,90]
+  },
+  "691": {
+    "files": ["Front/DRAGALGE.png","Front shiny/DRAGALGE.png","Back/DRAGALGE.png","Back shiny/DRAGALGE.png"],
+    "delays": [90,135]
+  },
+  "692": {
+    "files": ["Front/CLAUNCHER.png","Front shiny/CLAUNCHER.png","Back/CLAUNCHER.png","Back shiny/CLAUNCHER.png"],
+    "delays": [90,90]
+  },
+  "693": {
+    "files": ["Front/CLAWITZER.png","Front shiny/CLAWITZER.png","Back/CLAWITZER.png","Back shiny/CLAWITZER.png"],
+    "delays": [90,90]
+  },
+  "694": {
+    "files": ["Front/HELIOPTILE.png","Front shiny/HELIOPTILE.png","Back/HELIOPTILE.png","Back shiny/HELIOPTILE.png"],
+    "delays": [90,90]
+  },
+  "695": {
+    "files": ["Front/HELIOLISK.png","Front shiny/HELIOLISK.png","Back/HELIOLISK.png","Back shiny/HELIOLISK.png"],
+    "delays": [90,90]
+  },
+  "696": {
+    "files": ["Front/TYRUNT.png","Front shiny/TYRUNT.png","Back/TYRUNT.png","Back shiny/TYRUNT.png"],
+    "delays": [90,90]
+  },
+  "697": {
+    "files": ["Front/TYRANTRUM.png","Front shiny/TYRANTRUM.png","Back/TYRANTRUM.png","Back shiny/TYRANTRUM.png"],
+    "delays": [90,90]
+  },
+  "698": {
+    "files": ["Front/AMAURA.png","Front shiny/AMAURA.png","Back/AMAURA.png","Back shiny/AMAURA.png"],
+    "delays": [90,90]
+  },
+  "699": {
+    "files": ["Front/AURORUS.png","Front shiny/AURORUS.png","Back/AURORUS.png","Back shiny/AURORUS.png"],
+    "delays": [90,135]
+  },
+  "700": {
+    "files": ["Front/SYLVEON.png","Front shiny/SYLVEON.png","Back/SYLVEON.png","Back shiny/SYLVEON.png"],
+    "delays": [90,90]
+  },
+  "701": {
+    "files": ["Front/HAWLUCHA.png","Front shiny/HAWLUCHA.png","Back/HAWLUCHA.png","Back shiny/HAWLUCHA.png"],
+    "delays": [90,90]
+  },
+  "702": {
+    "files": ["Front/DEDENNE.png","Front shiny/DEDENNE.png","Back/DEDENNE.png","Back shiny/DEDENNE.png"],
+    "delays": [90,90]
+  },
+  "703": {
+    "files": ["Front/CARBINK.png","Front shiny/CARBINK.png","Back/CARBINK.png","Back shiny/CARBINK.png"],
+    "delays": [90,90]
+  },
+  "704": {
+    "files": ["Front/GOOMY.png","Front shiny/GOOMY.png","Back/GOOMY.png","Back shiny/GOOMY.png"],
+    "delays": [90,90]
+  },
+  "705": {
+    "files": ["Front/SLIGGOO.png","Front shiny/SLIGGOO.png","Back/SLIGGOO.png","Back shiny/SLIGGOO.png"],
+    "delays": [90,90]
+  },
+  "706": {
+    "files": ["Front/GOODRA.png","Front shiny/GOODRA.png","Back/GOODRA.png","Back shiny/GOODRA.png"],
+    "delays": [90,90]
+  },
+  "707": {
+    "files": ["Front/KLEFKI.png","Front shiny/KLEFKI.png","Back/KLEFKI.png","Back shiny/KLEFKI.png"],
+    "delays": [90,90]
+  },
+  "708": {
+    "files": ["Front/PHANTUMP.png","Front shiny/PHANTUMP.png","Back/PHANTUMP.png","Back shiny/PHANTUMP.png"],
+    "delays": [90,90]
+  },
+  "709": {
+    "files": ["Front/TREVENANT.png","Front shiny/TREVENANT.png","Back/TREVENANT.png","Back shiny/TREVENANT.png"],
+    "delays": [90,90]
+  },
+  "710": {
+    "files": ["Front/PUMPKABOO.png","Front shiny/PUMPKABOO.png","Back/PUMPKABOO.png","Back shiny/PUMPKABOO.png"],
+    "delays": [90,90]
+  },
+  "711": {
+    "files": ["Front/GOURGEIST.png","Front shiny/GOURGEIST.png","Back/GOURGEIST.png","Back shiny/GOURGEIST.png"],
+    "delays": [90,90]
+  },
+  "712": {
+    "files": ["Front/BERGMITE.png","Front shiny/BERGMITE.png","Back/BERGMITE.png","Back shiny/BERGMITE.png"],
+    "delays": [90,90]
+  },
+  "713": {
+    "files": ["Front/AVALUGG.png","Front shiny/AVALUGG.png","Back/AVALUGG.png","Back shiny/AVALUGG.png"],
+    "delays": [90,90]
+  },
+  "714": {
+    "files": ["Front/NOIBAT.png","Front shiny/NOIBAT.png","Back/NOIBAT.png","Back shiny/NOIBAT.png"],
+    "delays": [90,90]
+  },
+  "715": {
+    "files": ["Front/NOIVERN.png","Front shiny/NOIVERN.png","Back/NOIVERN.png","Back shiny/NOIVERN.png"],
+    "delays": [90,90]
+  },
+  "716": {
+    "files": ["Front/XERNEAS.png","Front shiny/XERNEAS.png","Back/XERNEAS.png","Back shiny/XERNEAS.png"],
+    "delays": [90,90],
+    "showdown": ["https://play.pokemonshowdown.com/sprites/gen5ani/xerneas.gif","https://play.pokemonshowdown.com/sprites/gen5ani-shiny/xerneas.gif",null,null]
+  },
+  "717": {
+    "files": ["Front/YVELTAL.png","Front shiny/YVELTAL.png","Back/YVELTAL.png","Back shiny/YVELTAL.png"],
+    "delays": [90,90]
+  },
+  "718": {
+    "files": ["Front/ZYGARDE.png","Front shiny/ZYGARDE.png","Back/ZYGARDE.png","Back shiny/ZYGARDE.png"],
+    "delays": [90,90]
+  },
+  "719": {
+    "files": ["Front/DIANCIE.png","Front shiny/DIANCIE.png","Back/DIANCIE.png","Back shiny/DIANCIE.png"],
+    "delays": [90,90]
+  },
+  "720": {
+    "files": ["Front/HOOPA.png","Front shiny/HOOPA.png","Back/HOOPA.png","Back shiny/HOOPA.png"],
+    "delays": [90,90]
+  },
+  "721": {
+    "files": ["Front/VOLCANION.png","Front shiny/VOLCANION.png","Back/VOLCANION.png","Back shiny/VOLCANION.png"],
+    "delays": [90,135]
+  },
+  "722": {
+    "files": ["Front/ROWLET.png","Front shiny/ROWLET.png","Back/ROWLET.png","Back shiny/ROWLET.png"],
+    "delays": [90,90]
+  },
+  "723": {
+    "files": ["Front/DARTRIX.png","Front shiny/DARTRIX.png","Back/DARTRIX.png","Back shiny/DARTRIX.png"],
+    "delays": [90,90]
+  },
+  "724": {
+    "files": ["Front/DECIDUEYE.png","Front shiny/DECIDUEYE.png","Back/DECIDUEYE.png","Back shiny/DECIDUEYE.png"],
+    "delays": [90,90]
+  },
+  "725": {
+    "files": ["Front/LITTEN.png","Front shiny/LITTEN.png","Back/LITTEN.png","Back shiny/LITTEN.png"],
+    "delays": [90,90]
+  },
+  "726": {
+    "files": ["Front/TORRACAT.png","Front shiny/TORRACAT.png","Back/TORRACAT.png","Back shiny/TORRACAT.png"],
+    "delays": [90,90]
+  },
+  "727": {
+    "files": ["Front/INCINEROAR.png","Front shiny/INCINEROAR.png","Back/INCINEROAR.png","Back shiny/INCINEROAR.png"],
+    "delays": [90,90]
+  },
+  "728": {
+    "files": ["Front/POPPLIO.png","Front shiny/POPPLIO.png","Back/POPPLIO.png","Back shiny/POPPLIO.png"],
+    "delays": [90,90]
+  },
+  "729": {
+    "files": ["Front/BRIONNE.png","Front shiny/BRIONNE.png","Back/BRIONNE.png","Back shiny/BRIONNE.png"],
+    "delays": [90,90]
+  },
+  "730": {
+    "files": ["Front/PRIMARINA.png","Front shiny/PRIMARINA.png","Back/PRIMARINA.png","Back shiny/PRIMARINA.png"],
+    "delays": [90,90]
+  },
+  "731": {
+    "files": ["Front/PIKIPEK.png","Front shiny/PIKIPEK.png","Back/PIKIPEK.png","Back shiny/PIKIPEK.png"],
+    "delays": [90,90]
+  },
+  "732": {
+    "files": ["Front/TRUMBEAK.png","Front shiny/TRUMBEAK.png","Back/TRUMBEAK.png","Back shiny/TRUMBEAK.png"],
+    "delays": [90,90]
+  },
+  "733": {
+    "files": ["Front/TOUCANNON.png","Front shiny/TOUCANNON.png","Back/TOUCANNON.png","Back shiny/TOUCANNON.png"],
+    "delays": [90,90]
+  },
+  "734": {
+    "files": ["Front/YUNGOOS.png","Front shiny/YUNGOOS.png","Back/YUNGOOS.png","Back shiny/YUNGOOS.png"],
+    "delays": [90,90]
+  },
+  "735": {
+    "files": ["Front/GUMSHOOS.png","Front shiny/GUMSHOOS.png","Back/GUMSHOOS.png","Back shiny/GUMSHOOS.png"],
+    "delays": [90,90]
+  },
+  "736": {
+    "files": ["Front/GRUBBIN.png","Front shiny/GRUBBIN.png","Back/GRUBBIN.png","Back shiny/GRUBBIN.png"],
+    "delays": [90,90]
+  },
+  "737": {
+    "files": ["Front/CHARJABUG.png","Front shiny/CHARJABUG.png","Back/CHARJABUG.png","Back shiny/CHARJABUG.png"],
+    "delays": [90,90]
+  },
+  "738": {
+    "files": ["Front/VIKAVOLT.png","Front shiny/VIKAVOLT.png","Back/VIKAVOLT.png","Back shiny/VIKAVOLT.png"],
+    "delays": [90,90]
+  },
+  "739": {
+    "files": ["Front/CRABRAWLER.png","Front shiny/CRABRAWLER.png","Back/CRABRAWLER.png","Back shiny/CRABRAWLER.png"],
+    "delays": [90,90]
+  },
+  "740": {
+    "files": ["Front/CRABOMINABLE.png","Front shiny/CRABOMINABLE.png","Back/CRABOMINABLE.png","Back shiny/CRABOMINABLE.png"],
+    "delays": [90,90]
+  },
+  "741": {
+    "files": ["Front/ORICORIO.png","Front shiny/ORICORIO.png","Back/ORICORIO.png","Back shiny/ORICORIO.png"],
+    "delays": [90,90]
+  },
+  "742": {
+    "files": ["Front/CUTIEFLY.png","Front shiny/CUTIEFLY.png","Back/CUTIEFLY.png","Back shiny/CUTIEFLY.png"],
+    "delays": [90,90]
+  },
+  "743": {
+    "files": ["Front/RIBOMBEE.png","Front shiny/RIBOMBEE.png","Back/RIBOMBEE.png","Back shiny/RIBOMBEE.png"],
+    "delays": [90,90]
+  },
+  "744": {
+    "files": ["Front/ROCKRUFF.png","Front shiny/ROCKRUFF.png","Back/ROCKRUFF.png","Back shiny/ROCKRUFF.png"],
+    "delays": [135,135]
+  },
+  "745": {
+    "files": ["Front/LYCANROC.png","Front shiny/LYCANROC.png","Back/LYCANROC.png","Back shiny/LYCANROC.png"],
+    "delays": [90,90]
+  },
+  "746": {
+    "files": ["Front/WISHIWASHI.png","Front shiny/WISHIWASHI.png","Back/WISHIWASHI.png","Back shiny/WISHIWASHI.png"],
+    "delays": [90,90]
+  },
+  "747": {
+    "files": ["Front/MAREANIE.png","Front shiny/MAREANIE.png","Back/MAREANIE.png","Back shiny/MAREANIE.png"],
+    "delays": [90,90]
+  },
+  "748": {
+    "files": ["Front/TOXAPEX.png","Front shiny/TOXAPEX.png","Back/TOXAPEX.png","Back shiny/TOXAPEX.png"],
+    "delays": [90,90]
+  },
+  "749": {
+    "files": ["Front/MUDBRAY.png","Front shiny/MUDBRAY.png","Back/MUDBRAY.png","Back shiny/MUDBRAY.png"],
+    "delays": [90,90]
+  },
+  "750": {
+    "files": ["Front/MUDSDALE.png","Front shiny/MUDSDALE.png","Back/MUDSDALE.png","Back shiny/MUDSDALE.png"],
+    "delays": [90,90]
+  },
+  "751": {
+    "files": ["Front/DEWPIDER.png","Front shiny/DEWPIDER.png","Back/DEWPIDER.png","Back shiny/DEWPIDER.png"],
+    "delays": [90,90]
+  },
+  "752": {
+    "files": ["Front/ARAQUANID.png","Front shiny/ARAQUANID.png","Back/ARAQUANID.png","Back shiny/ARAQUANID.png"],
+    "delays": [90,90]
+  },
+  "753": {
+    "files": ["Front/FOMANTIS.png","Front shiny/FOMANTIS.png","Back/FOMANTIS.png","Back shiny/FOMANTIS.png"],
+    "delays": [90,90]
+  },
+  "754": {
+    "files": ["Front/LURANTIS.png","Front shiny/LURANTIS.png","Back/LURANTIS.png","Back shiny/LURANTIS.png"],
+    "delays": [90,90]
+  },
+  "755": {
+    "files": ["Front/MORELULL.png","Front shiny/MORELULL.png","Back/MORELULL.png","Back shiny/MORELULL.png"],
+    "delays": [90,90]
+  },
+  "756": {
+    "files": ["Front/SHIINOTIC.png","Front shiny/SHIINOTIC.png","Back/SHIINOTIC.png","Back shiny/SHIINOTIC.png"],
+    "delays": [90,90]
+  },
+  "757": {
+    "files": ["Front/SALANDIT.png","Front shiny/SALANDIT.png","Back/SALANDIT.png","Back shiny/SALANDIT.png"],
+    "delays": [90,90]
+  },
+  "758": {
+    "files": ["Front/SALAZZLE.png","Front shiny/SALAZZLE.png","Back/SALAZZLE.png","Back shiny/SALAZZLE.png"],
+    "delays": [90,90]
+  },
+  "759": {
+    "files": ["Front/STUFFUL.png","Front shiny/STUFFUL.png","Back/STUFFUL.png","Back shiny/STUFFUL.png"],
+    "delays": [90,90]
+  },
+  "760": {
+    "files": ["Front/BEWEAR.png","Front shiny/BEWEAR.png","Back/BEWEAR.png","Back shiny/BEWEAR.png"],
+    "delays": [90,90]
+  },
+  "761": {
+    "files": ["Front/BOUNSWEET.png","Front shiny/BOUNSWEET.png","Back/BOUNSWEET.png","Back shiny/BOUNSWEET.png"],
+    "delays": [90,90]
+  },
+  "762": {
+    "files": ["Front/STEENEE.png","Front shiny/STEENEE.png","Back/STEENEE.png","Back shiny/STEENEE.png"],
+    "delays": [90,90]
+  },
+  "763": {
+    "files": ["Front/TSAREENA.png","Front shiny/TSAREENA.png","Back/TSAREENA.png","Back shiny/TSAREENA.png"],
+    "delays": [90,90]
+  },
+  "764": {
+    "files": ["Front/COMFEY.png","Front shiny/COMFEY.png","Back/COMFEY.png","Back shiny/COMFEY.png"],
+    "delays": [90,90]
+  },
+  "765": {
+    "files": ["Front/ORANGURU.png","Front shiny/ORANGURU.png","Back/ORANGURU.png","Back shiny/ORANGURU.png"],
+    "delays": [90,90]
+  },
+  "766": {
+    "files": ["Front/PASSIMIAN.png","Front shiny/PASSIMIAN.png","Back/PASSIMIAN.png","Back shiny/PASSIMIAN.png"],
+    "delays": [90,90]
+  },
+  "767": {
+    "files": ["Front/WIMPOD.png","Front shiny/WIMPOD.png","Back/WIMPOD.png","Back shiny/WIMPOD.png"],
+    "delays": [90,90]
+  },
+  "768": {
+    "files": ["Front/GOLISOPOD.png","Front shiny/GOLISOPOD.png","Back/GOLISOPOD.png","Back shiny/GOLISOPOD.png"],
+    "delays": [90,90]
+  },
+  "769": {
+    "files": ["Front/SANDYGAST.png","Front shiny/SANDYGAST.png","Back/SANDYGAST.png","Back shiny/SANDYGAST.png"],
+    "delays": [90,90]
+  },
+  "770": {
+    "files": ["Front/PALOSSAND.png","Front shiny/PALOSSAND.png","Back/PALOSSAND.png","Back shiny/PALOSSAND.png"],
+    "delays": [90,90]
+  },
+  "771": {
+    "files": ["Front/PYUKUMUKU.png","Front shiny/PYUKUMUKU.png","Back/PYUKUMUKU.png","Back shiny/PYUKUMUKU.png"],
+    "delays": [90,90]
+  },
+  "772": {
+    "files": ["Front/TYPENULL.png","Front shiny/TYPENULL.png","Back/TYPENULL.png","Back shiny/TYPENULL.png"],
+    "delays": [90,90]
+  },
+  "773": {
+    "files": ["Front/SILVALLY.png","Front shiny/SILVALLY.png","Back/SILVALLY.png","Back shiny/SILVALLY.png"],
+    "delays": [90,90]
+  },
+  "774": {
+    "files": ["Front/MINIOR.png","Front shiny/MINIOR.png","Back/MINIOR.png","Back shiny/MINIOR.png"],
+    "delays": [90,90]
+  },
+  "775": {
+    "files": ["Front/KOMALA.png","Front shiny/KOMALA.png","Back/KOMALA.png","Back shiny/KOMALA.png"],
+    "delays": [90,90]
+  },
+  "776": {
+    "files": ["Front/TURTONATOR.png","Front shiny/TURTONATOR.png","Back/TURTONATOR.png","Back shiny/TURTONATOR.png"],
+    "delays": [90,90]
+  },
+  "777": {
+    "files": ["Front/TOGEDEMARU.png","Front shiny/TOGEDEMARU.png","Back/TOGEDEMARU.png","Back shiny/TOGEDEMARU.png"],
+    "delays": [90,90]
+  },
+  "778": {
+    "files": ["Front/MIMIKYU.png","Front shiny/MIMIKYU.png","Back/MIMIKYU.png","Back shiny/MIMIKYU.png"],
+    "delays": [90,90]
+  },
+  "779": {
+    "files": ["Front/BRUXISH.png","Front shiny/BRUXISH.png","Back/BRUXISH.png","Back shiny/BRUXISH.png"],
+    "delays": [90,90]
+  },
+  "780": {
+    "files": ["Front/DRAMPA.png","Front shiny/DRAMPA.png","Back/DRAMPA.png","Back shiny/DRAMPA.png"],
+    "delays": [90,90]
+  },
+  "781": {
+    "files": ["Front/DHELMISE.png","Front shiny/DHELMISE.png","Back/DHELMISE.png","Back shiny/DHELMISE.png"],
+    "delays": [90,90]
+  },
+  "782": {
+    "files": ["Front/JANGMOO.png","Front shiny/JANGMOO.png","Back/JANGMOO.png","Back shiny/JANGMOO.png"],
+    "delays": [90,90]
+  },
+  "783": {
+    "files": ["Front/HAKAMOO.png","Front shiny/HAKAMOO.png","Back/HAKAMOO.png","Back shiny/HAKAMOO.png"],
+    "delays": [90,90]
+  },
+  "784": {
+    "files": ["Front/KOMMOO.png","Front shiny/KOMMOO.png","Back/KOMMOO.png","Back shiny/KOMMOO.png"],
+    "delays": [90,90]
+  },
+  "785": {
+    "files": ["Front/TAPUKOKO.png","Front shiny/TAPUKOKO.png","Back/TAPUKOKO.png","Back shiny/TAPUKOKO.png"],
+    "delays": [135,135]
+  },
+  "786": {
+    "files": ["Front/TAPULELE.png","Front shiny/TAPULELE.png","Back/TAPULELE.png","Back shiny/TAPULELE.png"],
+    "delays": [90,90]
+  },
+  "787": {
+    "files": ["Front/TAPUBULU.png","Front shiny/TAPUBULU.png","Back/TAPUBULU.png","Back shiny/TAPUBULU.png"],
+    "delays": [90,90]
+  },
+  "788": {
+    "files": ["Front/TAPUFINI.png","Front shiny/TAPUFINI.png","Back/TAPUFINI.png","Back shiny/TAPUFINI.png"],
+    "delays": [90,90]
+  },
+  "789": {
+    "files": ["Front/COSMOG.png","Front shiny/COSMOG.png","Back/COSMOG.png","Back shiny/COSMOG.png"],
+    "delays": [90,90]
+  },
+  "790": {
+    "files": ["Front/COSMOEM.png","Front shiny/COSMOEM.png","Back/COSMOEM.png","Back shiny/COSMOEM.png"],
+    "delays": [90,90]
+  },
+  "791": {
+    "files": ["Front/SOLGALEO.png","Front shiny/SOLGALEO.png","Back/SOLGALEO.png","Back shiny/SOLGALEO.png"],
+    "delays": [90,90]
+  },
+  "792": {
+    "files": ["Front/LUNALA.png","Front shiny/LUNALA.png","Back/LUNALA.png","Back shiny/LUNALA.png"],
+    "delays": [90,90]
+  },
+  "793": {
+    "files": ["Front/NIHILEGO.png","Front shiny/NIHILEGO.png","Back/NIHILEGO.png","Back shiny/NIHILEGO.png"],
+    "delays": [90,90]
+  },
+  "794": {
+    "files": ["Front/BUZZWOLE.png","Front shiny/BUZZWOLE.png","Back/BUZZWOLE.png","Back shiny/BUZZWOLE.png"],
+    "delays": [90,90]
+  },
+  "795": {
+    "files": ["Front/PHEROMOSA.png","Front shiny/PHEROMOSA.png","Back/PHEROMOSA.png","Back shiny/PHEROMOSA.png"],
+    "delays": [90,90]
+  },
+  "796": {
+    "files": ["Front/XURKITREE.png","Front shiny/XURKITREE.png","Back/XURKITREE.png","Back shiny/XURKITREE.png"],
+    "delays": [90,90]
+  },
+  "797": {
+    "files": ["Front/CELESTEELA.png","Front shiny/CELESTEELA.png","Back/CELESTEELA.png","Back shiny/CELESTEELA.png"],
+    "delays": [90,90]
+  },
+  "798": {
+    "files": ["Front/KARTANA.png","Front shiny/KARTANA.png","Back/KARTANA.png","Back shiny/KARTANA.png"],
+    "delays": [90,90]
+  },
+  "799": {
+    "files": ["Front/GUZZLORD.png","Front shiny/GUZZLORD.png","Back/GUZZLORD.png","Back shiny/GUZZLORD.png"],
+    "delays": [90,90]
+  },
+  "800": {
+    "files": ["Front/NECROZMA.png","Front shiny/NECROZMA.png","Back/NECROZMA.png","Back shiny/NECROZMA.png"],
+    "delays": [90,90]
+  },
+  "801": {
+    "files": ["Front/MAGEARNA.png","Front shiny/MAGEARNA.png","Back/MAGEARNA.png","Back shiny/MAGEARNA.png"],
+    "delays": [90,90]
+  },
+  "802": {
+    "files": ["Front/MARSHADOW.png","Front shiny/MARSHADOW.png","Back/MARSHADOW.png","Back shiny/MARSHADOW.png"],
+    "delays": [135,135]
+  },
+  "803": {
+    "files": ["Front/POIPOLE.png","Front shiny/POIPOLE.png","Back/POIPOLE.png","Back shiny/POIPOLE.png"],
+    "delays": [90,90]
+  },
+  "804": {
+    "files": ["Front/NAGANADEL.png","Front shiny/NAGANADEL.png","Back/NAGANADEL.png","Back shiny/NAGANADEL.png"],
+    "delays": [90,90]
+  },
+  "805": {
+    "files": ["Front/STAKATAKA.png","Front shiny/STAKATAKA.png","Back/STAKATAKA.png","Back shiny/STAKATAKA.png"],
+    "delays": [90,90]
+  },
+  "806": {
+    "files": ["Front/BLACEPHALON.png","Front shiny/BLACEPHALON.png","Back/BLACEPHALON.png","Back shiny/BLACEPHALON.png"],
+    "delays": [90,90]
+  },
+  "807": {
+    "files": ["Front/ZERAORA.png","Front shiny/ZERAORA.png","Back/ZERAORA.png","Back shiny/ZERAORA.png"],
+    "delays": [90,90]
+  },
+  "808": {
+    "files": ["Front/MELTAN.png","Front shiny/MELTAN.png","Back/MELTAN.png","Back shiny/MELTAN.png"],
+    "delays": [90,90]
+  },
+  "809": {
+    "files": ["Front/MELMETAL.png","Front shiny/MELMETAL.png","Back/MELMETAL.png","Back shiny/MELMETAL.png"],
+    "delays": [90,90]
+  },
+  "810": {
+    "files": ["Front/GROOKEY.png","Front shiny/GROOKEY.png","Back/GROOKEY.png","Back shiny/GROOKEY.png"],
+    "delays": [90,90]
+  },
+  "811": {
+    "files": ["Front/THWACKEY.png","Front shiny/THWACKEY.png","Back/THWACKEY.png","Back shiny/THWACKEY.png"],
+    "delays": [90,90]
+  },
+  "812": {
+    "files": ["Front/RILLABOOM.png","Front shiny/RILLABOOM.png","Back/RILLABOOM.png","Back shiny/RILLABOOM.png"],
+    "delays": [90,90]
+  },
+  "813": {
+    "files": ["Front/SCORBUNNY.png","Front shiny/SCORBUNNY.png","Back/SCORBUNNY.png","Back shiny/SCORBUNNY.png"],
+    "delays": [90,90]
+  },
+  "814": {
+    "files": ["Front/RABOOT.png","Front shiny/RABOOT.png","Back/RABOOT.png","Back shiny/RABOOT.png"],
+    "delays": [90,90]
+  },
+  "815": {
+    "files": ["Front/CINDERACE.png","Front shiny/CINDERACE.png","Back/CINDERACE.png","Back shiny/CINDERACE.png"],
+    "delays": [90,90]
+  },
+  "816": {
+    "files": ["Front/SOBBLE.png","Front shiny/SOBBLE.png","Back/SOBBLE.png","Back shiny/SOBBLE.png"],
+    "delays": [90,90]
+  },
+  "817": {
+    "files": ["Front/DRIZZILE.png","Front shiny/DRIZZILE.png","Back/DRIZZILE.png","Back shiny/DRIZZILE.png"],
+    "delays": [90,90]
+  },
+  "818": {
+    "files": ["Front/INTELEON.png","Front shiny/INTELEON.png","Back/INTELEON.png","Back shiny/INTELEON.png"],
+    "delays": [90,90]
+  },
+  "819": {
+    "files": ["Front/SKWOVET.png","Front shiny/SKWOVET.png","Back/SKWOVET.png","Back shiny/SKWOVET.png"],
+    "delays": [90,90]
+  },
+  "820": {
+    "files": ["Front/GREEDENT.png","Front shiny/GREEDENT.png","Back/GREEDENT.png","Back shiny/GREEDENT.png"],
+    "delays": [90,90]
+  },
+  "821": {
+    "files": ["Front/ROOKIDEE.png","Front shiny/ROOKIDEE.png","Back/ROOKIDEE.png","Back shiny/ROOKIDEE.png"],
+    "delays": [90,90]
+  },
+  "822": {
+    "files": ["Front/CORVISQUIRE.png","Front shiny/CORVISQUIRE.png","Back/CORVISQUIRE.png","Back shiny/CORVISQUIRE.png"],
+    "delays": [90,90]
+  },
+  "823": {
+    "files": ["Front/CORVIKNIGHT.png","Front shiny/CORVIKNIGHT.png","Back/CORVIKNIGHT.png","Back shiny/CORVIKNIGHT.png"],
+    "delays": [90,90]
+  },
+  "824": {
+    "files": ["Front/BLIPBUG.png","Front shiny/BLIPBUG.png","Back/BLIPBUG.png","Back shiny/BLIPBUG.png"],
+    "delays": [90,90]
+  },
+  "825": {
+    "files": ["Front/DOTTLER.png","Front shiny/DOTTLER.png","Back/DOTTLER.png","Back shiny/DOTTLER.png"],
+    "delays": [90,90]
+  },
+  "826": {
+    "files": ["Front/ORBEETLE.png","Front shiny/ORBEETLE.png","Back/ORBEETLE.png","Back shiny/ORBEETLE.png"],
+    "delays": [90,90]
+  },
+  "827": {
+    "files": ["Front/NICKIT.png","Front shiny/NICKIT.png","Back/NICKIT.png","Back shiny/NICKIT.png"],
+    "delays": [90,90]
+  },
+  "828": {
+    "files": ["Front/THIEVUL.png","Front shiny/THIEVUL.png","Back/THIEVUL.png","Back shiny/THIEVUL.png"],
+    "delays": [90,90]
+  },
+  "829": {
+    "files": ["Front/GOSSIFLEUR.png","Front shiny/GOSSIFLEUR.png","Back/GOSSIFLEUR.png","Back shiny/GOSSIFLEUR.png"],
+    "delays": [90,90]
+  },
+  "830": {
+    "files": ["Front/ELDEGOSS.png","Front shiny/ELDEGOSS.png","Back/ELDEGOSS.png","Back shiny/ELDEGOSS.png"],
+    "delays": [90,90]
+  },
+  "831": {
+    "files": ["Front/WOOLOO.png","Front shiny/WOOLOO.png","Back/WOOLOO.png","Back shiny/WOOLOO.png"],
+    "delays": [90,90]
+  },
+  "832": {
+    "files": ["Front/DUBWOOL.png","Front shiny/DUBWOOL.png","Back/DUBWOOL.png","Back shiny/DUBWOOL.png"],
+    "delays": [90,90]
+  },
+  "833": {
+    "files": ["Front/CHEWTLE.png","Front shiny/CHEWTLE.png","Back/CHEWTLE.png","Back shiny/CHEWTLE.png"],
+    "delays": [90,90]
+  },
+  "834": {
+    "files": ["Front/DREDNAW.png","Front shiny/DREDNAW.png","Back/DREDNAW.png","Back shiny/DREDNAW.png"],
+    "delays": [90,90]
+  },
+  "835": {
+    "files": ["Front/YAMPER.png","Front shiny/YAMPER.png","Back/YAMPER.png","Back shiny/YAMPER.png"],
+    "delays": [90,90]
+  },
+  "836": {
+    "files": ["Front/BOLTUND.png","Front shiny/BOLTUND.png","Back/BOLTUND.png","Back shiny/BOLTUND.png"],
+    "delays": [90,90]
+  },
+  "837": {
+    "files": ["Front/ROLYCOLY.png","Front shiny/ROLYCOLY.png","Back/ROLYCOLY.png","Back shiny/ROLYCOLY.png"],
+    "delays": [90,90]
+  },
+  "838": {
+    "files": ["Front/CARKOL.png","Front shiny/CARKOL.png","Back/CARKOL.png","Back shiny/CARKOL.png"],
+    "delays": [90,90]
+  },
+  "839": {
+    "files": ["Front/COALOSSAL.png","Front shiny/COALOSSAL.png","Back/COALOSSAL.png","Back shiny/COALOSSAL.png"],
+    "delays": [90,90]
+  },
+  "840": {
+    "files": ["Front/APPLIN.png","Front shiny/APPLIN.png","Back/APPLIN.png","Back shiny/APPLIN.png"],
+    "delays": [90,90]
+  },
+  "841": {
+    "files": ["Front/FLAPPLE.png","Front shiny/FLAPPLE.png","Back/FLAPPLE.png","Back shiny/FLAPPLE.png"],
+    "delays": [90,90]
+  },
+  "842": {
+    "files": ["Front/APPLETUN.png","Front shiny/APPLETUN.png","Back/APPLETUN.png","Back shiny/APPLETUN.png"],
+    "delays": [90,90]
+  },
+  "843": {
+    "files": ["Front/SILICOBRA.png","Front shiny/SILICOBRA.png","Back/SILICOBRA.png","Back shiny/SILICOBRA.png"],
+    "delays": [90,90]
+  },
+  "844": {
+    "files": ["Front/SANDACONDA.png","Front shiny/SANDACONDA.png","Back/SANDACONDA.png","Back shiny/SANDACONDA.png"],
+    "delays": [90,90]
+  },
+  "845": {
+    "files": ["Front/CRAMORANT.png","Front shiny/CRAMORANT.png","Back/CRAMORANT.png","Back shiny/CRAMORANT.png"],
+    "delays": [90,90]
+  },
+  "846": {
+    "files": ["Front/ARROKUDA.png","Front shiny/ARROKUDA.png","Back/ARROKUDA.png","Back shiny/ARROKUDA.png"],
+    "delays": [90,90]
+  },
+  "847": {
+    "files": ["Front/BARRASKEWDA.png","Front shiny/BARRASKEWDA.png","Back/BARRASKEWDA.png","Back shiny/BARRASKEWDA.png"],
+    "delays": [90,90]
+  },
+  "848": {
+    "files": ["Front/TOXEL.png","Front shiny/TOXEL.png","Back/TOXEL.png","Back shiny/TOXEL.png"],
+    "delays": [90,90]
+  },
+  "849": {
+    "files": ["Front/TOXTRICITY.png","Front shiny/TOXTRICITY.png","Back/TOXTRICITY.png","Back shiny/TOXTRICITY.png"],
+    "delays": [90,90]
+  },
+  "850": {
+    "files": ["Front/SIZZLIPEDE.png","Front shiny/SIZZLIPEDE.png","Back/SIZZLIPEDE.png","Back shiny/SIZZLIPEDE.png"],
+    "delays": [90,90]
+  },
+  "851": {
+    "files": ["Front/CENTISKORCH.png","Front shiny/CENTISKORCH.png","Back/CENTISKORCH.png","Back shiny/CENTISKORCH.png"],
+    "delays": [90,90]
+  },
+  "852": {
+    "files": ["Front/CLOBBOPUS.png","Front shiny/CLOBBOPUS.png","Back/CLOBBOPUS.png","Back shiny/CLOBBOPUS.png"],
+    "delays": [90,90]
+  },
+  "853": {
+    "files": ["Front/GRAPPLOCT.png","Front shiny/GRAPPLOCT.png","Back/GRAPPLOCT.png","Back shiny/GRAPPLOCT.png"],
+    "delays": [90,90]
+  },
+  "854": {
+    "files": ["Front/SINISTEA.png","Front shiny/SINISTEA.png","Back/SINISTEA.png","Back shiny/SINISTEA.png"],
+    "delays": [90,90]
+  },
+  "855": {
+    "files": ["Front/POLTEAGEIST.png","Front shiny/POLTEAGEIST.png","Back/POLTEAGEIST.png","Back shiny/POLTEAGEIST.png"],
+    "delays": [90,90]
+  },
+  "856": {
+    "files": ["Front/HATENNA.png","Front shiny/HATENNA.png","Back/HATENNA.png","Back shiny/HATENNA.png"],
+    "delays": [90,90]
+  },
+  "857": {
+    "files": ["Front/HATTREM.png","Front shiny/HATTREM.png","Back/HATTREM.png","Back shiny/HATTREM.png"],
+    "delays": [90,90]
+  },
+  "858": {
+    "files": ["Front/HATTERENE.png","Front shiny/HATTERENE.png","Back/HATTERENE.png","Back shiny/HATTERENE.png"],
+    "delays": [90,90]
+  },
+  "859": {
+    "files": ["Front/IMPIDIMP.png","Front shiny/IMPIDIMP.png","Back/IMPIDIMP.png","Back shiny/IMPIDIMP.png"],
+    "delays": [90,90]
+  },
+  "860": {
+    "files": ["Front/MORGREM.png","Front shiny/MORGREM.png","Back/MORGREM.png","Back shiny/MORGREM.png"],
+    "delays": [90,90]
+  },
+  "861": {
+    "files": ["Front/GRIMMSNARL.png","Front shiny/GRIMMSNARL.png","Back/GRIMMSNARL.png","Back shiny/GRIMMSNARL.png"],
+    "delays": [90,90]
+  },
+  "862": {
+    "files": ["Front/OBSTAGOON.png","Front shiny/OBSTAGOON.png","Back/OBSTAGOON.png","Back shiny/OBSTAGOON.png"],
+    "delays": [90,90]
+  },
+  "863": {
+    "files": ["Front/PERRSERKER.png","Front shiny/PERRSERKER.png","Back/PERRSERKER.png","Back shiny/PERRSERKER.png"],
+    "delays": [90,90]
+  },
+  "864": {
+    "files": ["Front/CURSOLA.png","Front shiny/CURSOLA.png","Back/CURSOLA.png","Back shiny/CURSOLA.png"],
+    "delays": [90,90]
+  },
+  "865": {
+    "files": ["Front/SIRFETCHD.png","Front shiny/SIRFETCHD.png","Back/SIRFETCHD.png","Back shiny/SIRFETCHD.png"],
+    "delays": [90,90]
+  },
+  "866": {
+    "files": ["Front/MRRIME.png","Front shiny/MRRIME.png","Back/MRRIME.png","Back shiny/MRRIME.png"],
+    "delays": [90,90]
+  },
+  "867": {
+    "files": ["Front/RUNERIGUS.png","Front shiny/RUNERIGUS.png","Back/RUNERIGUS.png","Back shiny/RUNERIGUS.png"],
+    "delays": [90,90]
+  },
+  "868": {
+    "files": ["Front/MILCERY.png","Front shiny/MILCERY.png","Back/MILCERY.png","Back shiny/MILCERY.png"],
+    "delays": [90,90]
+  },
+  "869": {
+    "files": ["Front/ALCREMIE.png","Front shiny/ALCREMIE.png","Back/ALCREMIE.png","Back shiny/ALCREMIE.png"],
+    "delays": [90,90]
+  },
+  "870": {
+    "files": ["Front/FALINKS.png","Front shiny/FALINKS.png","Back/FALINKS.png","Back shiny/FALINKS.png"],
+    "delays": [90,90]
+  },
+  "871": {
+    "files": ["Front/PINCURCHIN.png","Front shiny/PINCURCHIN.png","Back/PINCURCHIN.png","Back shiny/PINCURCHIN.png"],
+    "delays": [90,90]
+  },
+  "872": {
+    "files": ["Front/SNOM.png","Front shiny/SNOM.png","Back/SNOM.png","Back shiny/SNOM.png"],
+    "delays": [90,90]
+  },
+  "873": {
+    "files": ["Front/FROSMOTH.png","Front shiny/FROSMOTH.png","Back/FROSMOTH.png","Back shiny/FROSMOTH.png"],
+    "delays": [90,90]
+  },
+  "874": {
+    "files": ["Front/STONJOURNER.png","Front shiny/STONJOURNER.png","Back/STONJOURNER.png","Back shiny/STONJOURNER.png"],
+    "delays": [90,90]
+  },
+  "875": {
+    "files": ["Front/EISCUE.png","Front shiny/EISCUE.png","Back/EISCUE.png","Back shiny/EISCUE.png"],
+    "delays": [90,90]
+  },
+  "876": {
+    "files": ["Front/INDEEDEE.png","Front shiny/INDEEDEE.png","Back/INDEEDEE.png","Back shiny/INDEEDEE.png"],
+    "delays": [90,90]
+  },
+  "877": {
+    "files": ["Front/MORPEKO.png","Front shiny/MORPEKO.png","Back/MORPEKO.png","Back shiny/MORPEKO.png"],
+    "delays": [90,90]
+  },
+  "878": {
+    "files": ["Front/CUFANT.png","Front shiny/CUFANT.png","Back/CUFANT.png","Back shiny/CUFANT.png"],
+    "delays": [90,90]
+  },
+  "879": {
+    "files": ["Front/COPPERAJAH.png","Front shiny/COPPERAJAH.png","Back/COPPERAJAH.png","Back shiny/COPPERAJAH.png"],
+    "delays": [90,90]
+  },
+  "880": {
+    "files": ["Front/DRACOZOLT.png","Front shiny/DRACOZOLT.png","Back/DRACOZOLT.png","Back shiny/DRACOZOLT.png"],
+    "delays": [90,90]
+  },
+  "881": {
+    "files": ["Front/ARCTOZOLT.png","Front shiny/ARCTOZOLT.png","Back/ARCTOZOLT.png","Back shiny/ARCTOZOLT.png"],
+    "delays": [90,90]
+  },
+  "882": {
+    "files": ["Front/DRACOVISH.png","Front shiny/DRACOVISH.png","Back/DRACOVISH.png","Back shiny/DRACOVISH.png"],
+    "delays": [90,90]
+  },
+  "883": {
+    "files": ["Front/ARCTOVISH.png","Front shiny/ARCTOVISH.png","Back/ARCTOVISH.png","Back shiny/ARCTOVISH.png"],
+    "delays": [90,90]
+  },
+  "884": {
+    "files": ["Front/DURALUDON.png","Front shiny/DURALUDON.png","Back/DURALUDON.png","Back shiny/DURALUDON.png"],
+    "delays": [90,90]
+  },
+  "885": {
+    "files": ["Front/DREEPY.png","Front shiny/DREEPY.png","Back/DREEPY.png","Back shiny/DREEPY.png"],
+    "delays": [90,90]
+  },
+  "886": {
+    "files": ["Front/DRAKLOAK.png","Front shiny/DRAKLOAK.png","Back/DRAKLOAK.png","Back shiny/DRAKLOAK.png"],
+    "delays": [90,90]
+  },
+  "887": {
+    "files": ["Front/DRAGAPULT.png","Front shiny/DRAGAPULT.png","Back/DRAGAPULT.png","Back shiny/DRAGAPULT.png"],
+    "delays": [90,90]
+  },
+  "888": {
+    "files": ["Front/ZACIAN.png","Front shiny/ZACIAN.png","Back/ZACIAN.png","Back shiny/ZACIAN.png"],
+    "delays": [90,90]
+  },
+  "889": {
+    "files": ["Front/ZAMAZENTA.png","Front shiny/ZAMAZENTA.png","Back/ZAMAZENTA.png","Back shiny/ZAMAZENTA.png"],
+    "delays": [90,90]
+  },
+  "890": {
+    "files": ["Front/ETERNATUS.png","Front shiny/ETERNATUS.png","Back/ETERNATUS.png","Back shiny/ETERNATUS.png"],
+    "delays": [90,135]
+  },
+  "891": {
+    "files": ["Front/KUBFU.png","Front shiny/KUBFU.png","Back/KUBFU.png","Back shiny/KUBFU.png"],
+    "delays": [90,90]
+  },
+  "892": {
+    "files": ["Front/URSHIFU.png","Front shiny/URSHIFU.png","Back/URSHIFU.png","Back shiny/URSHIFU.png"],
+    "delays": [90,90]
+  },
+  "893": {
+    "files": ["Front/ZARUDE.png","Front shiny/ZARUDE.png","Back/ZARUDE.png","Back shiny/ZARUDE.png"],
+    "delays": [90,90]
+  },
+  "894": {
+    "files": ["Front/REGIELEKI.png","Front shiny/REGIELEKI.png","Back/REGIELEKI.png","Back shiny/REGIELEKI.png"],
+    "delays": [90,90]
+  },
+  "895": {
+    "files": ["Front/REGIDRAGO.png","Front shiny/REGIDRAGO.png","Back/REGIDRAGO.png","Back shiny/REGIDRAGO.png"],
+    "delays": [90,90]
+  },
+  "896": {
+    "files": ["Front/GLASTRIER.png","Front shiny/GLASTRIER.png","Back/GLASTRIER.png","Back shiny/GLASTRIER.png"],
+    "delays": [90,90]
+  },
+  "897": {
+    "files": ["Front/SPECTRIER.png","Front shiny/SPECTRIER.png","Back/SPECTRIER.png","Back shiny/SPECTRIER.png"],
+    "delays": [90,90]
+  },
+  "898": {
+    "files": ["Front/CALYREX.png","Front shiny/CALYREX.png","Back/CALYREX.png","Back shiny/CALYREX.png"],
+    "delays": [90,90]
+  },
+  "899": {
+    "files": ["Front/WYRDEER.png","Front shiny/WYRDEER.png","Back/WYRDEER.png","Back shiny/WYRDEER.png"],
+    "delays": [90,90]
+  },
+  "900": {
+    "files": ["Front/KLEAVOR.PNG","Front shiny/KLEAVOR.png","Back/KLEAVOR.png","Back shiny/KLEAVOR.png"],
+    "delays": [90,90]
+  },
+  "901": {
+    "files": ["Front/URSALUNA.PNG","Front shiny/URSALUNA.png","Back/URSALUNA.png","Back shiny/URSALUNA.png"],
+    "delays": [90,90]
+  },
+  "902": {
+    "files": ["Front/BASCULEGION.PNG","Front shiny/BASCULEGION.png","Back/BASCULEGION.png","Back shiny/BASCULEGION.png"],
+    "delays": [90,90]
+  },
+  "903": {
+    "files": ["Front/SNEASLER.PNG","Front shiny/SNEASLER.png","Back/SNEASLER.png","Back shiny/SNEASLER.png"],
+    "delays": [90,90]
+  },
+  "904": {
+    "files": ["Front/OVERQWIL.PNG","Front shiny/OVERQWIL.png","Back/OVERQWIL.png","Back shiny/OVERQWIL.png"],
+    "delays": [90,90]
+  },
+  "905": {
+    "files": ["Front/ENAMORUS.PNG","Front shiny/ENAMORUS.png","Back/ENAMORUS.png","Back shiny/ENAMORUS.png"],
+    "delays": [90,90]
+  },
+  "906": {
+    "files": ["Front/SPRIGATITO.png","Front shiny/SPRIGATITO.png","Back/SPRIGATITO.png","Back shiny/SPRIGATITO.png"],
+    "delays": [90,90]
+  },
+  "907": {
+    "files": ["Front/FLORAGATO.png","Front shiny/FLORAGATO.png","Back/FLORAGATO.png","Back shiny/FLORAGATO.png"],
+    "delays": [90,90]
+  },
+  "908": {
+    "files": ["Front/MEOWSCARADA.png","Front shiny/MEOWSCARADA.png","Back/MEOWSCARADA.png","Back shiny/MEOWSCARADA.png"],
+    "delays": [90,90]
+  },
+  "909": {
+    "files": ["Front/FUECOCO.png","Front shiny/FUECOCO.png","Back/FUECOCO.png","Back shiny/FUECOCO.png"],
+    "delays": [90,90]
+  },
+  "910": {
+    "files": ["Front/CROCALOR.png","Front shiny/CROCALOR.png","Back/CROCALOR.png","Back shiny/CROCALOR.png"],
+    "delays": [90,90]
+  },
+  "911": {
+    "files": ["Front/SKELEDIRGE.png","Front shiny/SKELEDIRGE.png","Back/SKELEDIRGE.png","Back shiny/SKELEDIRGE.png"],
+    "delays": [90,90]
+  },
+  "912": {
+    "files": ["Front/QUAXLY.png","Front shiny/QUAXLY.png","Back/QUAXLY.png","Back shiny/QUAXLY.png"],
+    "delays": [90,90]
+  },
+  "913": {
+    "files": ["Front/QUAXWELL.png","Front shiny/QUAXWELL.png","Back/QUAXWELL.png","Back shiny/QUAXWELL.png"],
+    "delays": [90,90]
+  },
+  "914": {
+    "files": ["Front/QUAQUAVAL.png","Front shiny/QUAQUAVAL.png","Back/QUAQUAVAL.png","Back shiny/QUAQUAVAL.png"],
+    "delays": [90,90]
+  },
+  "915": {
+    "files": ["Front/LECHONK.png","Front shiny/LECHONK.png","Back/LECHONK.png","Back shiny/LECHONK.png"],
+    "delays": [90,90]
+  },
+  "916": {
+    "files": ["Front/OINKOLOGNE.png","Front shiny/OINKOLOGNE.png","Back/OINKOLOGNE.png","Back shiny/OINKOLOGNE.png"],
+    "delays": [90,90]
+  },
+  "917": {
+    "files": ["Front/TAROUNTULA.png","Front shiny/TAROUNTULA.png","Back/TAROUNTULA.png","Back shiny/TAROUNTULA.png"],
+    "delays": [90,90]
+  },
+  "918": {
+    "files": ["Front/SPIDOPS.png","Front shiny/SPIDOPS.png","Back/SPIDOPS.png","Back shiny/SPIDOPS.png"],
+    "delays": [90,90]
+  },
+  "919": {
+    "files": ["Front/NYMBLE.png","Front shiny/NYMBLE.png","Back/NYMBLE.png","Back shiny/NYMBLE.png"],
+    "delays": [90,90]
+  },
+  "920": {
+    "files": ["Front/LOKIX.png","Front shiny/LOKIX.png","Back/LOKIX.png","Back shiny/LOKIX.png"],
+    "delays": [90,90]
+  },
+  "921": {
+    "files": ["Front/PAWMI.png","Front shiny/PAWMI.png","Back/PAWMI.png","Back shiny/PAWMI.png"],
+    "delays": [90,90]
+  },
+  "922": {
+    "files": ["Front/PAWMO.png","Front shiny/PAWMO.png","Back/PAWMO.png","Back shiny/PAWMO.png"],
+    "delays": [90,90]
+  },
+  "923": {
+    "files": ["Front/PAWMOT.PNG","Front shiny/PAWMOT.png","Back/PAWMOT.png","Back shiny/PAWMOT.png"],
+    "delays": [90,90]
+  },
+  "924": {
+    "files": ["Front/TANDEMAUS.png","Front shiny/TANDEMAUS.png","Back/TANDEMAUS.png","Back shiny/TANDEMAUS.png"],
+    "delays": [90,90]
+  },
+  "925": {
+    "files": ["Front/MAUSHOLD.png","Front shiny/MAUSHOLD.png","Back/MAUSHOLD.png","Back shiny/MAUSHOLD.png"],
+    "delays": [90,90]
+  },
+  "926": {
+    "files": ["Front/FIDOUGH.png","Front shiny/FIDOUGH.png","Back/FIDOUGH.png","Back shiny/FIDOUGH.png"],
+    "delays": [90,90]
+  },
+  "927": {
+    "files": ["Front/DACHSBUN.png","Front shiny/DACHSBUN.png","Back/DACHSBUN.png","Back shiny/DACHSBUN.png"],
+    "delays": [90,90]
+  },
+  "928": {
+    "files": ["Front/SMOLIV.png","Front shiny/SMOLIV.png","Back/SMOLIV.png","Back shiny/SMOLIV.png"],
+    "delays": [90,90]
+  },
+  "929": {
+    "files": ["Front/DOLLIV.png","Front shiny/DOLLIV.png","Back/DOLLIV.png","Back shiny/DOLLIV.png"],
+    "delays": [90,90]
+  },
+  "930": {
+    "files": ["Front/ARBOLIVA.png","Front shiny/ARBOLIVA.png","Back/ARBOLIVA.png","Back shiny/ARBOLIVA.png"],
+    "delays": [90,90]
+  },
+  "931": {
+    "files": ["Front/SQUAWKABILLY.png","Front shiny/SQUAWKABILLY.png","Back/SQUAWKABILLY.png","Back shiny/SQUAWKABILLY.png"],
+    "delays": [90,90]
+  },
+  "932": {
+    "files": ["Front/NACLI.png","Front shiny/NACLI.png","Back/NACLI.png","Back shiny/NACLI.png"],
+    "delays": [90,90]
+  },
+  "933": {
+    "files": ["Front/NACLSTACK.png","Front shiny/NACLSTACK.png","Back/NACLSTACK.png","Back shiny/NACLSTACK.png"],
+    "delays": [90,90]
+  },
+  "934": {
+    "files": ["Front/GARGANACL.png","Front shiny/GARGANACL.png","Back/GARGANACL.png","Back shiny/GARGANACL.png"],
+    "delays": [90,90]
+  },
+  "935": {
+    "files": ["Front/CHARCADET.png","Front shiny/CHARCADET.png","Back/CHARCADET.png","Back shiny/CHARCADET.png"],
+    "delays": [90,90]
+  },
+  "936": {
+    "files": ["Front/ARMAROUGE.png","Front shiny/ARMAROUGE.png","Back/ARMAROUGE.png","Back shiny/ARMAROUGE.png"],
+    "delays": [90,90]
+  },
+  "937": {
+    "files": ["Front/CERULEDGE.png","Front shiny/CERULEDGE.png","Back/CERULEDGE.png","Back shiny/CERULEDGE.png"],
+    "delays": [90,90]
+  },
+  "938": {
+    "files": ["Front/TADBULB.png","Front shiny/TADBULB.png","Back/TADBULB.png","Back shiny/TADBULB.png"],
+    "delays": [90,90]
+  },
+  "939": {
+    "files": ["Front/BELLIBOLT.png","Front shiny/BELLIBOLT.png","Back/BELLIBOLT.png","Back shiny/BELLIBOLT.png"],
+    "delays": [90,90]
+  },
+  "940": {
+    "files": ["Front/WATTREL.png","Front shiny/WATTREL.png","Back/WATTREL.png","Back shiny/WATTREL.png"],
+    "delays": [90,90]
+  },
+  "941": {
+    "files": ["Front/KILOWATTREL.png","Front shiny/KILOWATTREL.png","Back/KILOWATTREL.png","Back shiny/KILOWATTREL.png"],
+    "delays": [135,135]
+  },
+  "942": {
+    "files": ["Front/MASCHIFF.png","Front shiny/MASCHIFF.png","Back/MASCHIFF.png","Back shiny/MASCHIFF.png"],
+    "delays": [90,90]
+  },
+  "943": {
+    "files": ["Front/MABOSSTIFF.png","Front shiny/MABOSSTIFF.png","Back/MABOSSTIFF.png","Back shiny/MABOSSTIFF.png"],
+    "delays": [90,90]
+  },
+  "944": {
+    "files": ["Front/SHROODLE.png","Front shiny/SHROODLE.png","Back/SHROODLE.png","Back shiny/SHROODLE.png"],
+    "delays": [90,90]
+  },
+  "945": {
+    "files": ["Front/GRAFAIAI.png","Front shiny/GRAFAIAI.png","Back/GRAFAIAI.png","Back shiny/GRAFAIAI.png"],
+    "delays": [90,90]
+  },
+  "946": {
+    "files": ["Front/BRAMBLIN.png","Front shiny/BRAMBLIN.png","Back/BRAMBLIN.png","Back shiny/BRAMBLIN.png"],
+    "delays": [90,90]
+  },
+  "947": {
+    "files": ["Front/BRAMBLEGHAST.png","Front shiny/BRAMBLEGHAST.png","Back/BRAMBLEGHAST.png","Back shiny/BRAMBLEGHAST.png"],
+    "delays": [90,90]
+  },
+  "948": {
+    "files": ["Front/TOEDSCOOL.png","Front shiny/TOEDSCOOL.png","Back/TOEDSCOOL.png","Back shiny/TOEDSCOOL.png"],
+    "delays": [90,90]
+  },
+  "949": {
+    "files": ["Front/TOEDSCRUEL.png","Front shiny/TOEDSCRUEL.png","Back/TOEDSCRUEL.png","Back shiny/TOEDSCRUEL.png"],
+    "delays": [90,90]
+  },
+  "950": {
+    "files": ["Front/KLAWF.png","Front shiny/KLAWF.png","Back/KLAWF.png","Back shiny/KLAWF.png"],
+    "delays": [90,90]
+  },
+  "951": {
+    "files": ["Front/CAPSAKID.png","Front shiny/CAPSAKID.png","Back/CAPSAKID.png","Back shiny/CAPSAKID.png"],
+    "delays": [90,90]
+  },
+  "952": {
+    "files": ["Front/SCOVILLAIN.png","Front shiny/SCOVILLAIN.png","Back/SCOVILLAIN.png","Back shiny/SCOVILLAIN.png"],
+    "delays": [90,90]
+  },
+  "953": {
+    "files": ["Front/RELLOR.png","Front shiny/RELLOR.png","Back/RELLOR.png","Back shiny/RELLOR.png"],
+    "delays": [90,90]
+  },
+  "954": {
+    "files": ["Front/RABSCA.png","Front shiny/RABSCA.png","Back/RABSCA.png","Back shiny/RABSCA.png"],
+    "delays": [90,90]
+  },
+  "955": {
+    "files": ["Front/FLITTLE.png","Front shiny/FLITTLE.png","Back/FLITTLE.png","Back shiny/FLITTLE.png"],
+    "delays": [90,90]
+  },
+  "956": {
+    "files": ["Front/ESPATHRA.png","Front shiny/ESPATHRA.png","Back/ESPATHRA.png","Back shiny/ESPATHRA.png"],
+    "delays": [90,90]
+  },
+  "957": {
+    "files": ["Front/TINKATINK.png","Front shiny/TINKATINK.png","Back/TINKATINK.png","Back shiny/TINKATINK.png"],
+    "delays": [90,90]
+  },
+  "958": {
+    "files": ["Front/TINKATUFF.png","Front shiny/TINKATUFF.png","Back/TINKATUFF.png","Back shiny/TINKATUFF.png"],
+    "delays": [90,90]
+  },
+  "959": {
+    "files": ["Front/TINKATON.png","Front shiny/TINKATON.png","Back/TINKATON.png","Back shiny/TINKATON.png"],
+    "delays": [90,90]
+  },
+  "960": {
+    "files": ["Front/WIGLETT.png","Front shiny/WIGLETT.png","Back/WIGLETT.png","Back shiny/WIGLETT.png"],
+    "delays": [90,90]
+  },
+  "961": {
+    "files": ["Front/WUGTRIO.png","Front shiny/WUGTRIO.png","Back/WUGTRIO.png","Back shiny/WUGTRIO.png"],
+    "delays": [90,90]
+  },
+  "962": {
+    "files": ["Front/BOMBIRDIER.png","Front shiny/BOMBIRDIER.png","Back/BOMBIRDIER.png","Back shiny/BOMBIRDIER.png"],
+    "delays": [90,90]
+  },
+  "963": {
+    "files": ["Front/FINIZEN.png","Front shiny/FINIZEN.png","Back/FINIZEN.png","Back shiny/FINIZEN.png"],
+    "delays": [90,90]
+  },
+  "964": {
+    "files": ["Front/PALAFIN.png","Front shiny/PALAFIN.png","Back/PALAFIN.png","Back shiny/PALAFIN.png"],
+    "delays": [90,90]
+  },
+  "965": {
+    "files": ["Front/VAROOM.png","Front shiny/VAROOM.png","Back/VAROOM.png","Back shiny/VAROOM.png"],
+    "delays": [90,90]
+  },
+  "966": {
+    "files": ["Front/REVAVROOM.png","Front shiny/REVAVROOM.png","Back/REVAVROOM.png","Back shiny/REVAVROOM.png"],
+    "delays": [90,90]
+  },
+  "967": {
+    "files": ["Front/CYCLIZAR.png","Front shiny/CYCLIZAR.png","Back/CYCLIZAR.png","Back shiny/CYCLIZAR.png"],
+    "delays": [90,90]
+  },
+  "968": {
+    "files": ["Front/ORTHWORM.png","Front shiny/ORTHWORM.png","Back/ORTHWORM.png","Back shiny/ORTHWORM.png"],
+    "delays": [90,90]
+  },
+  "969": {
+    "files": ["Front/GLIMMET.png","Front shiny/GLIMMET.png","Back/GLIMMET.png","Back shiny/GLIMMET.png"],
+    "delays": [90,90]
+  },
+  "970": {
+    "files": ["Front/GLIMMORA.png","Front shiny/GLIMMORA.png","Back/GLIMMORA.png","Back shiny/GLIMMORA.png"],
+    "delays": [90,90]
+  },
+  "971": {
+    "files": ["Front/GREAVARD.png","Front shiny/GREAVARD.png","Back/GREAVARD.png","Back shiny/GREAVARD.png"],
+    "delays": [90,90]
+  },
+  "972": {
+    "files": ["Front/HOUNDSTONE.png","Front shiny/HOUNDSTONE.png","Back/HOUNDSTONE.png","Back shiny/HOUNDSTONE.png"],
+    "delays": [90,90]
+  },
+  "973": {
+    "files": ["Front/FLAMIGO.png","Front shiny/FLAMIGO.png","Back/FLAMIGO.png","Back shiny/FLAMIGO.png"],
+    "delays": [90,90]
+  },
+  "974": {
+    "files": ["Front/CETODDLE.png","Front shiny/CETODDLE.png","Back/CETODDLE.png","Back shiny/CETODDLE.png"],
+    "delays": [90,90]
+  },
+  "975": {
+    "files": ["Front/CETITAN.png","Front shiny/CETITAN.png","Back/CETITAN.png","Back shiny/CETITAN.png"],
+    "delays": [90,90]
+  },
+  "976": {
+    "files": ["Front/VELUZA.png","Front shiny/VELUZA.png","Back/VELUZA.png","Back shiny/VELUZA.png"],
+    "delays": [90,90]
+  },
+  "977": {
+    "files": ["Front/DONDOZO.png","Front shiny/DONDOZO.png","Back/DONDOZO.png","Back shiny/DONDOZO.png"],
+    "delays": [90,90]
+  },
+  "978": {
+    "files": ["Front/TATSUGIRI.png","Front shiny/TATSUGIRI.png","Back/TATSUGIRI.png","Back shiny/TATSUGIRI.png"],
+    "delays": [90,90]
+  },
+  "979": {
+    "files": ["Front/ANNIHILAPE.png","Front shiny/ANNIHILAPE.png","Back/ANNIHILAPE.png","Back shiny/ANNIHILAPE.png"],
+    "delays": [90,90]
+  },
+  "980": {
+    "files": ["Front/CLODSIRE.png","Front shiny/CLODSIRE.png","Back/CLODSIRE.png","Back shiny/CLODSIRE.png"],
+    "delays": [90,90]
+  },
+  "981": {
+    "files": ["Front/FARIGIRAF.png","Front shiny/FARIGIRAF.png","Back/FARIGIRAF.png","Back shiny/FARIGIRAF.png"],
+    "delays": [90,90]
+  },
+  "982": {
+    "files": ["Front/DUDUNSPARCE.png","Front shiny/DUDUNSPARCE.png","Back/DUDUNSPARCE.png","Back shiny/DUDUNSPARCE.png"],
+    "delays": [90,90]
+  },
+  "983": {
+    "files": ["Front/KINGAMBIT.png","Front shiny/KINGAMBIT.png","Back/KINGAMBIT.png","Back shiny/KINGAMBIT.png"],
+    "delays": [90,90]
+  },
+  "984": {
+    "files": ["Front/GREATTUSK.png","Front shiny/GREATTUSK.png","Back/GREATTUSK.png","Back shiny/GREATTUSK.png"],
+    "delays": [90,90]
+  },
+  "985": {
+    "files": ["Front/SCREAMTAIL.png","Front shiny/SCREAMTAIL.png","Back/SCREAMTAIL.png","Back shiny/SCREAMTAIL.png"],
+    "delays": [90,90]
+  },
+  "986": {
+    "files": ["Front/BRUTEBONNET.png","Front shiny/BRUTEBONNET.png","Back/BRUTEBONNET.png","Back shiny/BRUTEBONNET.png"],
+    "delays": [90,90]
+  },
+  "987": {
+    "files": ["Front/FLUTTERMANE.png","Front shiny/FLUTTERMANE.png","Back/FLUTTERMANE.png","Back shiny/FLUTTERMANE.png"],
+    "delays": [90,90]
+  },
+  "988": {
+    "files": ["Front/SLITHERWING.png","Front shiny/SLITHERWING.png","Back/SLITHERWING.png","Back shiny/SLITHERWING.png"],
+    "delays": [90,90]
+  },
+  "989": {
+    "files": ["Front/SANDYSHOCKS.png","Front shiny/SANDYSHOCKS.png","Back/SANDYSHOCKS.png","Back shiny/SANDYSHOCKS.png"],
+    "delays": [90,90]
+  },
+  "990": {
+    "files": ["Front/IRONTREADS.png","Front shiny/IRONTREADS.png","Back/IRONTREADS.png","Back shiny/IRONTREADS.png"],
+    "delays": [90,90]
+  },
+  "991": {
+    "files": ["Front/IRONBUNDLE.png","Front shiny/IRONBUNDLE.png","Back/IRONBUNDLE.png","Back shiny/IRONBUNDLE.png"],
+    "delays": [90,90]
+  },
+  "992": {
+    "files": ["Front/IRONHANDS.png","Front shiny/IRONHANDS.png","Back/IRONHANDS.png","Back shiny/IRONHANDS.png"],
+    "delays": [90,90]
+  },
+  "993": {
+    "files": ["Front/IRONJUGULIS.png","Front shiny/IRONJUGULIS.png","Back/IRONJUGULIS.png","Back shiny/IRONJUGULIS.png"],
+    "delays": [90,90]
+  },
+  "994": {
+    "files": ["Front/IRONMOTH.png","Front shiny/IRONMOTH.png","Back/IRONMOTH.png","Back shiny/IRONMOTH.png"],
+    "delays": [90,135]
+  },
+  "995": {
+    "files": ["Front/IRONTHORNS.png","Front shiny/IRONTHORNS.png","Back/IRONTHORNS.png","Back shiny/IRONTHORNS.png"],
+    "delays": [90,90]
+  },
+  "996": {
+    "files": ["Front/FRIGIBAX.png","Front shiny/FRIGIBAX.png","Back/FRIGIBAX.png","Back shiny/FRIGIBAX.png"],
+    "delays": [90,90]
+  },
+  "997": {
+    "files": ["Front/ARCTIBAX.png","Front shiny/ARCTIBAX.png","Back/ARCTIBAX.png","Back shiny/ARCTIBAX.png"],
+    "delays": [90,90]
+  },
+  "998": {
+    "files": ["Front/BAXCALIBUR.png","Front shiny/BAXCALIBUR.png","Back/BAXCALIBUR.png","Back shiny/BAXCALIBUR.png"],
+    "delays": [90,90]
+  },
+  "999": {
+    "files": ["Front/GIMMIGHOUL.png","Front shiny/GIMMIGHOUL.png","Back/GIMMIGHOUL.png","Back shiny/GIMMIGHOUL.png"],
+    "delays": [90,90]
+  },
+  "1000": {
+    "files": ["Front/GHOLDENGO.png","Front shiny/GHOLDENGO.png","Back/GHOLDENGO.png","Back shiny/GHOLDENGO.png"],
+    "delays": [90,90]
+  },
+  "1001": {
+    "files": ["Front/WOCHIEN.png","Front shiny/WOCHIEN.png","Back/WOCHIEN.png","Back shiny/WOCHIEN.png"],
+    "delays": [90,90]
+  },
+  "1002": {
+    "files": ["Front/CHIENPAO.png","Front shiny/CHIENPAO.png","Back/CHIENPAO.png","Back shiny/CHIENPAO.png"],
+    "delays": [90,90]
+  },
+  "1003": {
+    "files": ["Front/TINGLU.png","Front shiny/TINGLU.png","Back/TINGLU.png","Back shiny/TINGLU.png"],
+    "delays": [90,90]
+  },
+  "1004": {
+    "files": ["Front/CHIYU.png","Front shiny/CHIYU.png","Back/CHIYU.png","Back shiny/CHIYU.png"],
+    "delays": [135,135]
+  },
+  "1005": {
+    "files": ["Front/ROARINGMOON.png","Front shiny/ROARINGMOON.png","Back/ROARINGMOON.png","Back shiny/ROARINGMOON.png"],
+    "delays": [135,135]
+  },
+  "1006": {
+    "files": ["Front/IRONVALIANT.png","Front shiny/IRONVALIANT.png","Back/IRONVALIANT.png","Back shiny/IRONVALIANT.png"],
+    "delays": [90,90]
+  },
+  "1007": {
+    "files": ["Front/KORAIDON.png","Front shiny/KORAIDON.png","Back/KORAIDON.png","Back shiny/KORAIDON.png"],
+    "delays": [90,90]
+  },
+  "1008": {
+    "files": ["Front/MIRAIDON.png","Front shiny/MIRAIDON.png","Back/MIRAIDON.png","Back shiny/MIRAIDON.png"],
+    "delays": [90,90]
+  },
+  "1009": {
+    "files": ["Front/WALKINGWAKE.png","Front shiny/WALKINGWAKE.png","Back/WALKINGWAKE.png","Back shiny/WALKINGWAKE.png"],
+    "delays": [90,90]
+  },
+  "1010": {
+    "files": ["Front/IRONLEAVES.png","Front shiny/IRONLEAVES.png","Back/IRONLEAVES.png","Back shiny/IRONLEAVES.png"],
+    "delays": [90,90]
+  },
+  "1011": {
+    "files": ["Front/DIPPLIN.png","Front shiny/DIPPLIN.png","Back/DIPPLIN.png","Back shiny/DIPPLIN.png"],
+    "delays": [90,90]
+  },
+  "1012": {
+    "files": ["Front/POLTCHAGEIST.png","Front shiny/POLTCHAGEIST.png","Back/POLTCHAGEIST.png","Back shiny/POLTCHAGEIST.png"],
+    "delays": [90,90]
+  },
+  "1013": {
+    "files": ["Front/SINISTCHA.png","Front shiny/SINISTCHA.png","Back/SINISTCHA.png","Back shiny/SINISTCHA.png"],
+    "delays": [90,90]
+  },
+  "1014": {
+    "files": ["Front/OKIDOGI.png","Front shiny/OKIDOGI.png","Back/OKIDOGI.png","Back shiny/OKIDOGI.png"],
+    "delays": [90,135]
+  },
+  "1015": {
+    "files": ["Front/MUNKIDORI.png","Front shiny/MUNKIDORI.png","Back/MUNKIDORI.png","Back shiny/MUNKIDORI.png"],
+    "delays": [135,90]
+  },
+  "1016": {
+    "files": ["Front/FEZANDIPITI.png","Front shiny/FEZANDIPITI.png","Back/FEZANDIPITI.png","Back shiny/FEZANDIPITI.png"],
+    "delays": [90,90]
+  },
+  "1017": {
+    "files": ["Front/OGERPON.png","Front shiny/OGERPON.png","Back/OGERPON.png","Back shiny/OGERPON.png"],
+    "delays": [90,90]
+  },
+  "1018": {
+    "files": ["Front/ARCHALUDON.png","Front shiny/ARCHALUDON.png","Back/ARCHALUDON.png","Back shiny/ARCHALUDON.png"],
+    "delays": [90,90]
+  },
+  "1019": {
+    "files": ["Front/HYDRAPPLE.png","Front shiny/HYDRAPPLE.png","Back/HYDRAPPLE.png","Back shiny/HYDRAPPLE.png"],
+    "delays": [90,90]
+  },
+  "1020": {
+    "files": ["Front/GOUGINGFIRE.png","Front shiny/GOUGINGFIRE.png","Back/GOUGINGFIRE.png","Back shiny/GOUGINGFIRE.png"],
+    "delays": [90,90]
+  },
+  "1021": {
+    "files": ["Front/RAGINGBOLT.png","Front shiny/RAGINGBOLT.png","Back/RAGINGBOLT.png","Back shiny/RAGINGBOLT.png"],
+    "delays": [90,90]
+  },
+  "1022": {
+    "files": ["Front/IRONBOULDER.png","Front shiny/IRONBOULDER.png","Back/IRONBOULDER.png","Back shiny/IRONBOULDER.png"],
+    "delays": [90,90]
+  },
+  "1023": {
+    "files": ["Front/IRONCROWN.png","Front shiny/IRONCROWN.png","Back/IRONCROWN.png","Back shiny/IRONCROWN.png"],
+    "delays": [90,90]
+  },
+  "1024": {
+    "files": ["Front/TERAPAGOS.png","Front shiny/TERAPAGOS.png","Back/TERAPAGOS.png","Back shiny/TERAPAGOS.png"],
+    "delays": [135,135]
+  },
+  "1025": {
+    "files": ["Front/PECHARUNT.png","Front shiny/PECHARUNT.png","Back/PECHARUNT.png","Back shiny/PECHARUNT.png"],
+    "delays": [90,90]
+  },
+  "aegislash-blade": {
+    "files": ["Front/AEGISLASH_1.png","Front shiny/AEGISLASH_1.png","Back/AEGISLASH_1.png","Back shiny/AEGISLASH_1.png"],
+    "delays": [90,90]
+  },
+  "wishiwashi-school": {
+    "files": ["Front/WISHIWASHI_1.png","Front shiny/WISHIWASHI_1.png","Back/WISHIWASHI_1.png","Back shiny/WISHIWASHI_1.png"],
+    "delays": [135,135]
+  },
+  "zygarde-complete": {
+    "files": ["Front/ZYGARDE_2.png","Front shiny/ZYGARDE_2.png","Back/ZYGARDE_2.png","Back shiny/ZYGARDE_2.png"],
+    "delays": [90,90]
+  },
+  "mimikyu-busted": {
+    "files": ["Front/MIMIKYU_1.png","Front shiny/MIMIKYU_1.png","Back/MIMIKYU_1.png","Back shiny/MIMIKYU_1.png"],
+    "delays": [90,90]
+  },
+  "eiscue-noice": {
+    "files": ["Front/EISCUE_1.png","Front shiny/EISCUE_1.png","Back/EISCUE_1.png","Back shiny/EISCUE_1.png"],
+    "delays": [90,90]
+  },
+  "palafin-hero": {
+    "files": ["Front/PALAFIN_1.png","Front shiny/PALAFIN_1.png","Back/PALAFIN_1.png","Back shiny/PALAFIN_1.png"],
+    "delays": [135,135]
+  },
+  "terapagos-terastal": {
+    "files": ["Front/TERAPAGOS_1.png","Front shiny/TERAPAGOS_1.png","Back/TERAPAGOS_1.png","Back shiny/TERAPAGOS_1.png"],
+    "delays": [135,135]
+  },
+  "cramorant-gulping": {
+    "files": ["Front/CRAMORANT_1.png","Front shiny/CRAMORANT_1.png","Back/CRAMORANT_1.png","Back shiny/CRAMORANT_1.png"],
+    "delays": [90,90]
+  },
+  "cramorant-gorging": {
+    "files": ["Front/CRAMORANT_2.png","Front shiny/CRAMORANT_2.png","Back/CRAMORANT_2.png","Back shiny/CRAMORANT_2.png"],
+    "delays": [90,90]
+  },
+  "morpeko-hangry": {
+    "files": ["Front/MORPEKO_1.png","Front shiny/MORPEKO_1.png","Back/MORPEKO_1.png","Back shiny/MORPEKO_1.png"],
+    "delays": [90,90]
+  },
+  "minior-red": {
+    "files": ["Front/MINIOR_7.png","Front shiny/MINIOR_7.png","Back/MINIOR_7.png","Back shiny/MINIOR_7.png"],
+    "delays": [90,90]
+  },
+  "minior-orange": {
+    "files": ["Front/MINIOR_8.png","Front shiny/MINIOR_8.png","Back/MINIOR_8.png","Back shiny/MINIOR_8.png"],
+    "delays": [90,90]
+  },
+  "minior-yellow": {
+    "files": ["Front/MINIOR_9.png","Front shiny/MINIOR_9.png","Back/MINIOR_9.png","Back shiny/MINIOR_9.png"],
+    "delays": [90,90]
+  },
+  "minior-green": {
+    "files": ["Front/MINIOR_10.png","Front shiny/MINIOR_10.png","Back/MINIOR_10.png","Back shiny/MINIOR_10.png"],
+    "delays": [90,90]
+  },
+  "minior-blue": {
+    "files": ["Front/MINIOR_11.png","Front shiny/MINIOR_11.png","Back/MINIOR_11.png","Back shiny/MINIOR_11.png"],
+    "delays": [90,90]
+  },
+  "minior-indigo": {
+    "files": ["Front/MINIOR_12.png","Front shiny/MINIOR_12.png","Back/MINIOR_12.png","Back shiny/MINIOR_12.png"],
+    "delays": [90,90]
+  },
+  "minior-violet": {
+    "files": ["Front/MINIOR_13.png","Front shiny/MINIOR_13.png","Back/MINIOR_13.png","Back shiny/MINIOR_13.png"],
+    "delays": [90,90]
+  }
+}

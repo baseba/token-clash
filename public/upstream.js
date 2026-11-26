@@ -10,6 +10,7 @@ export const UPSTREAM = {
   emerald: { repo: 'pret/pokeemerald', commit: '9103e529c2fbdd7add4a1ff3350c6c1f92112c42' },
   firered: { repo: 'pret/pokefirered', commit: 'ce6406d8c2eaf46d543c8a2606de0c3cb1951982' },
   rogue: { repo: 'Pokabbie/pokeemerald-rogue', commit: '5ccb74cf1ef2c0349dfa5d70883b030bbc9ff803' },
+  essentials: { repo: 'rh-hideout-chinese/pokemon-engine', commit: '4d4eb60502cf2b347d30d68100f3ef5b54c97c2f' },
 };
 
 const encodePath = (path) => path.split('/').map(encodeURIComponent).join('/');
