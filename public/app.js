@@ -3588,6 +3588,8 @@ const trainerLink = (id, name) => (id ? h('a', { class: 'trainer-link', href: `/
 const record = (t) => h('span', { class: 'record' }, h('span', { class: 'w' }, `${t.wins}V`), ' ', h('span', { class: 'l' }, `${t.losses}D`));
 const rateBar = (t) => h('span', { class: 'rate', 'data-tip': t.games ? `${t.wins} de ${t.games} batallas ganadas` : 'Sin batallas todavía' }, h('span', { class: 'rate-bar' }, h('i', { style: { width: percent(t.winRate ?? 0) } })), h('span', { class: 'rate-num' }, percent(t.winRate)));
 const trainerMeta = (t) => `${t.rosterSize} Pokémon · ${t.shinies} shiny · ${compact(t.totalTokens)} tokens`;
+const ELO_TIP = 'Todos parten en 1000 Elo. Ganarle a alguien con más Elo da más puntos que ganarle a alguien con menos, y un empate cuenta como media victoria.';
+const eloChip = (elo) => h('span', { class: 'chip', 'data-tip': ELO_TIP }, h('b', null, String(elo)), ' Elo');
 
 function podium(top) {
   const medals = ['medal1', 'medal2', 'medal3'];
@@ -3600,6 +3602,7 @@ function podium(top) {
         { class: `podium-card place-${i + 1}${isMe(t) ? ' is-me' : ''}` },
         h('span', { class: 'podium-medal', 'aria-label': `Puesto ${i + 1}` }, glyph(medals[i])),
         h('b', { class: 'podium-name' }, trainerLink(t.id, t.name), isMe(t) ? h('span', { class: 'muted small' }, ' (tú)') : null),
+        eloChip(t.elo),
         record(t),
         rateBar(t),
         h('small', { class: 'muted' }, trainerMeta(t)),
@@ -3622,13 +3625,13 @@ function rankingCard(ranking) {
                   'div',
                   { class: `item${isMe(t) ? ' is-me' : ''}` },
                   h('span', { class: 'row' }, h('span', { class: 'rank' }, `#${i + 4}`), h('span', { class: 'rank-who' }, h('strong', null, trainerLink(t.id, t.name), isMe(t) ? h('span', { class: 'muted small' }, ' (tú)') : null), h('small', { class: 'muted' }, trainerMeta(t)))),
-                  h('span', { class: 'row rank-right' }, rateBar(t), record(t)),
+                  h('span', { class: 'row rank-right' }, eloChip(t.elo), rateBar(t), record(t)),
                 ),
               ),
             )
           : null,
       ];
-  return h('div', { class: 'card' }, h('div', { class: 'row between' }, h('h2', null, glyph('trophy'), ' Ranking'), h('span', { class: 'muted small' }, 'Solo batallas entre jugadores')), ...body);
+  return h('div', { class: 'card' }, h('div', { class: 'row between' }, h('h2', null, glyph('trophy'), ' Ranking'), h('span', { class: 'muted small', 'data-tip': ELO_TIP }, 'Por Elo · solo batallas entre jugadores')), ...body);
 }
 
 const DIFFICULTY_MULTIPLIER = { easy: 0.5, mid: 1, hard: 1.5, veryhard: 2, skynet: 3 };
@@ -3919,6 +3922,7 @@ async function trainerPage(id, seq) {
           h('div', { class: 'row profile-meta' },
             skinTitle(profile.avatar, 'span'),
             rec.rank ? h('span', { class: 'chip', 'data-tip': 'Su puesto en el ranking de batallas entre jugadores' }, glyph('trophy'), ` #${rec.rank}`) : null,
+            rec.elo !== null ? eloChip(rec.elo) : null,
             h('span', { class: 'chip' }, h('span', { class: 'w' }, `${rec.wins}V`), ' · ', h('span', { class: 'l' }, `${rec.losses}D`))))),
       mine ? h('a', { class: 'btn sm ghost', href: '/perfil', 'data-link': true }, glyph('gear'), ' Editar tu perfil') : null),
     h('section', { class: 'grid2' },

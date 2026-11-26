@@ -47,7 +47,8 @@ export function trainerProfile(source: ProfileSource, id: string) {
     .filter((challenge) => isHumanDuel(challenge) && challenge.status === 'finished' && challenge.final && sideOf(challenge, id) !== null)
     .sort((a, b) => finishedAt(b) - finishedAt(a));
   const vsAi = challenges.filter((challenge) => challenge.ai && !challenge.aiOnly && challenge.status === 'finished' && challenge.hostId === id);
-  const place = rankingOf(Object.values(source.trainers)).findIndex((row) => row.id === id);
+  const ranking = rankingOf(Object.values(source.trainers), challenges);
+  const place = ranking.findIndex((row) => row.id === id);
   const tournaments = tournamentStats(source).ranking.find((row) => row.id === id) ?? null;
   const games = trainer.wins + trainer.losses;
   return {
@@ -55,7 +56,7 @@ export function trainerProfile(source: ProfileSource, id: string) {
     name: trainer.name,
     avatar: trainer.look ?? null,
     lastSeen: trainer.lastSeen ?? null,
-    record: { wins: trainer.wins, losses: trainer.losses, games, winRate: games ? trainer.wins / games : null, rank: place >= 0 ? place + 1 : null },
+    record: { wins: trainer.wins, losses: trainer.losses, games, winRate: games ? trainer.wins / games : null, rank: place >= 0 ? place + 1 : null, elo: ranking[place]?.elo ?? null },
     collection: { pokemon: trainer.roster.length, species: new Set(trainer.roster.map((entry) => entry.finalID)).size, shinies: trainer.roster.filter((entry) => entry.shiny).length, tokens: trainer.totalTokens ?? 0 },
     vsAi: { wins: vsAi.filter((challenge) => challenge.winnerId === id).length, losses: vsAi.filter((challenge) => challenge.winnerId && challenge.winnerId !== id).length },
     tournaments: tournaments && { titles: tournaments.titles, finals: tournaments.finals, played: tournaments.played },

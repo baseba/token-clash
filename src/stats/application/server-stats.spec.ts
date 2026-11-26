@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serverStats, rankingOf, playersOf, tournamentStats } from './server-stats.js';
+import { serverStats, rankingOf, leaderboardOf, playersOf, tournamentStats } from './server-stats.js';
 
 const trainer = (id, name, wins, losses, roster, totalTokens = 0) => ({ id, name, wins, losses, roster, totalTokens });
 const fighter = (speciesName, sprite) => ({ speciesName, sprite, types: ['normal'] });
@@ -11,11 +11,34 @@ const battle = (id, hostId, guestId, winnerSide, extra = {}) => ({
   ...extra,
 });
 
-test('the ranking orders by wins, then win rate, and leaves out who never fought', () => {
-  const ranking = rankingOf([trainer('a', 'Ana', 2, 2, []), trainer('b', 'Beto', 3, 1, [{ shiny: true }, {}]), trainer('c', 'Caro', 2, 0, []), trainer('z', 'Zoe', 0, 0, [])]);
-  assert.deepEqual(ranking.map((t) => t.name), ['Beto', 'Caro', 'Ana']);
-  assert.equal(ranking[0].winRate, 0.75);
-  assert.equal(ranking[0].shinies, 1);
+test('the ranking orders by the Elo replayed from duels between players, not by wins', () => {
+  const trainers = [trainer('a', 'Ana', 2, 0, []), trainer('b', 'Beto', 3, 2, [{ shiny: true }, {}]), trainer('c', 'Caro', 0, 3, []), trainer('z', 'Zoe', 0, 0, [])];
+  const challenges: any[] = [
+    battle('x1', 'b', 'c', 0),
+    battle('x2', 'b', 'c', 0),
+    battle('x3', 'b', 'c', 0),
+    battle('x4', 'a', 'b', 0),
+    battle('x5', 'a', 'b', 0),
+    battle('x6', 'z', 'a', 0, { ai: 'hard' }),
+    battle('x7', 'z', 'a', 0, { tournamentId: 't1' }),
+    { ...battle('x8', 'z', 'c', 0), status: 'abandoned' },
+  ];
+  const ranking = rankingOf(trainers, challenges);
+  assert.deepEqual(ranking.map((row) => [row.name, row.elo, row.wins]), [['Ana', 1034, 2], ['Beto', 1009, 3], ['Caro', 956, 0]]);
+  assert.equal(ranking[1].winRate, 0.6);
+  assert.equal(ranking[1].shinies, 1);
+});
+
+test('a draw rates both players, and who never fought a duel has no place', () => {
+  const ranking = rankingOf([trainer('a', 'Ana', 0, 0, []), trainer('b', 'Beto', 0, 0, []), trainer('z', 'Zoe', 0, 0, [])], [battle('x1', 'a', 'b', null) as any]);
+  assert.deepEqual(ranking.map((row) => [row.name, row.elo, row.winRate]), [['Ana', 1000, null], ['Beto', 1000, null]]);
+});
+
+test('the leaderboard lists every trainer with its Elo, the unrated ones last', () => {
+  const summary = (id, name, wins, losses) => ({ ...trainer(id, name, wins, losses, [{}]), look: 'lass', equipped: { frame: 'gold' }, shinies: 0 });
+  const rows = leaderboardOf([summary('z', 'Zoe', 0, 0), summary('a', 'Ana', 1, 0), summary('b', 'Beto', 0, 1)], [battle('x1', 'a', 'b', 0) as any]);
+  assert.deepEqual(rows.map((row) => [row.name, row.elo]), [['Ana', 1016], ['Beto', 984], ['Zoe', null]]);
+  assert.deepEqual(rows[0], { id: 'a', name: 'Ana', avatar: 'lass', frame: 'gold', elo: 1016, wins: 1, losses: 0, rosterSize: 1, shinies: 0, totalTokens: 0 });
 });
 
 test('accounts that imported the same save count as one player', () => {
