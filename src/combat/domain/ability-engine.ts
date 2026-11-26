@@ -1,11 +1,11 @@
 import type { Boosts, MajorStatus, Weather } from '../../catalog/domain/creatures.js';
 import { abilityInfo } from '../../catalog/domain/abilities.js';
-import { ABILITIES, type AbilityEffect, type AbilityHook } from './ability-effects.js';
+import { ABILITIES, type AbilityEffect, type AbilityEngine, type AbilityHook, type BoostOptions } from './ability-effects.js';
 import { HELD_ITEMS } from '../../catalog/domain/held-items.js';
 import { ITEMS } from './item-effects.js';
 import type { AbilityDetails, AnyMove, BattleFighter, BattleState } from './battle-types.js';
 import { typeEffectiveness } from './damage.js';
-import { activeFighters, addToxicSpikes, addVolatile, asleep, boost, type BoostOptions, breakIllusion, changeForm, clearScreens, cure, currentWeather, emit, foeOf, grounded, hasBench, heal, hurt, lookOf, nameOf, setStatus, setTerrain, setTypes, setWeather, sideIndexOf, transform } from './effects.js';
+import { activeFighters, addToxicSpikes, addVolatile, asleep, boost, breakIllusion, changeForm, clearScreens, cure, currentWeather, emit, foeOf, grounded, hasBench, heal, hurt, lookOf, nameOf, setStatus, setTerrain, setTypes, setWeather, sideIndexOf, transform } from './effects.js';
 
 export function abilityKey(battle: BattleState, fighter: BattleFighter): string | null {
   const key = fighter.ability;
@@ -67,9 +67,7 @@ function engine(battle: BattleState): AbilityEngine {
   return engine;
 }
 
-export type AbilityEngine = ReturnType<typeof makeEngine>;
-
-function makeEngine(battle: BattleState) {
+function makeEngine(battle: BattleState): AbilityEngine {
   return {
     battle,
     rand: () => battle.random(),
