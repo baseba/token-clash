@@ -13,6 +13,4 @@ function findRoot(from: string): string {
 
 export const PROJECT_ROOT = findRoot(import.meta.dirname);
 
-export const catalogFile = (name: string) => join(PROJECT_ROOT, 'src', 'catalog', 'data', name);
-
 export const PUBLIC_DIR = join(PROJECT_ROOT, 'public');

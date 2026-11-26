@@ -6,7 +6,8 @@ import { createBattle, submit, autoAction, forfeit, needsAction, validActions, s
 import { rng, species, speciesData, effectiveness, learnedMoves, statsFor } from '../../catalog/domain/creatures.js';
 import { BATTLE_LEVEL, defaultMoveset, validMoveset, movesetFor, buildFighter } from './fighter.js';
 import { moveData } from './moves.js';
-import { PROJECT_ROOT, catalogFile } from '../../shared/paths.js';
+import { catalogFile } from '../../catalog/domain/data-file.js';
+import { PROJECT_ROOT } from '../../shared/paths.js';
 import { join } from 'node:path';
 
 const { roster } = parseSave(readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8'));

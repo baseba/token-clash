@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import * as radio from '../../../public/radio.js';
-import { catalogFile } from '../../shared/paths.js';
+import { catalogFile } from './data-file.js';
 
 export type RadioTrackId = string;
 

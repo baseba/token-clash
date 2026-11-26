@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { catalogFile } from '../../shared/paths.js';
+import { catalogFile } from './data-file.js';
 import { effectiveness } from './type-chart.js';
 import { knownAbility, INERT } from './abilities.js';
 import type { Gender, Ivs, RosterEntry } from './roster-entry.js';
