@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ALL_MOVE_IDS, lineage, lineageLearnset, learnedMoves, moveEntry, moveOrigins, type MajorStatus, type Weather } from './creatures.js';
+import { ALL_MOVE_IDS, finalForms, lineage, lineageLearnset, learnedMoves, moveEntry, moveOrigins, REGIONAL_FORM_EVOLUTIONS, speciesData, type MajorStatus, type Weather } from './creatures.js';
 
 test('a species carries its whole pre-evolution line', () => {
   assert.deepEqual(lineage(26), [26, 25, 172]);
@@ -42,4 +42,13 @@ test('movedex.json only names the statuses and weathers the engine knows', () =>
     for (const status of [move.status, ...(move.secondary ?? []).map((s) => s.status)]) if (status) assert.ok(status in statuses, `${id}: ${status}`);
     if (move.weather) assert.ok(move.weather in weathers, `${id}: ${move.weather}`);
   }
+});
+
+test('a line only evolves into what its regular form reaches, the regional-form evolutions stay out', () => {
+  assert.deepEqual(finalForms(263), [264], 'Zigzagoon stops at Linoone: Obstagoon needs the Galarian one');
+  assert.deepEqual(finalForms(194), [195], 'Wooper stops at Quagsire: Clodsire needs the Paldean one');
+  assert.deepEqual(finalForms(215), [461], 'Sneasel reaches Weavile, not the Hisuian Sneasler');
+  assert.deepEqual(finalForms(123).sort((a, b) => a - b), [212, 900], 'Scyther reaches Scizor and Kleavor');
+  assert.deepEqual(finalForms(624), [983], 'Pawniard reaches Kingambit');
+  for (const id of REGIONAL_FORM_EVOLUTIONS) assert.ok(speciesData(id), `#${id} is still a species of its own`);
 });

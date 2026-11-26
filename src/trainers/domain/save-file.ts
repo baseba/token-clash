@@ -1,4 +1,4 @@
-import { finalForms, NATURE_NAMES, speciesData } from '../../catalog/domain/creatures.js';
+import { finalForms, NATURE_NAMES, REGIONAL_FORM_EVOLUTIONS, speciesData } from '../../catalog/domain/creatures.js';
 import { hash } from '../../shared/domain/random.js';
 import { uniqueSpecies, variantKey, type Gender, type Ivs, type Rarity, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { toDuplicate, type Duplicate } from './recycling.js';
@@ -101,6 +101,14 @@ export function evolvedGraduate(entry: RosterEntry, chain: unknown): RosterEntry
   return { ...entry, finalID, ...(species?.stage != null && species.chainLen != null ? { stage: species.stage, chainLen: species.chainLen } : {}) };
 }
 
+export function withoutRegionalEvolution(entry: RosterEntry): RosterEntry {
+  const from = REGIONAL_FORM_EVOLUTIONS.has(entry.finalID) ? speciesData(entry.finalID)?.evolvesFrom : undefined;
+  if (!from) return entry;
+  const shorter = (value: number | undefined) => (value != null && value > 0 ? value - 1 : value);
+  const reverted: RosterEntry = { ...entry, finalID: from, stage: shorter(entry.stage), chainLen: shorter(entry.chainLen) };
+  return Object.fromEntries(Object.entries(reverted).filter(([, value]) => value !== undefined)) as unknown as RosterEntry;
+}
+
 export interface CaughtCandidate {
   entry: RosterEntry;
   caught: number;
@@ -160,7 +168,8 @@ export function parseSave(text: string): ParsedSave {
       fallbackId: `dex-${i}-${seen.finalID}`,
       chain: seen.chainOrder,
     });
-    add(entry && evolvedGraduate(entry, seen.chainOrder), seen.caughtAt);
+    const cameFromRegularForm = entry && Array.isArray(seen.chainOrder) && seen.chainOrder.includes(speciesData(entry.finalID)?.evolvesFrom);
+    add(entry && evolvedGraduate(cameFromRegularForm ? withoutRegionalEvolution(entry) : entry, seen.chainOrder), seen.caughtAt);
   });
 
   const active = state.active;
