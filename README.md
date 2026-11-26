@@ -52,19 +52,21 @@ cuenta.
 | `module-cycle` | Carpetas o archivos hermanos que se usan en círculo. |
 | `tangle` | Clases, funciones o constantes que se conocen en círculo, en más de un módulo o más de siete. |
 | `field-leak` | Código de afuera que trabaja sobre un campo de una clase que guarda sus campos. |
-| `shallow-module` | Una carpeta que muestra más de siete funciones y no esconde más de las que muestra. Un dominio con módulo de Nest se juzga entero, no capa por capa. |
+| `shallow-module` | Una carpeta que muestra más de siete funciones, con una lista de más de siete, y no esconde más de las que muestra. Un dominio con módulo de Nest se juzga entero, no capa por capa. |
 | `wide-directory` | Una carpeta con más de 15 archivos y carpetas. |
 | `long-file` | Un archivo con más de 2.000 líneas. |
 
 Hay una sola excepción, en `tools/deslop/debt.allow`: `shallow-module` en `src::catalog::domain`, una biblioteca
 de consulta que usan cinco dominios y `web`, cada uno para algo distinto. El día que el catálogo deje de mostrar
-más de lo que esconde, borra la entrada. Un diagnóstico nuevo se arregla en el código, no en ese archivo. Para ver
-también lo excusado: `node dist/tools/deslop/main.js` sin `--allow`.
+más de lo que esconde, borra la entrada: una entrada que ya no hace falta solo avisa, no falla. Un diagnóstico
+nuevo se arregla en el código, no en ese archivo. Para ver también lo excusado: `node dist/tools/deslop/main.js`
+sin `--allow`.
 
 Cada diferencia a propósito con el original y cada caso que la regla no ve está fijado en una fila de
-`tools/deslop/lint/leaks.rows.spec.ts`, `check.parity.spec.ts`, `shallow.spec.ts` o `tools/deslop/cli.spec.ts`. Una
-forma nueva se agrega como fila. Todavía sin fila, `field-leak` tampoco ve: un cast aplicado después del uso,
-`Reflect` y `.call`, las claves computadas, el estado en closures o en variables de módulo, y los generadores.
+`tools/deslop/lint/leaks.rows.spec.ts`, `leaks.spec.ts` (por ejemplo `Object.assign`), `check.parity.spec.ts`,
+`shallow.spec.ts` o `tools/deslop/cli.spec.ts`. Una forma nueva se agrega como fila. Todavía sin fila, `field-leak`
+tampoco ve: un cast aplicado después del uso, `Reflect` y `.call`, las claves computadas, el estado en closures o en
+variables de módulo, y los generadores.
 
 ## Cómo está armado
 

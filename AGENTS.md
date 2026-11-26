@@ -36,11 +36,14 @@ una decisión de arquitectura: pregunta antes. Lo mismo para la pila (Zod, `app-
 - La regla vive en el agregado o en una función pura de `domain/`, con su spec al lado. El DTO revisa la forma de
   la petición y el dominio, lo que depende del estado. El endpoint va en el controller del dominio dueño de lo que
   cambia, y el controller solo llama a un caso de uso.
+- Cada dominio es dueño de sus tablas: ninguna consulta escrita a mano toca la tabla de otro dominio, se le pide a
+  su servicio.
 - Un puerto (clase abstracta que sirve de token) solo si el adaptador puede cambiar o hay que reemplazarlo en los
   tests. Con un solo adaptador, impórtalo directo, como `SkynetService` con el cliente de Jev.
 - Nombres completos, también en los specs: nada de una letra, salvo `i` y `j`, el parámetro de un callback de una
   sola expresión, los comparadores `(a, b)`, los genéricos `<T>` y el generador pseudoaleatorio.
 - Un concepto, un nombre, un lugar: si renombras, renombra en todos lados, y un valor compartido se importa.
+- Si renombras algo que nombra [Cómo está armado](README.md#cómo-está-armado), actualiza esa sección en el mismo PR.
 - Identificadores en inglés. Los textos que ve el jugador, este archivo y el README, en español.
 - Peleas, presencia y chat viven en memoria a propósito: no los persistas.
 - Código viejo que rompe una regla no es un precedente.
@@ -57,7 +60,9 @@ una decisión de arquitectura: pregunta antes. Lo mismo para la pila (Zod, `app-
   `anims`, `radio` y `node scripts/import-pokeapi.mjs`), y lo que generan en `src/*/data/` y `public/upstream/` se
   commitea.
 - Sprites, gritos, sonidos y música los baja el navegador de jsDelivr, fijados a un commit en `public/upstream.js`.
-  Lo que transformamos (animaciones, entrenadores, tiles) se genera en `npm install` y no se versiona.
+  Lo que transformamos (animaciones, entrenadores, sprites de mapa, tiles) se genera en `npm install` y no se
+  versiona. La imagen instala con `--ignore-scripts` y corre esos scripts de sync ella misma (`deploy/Containerfile`):
+  un script nuevo de `postinstall` también va ahí.
 - El merge a `main` despliega solo cuando el CI pasa y no hay peleas en curso. Cada PR tiene que poder salir a
   producción por sí mismo, y lo que no está commiteado no llega.
 - Un cambio en `deploy/*.container`, `*.network`, `*.service`, `*.timer` o `deploy/deploy.sh` no se aplica solo y

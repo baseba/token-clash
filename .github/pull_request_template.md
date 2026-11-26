@@ -1,6 +1,10 @@
+## Why
+
+<!-- Por qué hace falta este cambio: el problema o la decisión detrás, en una o dos frases. -->
+
 ## Qué cambia
 
-<!-- Una o dos frases: qué hace este PR y por qué. -->
+<!-- Qué hace este PR, corto. -->
 
 ## Cómo probarlo
 
