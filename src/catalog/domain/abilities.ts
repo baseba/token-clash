@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { catalogFile } from '../../shared/paths.js';
+import { catalogFile } from './data-file.js';
 
 export interface AbilityInfo {
   key: string;
