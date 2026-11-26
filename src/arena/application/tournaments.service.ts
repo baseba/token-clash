@@ -10,7 +10,7 @@ import { TrainersService } from '../../trainers/application/trainers.service.js'
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
 import { Challenge, type BattleMode, type Visibility } from '../domain/challenge.js';
-import { shuffledOrder, tournamentMatchFor, type Seat, Tournament } from '../domain/tournament.js';
+import { tournamentMatchFor, type Seat, Tournament } from '../domain/tournament.js';
 import { ArenaEvents, type MatchFinished } from './arena-events.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
@@ -141,9 +141,13 @@ export class TournamentsService implements OnModuleInit {
   }
 
   private afterSeatsChange(tournament: Tournament): void {
-    if (tournament.everyoneReady) return this.start(tournament);
+    const at = now();
+    const started = tournament.startIfReady({ at, firstMatchAt: at + this.timings.bracketDrawMs });
     this.tournaments.save(tournament);
     this.broadcast(tournament);
+    if (!started) return;
+    this.lobby.notify();
+    setTimeout(() => this.startMatch(tournament), this.timings.bracketDrawMs).unref();
   }
 
   private close(tournament: Tournament, trainerId: string): void {
@@ -166,19 +170,6 @@ export class TournamentsService implements OnModuleInit {
     this.seatTimers.set(key, timer);
   }
 
-  private start(tournament: Tournament): void {
-    const at = now();
-    tournament.start({
-      at,
-      order: shuffledOrder(tournament.size),
-      firstMatchAt: at + this.timings.bracketDrawMs,
-    });
-    this.tournaments.save(tournament);
-    this.broadcast(tournament);
-    this.lobby.notify();
-    setTimeout(() => this.startMatch(tournament), this.timings.bracketDrawMs).unref();
-  }
-
   private seatTeam(tournament: Tournament, seat: Seat): RosterEntry[] {
     const ai = aiLevelOf(seat.id);
     if (ai) return tournament.mode === 'random' ? buildAiRandomParty() : buildAiTeam({ difficulty: ai });
@@ -188,11 +179,11 @@ export class TournamentsService implements OnModuleInit {
   }
 
   private startMatch(tournament: Tournament): void {
-    const next = tournament.nextMatch();
+    const next = tournament.startNextMatch(newId());
     if (!next) return;
     const [host, guest] = next.a.ai && !next.b.ai ? [next.b, next.a] : [next.a, next.b];
     const challenge = Challenge.tournamentMatch({
-      id: newId(),
+      id: next.challengeId,
       host: { id: host.id, name: host.name, team: this.seatTeam(tournament, host), ai: host.ai },
       guest: { id: guest.id, name: guest.name, team: this.seatTeam(tournament, guest), ai: guest.ai },
       mode: tournament.mode,
@@ -202,7 +193,6 @@ export class TournamentsService implements OnModuleInit {
       at: now(),
     });
     this.challenges.save(challenge);
-    tournament.matchStarted(next, challenge.id);
     this.tournaments.save(tournament);
     this.previews.startCountdown(this.presence.room(challenge), tournament.label(next));
     this.broadcast(tournament);
