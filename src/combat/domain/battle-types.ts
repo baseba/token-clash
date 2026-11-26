@@ -10,6 +10,8 @@ export interface MoveData extends MoveEntry {
   kind: 'attack' | 'status';
   supported: boolean;
   weakenedByGrassyTerrain?: boolean;
+  ignoresAbility?: boolean;
+  checksEachHit?: boolean;
   usesTargetAttack?: boolean;
   screen?: string;
   breaksScreens?: boolean;
@@ -232,6 +234,9 @@ export interface Volatiles {
   rage?: boolean;
   rampage?: { move: number; left: number };
   saltCure?: boolean;
+  syrupBomb?: { turns: number };
+  tarShot?: boolean;
+  throatChop?: { turns: number };
   slowStart?: number;
   smackedDown?: boolean;
   snatch?: number;
@@ -283,6 +288,8 @@ export interface BattleFighter extends Fighter {
   fainted?: boolean;
   turnHit?: { by: BattleFighter; physical: boolean; special: boolean; amount: number };
   timesHit?: number;
+  raisedOnTurn?: number;
+  loweredOnTurn?: number;
   onceUsed?: boolean;
   battleBondUsed?: boolean;
   disguiseBusted?: boolean;
@@ -308,6 +315,7 @@ export interface FieldState {
   terrain: string | null;
   terrainTurns: number;
   rooms: Record<string, number>;
+  ionDeluge?: number;
 }
 
 export interface Hazards {

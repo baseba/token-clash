@@ -1,7 +1,7 @@
 import type { Weather } from '../../../catalog/domain/creatures.js';
 import { aimedTarget, hiddenPowerType, moveAt, moveData, type MoveData, type MoveTarget, STRUGGLE, STRUGGLE_MOVE } from '../moves.js';
 import { MOVE_RULES, type MoveRuleApi } from '../rules/move-rules.js';
-import { isSun, stageMult } from '../conditions.js';
+import { isRain, isSun, stageMult } from '../conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState, MoveEvent, OrderReason } from '../battle-types.js';
 import { attack, baseDamage, blockedByProtection, bypassesSub, damageRoll, HIDDEN_BY, hiddenFrom, hits } from './damage.js';
 import { faint } from './switching.js';
@@ -16,6 +16,7 @@ const CONFUSION_POWER = 40;
 
 const moveApis = new WeakMap<BattleState, MoveRuleApi>();
 
+const CHARGE_BOOSTS = new Set(['meteor-beam', 'electro-shot']);
 const HEALS_WITH_WEATHER: Record<string, Weather> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
 
 export function moveBlocked(battle: BattleState, fighter: BattleFighter, move: AnyMove): string | null {
@@ -26,6 +27,7 @@ export function moveBlocked(battle: BattleState, fighter: BattleFighter, move: A
   const foe = foeOf(battle, fighter);
   if (foe?.volatiles.imprison && foe.moves.some((x) => x.key === move.key)) return 'imprison';
   if (move.flags.includes('cantusetwice') && fighter.volatiles.lastMove === move.key) return 'twice';
+  if (fighter.volatiles.throatChop && move.flags.includes('sound')) return 'throatChop';
   return null;
 }
 
@@ -109,6 +111,11 @@ export function failReason(battle: BattleState, me: BattleFighter, foe: BattleFi
     const theirs = battle.chosen?.[1 - sideIndex];
     if (!foe || battle.moved.has(foe) || !theirs || theirs.kind === 'status') return 'suckerPunch';
   }
+  if (move.id === 'upper-hand') {
+    const theirs = battle.chosen?.[1 - sideIndex];
+    if (!foe || battle.moved.has(foe) || !theirs || theirs.kind === 'status' || theirs.priority <= 0) return 'upperHand';
+  }
+  if (move.id === 'poltergeist' && !foe?.item) return 'noItem';
   if (move.id === 'focus-punch' && me.turnHit) return 'lostFocus';
   if (move.id === 'shell-trap' && !me.turnHit?.physical) return 'shellTrap';
   if (move.id === 'last-resort' && !lastResortReady(me)) return 'lastResort';
@@ -277,20 +284,23 @@ export function useMove(battle: BattleState, sideIndex: number, moveIdx: number,
   run(battle, me, 'onBeforeMoveForm', move);
   adaptMove(battle, me, move);
   if (me.volatiles.electrify === battle.turn) move.type = 'electric';
+  if (battle.field.ionDeluge === battle.turn && move.type === 'normal') move.type = 'electric';
   run(battle, me, 'onModifyMove', move);
   run(battle, me, 'onPrepareMove', move);
   me.revealedMoves.add(base.key);
   me.volatiles.prevMove = me.volatiles.lastMove;
   me.volatiles.lastMove = base.key;
-  const startsCharge = move.flags.includes('charge')
-    && !charged
-    && !(isSun(currentWeather(battle)) && (base.id === 'solar-beam' || base.id === 'solar-blade'));
+  const weather = currentWeather(battle);
+  const skipsCharge = (isSun(weather) && (base.id === 'solar-beam' || base.id === 'solar-blade')) || (isRain(weather) && base.id === 'electro-shot');
+  const startsCharge = move.flags.includes('charge') && !charged && !skipsCharge;
   if (startsCharge) {
     spendPP(battle, me, move);
     me.volatiles.charging = moveIdx;
     emit(battle, { t: 'charging', side: sideIndex, name: nameOf(me), move: move.name, key: base.key, hidden: !!HIDDEN_BY[base.id] });
+    if (CHARGE_BOOSTS.has(base.id)) boost(battle, me, { satk: 1 }, me);
     return;
   }
+  if (skipsCharge && !charged && CHARGE_BOOSTS.has(base.id)) boost(battle, me, { satk: 1 }, me);
   announceMove(battle, sideIndex, me, base, move, why ? { why } : {});
 
   const foe = foeOf(battle, me);
@@ -389,7 +399,7 @@ function statusMove(battle: BattleState, me: BattleFighter, foe: BattleFighter |
     return false;
   }
   let target = foe;
-  battle.moldBreaker = flag(battle, me, 'moldBreaker') ? { target: foe } : null;
+  battle.moldBreaker = flag(battle, me, 'moldBreaker') || move.ignoresAbility ? { target: foe } : null;
   try {
     if (move.effectivePriority > move.priority && foe.types.includes('dark')) {
       emit(battle, { t: 'immune', side: 1 - sideIndex });
@@ -431,6 +441,7 @@ function statusMove(battle: BattleState, me: BattleFighter, foe: BattleFighter |
   if (move.volatile === 'confusion') did = addVolatile(battle, target, 'confusion', source) || did;
   if (move.volatile === 'attract') did = addVolatile(battle, target, 'attract', source) || did;
   if (move.volatile === 'leechseed') did = addVolatile(battle, target, 'leechseed', source) || did;
+  if (move.volatile === 'tarshot') did = addVolatile(battle, target, 'tarshot', source) || did;
   if (move.self) did = Object.keys(boost(battle, source, move.self, source)).length > 0 || did;
   if (!did && move.volatile === 'attract' && (!target.gender || !source.gender || target.gender === source.gender)) {
     emit(battle, { t: 'nothing', side: sideIndex, reason: !target.gender || !source.gender ? 'genderless' : 'sameGender' });
