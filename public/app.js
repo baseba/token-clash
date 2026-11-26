@@ -2408,7 +2408,7 @@ function renderHome() {
     { class: 'nb-form' },
     field('Juego', h('div', { class: 'cards4', role: 'group', 'aria-label': 'Tipo de juego' }, choice('pick', [
       { value: 'friend', icon: 'users', label: 'Contra otro jugador', desc: 'Entras a una sala abierta o abres una nueva.' },
-      { value: 'ai', icon: 'robot', label: 'La IA', desc: 'Peleas ahora mismo, con Pokémon de la 1.ª a la 5.ª generación.' },
+      { value: 'ai', icon: 'robot', label: 'La IA', desc: 'Peleas ahora mismo, con Pokémon de la 1.ª a la 9.ª generación.' },
       { value: 'tournament', icon: 'trophy', label: 'Torneo', desc: 'De 4, 8 o 16 jugadores, con IAs para rellenar.' },
       { value: 'tower', icon: 'flag', label: 'La Torre', desc: 'Sube piso a piso desde el nivel 5 con tu colección. Se guarda entre pisos.' },
     ], rival, (v) => { rival = v; paint(); }))),
@@ -4176,7 +4176,7 @@ function trainerName(name, attrs = {}, avatar = null) {
 }
 const AI_NOTES = {
   easy: {
-    team: 'Los dados sortean sus 6 entre todos los Pokémon evolucionados de la 1.ª a la 5.ª generación, con movimientos al azar. Ataca casi sin pensar, como un Pokémon salvaje.',
+    team: 'Los dados sortean sus 6 entre todos los Pokémon evolucionados de la 1.ª a la 9.ª generación, con movimientos al azar. Ataca casi sin pensar, como un Pokémon salvaje.',
     random: 'Sus 6 también salen de los dados, solo entre Pokémon evolucionados. Ataca casi sin pensar, como un Pokémon salvaje.',
   },
   mid: {

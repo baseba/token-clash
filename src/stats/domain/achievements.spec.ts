@@ -39,7 +39,7 @@ test('a leader with a signature Pokémon can also be unlocked with it and half t
   assert.equal(brock.ways.length, 2);
   assert.ok(isUnlocked(record({ roster: [entry(208), entry(76), entry(141)] }), 'brock'), 'Steelix (Onix fully evolved) and half the rock types');
   assert.ok(!isUnlocked(record({ roster: [entry(95), entry(76)] }), 'brock'), 'an Onix is not fully evolved, and 2 rock types are not 3');
-  assert.equal(UNLOCKS.get('viola')!.ways.length, 1, 'Vivillon is not in the game yet, so no second way');
+  assert.equal(UNLOCKS.get('viola')!.ways.length, 2, 'Vivillon is in the game, so Viola has her second way too');
 });
 
 test('gym leaders of a type unlock with 3, 6, 10 and 15 species of it (the last with a shiny of the type)', () => {
@@ -232,3 +232,4 @@ test('an original never asks for the same Pokémon one of its recolors is named 
     }
   }
 });
+

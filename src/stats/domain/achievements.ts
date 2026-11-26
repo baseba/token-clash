@@ -1,4 +1,5 @@
 import { finalForms, lineage, speciesData, speciesIdByName } from '../../catalog/domain/creatures.js';
+import { GENERATIONS } from '../../catalog/domain/pokedex.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { EARNED_VARIANTS, ELITE_FOUR, GYM_LEADERS, isShopTrainer, originalTier, SHINY_VARIANTS, TRAINER_SPRITES, TRAINER_VARIANTS, VARIANT_COLOR_NAMES, VARIANT_COLOR_TYPES, VILLAINS } from '../../catalog/domain/trainer-sprites.js';
 import { CLASS_TRAINERS, SIGNATURE, SPECIES_NEED, STARTER_IDS, STARTER_NEED, TYPE_NEED, type ClassTrainer, type TrainerRarity } from '../../catalog/domain/trainer-goals.js';
@@ -10,9 +11,9 @@ import type { TournamentState } from '../../arena/domain/tournament.js';
 import { AI_LEVELS, type AiLevel } from '../../combat/domain/ai.js';
 import { SHOP_TRAINER_NOT_BOUGHT } from '../../trainers/domain/trainer.js';
 
-const REGIONS = { kanto: [1, 151], johto: [152, 251], hoenn: [252, 386], sinnoh: [387, 493], unova: [494, 649] } as const;
-type Region = keyof typeof REGIONS;
-const DEX_SIZE = 649;
+const REGION_ORDER = ['kanto', 'johto', 'hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea'] as const;
+type Region = (typeof REGION_ORDER)[number];
+const REGIONS = Object.fromEntries(REGION_ORDER.map((region, i) => [region, GENERATIONS[i]])) as Record<Region, [number, number]>;
 const RED_DEX = 250;
 const GYM_STEPS = [3, 6, 10, 15];
 const ELITE_SPECIES = 12;
@@ -88,7 +89,7 @@ export function recordOf({ trainer, team, challenges, tournaments, rankedFirst }
       speciesByType[type] = (speciesByType[type] ?? 0) + 1;
       if (entries.some((entry) => entry.shiny)) shinyByType[type] = (shinyByType[type] ?? 0) + 1;
     }
-  const registered = new Set(trainer.roster.flatMap((entry) => lineage(entry.finalID)).filter((id) => id <= DEX_SIZE));
+  const registered = new Set(trainer.roster.flatMap((entry) => lineage(entry.finalID)));
   const dexByRegion = Object.fromEntries(Object.keys(REGIONS).map((region) => [region, [...registered].filter((id) => inRegion(id, region as Region)).length])) as Record<Region, number>;
   const shinySpecies = [...species].filter(([, entries]) => entries.some((entry) => entry.shiny)).map(([id]) => id);
   const legendary = [...species.values()].filter((entries) => entries.some((entry) => entry.rarity === 'legendary')).map((entries) => entries[0].finalID);
@@ -165,9 +166,9 @@ const crowns = (need: number): GoalRule => (r) => goal('Torneos ganados', r.tour
 const beatAi = (level: AiLevel, label: string): GoalRule => (r) => goal(`Ganarle a la IA en ${label} o más difícil`, r.aiWinsAtLeast[level], 1);
 const shinies = (need: number): GoalRule => (r) => goal('Pokémon shiny en tu colección', r.shinies, need);
 const tokens = (need: number, label: string): GoalRule => (r) => goal(`Tokens en PokeTokenBar (${label})`, r.tokens, need);
-const available = (id: number | null): id is number => id !== null && id <= DEX_SIZE;
+const available = (id: number | null): id is number => id !== null;
 const nameOf = (id: number) => speciesData(id)?.name ?? `#${id}`;
-const finalsOf = (ids: readonly number[]) => [...new Set(ids.filter(available).flatMap((id) => finalForms(id, DEX_SIZE)))];
+const finalsOf = (ids: readonly number[]) => [...new Set(ids.filter(available).flatMap((id) => finalForms(id)))];
 const listNames = (ids: readonly number[]) => ids.map(nameOf).join(ids.length > 2 ? ', ' : ' o ').replace(/, ([^,]+)$/, ' o $1');
 const ownsAnyOf = (ids: readonly number[]): GoalRule => {
   const finals = finalsOf(ids);
@@ -197,7 +198,7 @@ function classRule({ rarity, goal: aim }: ClassTrainer): GoalRule {
       return (r) => ({ ...goal(text, ids.filter((id) => r.species.includes(id)).length, need), ...(ids.length > 1 ? { hint } : {}) });
     }
     case 'starter': {
-      const ranges = (aim.region ? [STARTER_IDS[aim.region]] : Object.values(STARTER_IDS)).filter(([from]) => from <= DEX_SIZE);
+      const ranges = aim.region ? [STARTER_IDS[aim.region]] : Object.values(STARTER_IDS);
       const ids = finalsOf(ranges.flatMap(([from]) => [from, from + 3, from + 6]));
       const label = aim.region ? `Iniciales de ${REGION_NAMES[aim.region]} evolucionados en tu colección` : 'Iniciales evolucionados en tu colección';
       const hint = `Cuentan: ${ids.map(nameOf).join(', ')}`;

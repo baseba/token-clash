@@ -12,7 +12,7 @@ const fullyEvolved = (id) => {
   return d.chainLen == null || d.stage == null || d.stage >= d.chainLen - 1;
 };
 
-test('every difficulty builds six distinct Pokémon from generations 1 to 5 with moves that work', () => {
+test('every difficulty builds six distinct Pokémon from generations 1 to 9 with moves that work', () => {
   for (const difficulty of AI_LEVELS) {
     for (let seed = 0; seed < 5; seed++) {
       const team = buildAiTeam({ difficulty, random: rng(`${difficulty}:${seed}`) });
@@ -77,10 +77,16 @@ test('the hard AIs still bring strong Pokémon, but not always the same ones', (
   for (const t of teams) for (const id of t.split(',')) assert.ok(pool.has(Number(id)));
 });
 
-test('the random party of the AI comes from fully evolved Pokémon of generations 1 to 5 too', () => {
+test('the random party of the AI comes from fully evolved Pokémon of generations 1 to 9 too', () => {
   const party = buildAiRandomParty({ random: rng(3) });
   assert.equal(party.length, 6);
   assert.ok(party.every((e) => e.finalID <= LAST_AI_SPECIES && e.level === 100 && fullyEvolved(e.finalID)));
+});
+
+test('the AI draws from every generation, up to the ninth', () => {
+  const pool = aiPool();
+  assert.equal(LAST_AI_SPECIES, 1025);
+  for (const id of [658, 724, 887, 959]) assert.ok(pool.includes(id), `#${id}`);
 });
 
 test('the AI always takes three distinct Pokémon to the battle', () => {

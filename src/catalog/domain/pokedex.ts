@@ -2,15 +2,19 @@ import { lineage, family, speciesData } from './creatures.js';
 import { abilityInfo } from './abilities.js';
 import type { RosterEntry } from './roster-entry.js';
 
-export const DEX_LIMIT = 649;
-
 export const GENERATIONS: [number, number][] = [
   [1, 151],
   [152, 251],
   [252, 386],
   [387, 493],
   [494, 649],
+  [650, 721],
+  [722, 809],
+  [810, 905],
+  [906, 1025],
 ];
+
+export const DEX_LIMIT = GENERATIONS[GENERATIONS.length - 1][1];
 
 export interface PokedexEntry {
   id: number;
@@ -42,7 +46,7 @@ export function pokedexOf(roster: RosterEntry[]): Pokedex {
   for (const entry of roster) {
     lineage(entry.finalID).forEach((id, depth) => {
       const species = speciesData(id);
-      if (!species || id > DEX_LIMIT) return;
+      if (!species) return;
       if (!rows.has(id)) {
         rows.set(id, {
           id,
@@ -75,6 +79,6 @@ export function pokedexOf(roster: RosterEntry[]): Pokedex {
   }
   const entries = [...rows.values()]
     .sort((a, b) => a.id - b.id)
-    .map((row) => ({ ...row, levels: row.levels.sort((a, b) => b - a), family: family(row.id).filter(({ id }) => id <= DEX_LIMIT).map(({ id, stage }) => ({ id, stage, name: rows.has(id) ? rows.get(id)!.name : null })) }));
+    .map((row) => ({ ...row, levels: row.levels.sort((a, b) => b - a), family: family(row.id).map(({ id, stage }) => ({ id, stage, name: rows.has(id) ? rows.get(id)!.name : null })) }));
   return { total: DEX_LIMIT, generations: GENERATIONS, registered: entries.length, shinies: entries.filter((e) => e.shiny).length, entries };
 }

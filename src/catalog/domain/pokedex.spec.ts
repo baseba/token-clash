@@ -14,15 +14,16 @@ test('owning a Raichu registers its whole line, and a shiny one makes the line s
   assert.deepEqual(raichu.abilities.map((a) => a.hidden), [false, true]);
   assert.equal(dex.registered, 4);
   assert.equal(dex.shinies, 3);
-  assert.equal(dex.total, 649);
-  assert.equal(dex.generations.length, 5);
+  assert.equal(dex.total, 1025);
+  assert.equal(dex.generations.length, 9);
 });
 
-test('species after the fifth generation stay out of the Pokédex', () => {
-  const dex = pokedexOf(<any[]>[{ finalID: 700, level: 30 }, { finalID: 25, level: 30 }]);
-  assert.deepEqual(dex.entries.map((e) => e.id), [25, 133, 172]);
+test('species of every generation enter the Pokédex, and the family shows their later evolutions', () => {
+  const dex = pokedexOf(<any[]>[{ finalID: 700, level: 30 }, { finalID: 25, level: 30 }, { finalID: 959, level: 50 }]);
+  assert.deepEqual(dex.entries.map((e) => e.id), [25, 133, 172, 700, 957, 958, 959]);
+  assert.deepEqual(dex.generations.at(-1), [906, 1025]);
   const eevee = pokedexOf(<any[]>[{ finalID: 133, level: 10 }]).entries[0];
-  assert.ok(eevee.family.every((f) => f.id <= 649));
+  assert.ok(eevee.family.some((f) => f.id === 700), 'Sylveon is part of the Eevee family');
 });
 
 test('the family shows the whole tree but only names what you registered', () => {
