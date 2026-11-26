@@ -1,7 +1,7 @@
-import { abilityInfo } from '../../catalog/domain/abilities.js';
-import { ABILITIES, type AbilityEffect } from './rules/ability-effects.js';
-import { ITEMS } from './rules/item-effects.js';
-import type { AbilityDetails, BattleFighter, BattleState } from './battle-types.js';
+import { abilityInfo } from '../../../catalog/domain/abilities.js';
+import { ABILITIES, type AbilityEffect } from '../rules/ability-effects.js';
+import { ITEMS } from '../rules/item-effects.js';
+import type { AbilityDetails, BattleFighter, BattleState } from '../battle-types.js';
 import { activeFighters, emit, foeOf, nameOf, sideIndexOf } from './state.js';
 
 export function abilityKey(battle: BattleState, fighter: BattleFighter): string | null {
