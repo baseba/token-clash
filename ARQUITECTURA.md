@@ -61,6 +61,8 @@ src/trainers/
     trainer.repository.ts el PUERTO: qué necesita el dominio del almacenamiento, en sus palabras
   application/      Casos de uso: orquestan el dominio y los repositorios.
     trainers.service.ts   importar un save, cambiar el equipo, registrar un resultado…
+    accounts.service.ts   la cuenta: registrarse, entrar, salir, la contraseña y las sesiones
+    shop.service.ts       comprar, equipar, reciclar y cambiar el look
   infrastructure/   ADAPTADORES: cómo se cumple el puerto con tecnología concreta.
     trainer.schema.ts     las tablas en Drizzle
     trainer.mapper.ts     agregado ⇄ filas
@@ -82,8 +84,8 @@ El puerto es una clase abstracta (`TrainerRepository`) que además sirve de toke
 En `trainers.module.ts`, el repositorio no está entre los `exports`:
 
 ```ts
-providers: [TrainersService, { provide: TrainerRepository, useClass: DrizzleTrainerRepository }],
-exports: [TrainersService],
+providers: [TrainersService, AccountsService, ShopService, { provide: TrainerRepository, useClass: DrizzleTrainerRepository }],
+exports: [TrainersService, AccountsService, ShopService],
 ```
 
 `combat` y `catalog` son casi solo `domain/`: funciones puras con la aleatoriedad inyectada (`random = Math.random`),
@@ -138,7 +140,7 @@ pelea, un equipo que no repite especie), y para mostrar la regla de dependencia,
 6. **Los modelos de lectura no guardan nada.** `stats` arma la página con consultas de solo lectura
    (`TrainersService.all()`, `ArenaQueries`). En un sistema grande tendría su propia proyección alimentada por
    eventos; acá sería exagerado. Los logros desbloquean entrenadores y artículos de la tienda, pero comprar,
-   equipar y cambiar el look se lo pide a `TrainersService` (regla 2).
+   equipar y cambiar el look se lo pide a `ShopService` (regla 2).
 
 ## 4. Recorrido de una petición
 
