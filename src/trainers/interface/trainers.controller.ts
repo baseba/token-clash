@@ -6,14 +6,13 @@ import { RateLimit } from '../../platform/http/rate-limit.guard.js';
 import { AccountsService } from '../application/accounts.service.js';
 import { ShopService } from '../application/shop.service.js';
 import { TrainersService } from '../application/trainers.service.js';
-import { byRanking } from '../domain/ranking.js';
 import type { Trainer } from '../domain/trainer.js';
 import { LogInDto, SetPasswordDto } from './dto/credentials.dto.js';
 import { ImportSaveDto } from './dto/import-save.dto.js';
 import { UpdateMonDto } from './dto/update-mon.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { Authenticated, CurrentSessionToken, CurrentTrainer, MaybeAuthenticated } from './session.guard.js';
-import { monDetail, myView, recyclingView, trainerSummary } from './trainer.presenter.js';
+import { monDetail, myView, recyclingView } from './trainer.presenter.js';
 import { RecycleDto } from './dto/recycle.dto.js';
 import { SyncSaveDto } from './dto/sync-save.dto.js';
 
@@ -118,10 +117,5 @@ export class TrainersController {
   @Authenticated()
   pokedex(@CurrentTrainer() trainer: Trainer) {
     return { pokedex: pokedexOf(trainer.roster) };
-  }
-
-  @Get('leaderboard')
-  leaderboard() {
-    return { trainers: this.trainers.all().map(trainerSummary).sort(byRanking).slice(0, 50) };
   }
 }

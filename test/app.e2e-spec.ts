@@ -155,11 +155,15 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   const total = lb.data.trainers.reduce((n, t) => n + t.wins + t.losses, 0);
   assert.equal(total, 2);
   assert.equal(lb.data.trainers.find((t) => t.name.startsWith('Beto')).name, 'Beto <b>');
+  const [winnerId, loserId] = endA.state.winner === 0 ? [a.data.me.id, b.data.me.id] : [b.data.me.id, a.data.me.id];
+  const rated = [[winnerId, 1016], [loserId, 984]];
+  assert.deepEqual(lb.data.trainers.filter((t) => t.elo !== null).map((t) => [t.id, t.elo]), rated, 'the first duel moves both players 16 Elo points');
   assert.equal((await call(`/api/challenges/${id}/accept`, { method: 'POST', token: b.data.token })).status, 409);
 
   assert.equal((await fetch(`${base}/stats`)).status, 200);
   const stats = await call('/api/stats');
   assert.equal(stats.data.totals.battles, 1);
+  assert.deepEqual(stats.data.ranking.map((row) => [row.id, row.elo]), rated);
   assert.equal(stats.data.recent[0].id, id);
   assert.ok(stats.data.topMons.length >= 1);
   assert.equal(typeof stats.data.live.battles, 'number');
@@ -168,6 +172,7 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   const profile = (await call(`/api/stats/trainers/${a.data.me.id}`)).data.trainer;
   assert.equal(profile.name, 'Ana');
   assert.equal(profile.record.games, 1);
+  assert.equal(profile.record.elo, winnerId === a.data.me.id ? 1016 : 984);
   assert.equal(profile.recent[0].id, id);
   assert.equal(profile.recent[0].rival.name, 'Beto <b>');
   assert.equal(profile.using.ball.key, 'pb');

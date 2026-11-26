@@ -29,13 +29,15 @@ function source(): any {
   };
 }
 
-test('a profile shows the record, the ranking place, the collection size and battles against players only', () => {
+test('a profile shows the record, the ranking place and Elo, the collection size and battles against players only', () => {
   const profile = trainerProfile(source(), 'ana')!;
-  assert.deepEqual(profile.record, { wins: 2, losses: 1, games: 3, winRate: 2 / 3, rank: 1 });
+  assert.deepEqual(profile.record, { wins: 2, losses: 1, games: 3, winRate: 2 / 3, rank: 1, elo: 1012 });
+  assert.deepEqual(trainerProfile(source(), 'beto')!.record, { wins: 1, losses: 2, games: 3, winRate: 1 / 3, rank: 2, elo: 988 });
   assert.deepEqual(profile.collection, { pokemon: 3, species: 2, shinies: 1, tokens: 500 });
   assert.deepEqual(profile.vsAi, { wins: 1, losses: 0 });
   assert.deepEqual(profile.recent.map((battle) => [battle.id, battle.rival.name, battle.result]), [['c2', 'Beto', 'lost'], ['c3', 'Beto', 'won'], ['c1', 'Beto', 'won']]);
   assert.equal(trainerProfile(source(), 'zoe')!.record.rank, null, 'who never fought has no place');
+  assert.equal(trainerProfile(source(), 'zoe')!.record.elo, null, 'nor an Elo');
   assert.equal(trainerProfile(source(), 'nadie'), null);
 });
 

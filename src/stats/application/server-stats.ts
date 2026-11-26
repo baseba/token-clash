@@ -1,13 +1,15 @@
 import { humanCount, type TournamentState } from '../../arena/domain/tournament.js';
 import { isHumanDuel, type ChallengeState } from '../../arena/domain/challenge.js';
 import { TURN_LIMIT } from '../../combat/domain/battle.js';
-import { byRanking } from '../../trainers/domain/ranking.js';
-import type { TrainerState } from '../../trainers/domain/trainer.js';
+import type { Equipped, TrainerState } from '../../trainers/domain/trainer.js';
+import { eloRatings, type RatedDuel } from '../domain/elo.js';
+import { byRanking } from '../domain/ranking.js';
 
 const RECENT = 12;
 const TOP_MONS = 12;
 const ACTIVE_NOW_MS = 15 * 60_000;
 const ACTIVE_DAY_MS = 24 * 60 * 60_000;
+const LEADERBOARD_SIZE = 50;
 
 type TrainerLike = Pick<TrainerState, 'id' | 'name' | 'wins' | 'losses' | 'roster'> & Partial<Pick<TrainerState, 'totalTokens' | 'lastSeen'>>;
 
@@ -19,14 +21,24 @@ export interface StatsSource {
 
 const nameOf = (source: StatsSource, id: string | null | undefined, fallback?: string | null) => (id ? source.trainers[id]?.name : undefined) ?? fallback ?? '¿?';
 
-export function rankingOf(trainers: TrainerLike[]) {
+const ratedDuelOf = (challenge: ChallengeState): RatedDuel[] =>
+  isHumanDuel(challenge) && challenge.status === 'finished' && challenge.guestId
+    ? [{ id: challenge.id, players: [challenge.hostId, challenge.guestId], winnerId: challenge.winnerId ?? null, finishedAt: challenge.finishedAt ?? challenge.createdAt }]
+    : [];
+
+const eloOf = (challenges: readonly ChallengeState[]) => eloRatings(challenges.flatMap(ratedDuelOf));
+
+export function rankingOf(trainers: TrainerLike[], challenges: readonly ChallengeState[]) {
+  const ratings = eloOf(challenges);
   return trainers
-    .filter((t) => t.wins + t.losses > 0)
-    .map((trainer) => {
+    .flatMap((trainer) => {
+      const elo = ratings.get(trainer.id);
+      if (elo === undefined) return [];
       const games = trainer.wins + trainer.losses;
       return {
         id: trainer.id,
         name: trainer.name,
+        elo,
         wins: trainer.wins,
         losses: trainer.losses,
         games,
@@ -37,6 +49,27 @@ export function rankingOf(trainers: TrainerLike[]) {
       };
     })
     .sort(byRanking);
+}
+
+type LeaderboardTrainer = TrainerLike & Pick<TrainerState, 'totalTokens'> & { look: string; equipped?: Equipped; shinies: number };
+
+export function leaderboardOf(trainers: LeaderboardTrainer[], challenges: readonly ChallengeState[]) {
+  const ratings = eloOf(challenges);
+  return trainers
+    .map((trainer) => ({
+      id: trainer.id,
+      name: trainer.name,
+      avatar: trainer.look,
+      frame: trainer.equipped?.frame ?? null,
+      elo: ratings.get(trainer.id) ?? null,
+      wins: trainer.wins,
+      losses: trainer.losses,
+      rosterSize: trainer.roster.length,
+      shinies: trainer.shinies,
+      totalTokens: trainer.totalTokens,
+    }))
+    .sort(byRanking)
+    .slice(0, LEADERBOARD_SIZE);
 }
 
 export function playersOf<T extends TrainerLike>(trainers: T[]): T[][] {
@@ -105,7 +138,7 @@ export function serverStats(source: StatsSource, now = Date.now()) {
       activeNow: activeSince(players, now - ACTIVE_NOW_MS),
       activeToday: activeSince(players, now - ACTIVE_DAY_MS),
     },
-    ranking: rankingOf(trainers),
+    ranking: rankingOf(trainers, challenges),
     recent: pvp
       .sort((a, b) => (b.finishedAt ?? b.createdAt) - (a.finishedAt ?? a.createdAt))
       .slice(0, RECENT)

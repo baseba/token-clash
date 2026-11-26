@@ -20,11 +20,12 @@ export class AchievementsService implements OnApplicationBootstrap {
   ) {}
 
   private recordFor(trainer: Trainer): PlayerRecord {
-    const [leader] = rankingOf(this.trainers.all());
+    const challenges = this.arena.allChallenges();
+    const [leader] = rankingOf(this.trainers.all(), challenges);
     return recordOf({
       trainer,
       team: trainer.teamEntries(),
-      challenges: this.arena.allChallenges(),
+      challenges,
       tournaments: this.arena.allTournaments(),
       rankedFirst: leader?.id === trainer.id,
     });
