@@ -1,6 +1,6 @@
 import { ALL_MOVE_IDS, type BoostKey, type Boosts, effectiveness, type MajorStatus, speciesData, type Stats } from '../../catalog/domain/creatures.js';
 import { moveData, type MoveData } from './moves.js';
-import { MOVE_RULES } from './move-rules.js';
+import { MOVE_RULES, type MoveRuleApi } from './move-rules.js';
 import { ABILITIES, type AbilityEffect } from './ability-effects.js';
 import type { BattleEvent, BattleFighter, BattleMove, BattleSide, BattleState, Guard, Hazards, Volatiles } from './battle-types.js';
 import { runCalled } from './use-move.js';
@@ -20,9 +20,7 @@ export function moveApi(battle: BattleState): MoveRuleApi {
   return api;
 }
 
-export type MoveRuleApi = ReturnType<typeof makeMoveApi>;
-
-function makeMoveApi(battle: BattleState) {
+function makeMoveApi(battle: BattleState): MoveRuleApi {
   const sideOf = (fighter: BattleFighter) => sideIndexOf(battle, fighter);
   const stallFails = (fighter: BattleFighter): boolean => {
     const stalls = fighter.volatiles.stall ?? 0;
@@ -33,7 +31,7 @@ function makeMoveApi(battle: BattleState) {
     fighter.volatiles.stall = stalls + 1;
     return false;
   };
-  const api = {
+  const api: MoveRuleApi = {
     battle,
     random: () => battle.random(),
     turn: () => battle.turn,
