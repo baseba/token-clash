@@ -7,8 +7,10 @@ import type { Action, AnyMove, BattleEvent, BattleFighter, BattleSideInput, Batt
 import { resolveReplacements, resolveSwitchOut, resolveTurn } from './turn.js';
 import { failReason, lastResortReady, moveBlocked } from './use-move.js';
 import { entryOrder, prepareEntry, runEntry, settle } from './switching.js';
-import { activeOf, asleep, benchSlots, foeOf, freshBoosts, onField } from './effects.js';
-import { abilityKey, run } from './ability-engine.js';
+import { asleep } from './effects.js';
+import { activeOf, benchSlots, foeOf, freshBoosts, onField } from './state.js';
+import { run } from './ability-engine.js';
+import { abilityKey } from './abilities.js';
 
 export type * from './battle-types.js';
 export { STRUGGLE_MOVE } from './moves.js';
