@@ -1,6 +1,6 @@
 import { All, Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
-import { HttpError } from '../../shared/http/http-error.js';
-import { RateLimit } from '../../shared/http/rate-limit.guard.js';
+import { HttpError } from '../../platform/http/http-error.js';
+import { RateLimit } from '../../platform/http/rate-limit.guard.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { Authenticated, CurrentTrainer, MaybeAuthenticated } from '../../trainers/interface/session.guard.js';
 import { ArenaViews } from '../application/arena-views.js';

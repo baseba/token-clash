@@ -1,4 +1,4 @@
-import { compact } from '../../shared/infrastructure/database/compact.js';
+import { compact } from '../../platform/database/compact.js';
 import { Challenge, type BattleMode, type ChallengeStatus, type Visibility } from '../domain/challenge.js';
 import { Tournament, type Bracket, type TournamentStatus } from '../domain/tournament.js';
 import type { challenges, ChallengeRow, MatchRow, SeatRow, tournamentMatches, TournamentRow, tournaments, tournamentSeats } from './arena.schema.js';

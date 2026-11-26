@@ -59,8 +59,8 @@ test("nobody reaches into another context's adapters (infrastructure/) or reposi
   assert.deepEqual(show(bad), []);
 });
 
-test('only infrastructure/ folders (and the one-time legacy import) use Drizzle', () => {
-  const bad = imports.filter(({ file, target }) => usesDrizzle(target) && !file.split('/').includes('infrastructure') && !isWiring(file));
+test('only infrastructure/ folders, platform/database/ and the one-time legacy import use Drizzle', () => {
+  const bad = imports.filter(({ file, target }) => usesDrizzle(target) && !file.split('/').includes('infrastructure') && !file.startsWith('platform/database/') && !isWiring(file));
   assert.deepEqual(show(bad), []);
 });
 
@@ -71,6 +71,16 @@ test('catalog depends on no other context: it serves data, and combat decides wh
 
 test('shared/ depends on nothing else in src: the arrows point into it, never out', () => {
   const bad = imports.filter(({ file, target }) => file.startsWith('shared/') && target.endsWith('.ts') && !target.startsWith('shared/') && !target.startsWith('../'));
+  assert.deepEqual(show(bad), []);
+});
+
+test('platform/ depends on nothing but shared/: the arrows point into it, never out', () => {
+  const bad = imports.filter(({ file, target }) => file.startsWith('platform/') && target.endsWith('.ts') && !target.startsWith('platform/') && !target.startsWith('shared/') && !target.startsWith('../'));
+  assert.deepEqual(show(bad), []);
+});
+
+test('a domain/ folder never imports platform/: what a domain may share lives in shared/', () => {
+  const bad = imports.filter(({ file, target }) => layerOf(file) === 'domain' && target.startsWith('platform/'));
   assert.deepEqual(show(bad), []);
 });
 

@@ -18,8 +18,11 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 | `tower` | La Torre: subidas con tu colección, pisos y caminos, experiencia, evolución, premios y récords | tabla `tower_runs` |
 | `stats` | La página de stats y los logros | nada: lee de los otros dominios y le pide los cambios a `trainers` |
 
-Más tres piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
-(archivos estáticos, health checks y la vista previa de los links, que lee la arena con `ArenaQueries`) y `shared` (configuración, errores, HTTP, base de datos).
+Más cuatro piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
+(archivos estáticos, health checks y la vista previa de los links, que lee la arena con `ArenaQueries`), `shared` (lo
+que un `domain/` puede importar: los errores de dominio, el reloj y la raíz del proyecto) y `platform` (la plomería de
+Nest: configuración, HTTP y base de datos). Un `domain/` nunca importa `platform/`, y ninguna de las dos importa un
+dominio: las flechas solo entran.
 
 ```
            realtime (WS)   web          HTTP controllers de cada dominio
@@ -105,7 +108,7 @@ directamente: hay un solo Jev, y sus tests le pasan un `fetch` falso.
 
 La estructura que recomiendan Nest y la mayoría de las guías es *por feature*: una carpeta por tema con su
 `dto/`, `entities/`, controller, service y module, todo al mismo nivel. Acá el primer nivel es igual (una carpeta por
-dominio, cada una con su `*.module.ts`, más `shared/`), pero adentro hay capas. Las diferencias:
+dominio, cada una con su `*.module.ts`, más `shared/` y `platform/`), pero adentro hay capas. Las diferencias:
 
 | Guía por feature | Acá | Por qué |
 | --- | --- | --- |
@@ -119,9 +122,9 @@ pelea, un equipo que no repite especie), y para mostrar la regla de dependencia,
 
 ## 3. Reglas entre dominios
 
-1. **Cada dominio es dueño de sus tablas.** Nadie más las lee ni las escribe. Solo los `infrastructure/` usan
-   Drizzle, y nadie importa la `infrastructure/` ni el repositorio de otro dominio: lo revisa
-   `src/architecture.spec.ts`. Nest no lo impide, porque `DatabaseModule` es global y cualquier módulo podría
+1. **Cada dominio es dueño de sus tablas.** Nadie más las lee ni las escribe. Solo los `infrastructure/` (y
+   `platform/database/`, que abre la base) usan Drizzle, y nadie importa la `infrastructure/` ni el repositorio de
+   otro dominio: lo revisa `src/architecture.spec.ts`. Nest no lo impide, porque `DatabaseModule` es global y cualquier módulo podría
    inyectar la base; una consulta escrita a mano contra una tabla ajena tampoco la ve el test, queda a la revisión.
 2. **Si A necesita que cambie algo de B, se lo pide a B.** Al terminar una pelea, `arena` no hace
    `UPDATE trainers SET wins = wins + 1`: llama a `TrainersService.recordRankedResult()`. La regla de qué pelea
@@ -149,9 +152,9 @@ pelea, un equipo que no repite especie), y para mostrar la regla de dependencia,
 `POST /api/challenges/:id/accept` (entrar a la sala de otro):
 
 ```
-SecurityHeadersMiddleware, ApiProtectionMiddleware   cabeceras, origen y límite por IP   (shared/http)
+SecurityHeadersMiddleware, ApiProtectionMiddleware   cabeceras, origen y límite por IP   (platform/http)
 SessionGuard (@Authenticated)                        Bearer token → Trainer, o 401       (trainers/interface)
-StandardSchemaValidationPipe                         el body cumple su DTO, o 400        (shared/http, */interface/dto)
+StandardSchemaValidationPipe                         el body cumple su DTO, o 400        (platform/http, */interface/dto)
 ChallengesController.accept                          lee la URL, llama al caso de uso    (arena/interface)
 ChallengesService.accept                             orquesta                            (arena/application)
   joinBlocker(challenge, …)                          ¿se puede entrar? regla pura        (arena/domain/lobby.ts)
@@ -167,19 +170,19 @@ durante la confirmación, y `finish()` solo termina una pelea en curso. El diagr
 `challenge.ts`. `lobby.ts` agrega lo único que el agregado no sabe: si el anfitrión sigue conectado.
 
 Si una regla dice que no, el dominio lanza un `DomainError` con un *tipo* (`conflict`, `not-found`…), nunca un
-código HTTP. `DomainErrorFilter` (`shared/http`) traduce el tipo a 409, 404… y responde `{ "error": "…" }`. El
+código HTTP. `DomainErrorFilter` (`platform/http`) traduce el tipo a 409, 404… y responde `{ "error": "…" }`. El
 dominio no sabe que existe HTTP.
 
 **DTO o dominio.** Un DTO (un esquema de [Zod](https://zod.dev) en `interface/dto/`) revisa la *forma* de la
 petición: tipos, valores permitidos y defaults. `mode` es `team` o `random`, y si no viene es `team`. Si no cumple,
 responde 400 antes de llegar al controller. Lo que depende del estado sigue siendo del dominio: si ese Pokémon conoce
 ese movimiento, o si al torneo le queda lugar. Nest lo aplica solo con `@Body({ schema: NewChallengeDto })`, gracias
-al `StandardSchemaValidationPipe` que registra `HttpModule` (`shared/http/http.module.ts`), y el esquema da también el tipo:
+al `StandardSchemaValidationPipe` que registra `HttpModule` (`platform/http/http.module.ts`), y el esquema da también el tipo:
 `type NewChallengeDto = z.infer<typeof NewChallengeDto>`.
 
 Las otras dos entradas siguen la misma regla: se leen una vez, en el borde, y adentro se confía en los tipos. Los
 mensajes del socket tienen sus esquemas en `realtime/client-messages.ts`, y las variables de entorno en
-`shared/config/app-config.ts`, que detiene el servidor al arrancar si una no se puede leer.
+`platform/config/app-config.ts`, que detiene el servidor al arrancar si una no se puede leer.
 
 ## 5. Una pelea en vivo
 
@@ -227,7 +230,7 @@ cuándo habló cada uno por última vez, en `ArenaChatService`.
 ## 6. Persistencia
 
 - **Esquema por dominio:** `*/infrastructure/*.schema.ts`. `drizzle.config.ts` los junta y `npm run db:generate`
-  escribe la migración SQL en `drizzle/`. La app las aplica al arrancar (`shared/infrastructure/database`).
+  escribe la migración SQL en `drizzle/`. La app las aplica al arrancar (`platform/database`).
 - **Mappers:** el agregado nunca ve una fila ni la tabla un agregado (`trainer.mapper.ts`, `arena.mapper.ts`).
 - **Identity map:** los repositorios cargan todo al arrancar y entregan siempre el mismo objeto por id; cada
   `save()` escribe al tiro en SQLite, en una transacción. Las salas en vivo tienen timers que guardan referencias a
@@ -237,7 +240,7 @@ cuándo habló cada uno por última vez, en `ArenaChatService`.
 - **Migración desde JSON:** `src/legacy/legacy-json-import.ts` importa `data/db.json` una sola vez, en una
   transacción y con los mappers de cada dominio. `legacy-json-import.spec.ts` comprueba que leerlo de vuelta da
   exactamente los mismos datos. La corre `app.module.ts`, que se la pasa a `DatabaseModule.forRoot({ afterOpen })`:
-  así `shared` no conoce `legacy`, y la importación pasa recién abierta y migrada la base, antes de que Nest entregue
+  así `platform` no conoce `legacy`, y la importación pasa recién abierta y migrada la base, antes de que Nest entregue
   la base a algún repositorio (los repositorios cargan sus tablas al construirse). `test/legacy-import.e2e-spec.ts`
   levanta la app con un `db.json` y lo comprueba.
 - **Datos viejos, normalizados una vez:** las salas anteriores a los modos o a la visibilidad no tenían esos campos.

@@ -11,7 +11,7 @@ import type { LobbyService } from '../arena/application/lobby.service.js';
 import type { TeamPreviewService } from '../arena/application/team-preview.service.js';
 import type { TournamentsService } from '../arena/application/tournaments.service.js';
 import type { RadioService } from '../radio/application/radio.service.js';
-import { AppConfig } from '../shared/config/app-config.js';
+import { AppConfig } from '../platform/config/app-config.js';
 import { ConnectionLimits, MAX_SOCKETS_PER_IP } from './connection-limits.js';
 import { GameGateway } from './game.gateway.js';
 

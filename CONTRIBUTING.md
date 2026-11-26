@@ -92,7 +92,7 @@ el `git push -u` del paso 5.
   `scripts/import-pokeapi.mjs`, córrelo (Node 22+) y sube lo que genera.
 - Los cambios a `deploy/*.container`, `*.network`, `*.service`, `*.timer` y `deploy/deploy.sh` no se aplican solos:
   avisa en el PR para que se instalen a mano.
-- El dominio es puro: nada en `*/domain/` importa Nest, Drizzle ni `node:http`, y el motor
+- El dominio es puro: nada en `*/domain/` importa Nest, Drizzle, `node:http` ni `src/platform/`, y el motor
   (`src/combat/domain/`) recibe la aleatoriedad inyectada. Mantenlo así para que se pueda testear.
   `src/architecture.spec.ts` falla si no.
 - Cada dominio es dueño de sus tablas. Si otro dominio necesita algo, se lo pide a su servicio de aplicación

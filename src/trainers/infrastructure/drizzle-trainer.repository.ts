@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { eq } from 'drizzle-orm';
-import type { Database } from '../../shared/infrastructure/database/database.js';
+import type { Database } from '../../platform/database/database.js';
 import type { Trainer } from '../domain/trainer.js';
 import { TrainerRepository } from '../domain/trainer.repository.js';
 import { entryToRow, sessionsToRows, toDomain, toRow } from './trainer.mapper.js';

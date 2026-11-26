@@ -1,7 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { DrizzleModule } from '@nestjs/drizzle';
 import { join } from 'node:path';
-import { AppConfig } from '../../config/app-config.js';
+import { AppConfig } from '../config/app-config.js';
 import { DATABASE_FILE, openDatabase, type Database } from './database.js';
 
 @Module({})

@@ -1,5 +1,5 @@
 import type { Gender, Rarity, RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { compact } from '../../shared/infrastructure/database/compact.js';
+import { compact } from '../../platform/database/compact.js';
 import { Trainer } from '../domain/trainer.js';
 import type { rosterEntries, RosterEntryRow, TrainerRow, trainers, trainerSessions, TrainerSessionRow } from './trainer.schema.js';
 
