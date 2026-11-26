@@ -1,7 +1,7 @@
 import { ALL_MOVE_IDS, type BoostKey, type Boosts, effectiveness, type MajorStatus, speciesData, type Stats } from '../../catalog/domain/creatures.js';
 import { moveData, type MoveData } from './moves.js';
-import { MOVE_RULES, type MoveRuleApi } from './move-rules.js';
-import { ABILITIES, type AbilityEffect } from './ability-effects.js';
+import { MOVE_RULES, type MoveRuleApi } from './rules/move-rules.js';
+import { ABILITIES, type AbilityEffect } from './rules/ability-effects.js';
 import type { BattleEvent, BattleFighter, BattleMove, BattleSide, BattleState, Guard, Hazards, Volatiles } from './battle-types.js';
 import { runCalled } from './use-move.js';
 import { dragOut, faint } from './switching.js';

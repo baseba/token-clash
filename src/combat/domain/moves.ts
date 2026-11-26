@@ -1,5 +1,5 @@
 import { moveEntry } from '../../catalog/domain/creatures.js';
-import { FULL_FRIENDSHIP_POWER, IMPOSSIBLE_MOVES, MOVE_RULES } from './move-rules.js';
+import { FULL_FRIENDSHIP_POWER, IMPOSSIBLE_MOVES, MOVE_RULES } from './rules/move-rules.js';
 import { hiddenPowerType } from '../../../public/natures.js';
 import type { MoveData, MoveTarget } from './battle-types.js';
 

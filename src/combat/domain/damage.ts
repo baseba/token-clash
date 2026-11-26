@@ -1,5 +1,5 @@
 import { type BoostKey, type Boosts, effectiveness, type MajorStatus } from '../../catalog/domain/creatures.js';
-import { MOVE_RULES } from './move-rules.js';
+import { MOVE_RULES } from './rules/move-rules.js';
 import { isRain, isSun, poisoned, stageMult } from './conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState } from './battle-types.js';
 import { dragOut, faint } from './switching.js';

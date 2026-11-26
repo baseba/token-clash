@@ -270,7 +270,7 @@ en [Chequeo de estructura](README.md#chequeo-de-estructura-npm-run-deslop).
   eventos para casi todo. Si los torneos crecieran (temporadas, inscripciones), serían candidatos a su propio
   dominio.
 - **`combat` decide qué movimientos se pueden usar.** Un movimiento funciona en Token Clash (`supported`) si las
-  reglas generales del motor lo cubren o si tiene una regla propia en `combat/domain/move-rules.ts`. Por eso lo
+  reglas generales del motor lo cubren o si tiene una regla propia en `combat/domain/rules/move-rules.ts`. Por eso lo
   calcula `combat/domain/moves.ts`, que lee cada fila de `movedex.json` (`moveEntry()`, en el catálogo) como la
   necesita el motor. Quien necesita saberlo le pregunta a `combat`: los entrenadores al validar sus movimientos
   (`validMoveset`), la IA, y el navegador en la colección. El catálogo sirve datos y no importa nada de otro
