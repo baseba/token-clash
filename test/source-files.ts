@@ -36,7 +36,7 @@ export function importsOf({ file, code }: SourceFile): Import[] {
 }
 
 export function valueImportsOf({ file, code }: SourceFile): Import[] {
-  const staticImports = [...code.matchAll(/^\s*import\s+([^'"]*?)\s*from\s+'([^']+)'/gm)].filter((m) => !isTypeOnly(m[1].trim())).map((m) => m[2]);
+  const staticImports = [...code.matchAll(/^\s*(?:import|export)\s+([^'"]*?)\s*from\s+'([^']+)'/gm)].filter((m) => !isTypeOnly(m[1].trim())).map((m) => m[2]);
   const dynamicImports = [...code.matchAll(/\bimport\(\s*'([^']+)'\s*\)/g)].map((m) => m[1]);
   return [...staticImports, ...dynamicImports].map((target) => ({ file, target }));
 }

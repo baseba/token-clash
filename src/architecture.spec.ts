@@ -130,13 +130,14 @@ test('a foreign key points at a table of its own schema file: other contexts are
 test('only the Jev client leaves the server: nobody else fetches or opens a socket', () => {
   const networkModules = ['http', 'https', 'http2', 'net', 'tls', 'dns', 'dgram', 'undici', 'ws'];
   const jev = (file: string) => file.startsWith('combat/infrastructure/jev/');
-  const mayConnect = (file: string, module: string) => jev(file) || (module === 'ws' && file.startsWith('realtime/'));
+  const mayConnect = (file: string, module: string) => jev(file) || (isPackage(module, 'ws') && file.startsWith('realtime/'));
   const fetching = sources.filter(({ file, code }) => !jev(file) && /(?<![-\w'"])fetch\b(?![-'"])/.test(code)).map(({ file }) => `${file} uses fetch`);
+  const socketClients = sources.filter(({ file, code }) => !jev(file) && /\bnew\s+(?:globalThis\.)?WebSocket\s*\(/.test(code)).map(({ file }) => `${file} opens a WebSocket`);
   const connecting = valueImports.filter(({ file, target }) => {
     const module = target.replace(/^node:/, '');
-    return networkModules.includes(module) && !mayConnect(file, module);
+    return networkModules.some((name) => isPackage(module, name)) && !mayConnect(file, module);
   });
   assert.ok(valueImports.some((i) => i.file === 'combat/infrastructure/jev/jev-proxy.ts' && i.target === 'node:http'));
-  assert.ok(!valueImports.some((i) => i.file === 'platform/http/client-ip.ts'));
-  assert.deepEqual([...fetching, ...show(connecting)], []);
+  assert.ok(!valueImports.some((i) => i.file === 'platform/http/client-ip.ts' && i.target === 'node:http'));
+  assert.deepEqual([...fetching, ...socketClients, ...show(connecting)], []);
 });
