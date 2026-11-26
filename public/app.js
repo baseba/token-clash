@@ -1376,6 +1376,57 @@ function importCard({ onDone, compact: small = false } = {}) {
   );
 }
 
+const POKETOKENBAR_GEN9_GRADUATES = 'Primeape, Farfetch’d, Mr. Mime, Girafarig, Dunsparce, Qwilfish, Ursaring, Corsola, Stantler, Linoone, Basculin y Bisharp';
+
+const poketokenbarInstallCommand = (origin) => `curl -fsSL ${origin}/poketokenbar/install.sh | bash -s ${origin}`;
+
+function poketokenbarInstallRow() {
+  const command = poketokenbarInstallCommand(location.origin);
+  return h('div', { class: 'row' }, h('code', { class: 'install-command' }, command), h('button', { class: 'btn sm', type: 'button', onclick: () => copy(command, 'Copiado') }, 'Copiar'));
+}
+
+const xcodeToolsStep = () => h('li', null, 'Ten al día las herramientas de Apple. Si nunca has compilado en tu Mac, instálalas con ', h('code', null, 'xcode-select --install'), '; si ya las tienes, instala lo que aparezca de «Command Line Tools» en Ajustes del Sistema → General → Actualización de software. El instalador las revisa antes de partir y te dice si falta algo.');
+
+function poketokenbarGen9Card() {
+  return h(
+    'div',
+    { class: 'card' },
+    h('h2', null, 'PokeTokenBar hasta la 9.ª generación'),
+    h('p', null, 'El PokeTokenBar oficial solo cría hasta Teselia (#649). Token Clash trae un parche que suma Kalos, Alola, Galar y Paldea: sus Pokémon eclosionan, evolucionan y se ven animados como aquí. Tu save sigue siendo el mismo.'),
+    h(
+      'ol',
+      { class: 'steps' },
+      xcodeToolsStep(),
+      h('li', null, 'Si instalaste PokeTokenBar con Homebrew, corre ', h('code', null, 'brew uninstall --cask poke-token-bar'), '. Tu Pokédex no se borra, y así ', h('code', null, 'brew upgrade'), ' no te devuelve la oficial.'),
+      h('li', null, 'Pega esto en la Terminal. Baja PokeTokenBar 2.5.7, le aplica el parche, lo compila y lo deja en Aplicaciones en unos minutos:'),
+    ),
+    poketokenbarInstallRow(),
+    h('p', { class: 'muted small' }, `Tu Pokédex, tus objetos y tus ajustes se quedan donde están, y el save automático sigue subiendo el mismo archivo sin tocar nada. Los graduados que ahora tienen una evolución nueva (${POKETOKENBAR_GEN9_GRADUATES}) pasan a su forma final al abrir el save, con el mismo perfil y la misma rareza. Las ramas nuevas, como Kleavor o Sylveon, salen criándolas con esta versión: Token Clash usa la forma que trae tu save.`),
+  );
+}
+
+function freshStartCard() {
+  return h(
+    'div',
+    { class: 'card' },
+    h('h2', null, 'Parte de cero con PokeTokenBar'),
+    h('p', null, 'PokeTokenBar vive en la barra de menú de tu Mac: cada token que gastas en Claude Code, Codex y otras herramientas de IA incuba un huevo y hace crecer a su Pokémon. La versión de Token Clash cría las nueve generaciones, de Kanto a Paldea, animadas como aquí.'),
+    h(
+      'ol',
+      { class: 'steps' },
+      xcodeToolsStep(),
+      h('li', null, 'Pega esto en la Terminal. Baja PokeTokenBar 2.5.7, le aplica el parche de Token Clash, lo compila y lo deja en Aplicaciones en unos minutos:'),
+    ),
+    poketokenbarInstallRow(),
+    h(
+      'ol',
+      { class: 'steps', start: 3 },
+      h('li', null, 'Sigue trabajando como siempre: tu primer huevo eclosiona a los 5 M de tokens.'),
+      h('li', null, 'Cuando tengas tus primeros Pokémon, vuelve aquí y crea tu cuenta con el save.'),
+    ),
+  );
+}
+
 const isPhone = () => matchMedia('(max-width: 640px)').matches;
 const phoneSaveNote = () => h('div', { class: 'phone-save-note' }, glyph('laptop'), h('p', null, h('b', null, 'El save se sube desde el computador. '), 'PokeTokenBar guarda tu save en el Mac: abre Token Clash ahí para subirlo o actualizarlo. Desde el celular puedes entrar con tu nombre y contraseña y jugar con el save que ya subiste.'));
 
@@ -2259,6 +2310,15 @@ function feedbackButton() {
   return h('section', { class: 'feedback' }, btn, dialog);
 }
 
+function freshStartToggle() {
+  const card = h('div', { class: 'fresh-start', hidden: true }, freshStartCard());
+  const button = h('button', { class: 'btn ghost', type: 'button', 'aria-expanded': 'false', onclick: () => {
+    card.hidden = !card.hidden;
+    button.setAttribute('aria-expanded', String(!card.hidden));
+  } }, glyph('sparkle'), ' ¿Aún no tienes PokeTokenBar? Parte de cero');
+  return h('div', null, button, card);
+}
+
 function renderLanding() {
   document.body.classList.add('signed-out');
   $app.replaceChildren(
@@ -2272,6 +2332,7 @@ function renderLanding() {
         h('h1', null, 'Tus tokens criaron Pokémon. Ahora a pelear.'),
         h('p', { class: 'lead' }, 'Sube el save de PokeTokenBar, arma tu equipo y desafía a otro jugador con un link, o pelea contra la IA. Cada especie pelea con su tipo real, sus golpes y stats según el nivel que le diste a punta de tokens.'),
         h('div', { class: 'hero-mons' }, [0, 1, 2].map((i) => h('div', { html: creatureHTML(demoMon(i)) }))),
+        freshStartToggle(),
       ),
       accessCard({ onDone: route }),
     ),
@@ -4490,9 +4551,15 @@ async function teamPage(seq) {
     reimport.hidden = !reimport.hidden;
     reimportBtn.setAttribute('aria-expanded', String(!reimport.hidden));
   } });
+  const gen9 = h('div', { class: 'reimport', hidden: true }, poketokenbarGen9Card());
+  const gen9Btn = toolButton({ icon: glyph('sparkle'), label: 'PokeTokenBar 6.ª a 9.ª', note: 'Cría Kalos a Paldea', 'aria-expanded': 'false', onclick: () => {
+    gen9.hidden = !gen9.hidden;
+    gen9Btn.setAttribute('aria-expanded', String(!gen9.hidden));
+  } });
   $app.replaceChildren(
-    h('div', { class: 'coll-page-head' }, h('div', null, h('h1', null, 'Colección'), h('div', { class: 'row' }, h('span', { class: 'chip' }, glyph('ball'), ` ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, glyph('sparkle'), ` ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, glyph('coin'), ` ${compact(me.totalTokens)} tokens`))), h('div', { class: 'tools' }, reimportBtn)),
+    h('div', { class: 'coll-page-head' }, h('div', null, h('h1', null, 'Colección'), h('div', { class: 'row' }, h('span', { class: 'chip' }, glyph('ball'), ` ${me.rosterSize} Pokémon`), h('span', { class: 'chip' }, glyph('sparkle'), ` ${me.shinies} shiny`), h('span', { class: 'chip', tabindex: 0, 'data-tip': 'Tokens totales según PokeTokenBar' }, glyph('coin'), ` ${compact(me.totalTokens)} tokens`))), h('div', { class: 'tools' }, gen9Btn, reimportBtn)),
     reimport,
+    gen9,
     h('div', { class: 'team-head' }, h('h2', null, 'Tu equipo ', countEl)),
     h('section', { class: 'party-board' }, partyEl, h('p', { class: 'hint' }, `Arrastra para ordenar · el líder abre la pelea · antes de cada combate eliges ${BATTLE_SIZE} de estos ${PARTY_SIZE}`)),
     sheet,
