@@ -231,8 +231,10 @@ export class Tournament implements TournamentState {
     this.status = 'cancelled';
   }
 
-  abandon(): void {
+  recoverAfterRestart(): boolean {
+    if (this.status !== 'running') return false;
     this.status = 'abandoned';
+    return true;
   }
 
   startIfReady({ at, firstMatchAt, random = Math.random }: { at: number; firstMatchAt: number; random?: () => number }): boolean {
