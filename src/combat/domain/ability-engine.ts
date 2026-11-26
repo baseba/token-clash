@@ -7,41 +7,41 @@ import { emit, foeOf, hasBench, lookOf, nameOf, sideIndexOf } from './state.js';
 import { abilityDef, abilityKey, anyActiveHas, itemDef, setAbility, showAbility } from './abilities.js';
 
 export function run<H extends AbilityHook>(battle: BattleState, fighter: BattleFighter, hook: H, ...args: HookArgs<H>): ReturnType<Hook<H>> | undefined {
-  return engine(battle).triggers.run(fighter, hook, ...args);
+  return wiring(battle).triggers.run(fighter, hook, ...args);
 }
 
-function call<H extends AbilityHook>(api: AbilityEngine, def: Partial<AbilityEffect> | null, fighter: BattleFighter, hook: H, args: HookArgs<H>): ReturnType<Hook<H>> | undefined {
+function call<H extends AbilityHook>(engine: AbilityEngine, def: Partial<AbilityEffect> | null, fighter: BattleFighter, hook: H, args: HookArgs<H>): ReturnType<Hook<H>> | undefined {
   type AnyHook = (engine: AbilityEngine, me: BattleFighter, ...args: unknown[]) => unknown;
-  return (def?.[hook] as AnyHook | undefined)?.(api, fighter, ...args) as ReturnType<Hook<H>> | undefined;
+  return (def?.[hook] as AnyHook | undefined)?.(engine, fighter, ...args) as ReturnType<Hook<H>> | undefined;
 }
 
 export function mul<H extends MultiplierHook>(battle: BattleState, fighter: BattleFighter, hook: H, ...args: HookArgs<H>): number {
-  const { api } = engine(battle);
-  return (call(api, abilityDef(battle, fighter), fighter, hook, args) ?? 1) * (call(api, itemDef(fighter), fighter, hook, args) ?? 1);
+  const { engine } = wiring(battle);
+  return (call(engine, abilityDef(battle, fighter), fighter, hook, args) ?? 1) * (call(engine, itemDef(fighter), fighter, hook, args) ?? 1);
 }
 
 export function chain<H extends ChainHook>(battle: BattleState, fighter: BattleFighter, hook: H, value: number, ...args: ChainArgs<H>): number {
-  return engine(battle).triggers.chain(fighter, hook, value, ...args);
+  return wiring(battle).triggers.chain(fighter, hook, value, ...args);
 }
 
 export const boost = (battle: BattleState, fighter: BattleFighter, changes: Boosts, source?: BattleFighter | null, opts?: BoostOptions): Boosts =>
-  boostWithTriggers(engine(battle).triggers, battle, fighter, changes, source, opts);
+  boostWithTriggers(wiring(battle).triggers, battle, fighter, changes, source, opts);
 export const setStatus = (battle: BattleState, fighter: BattleFighter, status: MajorStatus, source?: BattleFighter | null, opts?: { ability?: BattleFighter }): boolean =>
-  setStatusWithTriggers(engine(battle).triggers, battle, fighter, status, source, opts);
+  setStatusWithTriggers(wiring(battle).triggers, battle, fighter, status, source, opts);
 export const addVolatile = (
   battle: BattleState,
   fighter: BattleFighter,
   kind: string,
   source?: BattleFighter | null,
   opts?: { ability?: BattleFighter; move?: { key: string; name: string } },
-): boolean => addVolatileWithTriggers(engine(battle).triggers, battle, fighter, kind, source, opts);
+): boolean => addVolatileWithTriggers(wiring(battle).triggers, battle, fighter, kind, source, opts);
 export const setWeather = (battle: BattleState, weather: Weather, source: BattleFighter | null): boolean =>
-  setWeatherWithTriggers(engine(battle).triggers, battle, weather, source);
-export const clearWeather = (battle: BattleState): void => clearWeatherWithTriggers(engine(battle).triggers, battle);
+  setWeatherWithTriggers(wiring(battle).triggers, battle, weather, source);
+export const clearWeather = (battle: BattleState): void => clearWeatherWithTriggers(wiring(battle).triggers, battle);
 export const setTerrain = (battle: BattleState, terrain: string, source: BattleFighter | null): boolean =>
-  setTerrainWithTriggers(engine(battle).triggers, battle, terrain, source);
-export const clearTerrain = (battle: BattleState): void => clearTerrainWithTriggers(engine(battle).triggers, battle);
-export const speedOf = (battle: BattleState, fighter: BattleFighter): number => speedOfWithTriggers(engine(battle).triggers, battle, fighter);
+  setTerrainWithTriggers(wiring(battle).triggers, battle, terrain, source);
+export const clearTerrain = (battle: BattleState): void => clearTerrainWithTriggers(wiring(battle).triggers, battle);
+export const speedOf = (battle: BattleState, fighter: BattleFighter): number => speedOfWithTriggers(wiring(battle).triggers, battle, fighter);
 
 function showItem(battle: BattleState, fighter: BattleFighter, usedUp = false): void {
   if (!fighter.item) return;
@@ -49,33 +49,33 @@ function showItem(battle: BattleState, fighter: BattleFighter, usedUp = false): 
   if (usedUp) fighter.item = null;
 }
 
-interface BattleEngine {
-  api: AbilityEngine;
+interface AbilityWiring {
+  engine: AbilityEngine;
   triggers: AbilityTriggers;
 }
 
-const engines = new WeakMap<BattleState, BattleEngine>();
-function engine(battle: BattleState): BattleEngine {
-  let engine = engines.get(battle);
-  if (engine) return engine;
-  engine = makeEngine(battle);
-  engines.set(battle, engine);
-  return engine;
+const wirings = new WeakMap<BattleState, AbilityWiring>();
+function wiring(battle: BattleState): AbilityWiring {
+  let wiring = wirings.get(battle);
+  if (wiring) return wiring;
+  wiring = makeWiring(battle);
+  wirings.set(battle, wiring);
+  return wiring;
 }
 
-function makeEngine(battle: BattleState): BattleEngine {
+function makeWiring(battle: BattleState): AbilityWiring {
   const triggers: AbilityTriggers = {
     run(fighter, hook, ...args) {
-      const own = call(api, abilityDef(battle, fighter), fighter, hook, args);
-      const held = call(api, itemDef(fighter), fighter, hook, args);
+      const own = call(engine, abilityDef(battle, fighter), fighter, hook, args);
+      const held = call(engine, itemDef(fighter), fighter, hook, args);
       return own ?? held;
     },
     chain(fighter, hook, value, ...args) {
-      const byAbility = call(api, abilityDef(battle, fighter), fighter, hook, [...args, value] as HookArgs<typeof hook>) ?? value;
-      return call(api, itemDef(fighter), fighter, hook, [...args, byAbility] as HookArgs<typeof hook>) ?? byAbility;
+      const byAbility = call(engine, abilityDef(battle, fighter), fighter, hook, [...args, value] as HookArgs<typeof hook>) ?? value;
+      return call(engine, itemDef(fighter), fighter, hook, [...args, byAbility] as HookArgs<typeof hook>) ?? byAbility;
     },
   };
-  const api: AbilityEngine = {
+  const engine: AbilityEngine = {
     battle,
     rand: () => battle.random(),
     foe: (fighter: BattleFighter) => foeOf(battle, fighter),
@@ -118,5 +118,5 @@ function makeEngine(battle: BattleState): BattleEngine {
     showItem: (fighter: BattleFighter) => showItem(battle, fighter),
     useUpItem: (fighter: BattleFighter) => showItem(battle, fighter, true),
   };
-  return { api, triggers };
+  return { engine, triggers };
 }
