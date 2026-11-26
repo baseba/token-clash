@@ -6,7 +6,6 @@ import { invalid } from '../../shared/domain/errors.js';
 
 const RARITIES = new Set(['common', 'uncommon', 'rare', 'legendary']);
 const UUID = /^[0-9a-fA-F-]{8,40}$/;
-const MAX_ROSTER = 300;
 const MAX_DUPLICATES = 1000;
 const ABILITY_KEY = /^[a-z0-9-]{1,40}$/;
 const GENDERS = new Set(['male', 'female']);
@@ -176,7 +175,7 @@ export function parseSave(text: string): ParsedSave {
     }
   }
 
-  const roster = firstOfEachSpecies(candidates).slice(0, MAX_ROSTER);
+  const roster = firstOfEachSpecies(candidates);
   const kept = new Set(roster.map((entry) => entry.id));
   const duplicates = candidates
     .filter(({ entry }) => !kept.has(entry.id) && !entry.active && roster.some((first) => variantKey(first) === variantKey(entry)))

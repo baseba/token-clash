@@ -27,6 +27,13 @@ test('reads an export: finished + active, skips released', () => {
   assert.ok(old.ivs.hp >= 8 && old.ivs.hp <= 23);
 });
 
+test('keeps every species of a full dex, normal and shiny, with no cap', () => {
+  const dex = Array.from({ length: 1025 }, (_, i) => [false, true].map((isShiny) => ({ id: `mon-${i + 1}-${isShiny}`, baseID: i + 1, finalID: i + 1, isShiny, caughtAt: '2026-11-01T00:00:00Z' }))).flat();
+  const { roster } = parseSave(JSON.stringify({ format: 'poketokenbar.save', schema: 2, state: { dex } }));
+  assert.equal(roster.length, 2050);
+  assert.ok(roster.some((entry) => entry.finalID === 1025 && entry.shiny), 'the highest dex numbers are not cut first');
+});
+
 test('reads the raw live state file too', () => {
   const raw = JSON.stringify(JSON.parse(text).state);
   assert.equal(parseSave(raw).roster.length, 4);
