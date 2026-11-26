@@ -1,0 +1,1037 @@
+From 814bb445ed5a471c5e59895e9dfe231ee773d28f Mon Sep 17 00:00:00 2001
+From: Token Clash <token-clash@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 12:00:00 +0000
+Subject: [PATCH 1/4] feat(dex): open the National Dex to #1025, Kalos to
+ Paldea
+
+Eggs hatch from every base species up to #1025 and evolution trees are no longer cut at #649. The base index is cached under a name tied to the cap, so an index cached by the official build is not reused. The egg pool was measured again (540 bases): a rare egg still beats repeated uncommon eggs.
+---
+ Sources/PokeTokenBar/Core/CompanionModel.swift |  2 +-
+ Sources/PokeTokenBar/Core/Localization.swift   |  4 ++++
+ Sources/PokeTokenBar/Core/PokeAPIClient.swift  |  2 +-
+ Sources/PokeTokenBar/Core/PokedexRegion.swift  |  8 ++++++--
+ .../PokeTokenBarTests/PokedexRegionTests.swift | 18 +++++++++++++++---
+ Tests/PokeTokenBarTests/PremiumEggTests.swift  | 10 +++++-----
+ 6 files changed, 32 insertions(+), 12 deletions(-)
+
+diff --git a/Sources/PokeTokenBar/Core/CompanionModel.swift b/Sources/PokeTokenBar/Core/CompanionModel.swift
+index 2f9a6f8..1e5fb07 100644
+--- a/Sources/PokeTokenBar/Core/CompanionModel.swift
++++ b/Sources/PokeTokenBar/Core/CompanionModel.swift
+@@ -322,7 +322,7 @@ struct CandyGrant: Equatable, Sendable {
+ /// 현재 서비스가 제공하는 움직이는 포켓몬 스프라이트 범위.
+ /// PokéAPI 의 Gen-V animated 에셋은 전국도감 #1...649까지만 존재한다.
+ enum PokemonAssets {
+-    static let animatedSpeciesIDs = 1...649
++    static let animatedSpeciesIDs = 1...1025
+ 
+     static func hasAnimatedSprite(speciesID: Int) -> Bool {
+         animatedSpeciesIDs.contains(speciesID)
+diff --git a/Sources/PokeTokenBar/Core/Localization.swift b/Sources/PokeTokenBar/Core/Localization.swift
+index 8e2cb11..bf3dc2d 100644
+--- a/Sources/PokeTokenBar/Core/Localization.swift
++++ b/Sources/PokeTokenBar/Core/Localization.swift
+@@ -1452,6 +1452,10 @@ struct L {
+         case .hoenn: return t("호연", "Hoenn", "ホウエン", "Hoenn", "Hoenn", "Hoenn", "Hoenn", "Хоэнн")
+         case .sinnoh: return t("신오", "Sinnoh", "シンオウ", "Sinnoh", "Sinnoh", "Sinnoh", "Sinnoh", "Синно")
+         case .unova: return t("하나", "Unova", "イッシュ", "Teselia", "Unys", "Unova", "Einall", "Юнова")
++        case .kalos: return t("칼로스", "Kalos", "カロス", "Kalos", "Kalos", "Kalos", "Kalos", "Калос")
++        case .alola: return t("알로라", "Alola", "アローラ", "Alola", "Alola", "Alola", "Alola", "Алола")
++        case .galar: return t("가라르", "Galar", "ガラル", "Galar", "Galar", "Galar", "Galar", "Галар")
++        case .paldea: return t("팔데아", "Paldea", "パルデア", "Paldea", "Paldea", "Paldea", "Paldea", "Пальдея")
+         }
+     }
+ 
+diff --git a/Sources/PokeTokenBar/Core/PokeAPIClient.swift b/Sources/PokeTokenBar/Core/PokeAPIClient.swift
+index 2b8814b..bc1dc57 100644
+--- a/Sources/PokeTokenBar/Core/PokeAPIClient.swift
++++ b/Sources/PokeTokenBar/Core/PokeAPIClient.swift
+@@ -127,7 +127,7 @@ actor PokeAPIClient: PokeProviding, PokemonDetailProviding {
+         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+             .appendingPathComponent("PokeTokenBar")
+         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+-        return dir.appendingPathComponent("base-index.json")
++        return dir.appendingPathComponent("base-index-\(PokemonAssets.animatedSpeciesIDs.upperBound).json")
+     }()
+     private struct BaseIndexSnapshot: Codable { let fetchedAt: Date; let entries: [BaseSpecies] }
+     private struct GraphQLBaseResponse: Decodable {
+diff --git a/Sources/PokeTokenBar/Core/PokedexRegion.swift b/Sources/PokeTokenBar/Core/PokedexRegion.swift
+index c7034ba..69e695f 100644
+--- a/Sources/PokeTokenBar/Core/PokedexRegion.swift
++++ b/Sources/PokeTokenBar/Core/PokedexRegion.swift
+@@ -6,7 +6,7 @@ import Foundation
+ /// Membership is derived purely from the National Dex number — Gen 1 = 1–151, Gen 2 = 152–251,
+ /// Gen 3 = 252–386, Gen 4 = 387–493, Gen 5 = 494–649 — so no PokéAPI call is needed to place a species.
+ enum PokedexRegion: String, CaseIterable, Codable, Sendable, Identifiable {
+-    case kanto, johto, hoenn, sinnoh, unova
++    case kanto, johto, hoenn, sinnoh, unova, kalos, alola, galar, paldea
+ 
+     var id: String { rawValue }
+ 
+@@ -18,6 +18,10 @@ enum PokedexRegion: String, CaseIterable, Codable, Sendable, Identifiable {
+         case .hoenn: return 252...386
+         case .sinnoh: return 387...493
+         case .unova: return 494...649
++        case .kalos: return 650...721
++        case .alola: return 722...809
++        case .galar: return 810...905
++        case .paldea: return 906...1025
+         }
+     }
+ 
+@@ -30,7 +34,7 @@ enum PokedexRegion: String, CaseIterable, Codable, Sendable, Identifiable {
+     }
+ 
+     /// The full Gen 1–5 National Dex.
+-    static let nationalRange = 1...649
++    static let nationalRange = 1...1025
+     static var nationalTotal: Int { nationalRange.count }
+ }
+ 
+diff --git a/Tests/PokeTokenBarTests/PokedexRegionTests.swift b/Tests/PokeTokenBarTests/PokedexRegionTests.swift
+index 87878be..01f90c2 100644
+--- a/Tests/PokeTokenBarTests/PokedexRegionTests.swift
++++ b/Tests/PokeTokenBarTests/PokedexRegionTests.swift
+@@ -17,12 +17,20 @@ final class PokedexRegionTests: XCTestCase {
+         XCTAssertEqual(PokedexRegion.region(forDexNumber: 493), .sinnoh)
+         XCTAssertEqual(PokedexRegion.region(forDexNumber: 494), .unova)
+         XCTAssertEqual(PokedexRegion.region(forDexNumber: 649), .unova)
++        XCTAssertEqual(PokedexRegion.region(forDexNumber: 650), .kalos)
++        XCTAssertEqual(PokedexRegion.region(forDexNumber: 721), .kalos)
++        XCTAssertEqual(PokedexRegion.region(forDexNumber: 722), .alola)
++        XCTAssertEqual(PokedexRegion.region(forDexNumber: 809), .alola)
++        XCTAssertEqual(PokedexRegion.region(forDexNumber: 810), .galar)
++        XCTAssertEqual(PokedexRegion.region(forDexNumber: 905), .galar)
++        XCTAssertEqual(PokedexRegion.region(forDexNumber: 906), .paldea)
++        XCTAssertEqual(PokedexRegion.region(forDexNumber: 1025), .paldea)
+     }
+ 
+-    func testRegionIsNilOutsideGen1Through5() {
++    func testRegionIsNilOutsideGen1Through9() {
+         XCTAssertNil(PokedexRegion.region(forDexNumber: 0))
+         XCTAssertNil(PokedexRegion.region(forDexNumber: -5))
+-        XCTAssertNil(PokedexRegion.region(forDexNumber: 650))
++        XCTAssertNil(PokedexRegion.region(forDexNumber: 1026))
+         XCTAssertNil(PokedexRegion.region(forDexNumber: 10_000))
+     }
+ 
+@@ -32,6 +40,10 @@ final class PokedexRegionTests: XCTestCase {
+         XCTAssertEqual(PokedexRegion.hoenn.total, 135)
+         XCTAssertEqual(PokedexRegion.sinnoh.total, 107)
+         XCTAssertEqual(PokedexRegion.unova.total, 156)
++        XCTAssertEqual(PokedexRegion.kalos.total, 72)
++        XCTAssertEqual(PokedexRegion.alola.total, 88)
++        XCTAssertEqual(PokedexRegion.galar.total, 96)
++        XCTAssertEqual(PokedexRegion.paldea.total, 120)
+     }
+ 
+     func testIdentifiableIdsAreStable() {
+@@ -41,7 +53,7 @@ final class PokedexRegionTests: XCTestCase {
+ 
+     func testNationalTotalIsSumOfAllRegions() {
+         XCTAssertEqual(PokedexRegion.allCases.map(\.total).reduce(0, +), PokedexRegion.nationalTotal)
+-        XCTAssertEqual(PokedexRegion.nationalTotal, 649)
++        XCTAssertEqual(PokedexRegion.nationalTotal, 1025)
+     }
+ 
+     func testRegionRangesAreContiguousAndNonOverlapping() {
+diff --git a/Tests/PokeTokenBarTests/PremiumEggTests.swift b/Tests/PokeTokenBarTests/PremiumEggTests.swift
+index 4f2c89a..ac106df 100644
+--- a/Tests/PokeTokenBarTests/PremiumEggTests.swift
++++ b/Tests/PokeTokenBarTests/PremiumEggTests.swift
+@@ -138,15 +138,15 @@ final class PremiumEggTests: XCTestCase {
+     ///
+     /// 미수집 부스트(`chooseBase` 가 이미 수집한 base 의 가중을 절반으로)는 정가 계산에서 뺐다. 그 방향은
+     /// 중립이 아니라 **불리**하다 — 고급 밴드가 먼저 포화되면 그쪽 가중만 깎여 희귀+ 비중이 올라간다:
+-    /// 고급 ×0.75 → 0.5906, ×0.70 → 0.6072, ×0.5 → 0.6839. 뒤집히는 지점은 **×0.6492**이고 그보다
++    /// 고급 ×0.75 → 0.6037, ×0.70 → 0.6201, ×0.5 → 0.6956. 뒤집히는 지점은 **×0.6856**이고 그보다
+     /// 낮아지면 손익분기 0.625를 넘는다. 도감을 많이 채운 후반일수록 마진이 준다는 뜻이다.
+     /// 그 너머(고급 밴드 거의 수집 + 희귀 밴드 거의 미수집)는 뒤집히지만 재가격하지 않는다 — 1인 로컬·
+     /// 금전가치 없음이라 후반 코너에서 상위 알이 약간 손해인 것은 수용 범위다.
+     ///
+-    /// 출처: PokéAPI GraphQL v1beta2, `evolves_from_species_id IS NULL` · id ≤ 649 · 메타몽 제외,
+-    /// 2026-08-04 측정(base 328종). 풀이 크게 바뀌면 이 값을 다시 재고 결론을 재확인해야 한다.
++    /// 출처: PokéAPI GraphQL v1beta2, `evolves_from_species_id IS NULL` · id ≤ 1025 · 메타몽 제외,
++    /// 2026-11-26 측정(base 540종). 풀이 크게 바뀌면 이 값을 다시 재고 결론을 재확인해야 한다.
+     func testRareEggIsNotDominatedAtMeasuredPoolComposition() {
+-        let weight: [Rarity: Double] = [.common: 37_240, .uncommon: 3_135, .rare: 3_053, .legendary: 339]
++        let weight: [Rarity: Double] = [.common: 53_405, .uncommon: 5_870, .rare: 5_338, .legendary: 1_369]
+         // 고급 알 = 고급 이상 풀(전설 포함). 그 안에서 희귀 이상이 나올 확률.
+         let uncommonEggPool = weight[.uncommon]! + weight[.rare]! + weight[.legendary]!
+         let rarePlusShare = (weight[.rare]! + weight[.legendary]!) / uncommonEggPool
+@@ -161,7 +161,7 @@ final class PremiumEggTests: XCTestCase {
+                           "실측 희귀+ 비중 \(rarePlusShare) 가 손익분기 \(uncommonPrice / rarePrice) 를 넘었다 — 가격 재조정 필요")
+ 
+         // 후반 코너의 안전 경계 — 고급 밴드만 미수집 부스트로 30% 깎여도 아직 지배당하지 않는다.
+-        // 계수는 flip 지점(×0.6492)이 아니라 **그보다 위**로 잡는다: 정확히 flip 에 걸면 여유가 0.0003 이라
++        // 계수는 flip 지점(×0.6856)이 아니라 **그보다 위**로 잡는다: 정확히 flip 에 걸면 여유가 0.0003 이라
+         // 풀을 다시 잴 때 고급 가중이 0.13%(≈4)만 움직여도 설계와 무관하게 실패한다(오탐). ×0.70 은 여유
+         // 0.018 이라 재측정을 견디면서도 "부스트가 마진을 깎는다"는 성질은 그대로 잡는다.
+         let boostedUncommon = weight[.uncommon]! * 0.70
+
+From ad571eacc41fb543163e31a20e7e7310f83223df Mon Sep 17 00:00:00 2001
+From: Token Clash <token-clash@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 12:00:00 +0000
+Subject: [PATCH 2/4] feat(sprites): animate #650 to #1025 like Token Clash
+
+The Essentials Animated Pokemon System strips (pinned at rh-hideout-chinese/pokemon-engine) are sliced into GIFs when downloaded, cropped to what every frame shows, with the same frame delays as Token Clash. A shiny strip drawn at several times its normal's size is shrunk to match, and Xerneas's front comes from Showdown's gen5ani, since its strip is still.
+---
+ .../Core/LateGenerationSpriteTable.swift      | 382 ++++++++++++++++++
+ .../PokeTokenBar/Core/LateGenerations.swift   | 128 ++++++
+ Sources/PokeTokenBar/UI/SpriteLoader.swift    |  13 +
+ .../LateGenerationsTests.swift                | 123 ++++++
+ 4 files changed, 646 insertions(+)
+ create mode 100644 Sources/PokeTokenBar/Core/LateGenerationSpriteTable.swift
+ create mode 100644 Sources/PokeTokenBar/Core/LateGenerations.swift
+ create mode 100644 Tests/PokeTokenBarTests/LateGenerationsTests.swift
+
+diff --git a/Sources/PokeTokenBar/Core/LateGenerationSpriteTable.swift b/Sources/PokeTokenBar/Core/LateGenerationSpriteTable.swift
+new file mode 100644
+index 0000000..f7b8fcd
+--- /dev/null
++++ b/Sources/PokeTokenBar/Core/LateGenerationSpriteTable.swift
+@@ -0,0 +1,382 @@
++import Foundation
++
++extension LateGenerationSprites {
++    static let strips: [Int: Strip] = [
++        650: .init(files: ["Front/CHESPIN.png", "Front shiny/CHESPIN.png", "Back/CHESPIN.png", "Back shiny/CHESPIN.png"], delays: (0.09, 0.09)),
++        651: .init(files: ["Front/QUILLADIN.png", "Front shiny/QUILLADIN.png", "Back/QUILLADIN.png", "Back shiny/QUILLADIN.png"], delays: (0.09, 0.09)),
++        652: .init(files: ["Front/CHESNAUGHT.png", "Front shiny/CHESNAUGHT.png", "Back/CHESNAUGHT.png", "Back shiny/CHESNAUGHT.png"], delays: (0.09, 0.09)),
++        653: .init(files: ["Front/FENNEKIN.png", "Front shiny/FENNEKIN.png", "Back/FENNEKIN.png", "Back shiny/FENNEKIN.png"], delays: (0.09, 0.09), shinyScale: (1, 2)),
++        654: .init(files: ["Front/BRAIXEN.png", "Front shiny/BRAIXEN.png", "Back/BRAIXEN.png", "Back shiny/BRAIXEN.png"], delays: (0.09, 0.09)),
++        655: .init(files: ["Front/DELPHOX.png", "Front shiny/DELPHOX.png", "Back/DELPHOX.png", "Back shiny/DELPHOX.png"], delays: (0.09, 0.09)),
++        656: .init(files: ["Front/FROAKIE.png", "Front shiny/FROAKIE.png", "Back/FROAKIE.png", "Back shiny/FROAKIE.png"], delays: (0.09, 0.09)),
++        657: .init(files: ["Front/FROGADIER.png", "Front shiny/FROGADIER.png", "Back/FROGADIER.png", "Back shiny/FROGADIER.png"], delays: (0.09, 0.09)),
++        658: .init(files: ["Front/GRENINJA.png", "Front shiny/GRENINJA.png", "Back/GRENINJA.png", "Back shiny/GRENINJA.png"], delays: (0.09, 0.09)),
++        659: .init(files: ["Front/BUNNELBY.png", "Front shiny/BUNNELBY.png", "Back/BUNNELBY.png", "Back shiny/BUNNELBY.png"], delays: (0.09, 0.09)),
++        660: .init(files: ["Front/DIGGERSBY.png", "Front shiny/DIGGERSBY.png", "Back/DIGGERSBY.png", "Back shiny/DIGGERSBY.png"], delays: (0.09, 0.09)),
++        661: .init(files: ["Front/FLETCHLING.png", "Front shiny/FLETCHLING.png", "Back/FLETCHLING.png", "Back shiny/FLETCHLING.png"], delays: (0.09, 0.09)),
++        662: .init(files: ["Front/FLETCHINDER.png", "Front shiny/FLETCHINDER.png", "Back/FLETCHINDER.png", "Back shiny/FLETCHINDER.png"], delays: (0.09, 0.09)),
++        663: .init(files: ["Front/TALONFLAME.png", "Front shiny/TALONFLAME.png", "Back/TALONFLAME.png", "Back shiny/TALONFLAME.png"], delays: (0.09, 0.09)),
++        664: .init(files: ["Front/SCATTERBUG.png", "Front shiny/SCATTERBUG.png", "Back/SCATTERBUG.png", "Back shiny/SCATTERBUG.png"], delays: (0.09, 0.09)),
++        665: .init(files: ["Front/SPEWPA.png", "Front shiny/SPEWPA.png", "Back/SPEWPA.png", "Back shiny/SPEWPA.png"], delays: (0.09, 0.09)),
++        666: .init(files: ["Front/VIVILLON.png", "Front shiny/VIVILLON.png", "Back/VIVILLON.png", "Back shiny/VIVILLON.png"], delays: (0.09, 0.09)),
++        667: .init(files: ["Front/LITLEO.png", "Front shiny/LITLEO.png", "Back/LITLEO.png", "Back shiny/LITLEO.png"], delays: (0.09, 0.09)),
++        668: .init(files: ["Front/PYROAR.png", "Front shiny/PYROAR.png", "Back/PYROAR.png", "Back shiny/PYROAR.png"], delays: (0.09, 0.09)),
++        669: .init(files: ["Front/FLABEBE.png", "Front shiny/FLABEBE.png", "Back/FLABEBE.png", "Back shiny/FLABEBE.png"], delays: (0.09, 0.09)),
++        670: .init(files: ["Front/FLOETTE.png", "Front shiny/FLOETTE.png", "Back/FLOETTE.png", "Back shiny/FLOETTE.png"], delays: (0.09, 0.09)),
++        671: .init(files: ["Front/FLORGES.png", "Front shiny/FLORGES.png", "Back/FLORGES.png", "Back shiny/FLORGES.png"], delays: (0.09, 0.09)),
++        672: .init(files: ["Front/SKIDDO.png", "Front shiny/SKIDDO.png", "Back/SKIDDO.png", "Back shiny/SKIDDO.png"], delays: (0.09, 0.09)),
++        673: .init(files: ["Front/GOGOAT.png", "Front shiny/GOGOAT.png", "Back/GOGOAT.png", "Back shiny/GOGOAT.png"], delays: (0.09, 0.09)),
++        674: .init(files: ["Front/PANCHAM.png", "Front shiny/PANCHAM.png", "Back/PANCHAM.png", "Back shiny/PANCHAM.png"], delays: (0.09, 0.09)),
++        675: .init(files: ["Front/PANGORO.png", "Front shiny/PANGORO.png", "Back/PANGORO.png", "Back shiny/PANGORO.png"], delays: (0.09, 0.135)),
++        676: .init(files: ["Front/FURFROU.png", "Front shiny/FURFROU.png", "Back/FURFROU.png", "Back shiny/FURFROU.png"], delays: (0.09, 0.09)),
++        677: .init(files: ["Front/ESPURR.png", "Front shiny/ESPURR.png", "Back/ESPURR.png", "Back shiny/ESPURR.png"], delays: (0.09, 0.09)),
++        678: .init(files: ["Front/MEOWSTIC.png", "Front shiny/MEOWSTIC.png", "Back/MEOWSTIC.png", "Back shiny/MEOWSTIC.png"], delays: (0.09, 0.09)),
++        679: .init(files: ["Front/HONEDGE.png", "Front shiny/HONEDGE.png", "Back/HONEDGE.png", "Back shiny/HONEDGE.png"], delays: (0.09, 0.09)),
++        680: .init(files: ["Front/DOUBLADE.png", "Front shiny/DOUBLADE.png", "Back/DOUBLADE.png", "Back shiny/DOUBLADE.png"], delays: (0.09, 0.09)),
++        681: .init(files: ["Front/AEGISLASH.png", "Front shiny/AEGISLASH.png", "Back/AEGISLASH.png", "Back shiny/AEGISLASH.png"], delays: (0.09, 0.09)),
++        682: .init(files: ["Front/SPRITZEE.png", "Front shiny/SPRITZEE.png", "Back/SPRITZEE.png", "Back shiny/SPRITZEE.png"], delays: (0.09, 0.09)),
++        683: .init(files: ["Front/AROMATISSE.png", "Front shiny/AROMATISSE.png", "Back/AROMATISSE.png", "Back shiny/AROMATISSE.png"], delays: (0.09, 0.09)),
++        684: .init(files: ["Front/SWIRLIX.png", "Front shiny/SWIRLIX.png", "Back/SWIRLIX.png", "Back shiny/SWIRLIX.png"], delays: (0.09, 0.09)),
++        685: .init(files: ["Front/SLURPUFF.png", "Front shiny/SLURPUFF.png", "Back/SLURPUFF.png", "Back shiny/SLURPUFF.png"], delays: (0.09, 0.09)),
++        686: .init(files: ["Front/INKAY.png", "Front shiny/INKAY.png", "Back/INKAY.png", "Back shiny/INKAY.png"], delays: (0.09, 0.09)),
++        687: .init(files: ["Front/MALAMAR.png", "Front shiny/MALAMAR.png", "Back/MALAMAR.png", "Back shiny/MALAMAR.png"], delays: (0.09, 0.09)),
++        688: .init(files: ["Front/BINACLE.png", "Front shiny/BINACLE.png", "Back/BINACLE.png", "Back shiny/BINACLE.png"], delays: (0.09, 0.09)),
++        689: .init(files: ["Front/BARBARACLE.png", "Front shiny/BARBARACLE.png", "Back/BARBARACLE.png", "Back shiny/BARBARACLE.png"], delays: (0.09, 0.09)),
++        690: .init(files: ["Front/SKRELP.png", "Front shiny/SKRELP.png", "Back/SKRELP.png", "Back shiny/SKRELP.png"], delays: (0.09, 0.09)),
++        691: .init(files: ["Front/DRAGALGE.png", "Front shiny/DRAGALGE.png", "Back/DRAGALGE.png", "Back shiny/DRAGALGE.png"], delays: (0.09, 0.135)),
++        692: .init(files: ["Front/CLAUNCHER.png", "Front shiny/CLAUNCHER.png", "Back/CLAUNCHER.png", "Back shiny/CLAUNCHER.png"], delays: (0.09, 0.09)),
++        693: .init(files: ["Front/CLAWITZER.png", "Front shiny/CLAWITZER.png", "Back/CLAWITZER.png", "Back shiny/CLAWITZER.png"], delays: (0.09, 0.09)),
++        694: .init(files: ["Front/HELIOPTILE.png", "Front shiny/HELIOPTILE.png", "Back/HELIOPTILE.png", "Back shiny/HELIOPTILE.png"], delays: (0.09, 0.09)),
++        695: .init(files: ["Front/HELIOLISK.png", "Front shiny/HELIOLISK.png", "Back/HELIOLISK.png", "Back shiny/HELIOLISK.png"], delays: (0.09, 0.09)),
++        696: .init(files: ["Front/TYRUNT.png", "Front shiny/TYRUNT.png", "Back/TYRUNT.png", "Back shiny/TYRUNT.png"], delays: (0.09, 0.09)),
++        697: .init(files: ["Front/TYRANTRUM.png", "Front shiny/TYRANTRUM.png", "Back/TYRANTRUM.png", "Back shiny/TYRANTRUM.png"], delays: (0.09, 0.09)),
++        698: .init(files: ["Front/AMAURA.png", "Front shiny/AMAURA.png", "Back/AMAURA.png", "Back shiny/AMAURA.png"], delays: (0.09, 0.09)),
++        699: .init(files: ["Front/AURORUS.png", "Front shiny/AURORUS.png", "Back/AURORUS.png", "Back shiny/AURORUS.png"], delays: (0.09, 0.135)),
++        700: .init(files: ["Front/SYLVEON.png", "Front shiny/SYLVEON.png", "Back/SYLVEON.png", "Back shiny/SYLVEON.png"], delays: (0.09, 0.09)),
++        701: .init(files: ["Front/HAWLUCHA.png", "Front shiny/HAWLUCHA.png", "Back/HAWLUCHA.png", "Back shiny/HAWLUCHA.png"], delays: (0.09, 0.09)),
++        702: .init(files: ["Front/DEDENNE.png", "Front shiny/DEDENNE.png", "Back/DEDENNE.png", "Back shiny/DEDENNE.png"], delays: (0.09, 0.09)),
++        703: .init(files: ["Front/CARBINK.png", "Front shiny/CARBINK.png", "Back/CARBINK.png", "Back shiny/CARBINK.png"], delays: (0.09, 0.09)),
++        704: .init(files: ["Front/GOOMY.png", "Front shiny/GOOMY.png", "Back/GOOMY.png", "Back shiny/GOOMY.png"], delays: (0.09, 0.09)),
++        705: .init(files: ["Front/SLIGGOO.png", "Front shiny/SLIGGOO.png", "Back/SLIGGOO.png", "Back shiny/SLIGGOO.png"], delays: (0.09, 0.09)),
++        706: .init(files: ["Front/GOODRA.png", "Front shiny/GOODRA.png", "Back/GOODRA.png", "Back shiny/GOODRA.png"], delays: (0.09, 0.09)),
++        707: .init(files: ["Front/KLEFKI.png", "Front shiny/KLEFKI.png", "Back/KLEFKI.png", "Back shiny/KLEFKI.png"], delays: (0.09, 0.09)),
++        708: .init(files: ["Front/PHANTUMP.png", "Front shiny/PHANTUMP.png", "Back/PHANTUMP.png", "Back shiny/PHANTUMP.png"], delays: (0.09, 0.09)),
++        709: .init(files: ["Front/TREVENANT.png", "Front shiny/TREVENANT.png", "Back/TREVENANT.png", "Back shiny/TREVENANT.png"], delays: (0.09, 0.09)),
++        710: .init(files: ["Front/PUMPKABOO.png", "Front shiny/PUMPKABOO.png", "Back/PUMPKABOO.png", "Back shiny/PUMPKABOO.png"], delays: (0.09, 0.09)),
++        711: .init(files: ["Front/GOURGEIST.png", "Front shiny/GOURGEIST.png", "Back/GOURGEIST.png", "Back shiny/GOURGEIST.png"], delays: (0.09, 0.09)),
++        712: .init(files: ["Front/BERGMITE.png", "Front shiny/BERGMITE.png", "Back/BERGMITE.png", "Back shiny/BERGMITE.png"], delays: (0.09, 0.09), shinyScale: (1, 2)),
++        713: .init(files: ["Front/AVALUGG.png", "Front shiny/AVALUGG.png", "Back/AVALUGG.png", "Back shiny/AVALUGG.png"], delays: (0.09, 0.09)),
++        714: .init(files: ["Front/NOIBAT.png", "Front shiny/NOIBAT.png", "Back/NOIBAT.png", "Back shiny/NOIBAT.png"], delays: (0.09, 0.09)),
++        715: .init(files: ["Front/NOIVERN.png", "Front shiny/NOIVERN.png", "Back/NOIVERN.png", "Back shiny/NOIVERN.png"], delays: (0.09, 0.09)),
++        716: .init(files: ["Front/XERNEAS.png", "Front shiny/XERNEAS.png", "Back/XERNEAS.png", "Back shiny/XERNEAS.png"], delays: (0.09, 0.09), showdown: ["https://play.pokemonshowdown.com/sprites/gen5ani/xerneas.gif", "https://play.pokemonshowdown.com/sprites/gen5ani-shiny/xerneas.gif", nil, nil]),
++        717: .init(files: ["Front/YVELTAL.png", "Front shiny/YVELTAL.png", "Back/YVELTAL.png", "Back shiny/YVELTAL.png"], delays: (0.09, 0.09)),
++        718: .init(files: ["Front/ZYGARDE.png", "Front shiny/ZYGARDE.png", "Back/ZYGARDE.png", "Back shiny/ZYGARDE.png"], delays: (0.09, 0.09)),
++        719: .init(files: ["Front/DIANCIE.png", "Front shiny/DIANCIE.png", "Back/DIANCIE.png", "Back shiny/DIANCIE.png"], delays: (0.09, 0.09)),
++        720: .init(files: ["Front/HOOPA.png", "Front shiny/HOOPA.png", "Back/HOOPA.png", "Back shiny/HOOPA.png"], delays: (0.09, 0.09)),
++        721: .init(files: ["Front/VOLCANION.png", "Front shiny/VOLCANION.png", "Back/VOLCANION.png", "Back shiny/VOLCANION.png"], delays: (0.09, 0.135)),
++        722: .init(files: ["Front/ROWLET.png", "Front shiny/ROWLET.png", "Back/ROWLET.png", "Back shiny/ROWLET.png"], delays: (0.09, 0.09)),
++        723: .init(files: ["Front/DARTRIX.png", "Front shiny/DARTRIX.png", "Back/DARTRIX.png", "Back shiny/DARTRIX.png"], delays: (0.09, 0.09)),
++        724: .init(files: ["Front/DECIDUEYE.png", "Front shiny/DECIDUEYE.png", "Back/DECIDUEYE.png", "Back shiny/DECIDUEYE.png"], delays: (0.09, 0.09)),
++        725: .init(files: ["Front/LITTEN.png", "Front shiny/LITTEN.png", "Back/LITTEN.png", "Back shiny/LITTEN.png"], delays: (0.09, 0.09)),
++        726: .init(files: ["Front/TORRACAT.png", "Front shiny/TORRACAT.png", "Back/TORRACAT.png", "Back shiny/TORRACAT.png"], delays: (0.09, 0.09)),
++        727: .init(files: ["Front/INCINEROAR.png", "Front shiny/INCINEROAR.png", "Back/INCINEROAR.png", "Back shiny/INCINEROAR.png"], delays: (0.09, 0.09)),
++        728: .init(files: ["Front/POPPLIO.png", "Front shiny/POPPLIO.png", "Back/POPPLIO.png", "Back shiny/POPPLIO.png"], delays: (0.09, 0.09)),
++        729: .init(files: ["Front/BRIONNE.png", "Front shiny/BRIONNE.png", "Back/BRIONNE.png", "Back shiny/BRIONNE.png"], delays: (0.09, 0.09)),
++        730: .init(files: ["Front/PRIMARINA.png", "Front shiny/PRIMARINA.png", "Back/PRIMARINA.png", "Back shiny/PRIMARINA.png"], delays: (0.09, 0.09)),
++        731: .init(files: ["Front/PIKIPEK.png", "Front shiny/PIKIPEK.png", "Back/PIKIPEK.png", "Back shiny/PIKIPEK.png"], delays: (0.09, 0.09), shinyScale: (1, 2)),
++        732: .init(files: ["Front/TRUMBEAK.png", "Front shiny/TRUMBEAK.png", "Back/TRUMBEAK.png", "Back shiny/TRUMBEAK.png"], delays: (0.09, 0.09)),
++        733: .init(files: ["Front/TOUCANNON.png", "Front shiny/TOUCANNON.png", "Back/TOUCANNON.png", "Back shiny/TOUCANNON.png"], delays: (0.09, 0.09)),
++        734: .init(files: ["Front/YUNGOOS.png", "Front shiny/YUNGOOS.png", "Back/YUNGOOS.png", "Back shiny/YUNGOOS.png"], delays: (0.09, 0.09)),
++        735: .init(files: ["Front/GUMSHOOS.png", "Front shiny/GUMSHOOS.png", "Back/GUMSHOOS.png", "Back shiny/GUMSHOOS.png"], delays: (0.09, 0.09)),
++        736: .init(files: ["Front/GRUBBIN.png", "Front shiny/GRUBBIN.png", "Back/GRUBBIN.png", "Back shiny/GRUBBIN.png"], delays: (0.09, 0.09)),
++        737: .init(files: ["Front/CHARJABUG.png", "Front shiny/CHARJABUG.png", "Back/CHARJABUG.png", "Back shiny/CHARJABUG.png"], delays: (0.09, 0.09)),
++        738: .init(files: ["Front/VIKAVOLT.png", "Front shiny/VIKAVOLT.png", "Back/VIKAVOLT.png", "Back shiny/VIKAVOLT.png"], delays: (0.09, 0.09)),
++        739: .init(files: ["Front/CRABRAWLER.png", "Front shiny/CRABRAWLER.png", "Back/CRABRAWLER.png", "Back shiny/CRABRAWLER.png"], delays: (0.09, 0.09)),
++        740: .init(files: ["Front/CRABOMINABLE.png", "Front shiny/CRABOMINABLE.png", "Back/CRABOMINABLE.png", "Back shiny/CRABOMINABLE.png"], delays: (0.09, 0.09)),
++        741: .init(files: ["Front/ORICORIO.png", "Front shiny/ORICORIO.png", "Back/ORICORIO.png", "Back shiny/ORICORIO.png"], delays: (0.09, 0.09)),
++        742: .init(files: ["Front/CUTIEFLY.png", "Front shiny/CUTIEFLY.png", "Back/CUTIEFLY.png", "Back shiny/CUTIEFLY.png"], delays: (0.09, 0.09)),
++        743: .init(files: ["Front/RIBOMBEE.png", "Front shiny/RIBOMBEE.png", "Back/RIBOMBEE.png", "Back shiny/RIBOMBEE.png"], delays: (0.09, 0.09)),
++        744: .init(files: ["Front/ROCKRUFF.png", "Front shiny/ROCKRUFF.png", "Back/ROCKRUFF.png", "Back shiny/ROCKRUFF.png"], delays: (0.135, 0.135)),
++        745: .init(files: ["Front/LYCANROC.png", "Front shiny/LYCANROC.png", "Back/LYCANROC.png", "Back shiny/LYCANROC.png"], delays: (0.09, 0.09)),
++        746: .init(files: ["Front/WISHIWASHI.png", "Front shiny/WISHIWASHI.png", "Back/WISHIWASHI.png", "Back shiny/WISHIWASHI.png"], delays: (0.09, 0.09)),
++        747: .init(files: ["Front/MAREANIE.png", "Front shiny/MAREANIE.png", "Back/MAREANIE.png", "Back shiny/MAREANIE.png"], delays: (0.09, 0.09)),
++        748: .init(files: ["Front/TOXAPEX.png", "Front shiny/TOXAPEX.png", "Back/TOXAPEX.png", "Back shiny/TOXAPEX.png"], delays: (0.09, 0.09)),
++        749: .init(files: ["Front/MUDBRAY.png", "Front shiny/MUDBRAY.png", "Back/MUDBRAY.png", "Back shiny/MUDBRAY.png"], delays: (0.09, 0.09)),
++        750: .init(files: ["Front/MUDSDALE.png", "Front shiny/MUDSDALE.png", "Back/MUDSDALE.png", "Back shiny/MUDSDALE.png"], delays: (0.09, 0.09)),
++        751: .init(files: ["Front/DEWPIDER.png", "Front shiny/DEWPIDER.png", "Back/DEWPIDER.png", "Back shiny/DEWPIDER.png"], delays: (0.09, 0.09)),
++        752: .init(files: ["Front/ARAQUANID.png", "Front shiny/ARAQUANID.png", "Back/ARAQUANID.png", "Back shiny/ARAQUANID.png"], delays: (0.09, 0.09)),
++        753: .init(files: ["Front/FOMANTIS.png", "Front shiny/FOMANTIS.png", "Back/FOMANTIS.png", "Back shiny/FOMANTIS.png"], delays: (0.09, 0.09)),
++        754: .init(files: ["Front/LURANTIS.png", "Front shiny/LURANTIS.png", "Back/LURANTIS.png", "Back shiny/LURANTIS.png"], delays: (0.09, 0.09)),
++        755: .init(files: ["Front/MORELULL.png", "Front shiny/MORELULL.png", "Back/MORELULL.png", "Back shiny/MORELULL.png"], delays: (0.09, 0.09)),
++        756: .init(files: ["Front/SHIINOTIC.png", "Front shiny/SHIINOTIC.png", "Back/SHIINOTIC.png", "Back shiny/SHIINOTIC.png"], delays: (0.09, 0.09)),
++        757: .init(files: ["Front/SALANDIT.png", "Front shiny/SALANDIT.png", "Back/SALANDIT.png", "Back shiny/SALANDIT.png"], delays: (0.09, 0.09)),
++        758: .init(files: ["Front/SALAZZLE.png", "Front shiny/SALAZZLE.png", "Back/SALAZZLE.png", "Back shiny/SALAZZLE.png"], delays: (0.09, 0.09)),
++        759: .init(files: ["Front/STUFFUL.png", "Front shiny/STUFFUL.png", "Back/STUFFUL.png", "Back shiny/STUFFUL.png"], delays: (0.09, 0.09), shinyScale: (2, 1)),
++        760: .init(files: ["Front/BEWEAR.png", "Front shiny/BEWEAR.png", "Back/BEWEAR.png", "Back shiny/BEWEAR.png"], delays: (0.09, 0.09)),
++        761: .init(files: ["Front/BOUNSWEET.png", "Front shiny/BOUNSWEET.png", "Back/BOUNSWEET.png", "Back shiny/BOUNSWEET.png"], delays: (0.09, 0.09)),
++        762: .init(files: ["Front/STEENEE.png", "Front shiny/STEENEE.png", "Back/STEENEE.png", "Back shiny/STEENEE.png"], delays: (0.09, 0.09)),
++        763: .init(files: ["Front/TSAREENA.png", "Front shiny/TSAREENA.png", "Back/TSAREENA.png", "Back shiny/TSAREENA.png"], delays: (0.09, 0.09)),
++        764: .init(files: ["Front/COMFEY.png", "Front shiny/COMFEY.png", "Back/COMFEY.png", "Back shiny/COMFEY.png"], delays: (0.09, 0.09)),
++        765: .init(files: ["Front/ORANGURU.png", "Front shiny/ORANGURU.png", "Back/ORANGURU.png", "Back shiny/ORANGURU.png"], delays: (0.09, 0.09)),
++        766: .init(files: ["Front/PASSIMIAN.png", "Front shiny/PASSIMIAN.png", "Back/PASSIMIAN.png", "Back shiny/PASSIMIAN.png"], delays: (0.09, 0.09)),
++        767: .init(files: ["Front/WIMPOD.png", "Front shiny/WIMPOD.png", "Back/WIMPOD.png", "Back shiny/WIMPOD.png"], delays: (0.09, 0.09)),
++        768: .init(files: ["Front/GOLISOPOD.png", "Front shiny/GOLISOPOD.png", "Back/GOLISOPOD.png", "Back shiny/GOLISOPOD.png"], delays: (0.09, 0.09)),
++        769: .init(files: ["Front/SANDYGAST.png", "Front shiny/SANDYGAST.png", "Back/SANDYGAST.png", "Back shiny/SANDYGAST.png"], delays: (0.09, 0.09)),
++        770: .init(files: ["Front/PALOSSAND.png", "Front shiny/PALOSSAND.png", "Back/PALOSSAND.png", "Back shiny/PALOSSAND.png"], delays: (0.09, 0.09)),
++        771: .init(files: ["Front/PYUKUMUKU.png", "Front shiny/PYUKUMUKU.png", "Back/PYUKUMUKU.png", "Back shiny/PYUKUMUKU.png"], delays: (0.09, 0.09)),
++        772: .init(files: ["Front/TYPENULL.png", "Front shiny/TYPENULL.png", "Back/TYPENULL.png", "Back shiny/TYPENULL.png"], delays: (0.09, 0.09)),
++        773: .init(files: ["Front/SILVALLY.png", "Front shiny/SILVALLY.png", "Back/SILVALLY.png", "Back shiny/SILVALLY.png"], delays: (0.09, 0.09)),
++        774: .init(files: ["Front/MINIOR.png", "Front shiny/MINIOR.png", "Back/MINIOR.png", "Back shiny/MINIOR.png"], delays: (0.09, 0.09)),
++        775: .init(files: ["Front/KOMALA.png", "Front shiny/KOMALA.png", "Back/KOMALA.png", "Back shiny/KOMALA.png"], delays: (0.09, 0.09)),
++        776: .init(files: ["Front/TURTONATOR.png", "Front shiny/TURTONATOR.png", "Back/TURTONATOR.png", "Back shiny/TURTONATOR.png"], delays: (0.09, 0.09)),
++        777: .init(files: ["Front/TOGEDEMARU.png", "Front shiny/TOGEDEMARU.png", "Back/TOGEDEMARU.png", "Back shiny/TOGEDEMARU.png"], delays: (0.09, 0.09)),
++        778: .init(files: ["Front/MIMIKYU.png", "Front shiny/MIMIKYU.png", "Back/MIMIKYU.png", "Back shiny/MIMIKYU.png"], delays: (0.09, 0.09)),
++        779: .init(files: ["Front/BRUXISH.png", "Front shiny/BRUXISH.png", "Back/BRUXISH.png", "Back shiny/BRUXISH.png"], delays: (0.09, 0.09)),
++        780: .init(files: ["Front/DRAMPA.png", "Front shiny/DRAMPA.png", "Back/DRAMPA.png", "Back shiny/DRAMPA.png"], delays: (0.09, 0.09)),
++        781: .init(files: ["Front/DHELMISE.png", "Front shiny/DHELMISE.png", "Back/DHELMISE.png", "Back shiny/DHELMISE.png"], delays: (0.09, 0.09)),
++        782: .init(files: ["Front/JANGMOO.png", "Front shiny/JANGMOO.png", "Back/JANGMOO.png", "Back shiny/JANGMOO.png"], delays: (0.09, 0.09)),
++        783: .init(files: ["Front/HAKAMOO.png", "Front shiny/HAKAMOO.png", "Back/HAKAMOO.png", "Back shiny/HAKAMOO.png"], delays: (0.09, 0.09)),
++        784: .init(files: ["Front/KOMMOO.png", "Front shiny/KOMMOO.png", "Back/KOMMOO.png", "Back shiny/KOMMOO.png"], delays: (0.09, 0.09)),
++        785: .init(files: ["Front/TAPUKOKO.png", "Front shiny/TAPUKOKO.png", "Back/TAPUKOKO.png", "Back shiny/TAPUKOKO.png"], delays: (0.135, 0.135)),
++        786: .init(files: ["Front/TAPULELE.png", "Front shiny/TAPULELE.png", "Back/TAPULELE.png", "Back shiny/TAPULELE.png"], delays: (0.09, 0.09)),
++        787: .init(files: ["Front/TAPUBULU.png", "Front shiny/TAPUBULU.png", "Back/TAPUBULU.png", "Back shiny/TAPUBULU.png"], delays: (0.09, 0.09)),
++        788: .init(files: ["Front/TAPUFINI.png", "Front shiny/TAPUFINI.png", "Back/TAPUFINI.png", "Back shiny/TAPUFINI.png"], delays: (0.09, 0.09)),
++        789: .init(files: ["Front/COSMOG.png", "Front shiny/COSMOG.png", "Back/COSMOG.png", "Back shiny/COSMOG.png"], delays: (0.09, 0.09)),
++        790: .init(files: ["Front/COSMOEM.png", "Front shiny/COSMOEM.png", "Back/COSMOEM.png", "Back shiny/COSMOEM.png"], delays: (0.09, 0.09), shinyScale: (2, 2)),
++        791: .init(files: ["Front/SOLGALEO.png", "Front shiny/SOLGALEO.png", "Back/SOLGALEO.png", "Back shiny/SOLGALEO.png"], delays: (0.09, 0.09)),
++        792: .init(files: ["Front/LUNALA.png", "Front shiny/LUNALA.png", "Back/LUNALA.png", "Back shiny/LUNALA.png"], delays: (0.09, 0.09)),
++        793: .init(files: ["Front/NIHILEGO.png", "Front shiny/NIHILEGO.png", "Back/NIHILEGO.png", "Back shiny/NIHILEGO.png"], delays: (0.09, 0.09)),
++        794: .init(files: ["Front/BUZZWOLE.png", "Front shiny/BUZZWOLE.png", "Back/BUZZWOLE.png", "Back shiny/BUZZWOLE.png"], delays: (0.09, 0.09)),
++        795: .init(files: ["Front/PHEROMOSA.png", "Front shiny/PHEROMOSA.png", "Back/PHEROMOSA.png", "Back shiny/PHEROMOSA.png"], delays: (0.09, 0.09)),
++        796: .init(files: ["Front/XURKITREE.png", "Front shiny/XURKITREE.png", "Back/XURKITREE.png", "Back shiny/XURKITREE.png"], delays: (0.09, 0.09)),
++        797: .init(files: ["Front/CELESTEELA.png", "Front shiny/CELESTEELA.png", "Back/CELESTEELA.png", "Back shiny/CELESTEELA.png"], delays: (0.09, 0.09)),
++        798: .init(files: ["Front/KARTANA.png", "Front shiny/KARTANA.png", "Back/KARTANA.png", "Back shiny/KARTANA.png"], delays: (0.09, 0.09)),
++        799: .init(files: ["Front/GUZZLORD.png", "Front shiny/GUZZLORD.png", "Back/GUZZLORD.png", "Back shiny/GUZZLORD.png"], delays: (0.09, 0.09)),
++        800: .init(files: ["Front/NECROZMA.png", "Front shiny/NECROZMA.png", "Back/NECROZMA.png", "Back shiny/NECROZMA.png"], delays: (0.09, 0.09)),
++        801: .init(files: ["Front/MAGEARNA.png", "Front shiny/MAGEARNA.png", "Back/MAGEARNA.png", "Back shiny/MAGEARNA.png"], delays: (0.09, 0.09)),
++        802: .init(files: ["Front/MARSHADOW.png", "Front shiny/MARSHADOW.png", "Back/MARSHADOW.png", "Back shiny/MARSHADOW.png"], delays: (0.135, 0.135)),
++        803: .init(files: ["Front/POIPOLE.png", "Front shiny/POIPOLE.png", "Back/POIPOLE.png", "Back shiny/POIPOLE.png"], delays: (0.09, 0.09)),
++        804: .init(files: ["Front/NAGANADEL.png", "Front shiny/NAGANADEL.png", "Back/NAGANADEL.png", "Back shiny/NAGANADEL.png"], delays: (0.09, 0.09)),
++        805: .init(files: ["Front/STAKATAKA.png", "Front shiny/STAKATAKA.png", "Back/STAKATAKA.png", "Back shiny/STAKATAKA.png"], delays: (0.09, 0.09)),
++        806: .init(files: ["Front/BLACEPHALON.png", "Front shiny/BLACEPHALON.png", "Back/BLACEPHALON.png", "Back shiny/BLACEPHALON.png"], delays: (0.09, 0.09)),
++        807: .init(files: ["Front/ZERAORA.png", "Front shiny/ZERAORA.png", "Back/ZERAORA.png", "Back shiny/ZERAORA.png"], delays: (0.09, 0.09)),
++        808: .init(files: ["Front/MELTAN.png", "Front shiny/MELTAN.png", "Back/MELTAN.png", "Back shiny/MELTAN.png"], delays: (0.09, 0.09)),
++        809: .init(files: ["Front/MELMETAL.png", "Front shiny/MELMETAL.png", "Back/MELMETAL.png", "Back shiny/MELMETAL.png"], delays: (0.09, 0.09)),
++        810: .init(files: ["Front/GROOKEY.png", "Front shiny/GROOKEY.png", "Back/GROOKEY.png", "Back shiny/GROOKEY.png"], delays: (0.09, 0.09)),
++        811: .init(files: ["Front/THWACKEY.png", "Front shiny/THWACKEY.png", "Back/THWACKEY.png", "Back shiny/THWACKEY.png"], delays: (0.09, 0.09)),
++        812: .init(files: ["Front/RILLABOOM.png", "Front shiny/RILLABOOM.png", "Back/RILLABOOM.png", "Back shiny/RILLABOOM.png"], delays: (0.09, 0.09)),
++        813: .init(files: ["Front/SCORBUNNY.png", "Front shiny/SCORBUNNY.png", "Back/SCORBUNNY.png", "Back shiny/SCORBUNNY.png"], delays: (0.09, 0.09)),
++        814: .init(files: ["Front/RABOOT.png", "Front shiny/RABOOT.png", "Back/RABOOT.png", "Back shiny/RABOOT.png"], delays: (0.09, 0.09)),
++        815: .init(files: ["Front/CINDERACE.png", "Front shiny/CINDERACE.png", "Back/CINDERACE.png", "Back shiny/CINDERACE.png"], delays: (0.09, 0.09)),
++        816: .init(files: ["Front/SOBBLE.png", "Front shiny/SOBBLE.png", "Back/SOBBLE.png", "Back shiny/SOBBLE.png"], delays: (0.09, 0.09), shinyScale: (1, 2)),
++        817: .init(files: ["Front/DRIZZILE.png", "Front shiny/DRIZZILE.png", "Back/DRIZZILE.png", "Back shiny/DRIZZILE.png"], delays: (0.09, 0.09)),
++        818: .init(files: ["Front/INTELEON.png", "Front shiny/INTELEON.png", "Back/INTELEON.png", "Back shiny/INTELEON.png"], delays: (0.09, 0.09)),
++        819: .init(files: ["Front/SKWOVET.png", "Front shiny/SKWOVET.png", "Back/SKWOVET.png", "Back shiny/SKWOVET.png"], delays: (0.09, 0.09)),
++        820: .init(files: ["Front/GREEDENT.png", "Front shiny/GREEDENT.png", "Back/GREEDENT.png", "Back shiny/GREEDENT.png"], delays: (0.09, 0.09)),
++        821: .init(files: ["Front/ROOKIDEE.png", "Front shiny/ROOKIDEE.png", "Back/ROOKIDEE.png", "Back shiny/ROOKIDEE.png"], delays: (0.09, 0.09)),
++        822: .init(files: ["Front/CORVISQUIRE.png", "Front shiny/CORVISQUIRE.png", "Back/CORVISQUIRE.png", "Back shiny/CORVISQUIRE.png"], delays: (0.09, 0.09)),
++        823: .init(files: ["Front/CORVIKNIGHT.png", "Front shiny/CORVIKNIGHT.png", "Back/CORVIKNIGHT.png", "Back shiny/CORVIKNIGHT.png"], delays: (0.09, 0.09)),
++        824: .init(files: ["Front/BLIPBUG.png", "Front shiny/BLIPBUG.png", "Back/BLIPBUG.png", "Back shiny/BLIPBUG.png"], delays: (0.09, 0.09), shinyScale: (1, 2)),
++        825: .init(files: ["Front/DOTTLER.png", "Front shiny/DOTTLER.png", "Back/DOTTLER.png", "Back shiny/DOTTLER.png"], delays: (0.09, 0.09)),
++        826: .init(files: ["Front/ORBEETLE.png", "Front shiny/ORBEETLE.png", "Back/ORBEETLE.png", "Back shiny/ORBEETLE.png"], delays: (0.09, 0.09)),
++        827: .init(files: ["Front/NICKIT.png", "Front shiny/NICKIT.png", "Back/NICKIT.png", "Back shiny/NICKIT.png"], delays: (0.09, 0.09)),
++        828: .init(files: ["Front/THIEVUL.png", "Front shiny/THIEVUL.png", "Back/THIEVUL.png", "Back shiny/THIEVUL.png"], delays: (0.09, 0.09)),
++        829: .init(files: ["Front/GOSSIFLEUR.png", "Front shiny/GOSSIFLEUR.png", "Back/GOSSIFLEUR.png", "Back shiny/GOSSIFLEUR.png"], delays: (0.09, 0.09)),
++        830: .init(files: ["Front/ELDEGOSS.png", "Front shiny/ELDEGOSS.png", "Back/ELDEGOSS.png", "Back shiny/ELDEGOSS.png"], delays: (0.09, 0.09)),
++        831: .init(files: ["Front/WOOLOO.png", "Front shiny/WOOLOO.png", "Back/WOOLOO.png", "Back shiny/WOOLOO.png"], delays: (0.09, 0.09)),
++        832: .init(files: ["Front/DUBWOOL.png", "Front shiny/DUBWOOL.png", "Back/DUBWOOL.png", "Back shiny/DUBWOOL.png"], delays: (0.09, 0.09)),
++        833: .init(files: ["Front/CHEWTLE.png", "Front shiny/CHEWTLE.png", "Back/CHEWTLE.png", "Back shiny/CHEWTLE.png"], delays: (0.09, 0.09)),
++        834: .init(files: ["Front/DREDNAW.png", "Front shiny/DREDNAW.png", "Back/DREDNAW.png", "Back shiny/DREDNAW.png"], delays: (0.09, 0.09)),
++        835: .init(files: ["Front/YAMPER.png", "Front shiny/YAMPER.png", "Back/YAMPER.png", "Back shiny/YAMPER.png"], delays: (0.09, 0.09)),
++        836: .init(files: ["Front/BOLTUND.png", "Front shiny/BOLTUND.png", "Back/BOLTUND.png", "Back shiny/BOLTUND.png"], delays: (0.09, 0.09)),
++        837: .init(files: ["Front/ROLYCOLY.png", "Front shiny/ROLYCOLY.png", "Back/ROLYCOLY.png", "Back shiny/ROLYCOLY.png"], delays: (0.09, 0.09), shinyScale: (1, 2)),
++        838: .init(files: ["Front/CARKOL.png", "Front shiny/CARKOL.png", "Back/CARKOL.png", "Back shiny/CARKOL.png"], delays: (0.09, 0.09)),
++        839: .init(files: ["Front/COALOSSAL.png", "Front shiny/COALOSSAL.png", "Back/COALOSSAL.png", "Back shiny/COALOSSAL.png"], delays: (0.09, 0.09)),
++        840: .init(files: ["Front/APPLIN.png", "Front shiny/APPLIN.png", "Back/APPLIN.png", "Back shiny/APPLIN.png"], delays: (0.09, 0.09)),
++        841: .init(files: ["Front/FLAPPLE.png", "Front shiny/FLAPPLE.png", "Back/FLAPPLE.png", "Back shiny/FLAPPLE.png"], delays: (0.09, 0.09)),
++        842: .init(files: ["Front/APPLETUN.png", "Front shiny/APPLETUN.png", "Back/APPLETUN.png", "Back shiny/APPLETUN.png"], delays: (0.09, 0.09)),
++        843: .init(files: ["Front/SILICOBRA.png", "Front shiny/SILICOBRA.png", "Back/SILICOBRA.png", "Back shiny/SILICOBRA.png"], delays: (0.09, 0.09)),
++        844: .init(files: ["Front/SANDACONDA.png", "Front shiny/SANDACONDA.png", "Back/SANDACONDA.png", "Back shiny/SANDACONDA.png"], delays: (0.09, 0.09)),
++        845: .init(files: ["Front/CRAMORANT.png", "Front shiny/CRAMORANT.png", "Back/CRAMORANT.png", "Back shiny/CRAMORANT.png"], delays: (0.09, 0.09)),
++        846: .init(files: ["Front/ARROKUDA.png", "Front shiny/ARROKUDA.png", "Back/ARROKUDA.png", "Back shiny/ARROKUDA.png"], delays: (0.09, 0.09)),
++        847: .init(files: ["Front/BARRASKEWDA.png", "Front shiny/BARRASKEWDA.png", "Back/BARRASKEWDA.png", "Back shiny/BARRASKEWDA.png"], delays: (0.09, 0.09)),
++        848: .init(files: ["Front/TOXEL.png", "Front shiny/TOXEL.png", "Back/TOXEL.png", "Back shiny/TOXEL.png"], delays: (0.09, 0.09), shinyScale: (1, 2)),
++        849: .init(files: ["Front/TOXTRICITY.png", "Front shiny/TOXTRICITY.png", "Back/TOXTRICITY.png", "Back shiny/TOXTRICITY.png"], delays: (0.09, 0.09)),
++        850: .init(files: ["Front/SIZZLIPEDE.png", "Front shiny/SIZZLIPEDE.png", "Back/SIZZLIPEDE.png", "Back shiny/SIZZLIPEDE.png"], delays: (0.09, 0.09)),
++        851: .init(files: ["Front/CENTISKORCH.png", "Front shiny/CENTISKORCH.png", "Back/CENTISKORCH.png", "Back shiny/CENTISKORCH.png"], delays: (0.09, 0.09)),
++        852: .init(files: ["Front/CLOBBOPUS.png", "Front shiny/CLOBBOPUS.png", "Back/CLOBBOPUS.png", "Back shiny/CLOBBOPUS.png"], delays: (0.09, 0.09)),
++        853: .init(files: ["Front/GRAPPLOCT.png", "Front shiny/GRAPPLOCT.png", "Back/GRAPPLOCT.png", "Back shiny/GRAPPLOCT.png"], delays: (0.09, 0.09)),
++        854: .init(files: ["Front/SINISTEA.png", "Front shiny/SINISTEA.png", "Back/SINISTEA.png", "Back shiny/SINISTEA.png"], delays: (0.09, 0.09)),
++        855: .init(files: ["Front/POLTEAGEIST.png", "Front shiny/POLTEAGEIST.png", "Back/POLTEAGEIST.png", "Back shiny/POLTEAGEIST.png"], delays: (0.09, 0.09)),
++        856: .init(files: ["Front/HATENNA.png", "Front shiny/HATENNA.png", "Back/HATENNA.png", "Back shiny/HATENNA.png"], delays: (0.09, 0.09)),
++        857: .init(files: ["Front/HATTREM.png", "Front shiny/HATTREM.png", "Back/HATTREM.png", "Back shiny/HATTREM.png"], delays: (0.09, 0.09)),
++        858: .init(files: ["Front/HATTERENE.png", "Front shiny/HATTERENE.png", "Back/HATTERENE.png", "Back shiny/HATTERENE.png"], delays: (0.09, 0.09)),
++        859: .init(files: ["Front/IMPIDIMP.png", "Front shiny/IMPIDIMP.png", "Back/IMPIDIMP.png", "Back shiny/IMPIDIMP.png"], delays: (0.09, 0.09), shinyScale: (2, 2)),
++        860: .init(files: ["Front/MORGREM.png", "Front shiny/MORGREM.png", "Back/MORGREM.png", "Back shiny/MORGREM.png"], delays: (0.09, 0.09)),
++        861: .init(files: ["Front/GRIMMSNARL.png", "Front shiny/GRIMMSNARL.png", "Back/GRIMMSNARL.png", "Back shiny/GRIMMSNARL.png"], delays: (0.09, 0.09)),
++        862: .init(files: ["Front/OBSTAGOON.png", "Front shiny/OBSTAGOON.png", "Back/OBSTAGOON.png", "Back shiny/OBSTAGOON.png"], delays: (0.09, 0.09)),
++        863: .init(files: ["Front/PERRSERKER.png", "Front shiny/PERRSERKER.png", "Back/PERRSERKER.png", "Back shiny/PERRSERKER.png"], delays: (0.09, 0.09)),
++        864: .init(files: ["Front/CURSOLA.png", "Front shiny/CURSOLA.png", "Back/CURSOLA.png", "Back shiny/CURSOLA.png"], delays: (0.09, 0.09)),
++        865: .init(files: ["Front/SIRFETCHD.png", "Front shiny/SIRFETCHD.png", "Back/SIRFETCHD.png", "Back shiny/SIRFETCHD.png"], delays: (0.09, 0.09)),
++        866: .init(files: ["Front/MRRIME.png", "Front shiny/MRRIME.png", "Back/MRRIME.png", "Back shiny/MRRIME.png"], delays: (0.09, 0.09)),
++        867: .init(files: ["Front/RUNERIGUS.png", "Front shiny/RUNERIGUS.png", "Back/RUNERIGUS.png", "Back shiny/RUNERIGUS.png"], delays: (0.09, 0.09)),
++        868: .init(files: ["Front/MILCERY.png", "Front shiny/MILCERY.png", "Back/MILCERY.png", "Back shiny/MILCERY.png"], delays: (0.09, 0.09)),
++        869: .init(files: ["Front/ALCREMIE.png", "Front shiny/ALCREMIE.png", "Back/ALCREMIE.png", "Back shiny/ALCREMIE.png"], delays: (0.09, 0.09)),
++        870: .init(files: ["Front/FALINKS.png", "Front shiny/FALINKS.png", "Back/FALINKS.png", "Back shiny/FALINKS.png"], delays: (0.09, 0.09)),
++        871: .init(files: ["Front/PINCURCHIN.png", "Front shiny/PINCURCHIN.png", "Back/PINCURCHIN.png", "Back shiny/PINCURCHIN.png"], delays: (0.09, 0.09)),
++        872: .init(files: ["Front/SNOM.png", "Front shiny/SNOM.png", "Back/SNOM.png", "Back shiny/SNOM.png"], delays: (0.09, 0.09), shinyScale: (1, 3)),
++        873: .init(files: ["Front/FROSMOTH.png", "Front shiny/FROSMOTH.png", "Back/FROSMOTH.png", "Back shiny/FROSMOTH.png"], delays: (0.09, 0.09)),
++        874: .init(files: ["Front/STONJOURNER.png", "Front shiny/STONJOURNER.png", "Back/STONJOURNER.png", "Back shiny/STONJOURNER.png"], delays: (0.09, 0.09)),
++        875: .init(files: ["Front/EISCUE.png", "Front shiny/EISCUE.png", "Back/EISCUE.png", "Back shiny/EISCUE.png"], delays: (0.09, 0.09)),
++        876: .init(files: ["Front/INDEEDEE.png", "Front shiny/INDEEDEE.png", "Back/INDEEDEE.png", "Back shiny/INDEEDEE.png"], delays: (0.09, 0.09)),
++        877: .init(files: ["Front/MORPEKO.png", "Front shiny/MORPEKO.png", "Back/MORPEKO.png", "Back shiny/MORPEKO.png"], delays: (0.09, 0.09), shinyScale: (2, 2)),
++        878: .init(files: ["Front/CUFANT.png", "Front shiny/CUFANT.png", "Back/CUFANT.png", "Back shiny/CUFANT.png"], delays: (0.09, 0.09)),
++        879: .init(files: ["Front/COPPERAJAH.png", "Front shiny/COPPERAJAH.png", "Back/COPPERAJAH.png", "Back shiny/COPPERAJAH.png"], delays: (0.09, 0.09)),
++        880: .init(files: ["Front/DRACOZOLT.png", "Front shiny/DRACOZOLT.png", "Back/DRACOZOLT.png", "Back shiny/DRACOZOLT.png"], delays: (0.09, 0.09)),
++        881: .init(files: ["Front/ARCTOZOLT.png", "Front shiny/ARCTOZOLT.png", "Back/ARCTOZOLT.png", "Back shiny/ARCTOZOLT.png"], delays: (0.09, 0.09)),
++        882: .init(files: ["Front/DRACOVISH.png", "Front shiny/DRACOVISH.png", "Back/DRACOVISH.png", "Back shiny/DRACOVISH.png"], delays: (0.09, 0.09)),
++        883: .init(files: ["Front/ARCTOVISH.png", "Front shiny/ARCTOVISH.png", "Back/ARCTOVISH.png", "Back shiny/ARCTOVISH.png"], delays: (0.09, 0.09)),
++        884: .init(files: ["Front/DURALUDON.png", "Front shiny/DURALUDON.png", "Back/DURALUDON.png", "Back shiny/DURALUDON.png"], delays: (0.09, 0.09)),
++        885: .init(files: ["Front/DREEPY.png", "Front shiny/DREEPY.png", "Back/DREEPY.png", "Back shiny/DREEPY.png"], delays: (0.09, 0.09)),
++        886: .init(files: ["Front/DRAKLOAK.png", "Front shiny/DRAKLOAK.png", "Back/DRAKLOAK.png", "Back shiny/DRAKLOAK.png"], delays: (0.09, 0.09)),
++        887: .init(files: ["Front/DRAGAPULT.png", "Front shiny/DRAGAPULT.png", "Back/DRAGAPULT.png", "Back shiny/DRAGAPULT.png"], delays: (0.09, 0.09)),
++        888: .init(files: ["Front/ZACIAN.png", "Front shiny/ZACIAN.png", "Back/ZACIAN.png", "Back shiny/ZACIAN.png"], delays: (0.09, 0.09)),
++        889: .init(files: ["Front/ZAMAZENTA.png", "Front shiny/ZAMAZENTA.png", "Back/ZAMAZENTA.png", "Back shiny/ZAMAZENTA.png"], delays: (0.09, 0.09)),
++        890: .init(files: ["Front/ETERNATUS.png", "Front shiny/ETERNATUS.png", "Back/ETERNATUS.png", "Back shiny/ETERNATUS.png"], delays: (0.09, 0.135)),
++        891: .init(files: ["Front/KUBFU.png", "Front shiny/KUBFU.png", "Back/KUBFU.png", "Back shiny/KUBFU.png"], delays: (0.09, 0.09)),
++        892: .init(files: ["Front/URSHIFU.png", "Front shiny/URSHIFU.png", "Back/URSHIFU.png", "Back shiny/URSHIFU.png"], delays: (0.09, 0.09)),
++        893: .init(files: ["Front/ZARUDE.png", "Front shiny/ZARUDE.png", "Back/ZARUDE.png", "Back shiny/ZARUDE.png"], delays: (0.09, 0.09)),
++        894: .init(files: ["Front/REGIELEKI.png", "Front shiny/REGIELEKI.png", "Back/REGIELEKI.png", "Back shiny/REGIELEKI.png"], delays: (0.09, 0.09)),
++        895: .init(files: ["Front/REGIDRAGO.png", "Front shiny/REGIDRAGO.png", "Back/REGIDRAGO.png", "Back shiny/REGIDRAGO.png"], delays: (0.09, 0.09)),
++        896: .init(files: ["Front/GLASTRIER.png", "Front shiny/GLASTRIER.png", "Back/GLASTRIER.png", "Back shiny/GLASTRIER.png"], delays: (0.09, 0.09)),
++        897: .init(files: ["Front/SPECTRIER.png", "Front shiny/SPECTRIER.png", "Back/SPECTRIER.png", "Back shiny/SPECTRIER.png"], delays: (0.09, 0.09)),
++        898: .init(files: ["Front/CALYREX.png", "Front shiny/CALYREX.png", "Back/CALYREX.png", "Back shiny/CALYREX.png"], delays: (0.09, 0.09)),
++        899: .init(files: ["Front/WYRDEER.png", "Front shiny/WYRDEER.png", "Back/WYRDEER.png", "Back shiny/WYRDEER.png"], delays: (0.09, 0.09)),
++        900: .init(files: ["Front/KLEAVOR.PNG", "Front shiny/KLEAVOR.png", "Back/KLEAVOR.png", "Back shiny/KLEAVOR.png"], delays: (0.09, 0.09)),
++        901: .init(files: ["Front/URSALUNA.PNG", "Front shiny/URSALUNA.png", "Back/URSALUNA.png", "Back shiny/URSALUNA.png"], delays: (0.09, 0.09)),
++        902: .init(files: ["Front/BASCULEGION.PNG", "Front shiny/BASCULEGION.png", "Back/BASCULEGION.png", "Back shiny/BASCULEGION.png"], delays: (0.09, 0.09)),
++        903: .init(files: ["Front/SNEASLER.PNG", "Front shiny/SNEASLER.png", "Back/SNEASLER.png", "Back shiny/SNEASLER.png"], delays: (0.09, 0.09)),
++        904: .init(files: ["Front/OVERQWIL.PNG", "Front shiny/OVERQWIL.png", "Back/OVERQWIL.png", "Back shiny/OVERQWIL.png"], delays: (0.09, 0.09)),
++        905: .init(files: ["Front/ENAMORUS.PNG", "Front shiny/ENAMORUS.png", "Back/ENAMORUS.png", "Back shiny/ENAMORUS.png"], delays: (0.09, 0.09)),
++        906: .init(files: ["Front/SPRIGATITO.png", "Front shiny/SPRIGATITO.png", "Back/SPRIGATITO.png", "Back shiny/SPRIGATITO.png"], delays: (0.09, 0.09)),
++        907: .init(files: ["Front/FLORAGATO.png", "Front shiny/FLORAGATO.png", "Back/FLORAGATO.png", "Back shiny/FLORAGATO.png"], delays: (0.09, 0.09)),
++        908: .init(files: ["Front/MEOWSCARADA.png", "Front shiny/MEOWSCARADA.png", "Back/MEOWSCARADA.png", "Back shiny/MEOWSCARADA.png"], delays: (0.09, 0.09)),
++        909: .init(files: ["Front/FUECOCO.png", "Front shiny/FUECOCO.png", "Back/FUECOCO.png", "Back shiny/FUECOCO.png"], delays: (0.09, 0.09)),
++        910: .init(files: ["Front/CROCALOR.png", "Front shiny/CROCALOR.png", "Back/CROCALOR.png", "Back shiny/CROCALOR.png"], delays: (0.09, 0.09)),
++        911: .init(files: ["Front/SKELEDIRGE.png", "Front shiny/SKELEDIRGE.png", "Back/SKELEDIRGE.png", "Back shiny/SKELEDIRGE.png"], delays: (0.09, 0.09)),
++        912: .init(files: ["Front/QUAXLY.png", "Front shiny/QUAXLY.png", "Back/QUAXLY.png", "Back shiny/QUAXLY.png"], delays: (0.09, 0.09)),
++        913: .init(files: ["Front/QUAXWELL.png", "Front shiny/QUAXWELL.png", "Back/QUAXWELL.png", "Back shiny/QUAXWELL.png"], delays: (0.09, 0.09)),
++        914: .init(files: ["Front/QUAQUAVAL.png", "Front shiny/QUAQUAVAL.png", "Back/QUAQUAVAL.png", "Back shiny/QUAQUAVAL.png"], delays: (0.09, 0.09)),
++        915: .init(files: ["Front/LECHONK.png", "Front shiny/LECHONK.png", "Back/LECHONK.png", "Back shiny/LECHONK.png"], delays: (0.09, 0.09)),
++        916: .init(files: ["Front/OINKOLOGNE.png", "Front shiny/OINKOLOGNE.png", "Back/OINKOLOGNE.png", "Back shiny/OINKOLOGNE.png"], delays: (0.09, 0.09)),
++        917: .init(files: ["Front/TAROUNTULA.png", "Front shiny/TAROUNTULA.png", "Back/TAROUNTULA.png", "Back shiny/TAROUNTULA.png"], delays: (0.09, 0.09)),
++        918: .init(files: ["Front/SPIDOPS.png", "Front shiny/SPIDOPS.png", "Back/SPIDOPS.png", "Back shiny/SPIDOPS.png"], delays: (0.09, 0.09)),
++        919: .init(files: ["Front/NYMBLE.png", "Front shiny/NYMBLE.png", "Back/NYMBLE.png", "Back shiny/NYMBLE.png"], delays: (0.09, 0.09)),
++        920: .init(files: ["Front/LOKIX.png", "Front shiny/LOKIX.png", "Back/LOKIX.png", "Back shiny/LOKIX.png"], delays: (0.09, 0.09)),
++        921: .init(files: ["Front/PAWMI.png", "Front shiny/PAWMI.png", "Back/PAWMI.png", "Back shiny/PAWMI.png"], delays: (0.09, 0.09)),
++        922: .init(files: ["Front/PAWMO.png", "Front shiny/PAWMO.png", "Back/PAWMO.png", "Back shiny/PAWMO.png"], delays: (0.09, 0.09)),
++        923: .init(files: ["Front/PAWMOT.PNG", "Front shiny/PAWMOT.png", "Back/PAWMOT.png", "Back shiny/PAWMOT.png"], delays: (0.09, 0.09)),
++        924: .init(files: ["Front/TANDEMAUS.png", "Front shiny/TANDEMAUS.png", "Back/TANDEMAUS.png", "Back shiny/TANDEMAUS.png"], delays: (0.09, 0.09)),
++        925: .init(files: ["Front/MAUSHOLD.png", "Front shiny/MAUSHOLD.png", "Back/MAUSHOLD.png", "Back shiny/MAUSHOLD.png"], delays: (0.09, 0.09)),
++        926: .init(files: ["Front/FIDOUGH.png", "Front shiny/FIDOUGH.png", "Back/FIDOUGH.png", "Back shiny/FIDOUGH.png"], delays: (0.09, 0.09)),
++        927: .init(files: ["Front/DACHSBUN.png", "Front shiny/DACHSBUN.png", "Back/DACHSBUN.png", "Back shiny/DACHSBUN.png"], delays: (0.09, 0.09)),
++        928: .init(files: ["Front/SMOLIV.png", "Front shiny/SMOLIV.png", "Back/SMOLIV.png", "Back shiny/SMOLIV.png"], delays: (0.09, 0.09)),
++        929: .init(files: ["Front/DOLLIV.png", "Front shiny/DOLLIV.png", "Back/DOLLIV.png", "Back shiny/DOLLIV.png"], delays: (0.09, 0.09)),
++        930: .init(files: ["Front/ARBOLIVA.png", "Front shiny/ARBOLIVA.png", "Back/ARBOLIVA.png", "Back shiny/ARBOLIVA.png"], delays: (0.09, 0.09)),
++        931: .init(files: ["Front/SQUAWKABILLY.png", "Front shiny/SQUAWKABILLY.png", "Back/SQUAWKABILLY.png", "Back shiny/SQUAWKABILLY.png"], delays: (0.09, 0.09)),
++        932: .init(files: ["Front/NACLI.png", "Front shiny/NACLI.png", "Back/NACLI.png", "Back shiny/NACLI.png"], delays: (0.09, 0.09)),
++        933: .init(files: ["Front/NACLSTACK.png", "Front shiny/NACLSTACK.png", "Back/NACLSTACK.png", "Back shiny/NACLSTACK.png"], delays: (0.09, 0.09)),
++        934: .init(files: ["Front/GARGANACL.png", "Front shiny/GARGANACL.png", "Back/GARGANACL.png", "Back shiny/GARGANACL.png"], delays: (0.09, 0.09)),
++        935: .init(files: ["Front/CHARCADET.png", "Front shiny/CHARCADET.png", "Back/CHARCADET.png", "Back shiny/CHARCADET.png"], delays: (0.09, 0.09)),
++        936: .init(files: ["Front/ARMAROUGE.png", "Front shiny/ARMAROUGE.png", "Back/ARMAROUGE.png", "Back shiny/ARMAROUGE.png"], delays: (0.09, 0.09)),
++        937: .init(files: ["Front/CERULEDGE.png", "Front shiny/CERULEDGE.png", "Back/CERULEDGE.png", "Back shiny/CERULEDGE.png"], delays: (0.09, 0.09)),
++        938: .init(files: ["Front/TADBULB.png", "Front shiny/TADBULB.png", "Back/TADBULB.png", "Back shiny/TADBULB.png"], delays: (0.09, 0.09)),
++        939: .init(files: ["Front/BELLIBOLT.png", "Front shiny/BELLIBOLT.png", "Back/BELLIBOLT.png", "Back shiny/BELLIBOLT.png"], delays: (0.09, 0.09)),
++        940: .init(files: ["Front/WATTREL.png", "Front shiny/WATTREL.png", "Back/WATTREL.png", "Back shiny/WATTREL.png"], delays: (0.09, 0.09)),
++        941: .init(files: ["Front/KILOWATTREL.png", "Front shiny/KILOWATTREL.png", "Back/KILOWATTREL.png", "Back shiny/KILOWATTREL.png"], delays: (0.135, 0.135)),
++        942: .init(files: ["Front/MASCHIFF.png", "Front shiny/MASCHIFF.png", "Back/MASCHIFF.png", "Back shiny/MASCHIFF.png"], delays: (0.09, 0.09)),
++        943: .init(files: ["Front/MABOSSTIFF.png", "Front shiny/MABOSSTIFF.png", "Back/MABOSSTIFF.png", "Back shiny/MABOSSTIFF.png"], delays: (0.09, 0.09)),
++        944: .init(files: ["Front/SHROODLE.png", "Front shiny/SHROODLE.png", "Back/SHROODLE.png", "Back shiny/SHROODLE.png"], delays: (0.09, 0.09)),
++        945: .init(files: ["Front/GRAFAIAI.png", "Front shiny/GRAFAIAI.png", "Back/GRAFAIAI.png", "Back shiny/GRAFAIAI.png"], delays: (0.09, 0.09)),
++        946: .init(files: ["Front/BRAMBLIN.png", "Front shiny/BRAMBLIN.png", "Back/BRAMBLIN.png", "Back shiny/BRAMBLIN.png"], delays: (0.09, 0.09)),
++        947: .init(files: ["Front/BRAMBLEGHAST.png", "Front shiny/BRAMBLEGHAST.png", "Back/BRAMBLEGHAST.png", "Back shiny/BRAMBLEGHAST.png"], delays: (0.09, 0.09)),
++        948: .init(files: ["Front/TOEDSCOOL.png", "Front shiny/TOEDSCOOL.png", "Back/TOEDSCOOL.png", "Back shiny/TOEDSCOOL.png"], delays: (0.09, 0.09)),
++        949: .init(files: ["Front/TOEDSCRUEL.png", "Front shiny/TOEDSCRUEL.png", "Back/TOEDSCRUEL.png", "Back shiny/TOEDSCRUEL.png"], delays: (0.09, 0.09)),
++        950: .init(files: ["Front/KLAWF.png", "Front shiny/KLAWF.png", "Back/KLAWF.png", "Back shiny/KLAWF.png"], delays: (0.09, 0.09)),
++        951: .init(files: ["Front/CAPSAKID.png", "Front shiny/CAPSAKID.png", "Back/CAPSAKID.png", "Back shiny/CAPSAKID.png"], delays: (0.09, 0.09)),
++        952: .init(files: ["Front/SCOVILLAIN.png", "Front shiny/SCOVILLAIN.png", "Back/SCOVILLAIN.png", "Back shiny/SCOVILLAIN.png"], delays: (0.09, 0.09)),
++        953: .init(files: ["Front/RELLOR.png", "Front shiny/RELLOR.png", "Back/RELLOR.png", "Back shiny/RELLOR.png"], delays: (0.09, 0.09)),
++        954: .init(files: ["Front/RABSCA.png", "Front shiny/RABSCA.png", "Back/RABSCA.png", "Back shiny/RABSCA.png"], delays: (0.09, 0.09)),
++        955: .init(files: ["Front/FLITTLE.png", "Front shiny/FLITTLE.png", "Back/FLITTLE.png", "Back shiny/FLITTLE.png"], delays: (0.09, 0.09)),
++        956: .init(files: ["Front/ESPATHRA.png", "Front shiny/ESPATHRA.png", "Back/ESPATHRA.png", "Back shiny/ESPATHRA.png"], delays: (0.09, 0.09)),
++        957: .init(files: ["Front/TINKATINK.png", "Front shiny/TINKATINK.png", "Back/TINKATINK.png", "Back shiny/TINKATINK.png"], delays: (0.09, 0.09)),
++        958: .init(files: ["Front/TINKATUFF.png", "Front shiny/TINKATUFF.png", "Back/TINKATUFF.png", "Back shiny/TINKATUFF.png"], delays: (0.09, 0.09)),
++        959: .init(files: ["Front/TINKATON.png", "Front shiny/TINKATON.png", "Back/TINKATON.png", "Back shiny/TINKATON.png"], delays: (0.09, 0.09)),
++        960: .init(files: ["Front/WIGLETT.png", "Front shiny/WIGLETT.png", "Back/WIGLETT.png", "Back shiny/WIGLETT.png"], delays: (0.09, 0.09)),
++        961: .init(files: ["Front/WUGTRIO.png", "Front shiny/WUGTRIO.png", "Back/WUGTRIO.png", "Back shiny/WUGTRIO.png"], delays: (0.09, 0.09)),
++        962: .init(files: ["Front/BOMBIRDIER.png", "Front shiny/BOMBIRDIER.png", "Back/BOMBIRDIER.png", "Back shiny/BOMBIRDIER.png"], delays: (0.09, 0.09)),
++        963: .init(files: ["Front/FINIZEN.png", "Front shiny/FINIZEN.png", "Back/FINIZEN.png", "Back shiny/FINIZEN.png"], delays: (0.09, 0.09)),
++        964: .init(files: ["Front/PALAFIN.png", "Front shiny/PALAFIN.png", "Back/PALAFIN.png", "Back shiny/PALAFIN.png"], delays: (0.09, 0.09)),
++        965: .init(files: ["Front/VAROOM.png", "Front shiny/VAROOM.png", "Back/VAROOM.png", "Back shiny/VAROOM.png"], delays: (0.09, 0.09)),
++        966: .init(files: ["Front/REVAVROOM.png", "Front shiny/REVAVROOM.png", "Back/REVAVROOM.png", "Back shiny/REVAVROOM.png"], delays: (0.09, 0.09)),
++        967: .init(files: ["Front/CYCLIZAR.png", "Front shiny/CYCLIZAR.png", "Back/CYCLIZAR.png", "Back shiny/CYCLIZAR.png"], delays: (0.09, 0.09)),
++        968: .init(files: ["Front/ORTHWORM.png", "Front shiny/ORTHWORM.png", "Back/ORTHWORM.png", "Back shiny/ORTHWORM.png"], delays: (0.09, 0.09)),
++        969: .init(files: ["Front/GLIMMET.png", "Front shiny/GLIMMET.png", "Back/GLIMMET.png", "Back shiny/GLIMMET.png"], delays: (0.09, 0.09)),
++        970: .init(files: ["Front/GLIMMORA.png", "Front shiny/GLIMMORA.png", "Back/GLIMMORA.png", "Back shiny/GLIMMORA.png"], delays: (0.09, 0.09)),
++        971: .init(files: ["Front/GREAVARD.png", "Front shiny/GREAVARD.png", "Back/GREAVARD.png", "Back shiny/GREAVARD.png"], delays: (0.09, 0.09)),
++        972: .init(files: ["Front/HOUNDSTONE.png", "Front shiny/HOUNDSTONE.png", "Back/HOUNDSTONE.png", "Back shiny/HOUNDSTONE.png"], delays: (0.09, 0.09)),
++        973: .init(files: ["Front/FLAMIGO.png", "Front shiny/FLAMIGO.png", "Back/FLAMIGO.png", "Back shiny/FLAMIGO.png"], delays: (0.09, 0.09)),
++        974: .init(files: ["Front/CETODDLE.png", "Front shiny/CETODDLE.png", "Back/CETODDLE.png", "Back shiny/CETODDLE.png"], delays: (0.09, 0.09)),
++        975: .init(files: ["Front/CETITAN.png", "Front shiny/CETITAN.png", "Back/CETITAN.png", "Back shiny/CETITAN.png"], delays: (0.09, 0.09)),
++        976: .init(files: ["Front/VELUZA.png", "Front shiny/VELUZA.png", "Back/VELUZA.png", "Back shiny/VELUZA.png"], delays: (0.09, 0.09)),
++        977: .init(files: ["Front/DONDOZO.png", "Front shiny/DONDOZO.png", "Back/DONDOZO.png", "Back shiny/DONDOZO.png"], delays: (0.09, 0.09)),
++        978: .init(files: ["Front/TATSUGIRI.png", "Front shiny/TATSUGIRI.png", "Back/TATSUGIRI.png", "Back shiny/TATSUGIRI.png"], delays: (0.09, 0.09)),
++        979: .init(files: ["Front/ANNIHILAPE.png", "Front shiny/ANNIHILAPE.png", "Back/ANNIHILAPE.png", "Back shiny/ANNIHILAPE.png"], delays: (0.09, 0.09)),
++        980: .init(files: ["Front/CLODSIRE.png", "Front shiny/CLODSIRE.png", "Back/CLODSIRE.png", "Back shiny/CLODSIRE.png"], delays: (0.09, 0.09)),
++        981: .init(files: ["Front/FARIGIRAF.png", "Front shiny/FARIGIRAF.png", "Back/FARIGIRAF.png", "Back shiny/FARIGIRAF.png"], delays: (0.09, 0.09)),
++        982: .init(files: ["Front/DUDUNSPARCE.png", "Front shiny/DUDUNSPARCE.png", "Back/DUDUNSPARCE.png", "Back shiny/DUDUNSPARCE.png"], delays: (0.09, 0.09)),
++        983: .init(files: ["Front/KINGAMBIT.png", "Front shiny/KINGAMBIT.png", "Back/KINGAMBIT.png", "Back shiny/KINGAMBIT.png"], delays: (0.09, 0.09)),
++        984: .init(files: ["Front/GREATTUSK.png", "Front shiny/GREATTUSK.png", "Back/GREATTUSK.png", "Back shiny/GREATTUSK.png"], delays: (0.09, 0.09)),
++        985: .init(files: ["Front/SCREAMTAIL.png", "Front shiny/SCREAMTAIL.png", "Back/SCREAMTAIL.png", "Back shiny/SCREAMTAIL.png"], delays: (0.09, 0.09)),
++        986: .init(files: ["Front/BRUTEBONNET.png", "Front shiny/BRUTEBONNET.png", "Back/BRUTEBONNET.png", "Back shiny/BRUTEBONNET.png"], delays: (0.09, 0.09)),
++        987: .init(files: ["Front/FLUTTERMANE.png", "Front shiny/FLUTTERMANE.png", "Back/FLUTTERMANE.png", "Back shiny/FLUTTERMANE.png"], delays: (0.09, 0.09)),
++        988: .init(files: ["Front/SLITHERWING.png", "Front shiny/SLITHERWING.png", "Back/SLITHERWING.png", "Back shiny/SLITHERWING.png"], delays: (0.09, 0.09)),
++        989: .init(files: ["Front/SANDYSHOCKS.png", "Front shiny/SANDYSHOCKS.png", "Back/SANDYSHOCKS.png", "Back shiny/SANDYSHOCKS.png"], delays: (0.09, 0.09)),
++        990: .init(files: ["Front/IRONTREADS.png", "Front shiny/IRONTREADS.png", "Back/IRONTREADS.png", "Back shiny/IRONTREADS.png"], delays: (0.09, 0.09)),
++        991: .init(files: ["Front/IRONBUNDLE.png", "Front shiny/IRONBUNDLE.png", "Back/IRONBUNDLE.png", "Back shiny/IRONBUNDLE.png"], delays: (0.09, 0.09)),
++        992: .init(files: ["Front/IRONHANDS.png", "Front shiny/IRONHANDS.png", "Back/IRONHANDS.png", "Back shiny/IRONHANDS.png"], delays: (0.09, 0.09)),
++        993: .init(files: ["Front/IRONJUGULIS.png", "Front shiny/IRONJUGULIS.png", "Back/IRONJUGULIS.png", "Back shiny/IRONJUGULIS.png"], delays: (0.09, 0.09)),
++        994: .init(files: ["Front/IRONMOTH.png", "Front shiny/IRONMOTH.png", "Back/IRONMOTH.png", "Back shiny/IRONMOTH.png"], delays: (0.09, 0.135)),
++        995: .init(files: ["Front/IRONTHORNS.png", "Front shiny/IRONTHORNS.png", "Back/IRONTHORNS.png", "Back shiny/IRONTHORNS.png"], delays: (0.09, 0.09)),
++        996: .init(files: ["Front/FRIGIBAX.png", "Front shiny/FRIGIBAX.png", "Back/FRIGIBAX.png", "Back shiny/FRIGIBAX.png"], delays: (0.09, 0.09)),
++        997: .init(files: ["Front/ARCTIBAX.png", "Front shiny/ARCTIBAX.png", "Back/ARCTIBAX.png", "Back shiny/ARCTIBAX.png"], delays: (0.09, 0.09)),
++        998: .init(files: ["Front/BAXCALIBUR.png", "Front shiny/BAXCALIBUR.png", "Back/BAXCALIBUR.png", "Back shiny/BAXCALIBUR.png"], delays: (0.09, 0.09)),
++        999: .init(files: ["Front/GIMMIGHOUL.png", "Front shiny/GIMMIGHOUL.png", "Back/GIMMIGHOUL.png", "Back shiny/GIMMIGHOUL.png"], delays: (0.09, 0.09)),
++        1000: .init(files: ["Front/GHOLDENGO.png", "Front shiny/GHOLDENGO.png", "Back/GHOLDENGO.png", "Back shiny/GHOLDENGO.png"], delays: (0.09, 0.09)),
++        1001: .init(files: ["Front/WOCHIEN.png", "Front shiny/WOCHIEN.png", "Back/WOCHIEN.png", "Back shiny/WOCHIEN.png"], delays: (0.09, 0.09)),
++        1002: .init(files: ["Front/CHIENPAO.png", "Front shiny/CHIENPAO.png", "Back/CHIENPAO.png", "Back shiny/CHIENPAO.png"], delays: (0.09, 0.09)),
++        1003: .init(files: ["Front/TINGLU.png", "Front shiny/TINGLU.png", "Back/TINGLU.png", "Back shiny/TINGLU.png"], delays: (0.09, 0.09)),
++        1004: .init(files: ["Front/CHIYU.png", "Front shiny/CHIYU.png", "Back/CHIYU.png", "Back shiny/CHIYU.png"], delays: (0.135, 0.135)),
++        1005: .init(files: ["Front/ROARINGMOON.png", "Front shiny/ROARINGMOON.png", "Back/ROARINGMOON.png", "Back shiny/ROARINGMOON.png"], delays: (0.135, 0.135)),
++        1006: .init(files: ["Front/IRONVALIANT.png", "Front shiny/IRONVALIANT.png", "Back/IRONVALIANT.png", "Back shiny/IRONVALIANT.png"], delays: (0.09, 0.09)),
++        1007: .init(files: ["Front/KORAIDON.png", "Front shiny/KORAIDON.png", "Back/KORAIDON.png", "Back shiny/KORAIDON.png"], delays: (0.09, 0.09)),
++        1008: .init(files: ["Front/MIRAIDON.png", "Front shiny/MIRAIDON.png", "Back/MIRAIDON.png", "Back shiny/MIRAIDON.png"], delays: (0.09, 0.09)),
++        1009: .init(files: ["Front/WALKINGWAKE.png", "Front shiny/WALKINGWAKE.png", "Back/WALKINGWAKE.png", "Back shiny/WALKINGWAKE.png"], delays: (0.09, 0.09)),
++        1010: .init(files: ["Front/IRONLEAVES.png", "Front shiny/IRONLEAVES.png", "Back/IRONLEAVES.png", "Back shiny/IRONLEAVES.png"], delays: (0.09, 0.09)),
++        1011: .init(files: ["Front/DIPPLIN.png", "Front shiny/DIPPLIN.png", "Back/DIPPLIN.png", "Back shiny/DIPPLIN.png"], delays: (0.09, 0.09)),
++        1012: .init(files: ["Front/POLTCHAGEIST.png", "Front shiny/POLTCHAGEIST.png", "Back/POLTCHAGEIST.png", "Back shiny/POLTCHAGEIST.png"], delays: (0.09, 0.09)),
++        1013: .init(files: ["Front/SINISTCHA.png", "Front shiny/SINISTCHA.png", "Back/SINISTCHA.png", "Back shiny/SINISTCHA.png"], delays: (0.09, 0.09)),
++        1014: .init(files: ["Front/OKIDOGI.png", "Front shiny/OKIDOGI.png", "Back/OKIDOGI.png", "Back shiny/OKIDOGI.png"], delays: (0.09, 0.135)),
++        1015: .init(files: ["Front/MUNKIDORI.png", "Front shiny/MUNKIDORI.png", "Back/MUNKIDORI.png", "Back shiny/MUNKIDORI.png"], delays: (0.135, 0.09)),
++        1016: .init(files: ["Front/FEZANDIPITI.png", "Front shiny/FEZANDIPITI.png", "Back/FEZANDIPITI.png", "Back shiny/FEZANDIPITI.png"], delays: (0.09, 0.09)),
++        1017: .init(files: ["Front/OGERPON.png", "Front shiny/OGERPON.png", "Back/OGERPON.png", "Back shiny/OGERPON.png"], delays: (0.09, 0.09), shinyScale: (1, 4)),
++        1018: .init(files: ["Front/ARCHALUDON.png", "Front shiny/ARCHALUDON.png", "Back/ARCHALUDON.png", "Back shiny/ARCHALUDON.png"], delays: (0.09, 0.09)),
++        1019: .init(files: ["Front/HYDRAPPLE.png", "Front shiny/HYDRAPPLE.png", "Back/HYDRAPPLE.png", "Back shiny/HYDRAPPLE.png"], delays: (0.09, 0.09)),
++        1020: .init(files: ["Front/GOUGINGFIRE.png", "Front shiny/GOUGINGFIRE.png", "Back/GOUGINGFIRE.png", "Back shiny/GOUGINGFIRE.png"], delays: (0.09, 0.09)),
++        1021: .init(files: ["Front/RAGINGBOLT.png", "Front shiny/RAGINGBOLT.png", "Back/RAGINGBOLT.png", "Back shiny/RAGINGBOLT.png"], delays: (0.09, 0.09)),
++        1022: .init(files: ["Front/IRONBOULDER.png", "Front shiny/IRONBOULDER.png", "Back/IRONBOULDER.png", "Back shiny/IRONBOULDER.png"], delays: (0.09, 0.09)),
++        1023: .init(files: ["Front/IRONCROWN.png", "Front shiny/IRONCROWN.png", "Back/IRONCROWN.png", "Back shiny/IRONCROWN.png"], delays: (0.09, 0.09)),
++        1024: .init(files: ["Front/TERAPAGOS.png", "Front shiny/TERAPAGOS.png", "Back/TERAPAGOS.png", "Back shiny/TERAPAGOS.png"], delays: (0.135, 0.135)),
++        1025: .init(files: ["Front/PECHARUNT.png", "Front shiny/PECHARUNT.png", "Back/PECHARUNT.png", "Back shiny/PECHARUNT.png"], delays: (0.09, 0.09)),
++    ]
++}
+diff --git a/Sources/PokeTokenBar/Core/LateGenerations.swift b/Sources/PokeTokenBar/Core/LateGenerations.swift
+new file mode 100644
+index 0000000..7478705
+--- /dev/null
++++ b/Sources/PokeTokenBar/Core/LateGenerations.swift
+@@ -0,0 +1,128 @@
++import CoreGraphics
++import Foundation
++import ImageIO
++import UniformTypeIdentifiers
++
++enum LateGenerationSprites {
++    struct Strip: Sendable {
++        let files: [String]
++        let delays: (front: TimeInterval, back: TimeInterval)
++        var shinyScale: (front: Int, back: Int) = (1, 1)
++        var showdown: [String?] = [nil, nil, nil, nil]
++    }
++
++    enum Download: Equatable {
++        case gif(Data)
++        case missing
++        case failed
++    }
++
++    static let firstSpeciesID = 650
++    static let repo = "rh-hideout-chinese/pokemon-engine"
++    static let commit = "4d4eb60502cf2b347d30d68100f3ef5b54c97c2f"
++    static let pokemonDirectory = "Graphics/Pokemon/"
++
++    static func strip(speciesID: Int) -> Strip? { strips[speciesID] }
++
++    static func variant(shiny: Bool, back: Bool) -> Int { (back ? 2 : 0) + (shiny ? 1 : 0) }
++
++    static func stripURLs(_ file: String) -> [URL] {
++        let path = (pokemonDirectory + file).split(separator: "/")
++            .map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }
++            .joined(separator: "/")
++        return ["https://cdn.jsdelivr.net/gh/\(repo)@\(commit)/\(path)",
++                "https://raw.githubusercontent.com/\(repo)/\(commit)/\(path)"].compactMap(URL.init(string:))
++    }
++
++    static func download(speciesID: Int, shiny: Bool, back: Bool) async -> Download {
++        await download(speciesID: speciesID, shiny: shiny, back: back, fetch: liveFetch)
++    }
++
++    static func download(speciesID: Int, shiny: Bool, back: Bool,
++                         fetch: (URL) async -> (Data, Int)?) async -> Download {
++        guard let strip = strip(speciesID: speciesID) else { return .missing }
++        let variant = variant(shiny: shiny, back: back)
++        if let showdown = strip.showdown[variant], let url = URL(string: showdown) {
++            guard let (data, status) = await fetch(url) else { return .failed }
++            return status == 200 && !data.isEmpty ? .gif(data) : status == 404 ? .missing : .failed
++        }
++        var notFound = true
++        for url in stripURLs(strip.files[variant]) {
++            guard let (data, status) = await fetch(url) else { notFound = false; continue }
++            guard status == 200, !data.isEmpty else { notFound = notFound && status == 404; continue }
++            let delay = back ? strip.delays.back : strip.delays.front
++            let shrink = shiny ? (back ? strip.shinyScale.back : strip.shinyScale.front) : 1
++            return StripAnimation.gif(fromStrip: data, delay: delay, shrink: shrink).map(Download.gif) ?? .missing
++        }
++        return notFound ? .missing : .failed
++    }
++
++    static func liveFetch(_ url: URL) async -> (Data, Int)? {
++        guard let (data, response) = try? await URLSession.shared.data(from: url) else { return nil }
++        return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
++    }
++}
++
++enum StripAnimation {
++    static func frames(fromStrip data: Data) -> [CGImage] {
++        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
++              let strip = CGImageSourceCreateImageAtIndex(source, 0, nil),
++              strip.height > 0 else { return [] }
++        let side = strip.height
++        let count = strip.width / side
++        guard count > 1 else { return [] }
++        let tiles = (0..<count).compactMap { strip.cropping(to: CGRect(x: $0 * side, y: 0, width: side, height: side)) }
++        let boxes = tiles.compactMap { opaqueBox($0) }
++        guard let first = boxes.first else { return tiles }
++        let box = boxes.dropFirst().reduce(first) { $0.union($1) }
++        return tiles.compactMap { $0.cropping(to: box) }
++    }
++
++    static func gif(fromStrip data: Data, delay: TimeInterval, shrink factor: Int = 1) -> Data? {
++        let frames = frames(fromStrip: data)
++        guard frames.count > 1 else { return nil }
++        return gif(frames: factor > 1 ? frames.compactMap { shrink($0, by: factor) } : frames, delay: delay)
++    }
++
++    static func shrink(_ image: CGImage, by factor: Int) -> CGImage? {
++        let width = max(1, image.width / factor), height = max(1, image.height / factor)
++        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
++                                      bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
++                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
++        context.interpolationQuality = .none
++        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
++        return context.makeImage()
++    }
++
++    static func gif(frames: [CGImage], delay: TimeInterval) -> Data? {
++        let output = NSMutableData()
++        guard let destination = CGImageDestinationCreateWithData(output as CFMutableData, UTType.gif.identifier as CFString,
++                                                                  frames.count, nil) else { return nil }
++        let loop = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]
++        CGImageDestinationSetProperties(destination, loop as CFDictionary)
++        let timing = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: delay,
++                                                      kCGImagePropertyGIFUnclampedDelayTime: delay]]
++        for frame in frames { CGImageDestinationAddImage(destination, frame, timing as CFDictionary) }
++        guard CGImageDestinationFinalize(destination) else { return nil }
++        return output as Data
++    }
++
++    static func opaqueBox(_ image: CGImage) -> CGRect? {
++        let width = image.width, height = image.height
++        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
++                                      bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
++                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
++              let buffer = context.data else { return nil }
++        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
++        let pixels = buffer.bindMemory(to: UInt8.self, capacity: width * height * 4)
++        var minX = width, minY = height, maxX = -1, maxY = -1
++        for row in 0..<height {
++            for column in 0..<width where pixels[(row * width + column) * 4 + 3] > 0 {
++                minX = min(minX, column); maxX = max(maxX, column)
++                minY = min(minY, row); maxY = max(maxY, row)
++            }
++        }
++        guard maxX >= minX else { return nil }
++        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
++    }
++}
+diff --git a/Sources/PokeTokenBar/UI/SpriteLoader.swift b/Sources/PokeTokenBar/UI/SpriteLoader.swift
+index 7393336..49c0ea1 100644
+--- a/Sources/PokeTokenBar/UI/SpriteLoader.swift
++++ b/Sources/PokeTokenBar/UI/SpriteLoader.swift
+@@ -53,6 +53,19 @@ actor SpriteStore {
+         let file = directory.appendingPathComponent("\(key).\(ext)")
+         if let d = try? Data(contentsOf: file) { remember(key, d); return d }
+         if confirmedMissing.contains(key) { return nil }
++        if animated, form == nil, LateGenerationSprites.strip(speciesID: speciesID) != nil {
++            switch await LateGenerationSprites.download(speciesID: speciesID, shiny: shiny, back: back) {
++            case .gif(let d):
++                try? d.write(to: file, options: .atomic)
++                remember(key, d)
++                return d
++            case .missing:
++                confirmedMissing.insert(key)
++                return nil
++            case .failed:
++                return nil
++            }
++        }
+         let url = Self.spriteURL(speciesID: speciesID, animated: animated, shiny: shiny, form: form, back: back)
+         guard let (d, resp) = try? await URLSession.shared.data(from: url) else { return nil }
+         let status = (resp as? HTTPURLResponse)?.statusCode
+diff --git a/Tests/PokeTokenBarTests/LateGenerationsTests.swift b/Tests/PokeTokenBarTests/LateGenerationsTests.swift
+new file mode 100644
+index 0000000..c625f0f
+--- /dev/null
++++ b/Tests/PokeTokenBarTests/LateGenerationsTests.swift
+@@ -0,0 +1,123 @@
++import CoreGraphics
++import ImageIO
++import XCTest
++@testable import PokeTokenBar
++
++final class LateGenerationsTests: XCTestCase {
++    func testEverySpeciesFromKalosToPaldeaHasAnAnimatedStrip() {
++        let ids = Set(LateGenerationSprites.strips.keys)
++        XCTAssertEqual(ids, Set(LateGenerationSprites.firstSpeciesID...PokemonAssets.animatedSpeciesIDs.upperBound))
++        for (id, strip) in LateGenerationSprites.strips {
++            XCTAssertEqual(strip.files.count, 4, "#\(id)")
++            XCTAssertEqual(strip.showdown.count, 4, "#\(id)")
++            XCTAssertGreaterThanOrEqual(strip.delays.front, 0.09, "#\(id)")
++            XCTAssertGreaterThanOrEqual(strip.delays.back, 0.09, "#\(id)")
++        }
++    }
++
++    func testGenerationFiveKeepsThePokeAPIGifs() {
++        XCTAssertNil(LateGenerationSprites.strip(speciesID: 649))
++        XCTAssertTrue(PokemonAssets.hasAnimatedSprite(speciesID: 649))
++        XCTAssertTrue(PokemonAssets.hasAnimatedSprite(speciesID: 1025))
++        XCTAssertFalse(PokemonAssets.hasAnimatedSprite(speciesID: 1026))
++    }
++
++    func testStripURLsArePinnedAndEncodeTheFolderSpace() {
++        let urls = LateGenerationSprites.stripURLs("Front shiny/CHESPIN.png").map(\.absoluteString)
++        XCTAssertEqual(urls, [
++            "https://cdn.jsdelivr.net/gh/rh-hideout-chinese/pokemon-engine@\(LateGenerationSprites.commit)/Graphics/Pokemon/Front%20shiny/CHESPIN.png",
++            "https://raw.githubusercontent.com/rh-hideout-chinese/pokemon-engine/\(LateGenerationSprites.commit)/Graphics/Pokemon/Front%20shiny/CHESPIN.png",
++        ])
++    }
++
++    func testVariantOrderMatchesTheTable() {
++        XCTAssertEqual(LateGenerationSprites.variant(shiny: false, back: false), 0)
++        XCTAssertEqual(LateGenerationSprites.variant(shiny: true, back: false), 1)
++        XCTAssertEqual(LateGenerationSprites.variant(shiny: false, back: true), 2)
++        XCTAssertEqual(LateGenerationSprites.variant(shiny: true, back: true), 3)
++    }
++
++    func testAStripBecomesALoopingGifCroppedToWhatEveryFrameShows() throws {
++        let strip = try XCTUnwrap(Self.png(Self.strip(side: 10, boxes: [CGRect(x: 2, y: 3, width: 3, height: 4),
++                                                                         CGRect(x: 4, y: 1, width: 2, height: 2)])))
++        let gif = try XCTUnwrap(StripAnimation.gif(fromStrip: strip, delay: 0.135))
++        let frames = GIFDecoder.frames(from: gif)
++        XCTAssertEqual(frames.count, 2)
++        for frame in frames {
++            XCTAssertEqual(frame.image.size, CGSize(width: 4, height: 6))
++            XCTAssertEqual(frame.delay, 0.135, accuracy: 0.011)
++        }
++        let source = try XCTUnwrap(CGImageSourceCreateWithData(gif as CFData, nil))
++        let first = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
++        XCTAssertNotNil(StripAnimation.opaqueBox(first))
++        XCTAssertNotEqual(StripAnimation.opaqueBox(first)?.size, CGSize(width: 4, height: 6), "transparency survives the GIF")
++    }
++
++    func testAShinyDrawnAtSeveralTimesTheSizeShrinksToMatchItsNormal() throws {
++        let strip = try XCTUnwrap(Self.png(Self.strip(side: 16, boxes: [CGRect(x: 0, y: 0, width: 8, height: 12),
++                                                                         CGRect(x: 4, y: 4, width: 8, height: 8)])))
++        let gif = try XCTUnwrap(StripAnimation.gif(fromStrip: strip, delay: 0.09, shrink: 4))
++        let frames = GIFDecoder.frames(from: gif)
++        XCTAssertEqual(frames.first?.image.size, CGSize(width: 3, height: 3))
++        XCTAssertEqual(LateGenerationSprites.strip(speciesID: 1017)?.shinyScale.back, 4)
++        XCTAssertEqual(LateGenerationSprites.strip(speciesID: 1017)?.shinyScale.front, 1)
++    }
++
++    func testAStillStripIsNotAnAnimation() throws {
++        let still = try XCTUnwrap(Self.png(Self.strip(side: 10, boxes: [CGRect(x: 2, y: 2, width: 4, height: 4)])))
++        XCTAssertNil(StripAnimation.gif(fromStrip: still, delay: 0.09))
++    }
++
++    func testDownloadFallsBackToRawGitHubAndReportsMissingOnlyOnEvery404() async throws {
++        let strip = try XCTUnwrap(Self.png(Self.strip(side: 8, boxes: [CGRect(x: 1, y: 1, width: 2, height: 2),
++                                                                        CGRect(x: 3, y: 3, width: 2, height: 2)])))
++        var requested: [String] = []
++        let fromRaw = await LateGenerationSprites.download(speciesID: 650, shiny: false, back: false) { url in
++            requested.append(url.host() ?? "")
++            return url.host() == "raw.githubusercontent.com" ? (strip, 200) : (Data(), 503)
++        }
++        guard case .gif = fromRaw else { return XCTFail("expected a GIF, got \(fromRaw)") }
++        XCTAssertEqual(requested, ["cdn.jsdelivr.net", "raw.githubusercontent.com"])
++        let missing = await LateGenerationSprites.download(speciesID: 650, shiny: false, back: true) { _ in (Data(), 404) }
++        XCTAssertEqual(missing, .missing)
++        let offline = await LateGenerationSprites.download(speciesID: 650, shiny: false, back: true) { _ in nil }
++        XCTAssertEqual(offline, .failed)
++        let flaky = await LateGenerationSprites.download(speciesID: 650, shiny: false, back: true) { url in
++            url.host() == "cdn.jsdelivr.net" ? (Data(), 404) : nil
++        }
++        XCTAssertEqual(flaky, .failed)
++    }
++
++    func testXerneasFrontComesFromShowdownAndItsStillBackIsMissing() async throws {
++        let gif = Data([0x47, 0x49, 0x46])
++        var requested: [URL] = []
++        let front = await LateGenerationSprites.download(speciesID: 716, shiny: true, back: false) { url in
++            requested.append(url)
++            return (gif, 200)
++        }
++        XCTAssertEqual(front, .gif(gif))
++        XCTAssertEqual(requested.map(\.absoluteString), ["https://play.pokemonshowdown.com/sprites/gen5ani-shiny/xerneas.gif"])
++        let still = try XCTUnwrap(Self.png(Self.strip(side: 8, boxes: [CGRect(x: 1, y: 1, width: 2, height: 2)])))
++        let back = await LateGenerationSprites.download(speciesID: 716, shiny: false, back: true) { _ in (still, 200) }
++        XCTAssertEqual(back, .missing)
++    }
++
++    private static func strip(side: Int, boxes: [CGRect]) -> CGImage? {
++        let context = CGContext(data: nil, width: side * boxes.count, height: side, bitsPerComponent: 8,
++                                bytesPerRow: side * boxes.count * 4, space: CGColorSpaceCreateDeviceRGB(),
++                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
++        context?.setFillColor(CGColor(red: 0.8, green: 0.2, blue: 0.1, alpha: 1))
++        for (index, box) in boxes.enumerated() {
++            context?.fill(box.offsetBy(dx: CGFloat(index * side), dy: CGFloat(side) - box.maxY - box.minY))
++        }
++        return context?.makeImage()
++    }
++
++    private static func png(_ image: CGImage?) -> Data? {
++        guard let image else { return nil }
++        let output = NSMutableData()
++        guard let destination = CGImageDestinationCreateWithData(output as CFMutableData, "public.png" as CFString, 1, nil) else { return nil }
++        CGImageDestinationAddImage(destination, image, nil)
++        return CGImageDestinationFinalize(destination) ? output as Data : nil
++    }
++}
+
+From e05f16720f0e03f8b644504bebb90e5e7f916d10 Mon Sep 17 00:00:00 2001
+From: Token Clash <token-clash@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 12:00:00 +0000
+Subject: [PATCH 3/4] feat(save): graduates that stopped short of their final
+ form evolve on load
+
+A level 100 graduate whose saved chain ends at a form that now evolves (Primeape, Bisharp, Farfetch'd, ...) moves to its final form when the save loads, keeping profile and rarity, and the new final is recorded. It follows Token Clash's rule: same table of later finals, same hash of the entry id to pick one, so the app and the game show the same species. A graduate already at its final, Scizor for one, keeps its form.
+---
+ .../PokeTokenBar/Core/GraduateEvolution.swift | 38 ++++++++++++
+ Sources/PokeTokenBar/Core/SaveTransfer.swift  |  1 +
+ .../GraduateEvolutionTests.swift              | 60 +++++++++++++++++++
+ 3 files changed, 99 insertions(+)
+ create mode 100644 Sources/PokeTokenBar/Core/GraduateEvolution.swift
+ create mode 100644 Tests/PokeTokenBarTests/GraduateEvolutionTests.swift
+
+diff --git a/Sources/PokeTokenBar/Core/GraduateEvolution.swift b/Sources/PokeTokenBar/Core/GraduateEvolution.swift
+new file mode 100644
+index 0000000..bc8bbb9
+--- /dev/null
++++ b/Sources/PokeTokenBar/Core/GraduateEvolution.swift
+@@ -0,0 +1,38 @@
++import Foundation
++
++enum GraduateEvolution {
++    static let graduatedLevel = 100
++
++    static let laterFinals: [Int: [Int]] = [
++        56: [979], 57: [979], 83: [865], 122: [866], 203: [981], 206: [982], 211: [904], 216: [901], 217: [901],
++        222: [864], 234: [899], 263: [862], 264: [862], 439: [866], 550: [902], 624: [983], 625: [983],
++    ]
++
++    static func tokenClashHash(_ text: String) -> UInt32 {
++        var value: UInt32 = 0x811c9dc5
++        for unit in text.utf16 {
++            value ^= UInt32(unit)
++            value = value &* 0x01000193
++        }
++        return value
++    }
++
++    static func evolved(_ entry: DexEntry) -> DexEntry {
++        guard !entry.isReleased, (entry.profile?.level ?? graduatedLevel) == graduatedLevel,
++              entry.chainOrder.last == entry.finalID,
++              let later = laterFinals[entry.finalID], !later.isEmpty else { return entry }
++        var evolved = entry
++        evolved.finalID = later[Int(tokenClashHash(entry.id.lowercased()) % UInt32(later.count))]
++        evolved.chainOrder.append(evolved.finalID)
++        return evolved
++    }
++
++    static func evolved(_ state: CompanionState) -> CompanionState {
++        var migrated = state
++        migrated.dex = state.dex.map(evolved)
++        for (before, after) in zip(state.dex, migrated.dex) where before.finalID != after.finalID {
++            migrated.collectedFinals.insert("\(after.baseID):\(after.finalID)")
++        }
++        return migrated
++    }
++}
+diff --git a/Sources/PokeTokenBar/Core/SaveTransfer.swift b/Sources/PokeTokenBar/Core/SaveTransfer.swift
+index 4a12d4a..8cb95ba 100644
+--- a/Sources/PokeTokenBar/Core/SaveTransfer.swift
++++ b/Sources/PokeTokenBar/Core/SaveTransfer.swift
+@@ -188,6 +188,7 @@ enum SaveTransfer {
+             s.dex[index].chainOrder = deduped(s.dex[index].chainOrder)
+             s.dex[index].profile?.sanitize()
+         }
++        s = GraduateEvolution.evolved(s)
+         s.reconcileRepresentativeSelection()
+         return s
+     }
+diff --git a/Tests/PokeTokenBarTests/GraduateEvolutionTests.swift b/Tests/PokeTokenBarTests/GraduateEvolutionTests.swift
+new file mode 100644
+index 0000000..79bf55d
+--- /dev/null
++++ b/Tests/PokeTokenBarTests/GraduateEvolutionTests.swift
+@@ -0,0 +1,60 @@
++import XCTest
++@testable import PokeTokenBar
++
++final class GraduateEvolutionTests: XCTestCase {
++    func testAGraduateWhoseChainWasCutEvolvesKeepingItsProfile() {
++        var profile = PokemonProfile.generate(seed: 7, instanceID: "b")
++        profile.level = 100
++        let bisharp = DexEntry(id: "b", baseID: 624, finalID: 625, chainOrder: [624, 625], rarity: .uncommon,
++                               caughtAt: Date(timeIntervalSince1970: 1), isShiny: true, profile: profile)
++        let kingambit = GraduateEvolution.evolved(bisharp)
++        XCTAssertEqual(kingambit.finalID, 983)
++        XCTAssertEqual(kingambit.chainOrder, [624, 625, 983])
++        XCTAssertEqual(kingambit.rarity, .uncommon)
++        XCTAssertTrue(kingambit.isShiny)
++        XCTAssertEqual(kingambit.profile, profile)
++        XCTAssertTrue(kingambit.needsNamesRefresh, "the new species name is fetched like any missing name")
++        XCTAssertEqual(GraduateEvolution.evolved(kingambit).finalID, 983, "migrating twice changes nothing")
++    }
++
++    func testOnlyGraduatesAtTheEndOfTheirSavedChainEvolve() {
++        let released = DexEntry(baseID: 56, finalID: 57, chainOrder: [56, 57], rarity: .common, caughtAt: nil,
++                                releasedAt: Date(timeIntervalSince1970: 1))
++        XCTAssertEqual(GraduateEvolution.evolved(released).finalID, 57)
++        let scizor = DexEntry(baseID: 123, finalID: 212, chainOrder: [123, 212], rarity: .rare, caughtAt: nil)
++        XCTAssertEqual(GraduateEvolution.evolved(scizor).finalID, 212)
++        let odd = DexEntry(baseID: 56, finalID: 57, chainOrder: [56], rarity: .common, caughtAt: nil)
++        XCTAssertEqual(GraduateEvolution.evolved(odd).finalID, 57)
++    }
++
++    func testEveryLaterFinalIsAnAnimatedLateSpecies() {
++        for (before, after) in GraduateEvolution.laterFinals {
++            XCTAssertLessThan(before, LateGenerationSprites.firstSpeciesID)
++            for id in after { XCTAssertNotNil(LateGenerationSprites.strip(speciesID: id), "#\(before) → #\(id)") }
++        }
++    }
++
++    func testTheBranchPickMatchesTokenClashsHash() {
++        XCTAssertEqual(GraduateEvolution.tokenClashHash(""), 0x811c9dc5)
++        XCTAssertEqual(GraduateEvolution.tokenClashHash("a"), 0xe40c292c)
++        XCTAssertEqual(GraduateEvolution.tokenClashHash("3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90"), 0x0212177d)
++    }
++
++    func testAGraduateBelowLevelOneHundredKeepsItsForm() {
++        var profile = PokemonProfile.generate(seed: 3, instanceID: "c")
++        profile.level = 99
++        let primeape = DexEntry(baseID: 56, finalID: 57, chainOrder: [56, 57], rarity: .common, caughtAt: nil, profile: profile)
++        XCTAssertEqual(GraduateEvolution.evolved(primeape).finalID, 57)
++    }
++
++    func testLoadingASaveEvolvesGraduatesAndCountsTheNewFinal() {
++        var state = CompanionState()
++        state.dex = [DexEntry(baseID: 56, finalID: 57, chainOrder: [56, 57], rarity: .common, caughtAt: nil),
++                     DexEntry(baseID: 1, finalID: 3, chainOrder: [1, 2, 3], rarity: .common, caughtAt: nil)]
++        state.collectedFinals = ["56:57", "1:3"]
++        let loaded = SaveTransfer.sanitized(state)
++        XCTAssertEqual(loaded.dex.map(\.finalID), [979, 3])
++        XCTAssertEqual(loaded.collectedFinals, ["56:57", "56:979", "1:3"])
++        XCTAssertEqual(SaveTransfer.sanitized(loaded).dex.map(\.finalID), [979, 3])
++    }
++}
+
+From dfff186b6f10b98e8d145ef6b55f05f21b4a63c0 Mon Sep 17 00:00:00 2001
+From: Token Clash <token-clash@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 12:00:00 +0000
+Subject: [PATCH 4/4] fix(update): open the release page instead of running
+ brew upgrade
+
+A brew upgrade would replace this build with the official one and drop the new generations.
+---
+ Sources/PokeTokenBar/Core/UpdateChecker.swift | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
+
+diff --git a/Sources/PokeTokenBar/Core/UpdateChecker.swift b/Sources/PokeTokenBar/Core/UpdateChecker.swift
+index 3f6bcd2..4d353dc 100644
+--- a/Sources/PokeTokenBar/Core/UpdateChecker.swift
++++ b/Sources/PokeTokenBar/Core/UpdateChecker.swift
+@@ -147,17 +147,9 @@ final class UpdateChecker {
+         guard let update = updateTarget, !isUpdating else { return }
+         isUpdating = true
+         Task { @MainActor in
+-            // brew cask 설치본이면 분리(detached) 스크립트가 앱 종료 후 tap 갱신→업그레이드→재오픈.
+-            // 그 외(brew 미설치/비-cask 설치)면 릴리스 페이지를 연다.
+-            let brew = await Task.detached { Self.brewCaskPath() }.value
+-            if let brew {
+-                Self.launchDetachedUpgrade(brew: brew)
+-                NSApp.terminate(nil)
+-            } else {
+-                isUpdating = false
+-                AppLog.write("update: brew cask 아님/brew 미설치 → 릴리스 페이지 열기")
+-                if let u = URL(string: update.url) { NSWorkspace.shared.open(u) }
+-            }
++            isUpdating = false
++            AppLog.write("update: Token Clash build → opening the release page instead of brew upgrade")
++            if let u = URL(string: update.url) { NSWorkspace.shared.open(u) }
+         }
+     }
+ 
