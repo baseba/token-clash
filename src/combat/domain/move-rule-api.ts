@@ -218,6 +218,7 @@ function makeMoveApi(battle: BattleState) {
       emit(battle, { t: 'learned', side: sideOf(me), name: nameOf(me), move: last.name });
       return true;
     },
+    moveData,
     callMove: (fighter: BattleFighter, key: string, opts?: { powerMult?: number; instructed?: boolean }) => runCalled(battle, fighter, key, opts),
     metronomePool: () => METRONOME_POOL(),
   };
