@@ -314,14 +314,16 @@ TypeScript. Revisa `src/` con seis reglas. Hoy solo reporta y no corre en `npm t
 | `module-cycle` | Carpetas o archivos hermanos que se usan en círculo. Un tipo en una firma cuenta. |
 | `tangle` | Clases, funciones o constantes que se conocen en círculo, en más de un módulo o más de siete. |
 | `field-leak` | Código de afuera que trabaja sobre un campo de una clase que guarda sus campos. |
-| `shallow-module` | Una carpeta que muestra más de siete funciones, con una lista de más de siete, y no esconde más de las que muestra. |
+| `shallow-module` | Una carpeta que muestra más de siete funciones, con una lista de más de siete, y no esconde más de las que muestra. Las capas de un dominio con módulo de Nest no se juzgan solas (ver las diferencias con el original). |
 | `wide-directory` | Una carpeta con más de 15 archivos y carpetas. |
 | `long-file` | Un archivo con más de 2.000 líneas. |
 
 El código de test no cuenta en ninguna regla. `load.ts` descarta los `*.spec.ts`, `*.test.ts` y `*.e2e-spec.ts` y las
 carpetas `test/`, `tests/` y `__tests__/` antes de armar el modelo, así que tampoco suman en `wide-directory` ni en
 `long-file`. Si una carpeta muestra las mismas funciones que otra de más adentro y tiene el mismo total,
-`shallow-module` reporta solo la de más adentro.
+`shallow-module` reporta solo la de más adentro. Una capa de un dominio con módulo de Nest no se juzga sola (ver las
+diferencias con el original): con `npm run deslop -- src::<dominio>::<capa>` la capa misma no se reporta, pero las
+carpetas de adentro sí.
 
 **La regla de `field-leak`.** Un campo es una propiedad de instancia de una clase que no guarda una función, o una
 propiedad de parámetro del constructor. Las propiedades estáticas son constantes. Una clase guarda sus campos cuando
@@ -374,6 +376,15 @@ escritura que lee primero (`+=`, `??=`, `++`) llega a los dos.
 - La línea de herencia es de adentro.
 - Un cast directo de un valor a un tipo que no es valor filtra.
 - Las interfaces declaradas con `implements` llevan el trabajo al campo.
+- `shallow-module` no juzga sola una capa de un dominio con módulo de Nest: una carpeta
+  `src/<dominio>/{domain,application,infrastructure,interface}` cuando `src/<dominio>` tiene su propio `*.module.ts`.
+  Se juzga `src/<dominio>`, que suma las funciones de sus capas como siempre. Las otras carpetas hermanas, las
+  carpetas dentro de una capa y las capas de una carpeta sin `*.module.ts` propio (como `catalog` y `shared`) se
+  juzgan como cualquier otra. La unidad es el módulo de Nest: cuenta lo que cruza el borde del dominio, en la capa
+  que sea, y una llamada de afuera a una capa cuenta como algo que muestra el dominio. Por eso un dominio en capas
+  cuenta como escondidos sus handlers y sus métodos de repositorio, y rara vez es superficial. En este repo la regla
+  reporta `src/catalog/domain`, `shared` y carpetas dentro de una capa. El original juzga cada carpeta: es una
+  diferencia, no un arreglo.
 
 **Lo que no ve, a propósito (lista cerrada):**
 
