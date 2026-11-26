@@ -1,8 +1,10 @@
-import { effectiveness } from '../../catalog/domain/creatures.js';
-import type { BattleFighter, BattleMove, BattleState } from './battle-types.js';
-import { activeFighters, activeOf, benchSlots, boost, clamp, clearToxicSpikes, clearWeather, cure, emit, freshBoosts, grounded, heal, hurt, lookOf, nameOf, setStatus, sideIndexOf, speedOf } from './effects.js';
-import { flag, run } from './ability-engine.js';
-import { fighterView } from './battle-view.js';
+import { effectiveness } from '../../../catalog/domain/creatures.js';
+import type { BattleFighter, BattleMove, BattleState } from '../battle-types.js';
+import { clearToxicSpikes, cure, grounded, heal, hurt } from './effects.js';
+import { activeFighters, activeOf, benchSlots, clamp, emit, freshBoosts, lookOf, nameOf, sideIndexOf } from './state.js';
+import { boost, clearWeather, run, setStatus, speedOf } from './ability-engine.js';
+import { flag } from './abilities.js';
+import { fighterView } from './fighter-view.js';
 
 export function prepareEntry(battle: BattleState, sideIndex: number): void {
   const fighter = activeOf(battle, sideIndex);

@@ -1,9 +1,10 @@
-import { type BoostKey, type Boosts, formData, type MajorStatus, statsFor, type Weather } from '../../catalog/domain/creatures.js';
-import type { BoostChanges, BoostOptions } from './rules/ability-effects.js';
-import { isSun, poisoned, stageMult } from './conditions.js';
-import type { BattleEvent, BattleFighter, BattleSide, BattleState, Look } from './battle-types.js';
-import { anyActiveHas, chain, flag, run, showAbility } from './ability-engine.js';
-import { publicMoves } from './battle-view.js';
+import { type BoostKey, type Boosts, effectiveness, formData, type MajorStatus, statsFor, type Weather } from '../../../catalog/domain/creatures.js';
+import type { AbilityHook, BoostChanges, BoostOptions, ChainArgs, ChainHook, Hook, HookArgs } from '../rules/ability-effects.js';
+import { isSun, poisoned, stageMult } from '../conditions.js';
+import type { AnyMove, BattleFighter, BattleState } from '../battle-types.js';
+import { activeFighters, clamp, emit, foeOf, nameOf, sideIndexOf } from './state.js';
+import { anyActiveHas, flag, showAbility } from './abilities.js';
+import { publicMoves } from './fighter-view.js';
 
 export const STAGE_LIMIT = 6;
 const FIELD_TURNS = 5;
@@ -11,34 +12,21 @@ const PRIMAL = new Set<Weather | null>(['heavyrain', 'harshsun', 'winds']);
 export const SCREEN_KINDS = ['reflect', 'lightscreen', 'auroraveil'];
 const VEIL_WEATHER = new Set<Weather | null>(['hail', 'snow']);
 
-export const freshBoosts = (): Record<BoostKey, number> => ({ atk: 0, def: 0, satk: 0, sdef: 0, spd: 0, acc: 0, eva: 0 });
-export const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
-
-export const emit = (battle: BattleState, event: BattleEvent): number => battle.events.push(event);
-export const activeOf = (battle: BattleState, sideIndex: number): BattleFighter => battle.sides[sideIndex].team[battle.sides[sideIndex].active];
-export const sideIndexOf = (battle: BattleState, fighter: BattleFighter): number => battle.sides.findIndex((side) => side.team.includes(fighter));
-export const onField = (battle: BattleState, fighter: BattleFighter): boolean =>
-  fighter.hp > 0 && activeOf(battle, sideIndexOf(battle, fighter)) === fighter;
-export const activeFighters = (battle: BattleState): BattleFighter[] => [0, 1].map((s) => activeOf(battle, s)).filter((f) => f.hp > 0);
-export const foeOf = (battle: BattleState, fighter: BattleFighter): BattleFighter | null => {
-  const foe = activeOf(battle, 1 - sideIndexOf(battle, fighter));
-  return foe.hp > 0 ? foe : null;
-};
-export const nameOf = (fighter: BattleFighter): string => fighter.volatiles.illusion?.name ?? fighter.name;
-export const hasBench = (battle: BattleState, fighter: BattleFighter): boolean =>
-  battle.sides[sideIndexOf(battle, fighter)].team.some((other) => other !== fighter && other.hp > 0);
-export const benchSlots = (side: BattleSide): number[] => side.team.flatMap((fighter, slot) => (slot !== side.active && fighter.hp > 0 ? [slot] : []));
+export interface AbilityTriggers {
+  run<H extends AbilityHook>(fighter: BattleFighter, hook: H, ...args: HookArgs<H>): ReturnType<Hook<H>> | undefined;
+  chain<H extends ChainHook>(fighter: BattleFighter, hook: H, value: number, ...args: ChainArgs<H>): number;
+}
 
 const MAX_TOXIC_SPIKES = 2;
 const DIRECT_DAMAGE = new Set(['confusion', 'cost', 'painsplit']);
 
-export function boost(battle: BattleState, fighter: BattleFighter, changes: Boosts, source: BattleFighter | null = null, opts: BoostOptions = {}): Boosts {
+export function boostWithTriggers(triggers: AbilityTriggers, battle: BattleState, fighter: BattleFighter, changes: Boosts, source: BattleFighter | null = null, opts: BoostOptions = {}): Boosts {
   if (fighter.hp <= 0) return {};
   const ch: BoostChanges = { ...changes } as BoostChanges;
   if (source && source !== fighter && battle.sides[sideIndexOf(battle, fighter)].conds.mist)
     for (const key of Object.keys(ch)) if (ch[key] < 0) delete ch[key];
-  run(battle, fighter, 'onTryBoost', ch, source, opts.effect);
-  run(battle, fighter, 'onChangeBoost', ch);
+  triggers.run(fighter, 'onTryBoost', ch, source, opts.effect);
+  triggers.run(fighter, 'onChangeBoost', ch);
   const applied: Boosts = {};
   for (const [stat, by] of Object.entries(ch) as [BoostKey, number][]) {
     if (!by) continue;
@@ -53,10 +41,10 @@ export function boost(battle: BattleState, fighter: BattleFighter, changes: Boos
     emit(battle, { t: 'boost', side: sideIndexOf(battle, fighter), stat, by, stage: fighter.boosts[stat] });
   }
   if (source && source !== fighter && ((Object.values(applied) as number[]).some((v) => v < 0) || opts.effect === 'intimidate'))
-    run(battle, fighter, 'onAfterEachBoost', applied, source, opts.effect);
+    triggers.run(fighter, 'onAfterEachBoost', applied, source, opts.effect);
   const ups: Boosts = Object.fromEntries((Object.entries(applied) as [BoostKey, number][]).filter(([, v]) => v > 0));
   const foe = foeOf(battle, fighter);
-  if (foe && Object.keys(ups).length) run(battle, foe, 'onFoeBoost', fighter, ups, opts.effect);
+  if (foe && Object.keys(ups).length) triggers.run(foe, 'onFoeBoost', fighter, ups, opts.effect);
   return applied;
 }
 
@@ -66,7 +54,7 @@ export function grounded(battle: BattleState, fighter: BattleFighter): boolean {
   return !defendingTypes(battle, fighter).includes('flying') && !flag(battle, fighter, 'levitates');
 }
 
-export function defendingTypes(battle: BattleState, fighter: BattleFighter): string[] {
+function defendingTypes(battle: BattleState, fighter: BattleFighter): string[] {
   if (fighter.volatiles.roost !== battle.turn || !fighter.types.includes('flying')) return fighter.types;
   const landed = fighter.types.filter((type) => type !== 'flying');
   return landed.length ? landed : ['normal'];
@@ -93,7 +81,8 @@ export function statusImmune(battle: BattleState, fighter: BattleFighter, status
   return false;
 }
 
-export function setStatus(
+export function setStatusWithTriggers(
+  triggers: AbilityTriggers,
   battle: BattleState,
   fighter: BattleFighter,
   status: MajorStatus,
@@ -104,13 +93,13 @@ export function setStatus(
   if (statusImmune(battle, fighter, status, source)) return false;
   if (source && source !== fighter && battle.sides[sideIndexOf(battle, fighter)].conds.safeguard) return false;
   if (status === 'slp' && activeFighters(battle).some((o) => o.volatiles.uproar)) return false;
-  if (run(battle, fighter, 'onSetStatus', status, source) === false) return false;
+  if (triggers.run(fighter, 'onSetStatus', status, source) === false) return false;
   if (opts.ability) showAbility(battle, opts.ability);
   fighter.status = status;
   fighter.statusTurns = status === 'slp' ? 1 + Math.floor(battle.random() * 3) : 0;
   emit(battle, { t: 'status', side: sideIndexOf(battle, fighter), name: nameOf(fighter), status });
-  run(battle, fighter, 'onAfterSetStatus', status, source);
-  if (source && source !== fighter) run(battle, source, 'onInflictStatus', fighter, status);
+  triggers.run(fighter, 'onAfterSetStatus', status, source);
+  if (source && source !== fighter) triggers.run(source, 'onInflictStatus', fighter, status);
   return true;
 }
 
@@ -122,7 +111,8 @@ export function cure(battle: BattleState, fighter: BattleFighter, announce = tru
   if (announce) emit(battle, { t: 'cure', side: sideIndexOf(battle, fighter), name: nameOf(fighter), status });
 }
 
-export function addVolatile(
+export function addVolatileWithTriggers(
+  triggers: AbilityTriggers,
   battle: BattleState,
   fighter: BattleFighter,
   kind: string,
@@ -135,7 +125,7 @@ export function addVolatile(
   if (kind === 'disable' && (fighter.volatiles.disabled || !opts.move?.key)) return false;
   if (kind === 'perish' && fighter.volatiles.perish) return false;
   if (kind === 'leechseed' && (fighter.volatiles.leechSeed || fighter.types.includes('grass'))) return false;
-  if (run(battle, fighter, 'onSetStatus', kind, source) === false) return false;
+  if (triggers.run(fighter, 'onSetStatus', kind, source) === false) return false;
   if (opts.ability) showAbility(battle, opts.ability);
   const sideIndex = sideIndexOf(battle, fighter);
   if (kind === 'flinch') fighter.volatiles.flinch = true;
@@ -179,7 +169,7 @@ export function setTypes(battle: BattleState, fighter: BattleFighter, types: rea
   emit(battle, { t: 'types', side: sideIndexOf(battle, fighter), types: fighter.types });
 }
 
-export function setWeather(battle: BattleState, weather: Weather, source: BattleFighter | null): boolean {
+export function setWeatherWithTriggers(triggers: AbilityTriggers, battle: BattleState, weather: Weather, source: BattleFighter | null): boolean {
   const cur = battle.field.weather;
   if (cur === weather) return false;
   if (PRIMAL.has(cur) && !PRIMAL.has(weather)) return false;
@@ -188,37 +178,37 @@ export function setWeather(battle: BattleState, weather: Weather, source: Battle
   battle.field.weatherTurns = PRIMAL.has(weather) ? Infinity : FIELD_TURNS;
   battle.field.weatherSetter = PRIMAL.has(weather) ? source : null;
   emit(battle, { t: 'weather', weather });
-  for (const fighter of activeFighters(battle)) run(battle, fighter, 'onWeatherChange');
+  for (const fighter of activeFighters(battle)) triggers.run(fighter, 'onWeatherChange');
   return true;
 }
 
-export function clearWeather(battle: BattleState): void {
+export function clearWeatherWithTriggers(triggers: AbilityTriggers, battle: BattleState): void {
   const weather = battle.field.weather;
   if (!weather) return;
   battle.field.weather = null;
   battle.field.weatherTurns = 0;
   battle.field.weatherSetter = null;
   emit(battle, { t: 'weatherEnd', weather });
-  for (const fighter of activeFighters(battle)) run(battle, fighter, 'onWeatherChange');
+  for (const fighter of activeFighters(battle)) triggers.run(fighter, 'onWeatherChange');
 }
 
-export function setTerrain(battle: BattleState, terrain: string, source: BattleFighter | null): boolean {
+export function setTerrainWithTriggers(triggers: AbilityTriggers, battle: BattleState, terrain: string, source: BattleFighter | null): boolean {
   if (battle.field.terrain === terrain) return false;
   if (source) showAbility(battle, source);
   battle.field.terrain = terrain;
   battle.field.terrainTurns = FIELD_TURNS;
   emit(battle, { t: 'terrain', terrain });
-  for (const fighter of activeFighters(battle)) run(battle, fighter, 'onTerrainChange');
+  for (const fighter of activeFighters(battle)) triggers.run(fighter, 'onTerrainChange');
   return true;
 }
 
-export function clearTerrain(battle: BattleState): void {
+export function clearTerrainWithTriggers(triggers: AbilityTriggers, battle: BattleState): void {
   const terrain = battle.field.terrain;
   if (!terrain) return;
   battle.field.terrain = null;
   battle.field.terrainTurns = 0;
   emit(battle, { t: 'terrainEnd', terrain });
-  for (const fighter of activeFighters(battle)) run(battle, fighter, 'onTerrainChange');
+  for (const fighter of activeFighters(battle)) triggers.run(fighter, 'onTerrainChange');
 }
 
 export function setScreen(battle: BattleState, sideIndex: number, kind: string): boolean {
@@ -267,18 +257,6 @@ export function addToxicSpikes(battle: BattleState, sideIndex: number): boolean 
   side.toxicSpikes += 1;
   emit(battle, { t: 'hazard', side: sideIndex, layers: side.toxicSpikes });
   return true;
-}
-
-export function lookOf(fighter: BattleFighter): Look {
-  return {
-    name: fighter.name,
-    speciesName: fighter.speciesName,
-    sprite: fighter.sprite,
-    floats: fighter.floats,
-    types: fighter.types,
-    shiny: fighter.shiny,
-    rarity: fighter.rarity,
-  };
 }
 
 export function transform(battle: BattleState, fighter: BattleFighter, into: BattleFighter): void {
@@ -350,12 +328,34 @@ export function breakIllusion(fighter: BattleFighter): boolean {
   return true;
 }
 
-export function speedOf(battle: BattleState, fighter: BattleFighter): number {
+export function speedOfWithTriggers(triggers: AbilityTriggers, battle: BattleState, fighter: BattleFighter): number {
   let spd = fighter.stats.spd * stageMult(fighter.boosts.spd);
   if (battle.sides[sideIndexOf(battle, fighter)]?.conds.tailwind) spd *= 2;
-  spd = chain(battle, fighter, 'onSpeed', spd);
+  spd = triggers.chain(fighter, 'onSpeed', spd);
   if (fighter.status === 'par' && !flag(battle, fighter, 'ignoresParalysisSpeed')) spd *= 0.5;
   return spd;
+}
+
+export function typeEffectiveness(battle: BattleState, move: AnyMove, attacker: BattleFighter, target: BattleFighter): number {
+  if (!move.type) return 1;
+  if (move.type === 'ground' && !move.hitsAirborne && (target.volatiles.magnetRise || target.volatiles.telekinesis) && !grounded(battle, target)) return 0;
+  let eff = 1;
+  for (const type of defendingTypes(battle, target)) {
+    let multiplier = effectiveness(move.type, [type]);
+    if (move.extraType) multiplier *= effectiveness(move.extraType, [type]);
+    if (multiplier === 0
+      && type === 'flying'
+      && move.type === 'ground'
+      && (move.hitsAirborne || target.volatiles.smackedDown || target.volatiles.ingrain || battle.field.rooms.gravity))
+      multiplier = 1;
+    if (multiplier === 0 && type === 'ghost' && (move.type === 'normal' || move.type === 'fighting') && target.volatiles.foresight) multiplier = 1;
+    if (multiplier === 0 && type === 'dark' && move.type === 'psychic' && target.volatiles.miracleEye) multiplier = 1;
+    if (multiplier === 0 && type === 'ghost' && (move.type === 'normal' || move.type === 'fighting') && flag(battle, attacker, 'hitsGhost'))
+      multiplier = 1;
+    if (multiplier > 1 && type === 'flying' && currentWeather(battle) === 'winds') multiplier = 1;
+    eff *= multiplier;
+  }
+  return eff;
 }
 
 export const asleep = (battle: BattleState, fighter: BattleFighter): boolean => fighter.status === 'slp' || flag(battle, fighter, 'comatose');

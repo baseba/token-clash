@@ -1,9 +1,11 @@
 import type { Graph, ThingId } from '../graph/graph.js';
-import type { ItemId, Model } from '../model/model.js';
+import { type ItemId, type Model, SOURCE_EXTENSION } from '../model/model.js';
 import type { NodeId, Tree } from '../model/tree.js';
 import { type Diagnostic, HELD_IN_MIND, type LongList, ascending, compareText, counted, inScope, listed, moduleLocation } from './report.js';
 
 const BREAK_EVEN = 1;
+
+const LAYERS = new Set(['domain', 'application', 'infrastructure', 'interface']);
 
 interface List {
   name: string;
@@ -23,9 +25,16 @@ function showsTheSame(tree: Tree, below: Shallow, above: Shallow): boolean {
   return below.total === above.total && below.shown.size === above.shown.size && [...below.shown].every((item) => above.shown.has(item));
 }
 
-function judgedModules(tree: Tree): Set<NodeId> {
+function isLayer(tree: Tree, nestModuleHolders: Set<NodeId | undefined>, id: NodeId): boolean {
+  const context = tree.parent(id);
+  return context !== undefined && tree.parent(context) === tree.root() && nestModuleHolders.has(context) && LAYERS.has(tree.node(id).name);
+}
+
+function judgedModules(model: Model): Set<NodeId> {
+  const tree = model.tree;
   const parents = new Set(tree.ids().map((id) => tree.parent(id)));
-  return new Set(tree.ids().filter((id) => tree.node(id).kind === 'package' || parents.has(id)));
+  const nestModuleHolders = new Set(model.files.filter((file) => file.path.replace(SOURCE_EXTENSION, '').endsWith('.module')).map((file) => tree.parent(file.module)));
+  return new Set(tree.ids().filter((id) => (tree.node(id).kind === 'package' || parents.has(id)) && !isLayer(tree, nestModuleHolders, id)));
 }
 
 function typesKnown(model: Model, graph: Graph): Map<ThingId, Set<ThingId>> {
@@ -72,7 +81,7 @@ function tooLong(lists: List[]): { notes: string[]; long: LongList[] } {
 
 export function checkShallow(model: Model, graph: Graph, scope: NodeId | undefined): Diagnostic[] {
   const tree = model.tree;
-  const judged = judgedModules(tree);
+  const judged = judgedModules(model);
   const home = (item: ItemId) => {
     const thing = graph.thingOf[item];
     return thing === undefined ? undefined : graph.things[thing].home;
