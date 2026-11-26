@@ -35,6 +35,20 @@ printf 'import Foundation\nimport Observation\n@Observable final class Probe { v
 say "Revisando las herramientas de Apple"
 xcrun swiftc -typecheck "$WORK/probe/Sources/Probe/main.swift" >"$WORK/probe.log" 2>&1 || probe_failed
 xcrun swift package --package-path "$WORK/probe" dump-package >"$WORK/probe.log" 2>&1 || probe_failed
+printf 'import SwiftUI\nstruct Probe: View { @State private var n = 0; var body: some View { Button("\\(n)") { n += 1 } } }\n' > "$WORK/probe/ui.swift"
+PROBE_TARGET="$(uname -m)-apple-macos14"
+if ! xcrun swiftc -target "$PROBE_TARGET" -typecheck "$WORK/probe/ui.swift" >"$WORK/probe.log" 2>&1; then
+  SDK_PICK=""
+  while IFS= read -r sdk; do
+    if xcrun swiftc -sdk "$sdk" -target "$PROBE_TARGET" -typecheck "$WORK/probe/ui.swift" </dev/null >/dev/null 2>&1; then
+      SDK_PICK="$sdk"
+      break
+    fi
+  done < <(printf '%s\n' "$(xcode-select -p)"/SDKs/MacOSX[0-9]*.*.sdk | sort -rV)
+  [[ -n "$SDK_PICK" ]] || fail "Tu SDK de macOS usa macros de SwiftUI que las Command Line Tools no traen, y no encontré otro SDK que compile. Instala Xcode desde la App Store y vuelve a intentarlo."
+  export SDKROOT="$SDK_PICK"
+  say "Compilando con $(basename "$SDK_PICK") (el SDK por defecto no trae los macros de SwiftUI)"
+fi
 
 say "Bajando PokeTokenBar $TAG"
 git -c advice.detachedHead=false clone --quiet --depth 1 --branch "$TAG" "$REPO" "$WORK/PokeTokenBar"

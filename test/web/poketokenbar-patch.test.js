@@ -39,6 +39,14 @@ test('the installer builds the official tag the patch was made on, checked by co
   assert.match(installer, /\/poketokenbar\/gen6-9\.patch/);
 });
 
+test('the installer builds with an SDK whose SwiftUI macros the Command Line Tools can expand', () => {
+  const probe = installer.indexOf('@State private var');
+  const sdkroot = installer.indexOf('export SDKROOT="$SDK_PICK"');
+  const build = installer.indexOf('./scripts/build-app.sh');
+  assert.ok(probe > 0 && probe < sdkroot && sdkroot < build);
+  assert.match(installer, /xcrun swiftc -sdk "\$sdk"/);
+});
+
 test('PokeTokenBar evolves the same graduates into the same species Token Clash does', async () => {
   const { finalForms } = await import('../../dist/src/catalog/domain/creatures.js');
   const { hash } = await import('../../dist/src/shared/domain/random.js');
