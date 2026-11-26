@@ -1,7 +1,7 @@
-import { HELD_ITEMS, TYPE_BOOST } from '../../catalog/domain/held-items.js';
-import { speciesData } from '../../catalog/domain/creatures.js';
+import { HELD_ITEMS, TYPE_BOOST } from '../../../catalog/domain/held-items.js';
+import { speciesData } from '../../../catalog/domain/creatures.js';
 import type { AbilityEffect } from './ability-effects.js';
-import type { BattleFighter } from './battle-types.js';
+import type { BattleFighter } from '../battle-types.js';
 
 const FOCUS_BAND_CHANCE = 0.1;
 const LIFE_ORB = 1.3;

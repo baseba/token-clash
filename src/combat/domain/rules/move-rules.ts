@@ -1,8 +1,8 @@
-import type { BoostKey, Boosts, MajorStatus, Stats, Weather } from '../../catalog/domain/creatures.js';
-import { TYPES } from '../../catalog/domain/type-chart.js';
+import type { BoostKey, Boosts, MajorStatus, Stats, Weather } from '../../../catalog/domain/creatures.js';
+import { TYPES } from '../../../catalog/domain/type-chart.js';
 import type { AbilityEffect } from './ability-effects.js';
-import type { BattleEvent, BattleFighter, BattleMove, BattleSide, BattleState, Guard, Hazards, MoveData, SideCondition, Volatiles } from './battle-types.js';
-import { stageMult } from './conditions.js';
+import type { BattleEvent, BattleFighter, BattleMove, BattleSide, BattleState, Guard, Hazards, MoveData, SideCondition, Volatiles } from '../battle-types.js';
+import { stageMult } from '../conditions.js';
 
 export interface CalledMove {
   key?: string;
