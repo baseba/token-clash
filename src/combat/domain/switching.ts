@@ -1,8 +1,8 @@
 import { effectiveness } from '../../catalog/domain/creatures.js';
 import type { BattleFighter, BattleMove, BattleState } from './battle-types.js';
-import { boost, clearToxicSpikes, clearWeather, cure, grounded, heal, hurt, setStatus, speedOf } from './effects.js';
+import { clearToxicSpikes, cure, grounded, heal, hurt } from './effects.js';
 import { activeFighters, activeOf, benchSlots, clamp, emit, freshBoosts, lookOf, nameOf, sideIndexOf } from './state.js';
-import { run } from './ability-engine.js';
+import { boost, clearWeather, run, setStatus, speedOf } from './ability-engine.js';
 import { flag } from './abilities.js';
 import { fighterView } from './fighter-view.js';
 

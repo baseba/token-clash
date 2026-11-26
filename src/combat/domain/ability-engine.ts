@@ -1,36 +1,47 @@
 import type { Boosts, MajorStatus, Weather } from '../../catalog/domain/creatures.js';
-import type { AbilityEffect, AbilityEngine, AbilityHook, BoostOptions } from './rules/ability-effects.js';
+import type { AbilityEffect, AbilityEngine, AbilityHook, BoostOptions, ChainArgs, ChainHook, Hook, HookArgs, MultiplierHook } from './rules/ability-effects.js';
 import { HELD_ITEMS } from '../../catalog/domain/held-items.js';
 import type { AbilityDetails, AnyMove, BattleFighter, BattleState } from './battle-types.js';
-import { addToxicSpikes, addVolatile, asleep, boost, breakIllusion, changeForm, clearScreens, cure, currentWeather, grounded, heal, hurt, setStatus, setTerrain, setTypes, setWeather, transform, typeEffectiveness } from './effects.js';
+import { type AbilityTriggers, addToxicSpikes, addVolatileWithTriggers, asleep, boostWithTriggers, breakIllusion, changeForm, clearScreens, clearTerrainWithTriggers, clearWeatherWithTriggers, cure, currentWeather, grounded, heal, hurt, setStatusWithTriggers, setTerrainWithTriggers, setTypes, setWeatherWithTriggers, speedOfWithTriggers, transform, typeEffectiveness } from './effects.js';
 import { emit, foeOf, hasBench, lookOf, nameOf, sideIndexOf } from './state.js';
 import { abilityDef, abilityKey, anyActiveHas, itemDef, setAbility, showAbility } from './abilities.js';
 
-type Hook<H extends AbilityHook> = NonNullable<AbilityEffect[H]>;
-type HookArgs<H extends AbilityHook> = Parameters<Hook<H>> extends [AbilityEngine, BattleFighter, ...infer Args] ? Args : never;
-type MultiplierHook = 'onBasePower' | 'onIncoming' | 'onAttack' | 'onDefense' | 'onAttackerFinal' | 'onDefenderFinal';
-type ChainHook = 'onSpeed' | 'onAccuracy' | 'onEvasion' | 'onCritStage' | 'onEffectiveness' | 'onDamage' | 'onModifyPriority' | 'onStatusDamage';
-type ChainArgs<H extends ChainHook> = HookArgs<H> extends [...infer Args, number] ? Args : never;
-
 export function run<H extends AbilityHook>(battle: BattleState, fighter: BattleFighter, hook: H, ...args: HookArgs<H>): ReturnType<Hook<H>> | undefined {
-  const own = call(battle, abilityDef(battle, fighter), fighter, hook, args);
-  const held = call(battle, itemDef(fighter), fighter, hook, args);
-  return own ?? held;
+  return engine(battle).triggers.run(fighter, hook, ...args);
 }
 
-function call<H extends AbilityHook>(battle: BattleState, def: Partial<AbilityEffect> | null, fighter: BattleFighter, hook: H, args: HookArgs<H>): ReturnType<Hook<H>> | undefined {
+function call<H extends AbilityHook>(api: AbilityEngine, def: Partial<AbilityEffect> | null, fighter: BattleFighter, hook: H, args: HookArgs<H>): ReturnType<Hook<H>> | undefined {
   type AnyHook = (engine: AbilityEngine, me: BattleFighter, ...args: unknown[]) => unknown;
-  return (def?.[hook] as AnyHook | undefined)?.(engine(battle), fighter, ...args) as ReturnType<Hook<H>> | undefined;
+  return (def?.[hook] as AnyHook | undefined)?.(api, fighter, ...args) as ReturnType<Hook<H>> | undefined;
 }
 
 export function mul<H extends MultiplierHook>(battle: BattleState, fighter: BattleFighter, hook: H, ...args: HookArgs<H>): number {
-  return (call(battle, abilityDef(battle, fighter), fighter, hook, args) ?? 1) * (call(battle, itemDef(fighter), fighter, hook, args) ?? 1);
+  const { api } = engine(battle);
+  return (call(api, abilityDef(battle, fighter), fighter, hook, args) ?? 1) * (call(api, itemDef(fighter), fighter, hook, args) ?? 1);
 }
 
 export function chain<H extends ChainHook>(battle: BattleState, fighter: BattleFighter, hook: H, value: number, ...args: ChainArgs<H>): number {
-  const byAbility = call(battle, abilityDef(battle, fighter), fighter, hook, [...args, value] as HookArgs<H>) ?? value;
-  return call(battle, itemDef(fighter), fighter, hook, [...args, byAbility] as HookArgs<H>) ?? byAbility;
+  return engine(battle).triggers.chain(fighter, hook, value, ...args);
 }
+
+export const boost = (battle: BattleState, fighter: BattleFighter, changes: Boosts, source?: BattleFighter | null, opts?: BoostOptions): Boosts =>
+  boostWithTriggers(engine(battle).triggers, battle, fighter, changes, source, opts);
+export const setStatus = (battle: BattleState, fighter: BattleFighter, status: MajorStatus, source?: BattleFighter | null, opts?: { ability?: BattleFighter }): boolean =>
+  setStatusWithTriggers(engine(battle).triggers, battle, fighter, status, source, opts);
+export const addVolatile = (
+  battle: BattleState,
+  fighter: BattleFighter,
+  kind: string,
+  source?: BattleFighter | null,
+  opts?: { ability?: BattleFighter; move?: { key: string; name: string } },
+): boolean => addVolatileWithTriggers(engine(battle).triggers, battle, fighter, kind, source, opts);
+export const setWeather = (battle: BattleState, weather: Weather, source: BattleFighter | null): boolean =>
+  setWeatherWithTriggers(engine(battle).triggers, battle, weather, source);
+export const clearWeather = (battle: BattleState): void => clearWeatherWithTriggers(engine(battle).triggers, battle);
+export const setTerrain = (battle: BattleState, terrain: string, source: BattleFighter | null): boolean =>
+  setTerrainWithTriggers(engine(battle).triggers, battle, terrain, source);
+export const clearTerrain = (battle: BattleState): void => clearTerrainWithTriggers(engine(battle).triggers, battle);
+export const speedOf = (battle: BattleState, fighter: BattleFighter): number => speedOfWithTriggers(engine(battle).triggers, battle, fighter);
 
 function showItem(battle: BattleState, fighter: BattleFighter, usedUp = false): void {
   if (!fighter.item) return;
@@ -38,8 +49,13 @@ function showItem(battle: BattleState, fighter: BattleFighter, usedUp = false): 
   if (usedUp) fighter.item = null;
 }
 
-const engines = new WeakMap<BattleState, AbilityEngine>();
-function engine(battle: BattleState): AbilityEngine {
+interface BattleEngine {
+  api: AbilityEngine;
+  triggers: AbilityTriggers;
+}
+
+const engines = new WeakMap<BattleState, BattleEngine>();
+function engine(battle: BattleState): BattleEngine {
   let engine = engines.get(battle);
   if (engine) return engine;
   engine = makeEngine(battle);
@@ -47,8 +63,19 @@ function engine(battle: BattleState): AbilityEngine {
   return engine;
 }
 
-function makeEngine(battle: BattleState): AbilityEngine {
-  return {
+function makeEngine(battle: BattleState): BattleEngine {
+  const triggers: AbilityTriggers = {
+    run(fighter, hook, ...args) {
+      const own = call(api, abilityDef(battle, fighter), fighter, hook, args);
+      const held = call(api, itemDef(fighter), fighter, hook, args);
+      return own ?? held;
+    },
+    chain(fighter, hook, value, ...args) {
+      const byAbility = call(api, abilityDef(battle, fighter), fighter, hook, [...args, value] as HookArgs<typeof hook>) ?? value;
+      return call(api, itemDef(fighter), fighter, hook, [...args, byAbility] as HookArgs<typeof hook>) ?? byAbility;
+    },
+  };
+  const api: AbilityEngine = {
     battle,
     rand: () => battle.random(),
     foe: (fighter: BattleFighter) => foeOf(battle, fighter),
@@ -57,23 +84,23 @@ function makeEngine(battle: BattleState): AbilityEngine {
     show: (fighter: BattleFighter, note?: string | null, details?: AbilityDetails) => showAbility(battle, fighter, note, details),
     immune: (fighter: BattleFighter) => emit(battle, { t: 'immune', side: sideIndexOf(battle, fighter) }),
     boost: (fighter: BattleFighter, changes: Boosts, source?: BattleFighter | null, opts?: BoostOptions) =>
-      boost(battle, fighter, changes, source, opts),
+      boostWithTriggers(triggers, battle, fighter, changes, source, opts),
     damage: (fighter: BattleFighter, amount: number, cause?: string) => hurt(battle, fighter, amount, cause),
     heal: (fighter: BattleFighter, amount: number, opts?: { silent?: boolean }) => heal(battle, fighter, amount, opts),
     setStatus: (fighter: BattleFighter, status: MajorStatus, source?: BattleFighter | null, opts?: { ability?: BattleFighter }) =>
-      setStatus(battle, fighter, status, source, opts),
+      setStatusWithTriggers(triggers, battle, fighter, status, source, opts),
     addVolatile: (
       fighter: BattleFighter,
       kind: string,
       source?: BattleFighter | null,
       opts?: { ability?: BattleFighter; move?: { key: string; name: string } },
     ) =>
-      addVolatile(battle, fighter, kind, source, opts),
+      addVolatileWithTriggers(triggers, battle, fighter, kind, source, opts),
     cure: (fighter: BattleFighter, announce?: boolean) => cure(battle, fighter, announce),
     weather: () => currentWeather(battle),
     terrain: () => battle.field.terrain,
-    setWeather: (weather: Weather, source: BattleFighter | null) => setWeather(battle, weather, source),
-    setTerrain: (terrain: string, source: BattleFighter | null) => setTerrain(battle, terrain, source),
+    setWeather: (weather: Weather, source: BattleFighter | null) => setWeatherWithTriggers(triggers, battle, weather, source),
+    setTerrain: (terrain: string, source: BattleFighter | null) => setTerrainWithTriggers(triggers, battle, terrain, source),
     grounded: (fighter: BattleFighter) => grounded(battle, fighter),
     asleep: (fighter: BattleFighter) => asleep(battle, fighter),
     effectiveness: (move: AnyMove, attacker: BattleFighter, target: BattleFighter) => typeEffectiveness(battle, move, attacker, target),
@@ -91,4 +118,5 @@ function makeEngine(battle: BattleState): AbilityEngine {
     showItem: (fighter: BattleFighter) => showItem(battle, fighter),
     useUpItem: (fighter: BattleFighter) => showItem(battle, fighter, true),
   };
+  return { api, triggers };
 }
