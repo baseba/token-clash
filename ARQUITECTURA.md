@@ -216,8 +216,9 @@ conexión, y la arena lo cambia solo con métodos que no nombran agregados: `sig
 `follow` devuelven `false` si ya está en el lobby, en una sala o en un torneo, y `enterLobby` solo rechaza una
 conexión que ya está en una sala o en el lobby. Por eso la página de un torneo puede abrir el lobby sin dejar de
 seguir el torneo. `signIn` guarda solo la primera identidad: una conexión anónima puede firmar después, pero una
-firmada no cambia de entrenador, así que abrir el lobby sin token no la deja fuera del asiento que tiene en el torneo. Lo que lee un solo servicio vive en ese servicio: el último turno que vio cada espectador, en
-`LiveBattleService`, y cuándo habló cada uno por última vez, en `ArenaChatService`.
+firmada no cambia de entrenador, así que abrir el lobby sin token no la deja fuera del asiento que tiene en el torneo.
+Lo que lee un solo servicio vive en ese servicio: el último turno que vio cada espectador, en `LiveBattleService`, y
+cuándo habló cada uno por última vez, en `ArenaChatService`.
 
 ## 6. Persistencia
 
