@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DomainError } from '../../shared/domain/errors.js';
-import { Challenge, isHumanDuel, ROOM_MAX_AGE_MS } from './challenge.js';
+import { AI_NAMES, aiName, Challenge, isHumanDuel, ROOM_MAX_AGE_MS } from './challenge.js';
 
 const ana = { id: 'ana', name: 'Ana' };
 const beto = { id: 'beto', name: 'Beto' };
@@ -68,14 +68,31 @@ test('a guest who leaves the ready check reopens the room; a random room forgets
 
 test('only a battle in course finishes or is cut by a restart', () => {
   assert.equal(kindOf(() => open().finish(result)), 'conflict');
-  assert.equal(kindOf(() => open().abandon()), 'conflict');
+  const waiting = open();
+  assert.equal(waiting.recoverAfterRestart(), false);
+  assert.equal(waiting.status, 'open');
   const finished = seated();
   finished.finish(result);
   assert.deepEqual([finished.status, finished.winnerId, finished.turns], ['finished', 'ana', 3]);
-  assert.equal(kindOf(() => finished.abandon()), 'conflict');
+  assert.equal(finished.recoverAfterRestart(), false);
+  assert.equal(finished.status, 'finished');
   const cut = seated();
-  cut.abandon();
+  assert.equal(cut.recoverAfterRestart(), true);
   assert.equal(cut.status, 'abandoned');
+  assert.equal(kindOf(() => cut.finish(result)), 'conflict');
+});
+
+test('after a restart an open room keeps one Pokémon per species in its host team', () => {
+  const pokemon = (id: string, finalID: number) => ({ id, finalID }) as any;
+  const repeated = Challenge.open({ id: 'c3', host: ana, hostTeam: [pokemon('a', 1), pokemon('b', 1), pokemon('c', 2)], mode: 'team', visibility: 'public', at: 1 });
+  assert.equal(repeated.recoverAfterRestart(), true);
+  assert.deepEqual(repeated.hostTeam.map((entry) => entry.id), ['a', 'c']);
+  assert.equal(repeated.recoverAfterRestart(), false);
+  const fighting = seated();
+  fighting.hostTeam = [pokemon('a', 1), pokemon('b', 1)];
+  assert.equal(fighting.recoverAfterRestart(), true);
+  assert.equal(fighting.status, 'abandoned');
+  assert.equal(fighting.hostTeam.length, 2);
 });
 
 test('only a 1v1 between people is a human duel', () => {
@@ -101,4 +118,25 @@ test('a room already fighting, finished or of a tournament never expires', () =>
   const done = seated();
   done.finish(result);
   assert.equal(done.expire(10 * ROOM_MAX_AGE_MS, { readyCheck: false }), false);
+});
+
+test('a battle against the AI names its AI unless it already has a name', () => {
+  const againstAi = (name?: string) =>
+    Challenge.againstAi({ id: 'c2', host: ana, hostTeam: [], ai: { id: 'ai:hard', level: 'hard', ...(name ? { name } : {}) }, aiTeam: [], mode: 'team', at: 1 });
+  assert.match(againstAi().guestName!, / ai - difícil$/);
+  assert.equal(againstAi('Líder Brock').guestName, 'Líder Brock');
+  assert.equal(againstAi().ai, 'hard');
+});
+
+test('AI names come from the list, carry the difficulty and never repeat a name already taken', () => {
+  const taken = [];
+  for (let i = 0; i < AI_NAMES.length; i++) {
+    const { base, name } = aiName('veryhard', taken);
+    assert.ok(AI_NAMES.includes(base));
+    assert.ok(!taken.includes(base));
+    assert.equal(name, `${base} - muy difícil`);
+    taken.push(base);
+  }
+  assert.equal(new Set(taken).size, AI_NAMES.length);
+  assert.equal(aiName('easy', [], () => 0).name, 'crubio ai - fácil');
 });

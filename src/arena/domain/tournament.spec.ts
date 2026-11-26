@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AI_NAMES, aiName, reachedRound, addSeat, removeSeat, setReady, nextAiId, createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor, Tournament } from './tournament.js';
+import { createBracket, nextMatch, recordWinner, roundName, matchNumber, totalMatches, tournamentMatchFor, Tournament } from './tournament.js';
 import { aiLevelOf } from '../../combat/domain/ai.js';
 import { DomainError } from '../../shared/domain/errors.js';
 
-const tournament = (size = 4, extra = {}): any => ({ id: 't', hostId: 'h', mode: 'team', size, seats: [{ id: 'h', name: 'Host', ai: null, ready: false }], ...extra });
+const tournament = (size = 4, extra = {}) => Tournament.restore({ id: 't', hostId: 'h', mode: 'team', size, visibility: 'public', status: 'open', createdAt: 0, seats: [{ id: 'h', name: 'Host', ai: null, ready: false }], ...extra });
 const lobby = () => {
   const created = Tournament.create({ id: 't', host: { id: 'h', name: 'Host' }, mode: 'team', size: 4, visibility: 'private', at: 0 });
   created.join({ id: 'p', name: 'Pía' });
@@ -29,20 +29,21 @@ const refusal = (run: () => void) => {
 };
 
 test('AIs sit down ready, humans have to press ready, and the room starts only when full', () => {
-  const filling = Tournament.restore(tournament(4, { status: 'open' }));
-  addSeat(filling, { id: 'p', name: 'Pía', ai: null });
-  addSeat(filling, { ...nextAiId(filling, 'hard'), name: 'IA', ai: 'hard' });
-  addSeat(filling, { id: nextAiId(filling, 'hard').id, name: 'IA 2', ai: 'hard' });
+  const filling = tournament();
+  filling.join({ id: 'p', name: 'Pía' });
+  filling.addAis('h', 'hard', 2);
   assert.deepEqual(filling.seats.map((s) => [s.id, s.ready]), [['h', false], ['p', false], ['ai:hard#1', true], ['ai:hard#2', true]]);
-  assert.throws(() => addSeat(filling, { id: 'x', name: 'X' } as any), /lleno/);
-  setReady(filling, 'h', true);
+  assert.throws(() => filling.join({ id: 'x', name: 'X' }), /lleno/);
+  filling.setReady('h', true);
   assert.equal(filling.startIfReady(startNow()), false);
-  removeSeat(filling, 3);
-  setReady(filling, 'p', true);
+  filling.kick('h', 3);
+  filling.setReady('p', true);
   assert.equal(filling.startIfReady(startNow()), false);
-  assert.throws(() => removeSeat(filling, 0), /no se puede quitar/);
-  assert.throws(() => addSeat(filling, { id: 'p', name: 'Pía' } as any), /Ya estás/);
-  addSeat(filling, { id: nextAiId(filling, 'hard').id, name: 'IA 3', ai: 'hard' });
+  assert.throws(() => filling.kick('h', 0), /no se puede quitar/);
+  assert.throws(() => filling.join({ id: 'p', name: 'Pía' }), /Ya estás/);
+  assert.throws(() => filling.setReady('x', true), /No estás/);
+  filling.addAis('h', 'hard', 1);
+  assert.equal(filling.seats[3].id, 'ai:hard#2');
   assert.equal(filling.startIfReady(startNow()), true);
   assert.equal(filling.status, 'running');
   assert.equal(filling.startIfReady(startNow()), false);
@@ -80,35 +81,28 @@ test('the bracket plays round by round and the last winner is the champion', () 
 });
 
 test('a public tournament search joins one with the same settings and free seats', () => {
-  const full = tournament(4, { id: 'full', hostId: 'a', seats: [1, 2, 3, 4].map((i) => ({ id: `s${i}` })) });
-  const other = tournament(8, { id: 'eight', hostId: 'b', seats: [{ id: 'b' }] });
-  const fit = tournament(4, { id: 'fit', hostId: 'c', seats: [{ id: 'c' }] });
-  const mine = tournament(4, { id: 'mine', hostId: 'me', seats: [{ id: 'me' }] });
+  const seats = (...ids: string[]) => ids.map((id) => ({ id, name: id, ai: null, ready: false }));
+  const full = tournament(4, { id: 'full', hostId: 'a', seats: seats('s1', 's2', 's3', 's4') });
+  const other = tournament(8, { id: 'eight', hostId: 'b', seats: seats('b') });
+  const fit = tournament(4, { id: 'fit', hostId: 'c', seats: seats('c') });
+  const mine = tournament(4, { id: 'mine', hostId: 'me', seats: seats('me') });
   const found = tournamentMatchFor([full, other, fit, mine], { trainerId: 'me', mode: 'team', size: 4 });
-  assert.equal(found.rival.id, 'fit');
-  assert.equal(found.own.id, 'mine');
+  assert.equal(found.rival?.id, 'fit');
+  assert.equal(found.own?.id, 'mine');
   assert.equal(found.seated, null);
 });
 
-test('AI names come from the list, carry the difficulty and never repeat inside a tournament', () => {
-  const taken = [];
-  for (let i = 0; i < AI_NAMES.length; i++) {
-    const { base, name } = aiName('veryhard', taken);
-    assert.ok(AI_NAMES.includes(base));
-    assert.ok(!taken.includes(base));
-    assert.equal(name, `${base} - muy difícil`);
-    taken.push(base);
-  }
-  assert.equal(new Set(taken).size, AI_NAMES.length);
-  assert.equal(aiName('easy', [], () => 0).name, 'crubio ai - fácil');
-});
-
-test('how far each seat got in the bracket', () => {
-  const bracket = createBracket([0, 1, 2, 3]);
-  recordWinner(bracket, { round: 0, index: 0 }, 1);
-  recordWinner(bracket, { round: 0, index: 1 }, 2);
-  assert.equal(reachedRound(bracket, 0), 0);
-  assert.equal(reachedRound(bracket, 2), 1);
+test('how far each seat got in the bracket, and how many matches are played', () => {
+  const fourAis = fullOfAis(4);
+  assert.equal(fourAis.reachedBy('h'), null);
+  assert.deepEqual(fourAis.progress(), { played: 0, total: 3 });
+  fourAis.startIfReady(startNow());
+  fourAis.matchFinished({ round: 0, index: 0 }, 'ai:easy#1', { now: 0, nextMatchAt: 0 });
+  fourAis.matchFinished({ round: 0, index: 1 }, 'ai:easy#2', { now: 0, nextMatchAt: 0 });
+  assert.equal(fourAis.reachedBy('h'), 'Semifinal');
+  assert.equal(fourAis.reachedBy('ai:easy#2'), 'Final');
+  assert.equal(fourAis.reachedBy('nobody'), null);
+  assert.deepEqual(fourAis.progress(), { played: 2, total: 3 });
 });
 
 test('a match waits for its players and for everyone following the tournament to reach the room', async () => {
@@ -143,7 +137,7 @@ test('no match starts while the tournament is not running or once every match ha
   const abandoned = fullOfAis(4);
   abandoned.startIfReady(startNow());
   abandoned.startNextMatch('room1');
-  abandoned.abandon();
+  abandoned.recoverAfterRestart();
   assert.equal(abandoned.startNextMatch('room2'), null);
   assert.deepEqual(abandoned.current, { round: 0, index: 0, challengeId: 'room1' });
   assert.equal(abandoned.bracket![0][1].challengeId, null);
@@ -156,6 +150,20 @@ test('no match starts while the tournament is not running or once every match ha
   assert.equal(decided.status, 'running');
   assert.equal(decided.startNextMatch('room2'), null);
   assert.deepEqual(decided.current, { round: 0, index: 0, challengeId: 'room1' });
+});
+
+test('only a running tournament is cut by a restart', () => {
+  const waiting = lobby();
+  const cancelled = lobby();
+  cancelled.close('h');
+  const finished = tournament(4, { status: 'finished' });
+  const restarted = [waiting, cancelled, finished].map((tournament) => [tournament.recoverAfterRestart(), tournament.status]);
+  assert.deepEqual(restarted, [[false, 'open'], [false, 'cancelled'], [false, 'finished']]);
+  const running = fullOfAis(4);
+  running.startIfReady(startNow());
+  assert.equal(running.recoverAfterRestart(), true);
+  assert.equal(running.status, 'abandoned');
+  assert.equal(running.recoverAfterRestart(), false);
 });
 
 test('a cancelled lobby never starts, even with every seat full and ready', () => {
