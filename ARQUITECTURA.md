@@ -18,13 +18,13 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 | `tower` | La Torre: subidas con tu colección, pisos y caminos, experiencia, evolución, premios y récords | tabla `tower_runs` |
 | `stats` | La página de stats y los logros | nada: lee de los otros dominios y le pide los cambios a `trainers` |
 
-Más cinco piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
-(archivos estáticos, health checks y la vista previa de los links, que lee la arena con `ArenaQueries`), `shared` (lo
-que un `domain/` puede importar: los errores de dominio, el reloj, la aleatoriedad con semilla y la raíz del
-proyecto), `platform` (la plomería de Nest: configuración, HTTP y base de datos) y `app` (la raíz de composición:
-`app.module.ts`, que junta los módulos, y la importación única de `data/db.json`). Un `domain/` nunca importa `platform/`, `shared/` no importa Nest, Drizzle
-ni `node:http`, y ni `shared` ni `platform` importan un dominio: las flechas solo entran. `main.ts` y `jev-proxy.main.ts`
-quedan en la raíz de `src/`: son los dos procesos que arrancan.
+Más cinco piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web` (archivos
+estáticos, health checks y la vista previa de los links, que lee la arena con `ArenaQueries`), `shared` (lo que un
+`domain/` puede importar: los errores de dominio, el reloj, la aleatoriedad con semilla y la raíz del proyecto),
+`platform` (la plomería de Nest: configuración, HTTP y base de datos) y `app` (la raíz de composición: `app.module.ts`,
+que junta los módulos, y la importación única de `data/db.json`). Un `domain/` nunca importa `platform/`, `shared/` no
+importa Nest, Drizzle ni `node:http`, y ni `shared` ni `platform` importan un dominio: las flechas solo entran.
+`main.ts` y `jev-proxy.main.ts` quedan en la raíz de `src/`: son los dos procesos que arrancan.
 
 ```
            realtime (WS)   web          HTTP controllers de cada dominio
@@ -93,11 +93,12 @@ exports: [TrainersService, AccountsService, ShopService],
 ```
 
 `combat` y `catalog` son casi solo `domain/`: funciones puras con la aleatoriedad inyectada (`random = Math.random`),
-así que sus tests reproducen una pelea entera con una semilla fija. La única lectura es la del catálogo: sus JSON
-se leen una vez, al cargar el módulo, y la tabla de tipos es `public/types.js`, la misma que usa el navegador
-(`catalog/domain/type-chart.ts` explica cómo). La tienda (`public/shop.js`) y los entrenadores
-(`public/trainer-sprites.js`, `public/trainer-variants.js`) siguen el mismo camino: el catálogo les pone tipos en
-`catalog/domain/shop.ts` y `trainer-sprites.ts`, y `tsconfig.json` los incluye en el build.
+así que sus tests reproducen una pelea entera con una semilla fija. Las únicas lecturas son las del catálogo y la de la
+radio (`radio/domain/radio-tracks.ts`): sus JSON se leen una vez, al cargar el módulo. La tabla de tipos es
+`public/types.js`, la misma que usa el navegador (`catalog/domain/type-chart.ts` explica cómo). La tienda
+(`public/shop.js`) y los entrenadores (`public/trainer-sprites.js`, `public/trainer-variants.js`) siguen el mismo
+camino: el catálogo les pone tipos en `catalog/domain/shop.ts` y `trainer-sprites.ts`, y `tsconfig.json` los incluye en
+el build.
 
 En general, un dominio tiene solo las capas que usa: `chat` no tiene HTTP propio (sus mensajes le llegan por la arena) y `stats` no guarda nada.
 
