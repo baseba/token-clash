@@ -1,16 +1,18 @@
 import type { Weather } from '../../catalog/domain/creatures.js';
 import { aimedTarget, hiddenPowerType, moveAt, moveData, type MoveData, type MoveTarget, STRUGGLE, STRUGGLE_MOVE } from './moves.js';
-import { MOVE_RULES } from './rules/move-rules.js';
+import { MOVE_RULES, type MoveRuleApi } from './rules/move-rules.js';
 import { isSun, stageMult } from './conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState, MoveEvent, OrderReason } from './battle-types.js';
 import { attack, baseDamage, blockedByProtection, bypassesSub, damageRoll, HIDDEN_BY, hiddenFrom, hits, typeEffectiveness } from './damage.js';
 import { faint } from './switching.js';
 import { activeOf, addVolatile, asleep, boost, clearHazards, clearScreens, cure, currentWeather, emit, foeOf, grounded, heal, hurt, nameOf, onField, setScreen, setStatus, setTerrain, setWeather, sideIndexOf, statusImmune } from './effects.js';
 import { abilityKey, anyActiveHas, flag, run, showAbility } from './ability-engine.js';
-import { moveApi } from './move-rule-api.js';
-import { shownTarget } from './battle-view.js';
+import { makeMoveApi } from './move-rule-api.js';
+import { shownTarget } from './fighter-view.js';
 
 const CONFUSION_POWER = 40;
+
+const moveApis = new WeakMap<BattleState, MoveRuleApi>();
 
 const HEALS_WITH_WEATHER: Record<string, Weather> = { synthesis: 'sun', 'morning-sun': 'sun', moonlight: 'sun', 'shore-up': 'sand' };
 
@@ -134,6 +136,14 @@ function adaptMove(battle: BattleState, me: BattleFighter, move: BattleMove): vo
   if (move.id === 'photon-geyser' && me.stats.atk * stageMult(me.boosts.atk) > me.stats.satk * stageMult(me.boosts.satk)) move.category = 'physical';
 }
 
+function moveApi(battle: BattleState): MoveRuleApi {
+  let api = moveApis.get(battle);
+  if (api) return api;
+  api = makeMoveApi(battle, (fighter, key, opts) => runCalled(battle, fighter, key, opts));
+  moveApis.set(battle, api);
+  return api;
+}
+
 function perform(
   battle: BattleState,
   sideIndex: number,
@@ -179,7 +189,7 @@ function perform(
   else if (move.aimable && move.target === 'self') {
     if (!heal(battle, me, me.stats.hp / 2)) emit(battle, { t: 'nothing', side: sideIndex });
   } else {
-    dealt = attack(battle, me, foe, move) || 0;
+    dealt = attack(battle, me, foe, move, moveApi(battle)) || 0;
     if (dealt && move.flags.includes('recharge') && me.hp > 0 && moveIdx != null) me.volatiles.mustRecharge = moveIdx;
     if (move.recoilMaxHp && me.hp > 0) hurt(battle, me, Math.round(me.stats.hp * move.recoilMaxHp), 'recoil');
     me.volatiles.lastFailed = !dealt;
@@ -220,7 +230,7 @@ function announceMove(battle: BattleState, sideIndex: number, me: BattleFighter,
   });
 }
 
-export function runCalled(battle: BattleState, me: BattleFighter, key: string, opts: { powerMult?: number; instructed?: boolean } = {}): void {
+function runCalled(battle: BattleState, me: BattleFighter, key: string, opts: { powerMult?: number; instructed?: boolean } = {}): void {
   const base = moveData(key);
   if (!base || me.hp <= 0) return;
   const sideIndex = sideIndexOf(battle, me);
