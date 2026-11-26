@@ -73,6 +73,10 @@ function testsReading(code: string, naming: RegExp): string[] {
   return tests.filter(reads);
 }
 
+const SKIP_OPTION = /^\s*(?:test|it)\(\s*(['"`])[\s\S]*?\1\s*,\s*\{[^{}]*\bskip\b\s*[:,}]/;
+const CONTEXT_SKIP = /(?<![\w.])(?:t|context)\.skip\(/;
+const isSkipGuarded = (body: string) => SKIP_OPTION.test(body) || CONTEXT_SKIP.test(body);
+
 test('a test that reads a folder downloaded at install skips when the folder is missing', () => {
   const downloaded = readFileSync(join(PROJECT_ROOT, '.gitignore'), 'utf8').split('\n').map((line) => /^public\/([\w-]+)\/?$/.exec(line.trim())?.[1]).filter((name) => name !== undefined);
   assert.ok(downloaded.includes('anims'));
@@ -81,7 +85,7 @@ test('a test that reads a folder downloaded at install skips when the folder is 
   const testFiles = [...projectFiles('src', (name) => name.endsWith('.spec.ts')), ...projectFiles('tools', (name) => name.endsWith('.spec.ts')), ...projectFiles('test', (name) => /\.(e2e-spec\.ts|test\.js)$/.test(name))];
   const readers = testFiles.flatMap((path) => testsReading(readFileSync(join(PROJECT_ROOT, path), 'utf8'), naming).map((body) => ({ path, body })));
   assert.ok(readers.some(({ path }) => path === join('test', 'web', 'battle-anims.test.js')));
-  assert.deepEqual(readers.filter(({ body }) => !/\bskip\s*:|\.skip\(/.test(body)).map(({ path, body }) => `${path}: ${body.split('\n')[0].trim()}`), []);
+  assert.deepEqual(readers.filter(({ body }) => !isSkipGuarded(body)).map(({ path, body }) => `${path}: ${body.split('\n')[0].trim()}`), []);
 });
 
 test('the dependencies are the agreed ones: adding one is a decision, not a side effect', () => {
