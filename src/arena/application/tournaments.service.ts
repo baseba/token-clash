@@ -46,11 +46,7 @@ export class TournamentsService implements OnModuleInit {
   }
 
   onModuleInit(): void {
-    for (const tournament of this.tournaments.all()) {
-      if (tournament.status !== 'running') continue;
-      tournament.abandon();
-      this.tournaments.save(tournament);
-    }
+    for (const tournament of this.tournaments.all()) if (tournament.recoverAfterRestart()) this.tournaments.save(tournament);
   }
 
   find(id: string): Tournament {
