@@ -158,9 +158,9 @@ test('a connection inside a room or a tournament refuses to enter another one, a
 test('a connection keeps the first trainer it signs in as, so a later sign-in without a token or with another one changes nothing', () => {
   const { gateway, entered, connect, ws, stop } = connectedGateway();
   const anonymous = connect();
-  const signed = connect();
+  const signedLater = connect();
   gateway.onTour(ws(anonymous), { t: 'tour', id: 'tour-1', token: undefined });
-  gateway.onTour(ws(signed), { t: 'tour', id: 'tour-1', token: undefined });
+  gateway.onTour(ws(signedLater), { t: 'tour', id: 'tour-1', token: undefined });
   const [anonymousAtFirst, ash] = entered;
   anonymousAtFirst.signIn(undefined);
   assert.equal(anonymousAtFirst.trainerId, null);

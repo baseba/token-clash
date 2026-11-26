@@ -443,6 +443,22 @@ test('a host whose tournament page opens the lobby without a token keeps the sea
   await viewer.close();
 });
 
+test('a host whose tournament page opens the lobby without a token after the seat grace still frees the seat on leaving', async () => {
+  const host = await trainer('Tarde');
+  const id = (await call('/api/tournaments', { method: 'POST', token: host.token, body: { size: 4, mode: 'team', visibility: 'private' } })).data.tournament.id;
+  const page = new Client({ t: 'tour', id, token: host.token });
+  await page.next((f) => f.t === 'watch');
+  await sleep(SEAT_GRACE_MS * 2);
+  page.send({ t: 'lobby', token: null });
+  await page.next((f) => f.t === 'rooms');
+
+  const viewer = new Client({ t: 'tour', id, token: null });
+  await viewer.next((f) => f.t === 'watch');
+  await page.close();
+  await viewer.next((f) => f.t === 'tour' && f.tournament.status === 'cancelled');
+  await viewer.close();
+});
+
 test('a socket sent to a room that does not exist is not signed in, so its next entry signs in with its own token', async () => {
   const host = await trainer('Firma');
   const stranger = await trainer('Perdido');
