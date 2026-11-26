@@ -1,9 +1,9 @@
 import type { BoostKey, Boosts } from '../../catalog/domain/creatures.js';
 import { TYPES } from '../../catalog/domain/type-chart.js';
 import type { MoveRuleApi } from './move-rule-api.js';
-import type { BattleFighter, BattleMove, SideCondition, Volatiles } from './battle-types.js';
+import type { BattleFighter, BattleMove, MoveData, SideCondition, Volatiles } from './battle-types.js';
 import { stageMult } from './conditions.js';
-import { FULL_FRIENDSHIP_POWER, moveData, type MoveData } from './moves.js';
+import { FULL_FRIENDSHIP_POWER, moveData } from './moves.js';
 
 export interface CalledMove {
   key?: string;
