@@ -4,6 +4,7 @@ import { aiTrainerId, buildAiRandomParty, buildAiTeam, type AiLevel } from '../.
 import { AppConfig, type ArenaTimings } from '../../shared/config/app-config.js';
 import { newId, now } from '../../shared/domain/clock.js';
 import { conflict } from '../../shared/domain/errors.js';
+import { AccountsService } from '../../trainers/application/accounts.service.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository } from '../domain/arena.repositories.js';
@@ -24,6 +25,7 @@ export class DuelService {
     config: AppConfig,
     private readonly challenges: ChallengeRepository,
     private readonly trainers: TrainersService,
+    private readonly accounts: AccountsService,
     private readonly presence: Presence,
     private readonly views: ArenaViews,
     private readonly lobby: LobbyService,
@@ -117,7 +119,7 @@ export class DuelService {
       ws.send({ t: 'error', error: 'Ese desafío no existe.' });
       return null;
     }
-    if (token !== undefined) ws.signIn(this.trainers.authenticate(token));
+    if (token !== undefined) ws.signIn(this.accounts.authenticate(token));
     if (!ws.enterRoom(challenge.id)) return null;
     const room = this.presence.room(challenge);
     room.sockets.add(ws);

@@ -3,6 +3,8 @@ import { pokedexOf } from '../../catalog/domain/pokedex.js';
 import { SkynetService } from '../../combat/application/skynet.service.js';
 import { HttpError } from '../../shared/http/http-error.js';
 import { RateLimit } from '../../shared/http/rate-limit.guard.js';
+import { AccountsService } from '../application/accounts.service.js';
+import { ShopService } from '../application/shop.service.js';
 import { TrainersService } from '../application/trainers.service.js';
 import { byRanking } from '../domain/ranking.js';
 import type { Trainer } from '../domain/trainer.js';
@@ -19,6 +21,8 @@ import { SyncSaveDto } from './dto/sync-save.dto.js';
 export class TrainersController {
   constructor(
     private readonly trainers: TrainersService,
+    private readonly accounts: AccountsService,
+    private readonly shop: ShopService,
     private readonly skynet: SkynetService,
   ) {}
 
@@ -35,7 +39,7 @@ export class TrainersController {
   @HttpCode(200)
   @RateLimit({ bucket: 'login', by: 'ip', max: 10, windowMs: 10 * 60_000, message: 'Demasiados intentos, espera unos minutos.' })
   logIn(@Body({ schema: LogInDto }) body: LogInDto) {
-    const session = this.trainers.logIn(body);
+    const session = this.accounts.logIn(body);
     if (!session) throw new HttpError(401, 'Nombre o contraseña incorrectos.');
     return { token: session.token, me: myView(session.trainer, this.skynet.aiLevels) };
   }
@@ -53,14 +57,14 @@ export class TrainersController {
   @HttpCode(204)
   @Authenticated()
   logOut(@CurrentTrainer() trainer: Trainer, @CurrentSessionToken() token: string) {
-    this.trainers.logOut(trainer, token);
+    this.accounts.logOut(trainer, token);
   }
 
   @Put('me/password')
   @RateLimit({ bucket: 'password', by: 'trainer', max: 10, windowMs: 10 * 60_000, message: 'Demasiados intentos, espera unos minutos.' })
   @Authenticated()
   setPassword(@CurrentTrainer() trainer: Trainer, @Body({ schema: SetPasswordDto }) body: SetPasswordDto) {
-    return { me: myView(this.trainers.setPassword(trainer, body), this.skynet.aiLevels) };
+    return { me: myView(this.accounts.setPassword(trainer, body), this.skynet.aiLevels) };
   }
 
   @Get('me/recycling')
@@ -74,7 +78,7 @@ export class TrainersController {
   @RateLimit({ bucket: 'recycle', by: 'trainer', max: 120, windowMs: 60_000, message: 'Más despacio con la trituradora.' })
   @Authenticated()
   recycle(@CurrentTrainer() trainer: Trainer, @Body({ schema: RecycleDto }) body: RecycleDto) {
-    const record = this.trainers.recycle(trainer, body.entry);
+    const record = this.shop.recycle(trainer, body.entry);
     return { tokens: record.tokens, recycling: recyclingView(trainer) };
   }
 

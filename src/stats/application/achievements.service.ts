@@ -3,6 +3,7 @@ import { ArenaQueries } from '../../arena/application/arena-queries.js';
 import { forbidden } from '../../shared/domain/errors.js';
 import { TRAINER_SPRITES } from '../../catalog/domain/trainer-sprites.js';
 import { hash } from '../../catalog/domain/creatures.js';
+import { ShopService } from '../../trainers/application/shop.service.js';
 import { TrainersService } from '../../trainers/application/trainers.service.js';
 import type { EquipKind, Trainer } from '../../trainers/domain/trainer.js';
 import { buyBlocker, isUnlocked, lookBlocker, recordOf, spriteProgress, type PlayerRecord } from '../domain/achievements.js';
@@ -14,6 +15,7 @@ export class AchievementsService implements OnApplicationBootstrap {
 
   constructor(
     private readonly trainers: TrainersService,
+    private readonly shop: ShopService,
     private readonly arena: ArenaQueries,
   ) {}
 
@@ -35,7 +37,7 @@ export class AchievementsService implements OnApplicationBootstrap {
       const record = this.recordFor(trainer);
       if (isUnlocked(record, trainer.avatar)) continue;
       const choices = TRAINER_SPRITES.filter((key) => isUnlocked(record, key));
-      this.trainers.replaceLook(trainer, choices.length ? choices[hash(`${trainer.id}:look`) % choices.length] : null);
+      this.shop.replaceLook(trainer, choices.length ? choices[hash(`${trainer.id}:look`) % choices.length] : null);
       relooked += 1;
     }
     if (relooked) this.logger.log(`${relooked} entrenador(es) tenían un entrenador que ya no les corresponde: les tocó uno que sí tienen.`);
@@ -53,11 +55,11 @@ export class AchievementsService implements OnApplicationBootstrap {
   buy(trainer: Trainer, itemId: string): Trainer {
     const reason = buyBlocker(this.recordFor(trainer), itemId);
     if (reason) throw forbidden(reason);
-    return this.trainers.buy(trainer, itemId);
+    return this.shop.buy(trainer, itemId);
   }
 
   equip(trainer: Trainer, kind: EquipKind, key: string | null): Trainer {
-    return this.trainers.equip(trainer, kind, key);
+    return this.shop.equip(trainer, kind, key);
   }
 
   chooseLook(trainer: Trainer, key: string): Trainer {

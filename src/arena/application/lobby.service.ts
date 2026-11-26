@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TrainersService } from '../../trainers/application/trainers.service.js';
+import { AccountsService } from '../../trainers/application/accounts.service.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
 import type { Challenge } from '../domain/challenge.js';
 import { HOST_GRACE_MS, openRooms, openTournaments } from '../domain/lobby.js';
@@ -19,7 +19,7 @@ export class LobbyService {
   constructor(
     private readonly challenges: ChallengeRepository,
     private readonly tournaments: TournamentRepository,
-    private readonly trainers: TrainersService,
+    private readonly accounts: AccountsService,
     private readonly presence: Presence,
     private readonly views: ArenaViews,
   ) {}
@@ -67,7 +67,7 @@ export class LobbyService {
   }
 
   subscribe(ws: ClientConnection, token: string | undefined): void {
-    ws.signIn(this.trainers.peekToken(token));
+    ws.signIn(this.accounts.peekToken(token));
     this.subscribers.add(ws);
     this.send(ws, true);
   }
