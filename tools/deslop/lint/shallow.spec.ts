@@ -90,10 +90,10 @@ test('a module that hides a function of its own, or shows one more, is reported 
   assert.equal(diagnose(showing)[0].message, '`p::catalog` is shallow: it shows 9 of its 9 functions');
 });
 
-function layered(context: string, layer: string, outsideCalls: number): Sample {
+function splitInFolders(parent: string, layer: string, outsideCalls: number): Sample {
   const sample = new Sample();
-  const rules = sample.module(`${context}::${layer}::rules`);
-  const service = sample.module(`${context}::application::service`);
+  const rules = sample.module(`${parent}::${layer}::rules`);
+  const service = sample.module(`${parent}::application::service`);
   const run = sample.item(sample.module('app'), 'run', 'function');
   const tournament = sample.item(rules, 'Tournament', 'type');
   const tournaments = sample.item(service, 'Tournaments', 'type');
@@ -106,19 +106,58 @@ function layered(context: string, layer: string, outsideCalls: number): Sample {
   return sample;
 }
 
+function withNestModule(sample: Sample, context: string): Sample {
+  sample.module(`${context}::${context}.module`);
+  return sample;
+}
+
+function layered(parent: string, layer: string, outsideCalls: number): Sample {
+  return withNestModule(splitInFolders(parent, layer, outsideCalls), parent.split('::')[0]);
+}
+
+function calledInItsDomain(unusedLayer: string, unused: number): Sample {
+  const sample = withNestModule(new Sample(), 'arena');
+  const rules = sample.module('arena::domain::rules');
+  const unusedModule = sample.module(`arena::${unusedLayer}::store`);
+  const run = sample.item(sample.module('app'), 'run', 'function');
+  const tournament = sample.item(rules, 'Tournament', 'type');
+  for (let i = 0; i < 8; i += 1) sample.refer(run, sample.member(tournament, rules, `Tournament::m${i}`, 'function'));
+  for (let i = 0; i < unused; i += 1) sample.item(unusedModule, `save${i}`, 'function');
+  return sample;
+}
+
 test('a context split into layers is judged as one module, and a function its other layers use is not one it shows', () => {
   assert.deepEqual(keys(layered('arena', 'domain', 8)), ['p::arena']);
   assert.equal(diagnose(layered('arena', 'domain', 8))[0].message, '`p::arena` is shallow: it shows 8 of its 16 functions');
 });
 
+test('a call from another context into a layer counts as shown by the context', () => {
+  assert.deepEqual(keys(calledInItsDomain('infrastructure', 8)), ['p::arena']);
+  assert.equal(diagnose(calledInItsDomain('infrastructure', 8))[0].message, '`p::arena` is shallow: it shows 8 of its 16 functions');
+  assert.deepEqual(keys(calledInItsDomain('infrastructure', 9)), []);
+  assert.deepEqual(keys(calledInItsDomain('interface', 9)), []);
+});
+
 test('a layer is not judged on its own, however much it shows to the other layers', () => {
-  assert.deepEqual(keys(layered('arena', 'domain', 7)), []);
-  assert.deepEqual(keys(layered('arena', 'domain', 0)), []);
+  for (const layer of ['domain', 'infrastructure', 'interface']) {
+    assert.deepEqual(keys(layered('arena', layer, 7)), [], layer);
+    assert.deepEqual(keys(layered('arena', layer, 0)), [], layer);
+  }
 });
 
 test('a folder that is not a layer is judged on its own, as before', () => {
   assert.deepEqual(keys(layered('arena', 'pokedex', 7)), ['p::arena::pokedex']);
+});
+
+test('a folder named like a layer is judged on its own when it is not a direct child of a context', () => {
   assert.deepEqual(keys(layered('arena::kernel', 'domain', 7)), ['p::arena::kernel::domain']);
+  const atTheRoot = splitInFolders('', 'domain', 7);
+  atTheRoot.module('app.module');
+  assert.deepEqual(keys(atTheRoot), ['p::domain']);
+});
+
+test('a context without a Nest module is not split into layers, so its domain is judged on its own', () => {
+  assert.deepEqual(keys(splitInFolders('catalog', 'domain', 7)), ['p::catalog::domain']);
 });
 
 test('a folder inside a layer is judged on its own when it has modules inside it', () => {
@@ -130,6 +169,7 @@ test('a folder inside a layer is judged on its own when it has modules inside it
 test('a layered context in a project is reported as one module', () => {
   const indexes = Array.from({ length: 8 }, (_unused, index) => index);
   const directory = project({
+    'src/arena/arena.module.ts': 'export class ArenaModule {}\n',
     'src/arena/domain/rules.ts': indexes.map((index) => `export function rule${index}(): number {\n  return ${index};\n}\n`).join('\n'),
     'src/arena/application/service.ts': `import { ${indexes.map((index) => `rule${index}`).join(', ')} } from '../domain/rules.js';\n\n${indexes.map((index) => `export function useCase${index}(): number {\n  return rule${index}() + 1;\n}\n`).join('\n')}`,
     'src/main.ts': `import { ${indexes.map((index) => `useCase${index}`).join(', ')} } from './arena/application/service.js';\n\nexport function run(): number {\n  return ${indexes.map((index) => `useCase${index}()`).join(' + ')};\n}\n`,

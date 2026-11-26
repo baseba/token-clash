@@ -25,14 +25,16 @@ function showsTheSame(tree: Tree, below: Shallow, above: Shallow): boolean {
   return below.total === above.total && below.shown.size === above.shown.size && [...below.shown].every((item) => above.shown.has(item));
 }
 
-function isLayer(tree: Tree, id: NodeId): boolean {
+function isLayer(tree: Tree, nestModuleHolders: Set<NodeId | undefined>, id: NodeId): boolean {
   const context = tree.parent(id);
-  return context !== undefined && tree.parent(context) === tree.root() && LAYERS.has(tree.node(id).name);
+  return context !== undefined && tree.parent(context) === tree.root() && nestModuleHolders.has(context) && LAYERS.has(tree.node(id).name);
 }
 
-function judgedModules(tree: Tree): Set<NodeId> {
+function judgedModules(model: Model): Set<NodeId> {
+  const tree = model.tree;
   const parents = new Set(tree.ids().map((id) => tree.parent(id)));
-  return new Set(tree.ids().filter((id) => (tree.node(id).kind === 'package' || parents.has(id)) && !isLayer(tree, id)));
+  const nestModuleHolders = new Set(model.files.filter((file) => file.path.endsWith('.module.ts')).map((file) => tree.parent(file.module)));
+  return new Set(tree.ids().filter((id) => (tree.node(id).kind === 'package' || parents.has(id)) && !isLayer(tree, nestModuleHolders, id)));
 }
 
 function typesKnown(model: Model, graph: Graph): Map<ThingId, Set<ThingId>> {
@@ -79,7 +81,7 @@ function tooLong(lists: List[]): { notes: string[]; long: LongList[] } {
 
 export function checkShallow(model: Model, graph: Graph, scope: NodeId | undefined): Diagnostic[] {
   const tree = model.tree;
-  const judged = judgedModules(tree);
+  const judged = judgedModules(model);
   const home = (item: ItemId) => {
     const thing = graph.thingOf[item];
     return thing === undefined ? undefined : graph.things[thing].home;
