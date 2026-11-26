@@ -5,7 +5,26 @@ import { dirname, join, normalize, relative } from 'node:path';
 import { PROJECT_ROOT } from './shared/paths.js';
 
 const SRC = join(PROJECT_ROOT, 'src');
-const CONTEXTS = ['arena', 'catalog', 'chat', 'combat', 'radio', 'stats', 'tower', 'trainers'];
+const USES: Record<string, readonly string[]> = {
+  catalog: [],
+  combat: ['catalog'],
+  trainers: ['catalog', 'combat'],
+  chat: [],
+  arena: ['catalog', 'chat', 'combat', 'trainers'],
+  radio: ['trainers'],
+  tower: ['arena', 'catalog', 'combat', 'trainers'],
+  stats: ['arena', 'catalog', 'combat', 'trainers'],
+  realtime: ['arena', 'radio'],
+  web: ['arena', 'catalog'],
+};
+const CONTEXTS = Object.keys(USES);
+const PLUMBING = ['app', 'platform', 'shared'];
+const LAYER_USES: Record<string, readonly string[]> = {
+  domain: [],
+  application: ['domain', 'infrastructure'],
+  infrastructure: ['domain', 'application'],
+  interface: ['application', 'domain'],
+};
 
 interface Import {
   file: string;
@@ -30,6 +49,7 @@ function importsOf(path: string): Import[] {
 const imports = sourceFiles(SRC).flatMap(importsOf);
 
 const contextOf = (path: string) => CONTEXTS.find((context) => path.startsWith(`${context}/`));
+const folderOf = (path: string) => path.split('/')[0];
 const layerOf = (path: string) => path.split('/')[1];
 const isPackage = (target: string, name: string) => target === name || target.startsWith(`${name}/`);
 const usesDrizzle = (target: string) => isPackage(target, 'drizzle-orm') || isPackage(target, '@nestjs/drizzle');
@@ -68,11 +88,6 @@ test('only infrastructure/ folders, platform/database/ and the one-time legacy i
   assert.deepEqual(show(bad), []);
 });
 
-test('catalog depends on no other context: it serves data, and combat decides what the engine can play', () => {
-  const bad = imports.filter(({ file, target }) => contextOf(file) === 'catalog' && contextOf(target) && contextOf(target) !== 'catalog');
-  assert.deepEqual(show(bad), []);
-});
-
 test('shared/ depends on nothing else in src: the arrows point into it, never out', () => {
   const bad = imports.filter(({ file, target }) => file.startsWith('shared/') && target.endsWith('.ts') && !target.startsWith('shared/') && !target.startsWith('../'));
   assert.deepEqual(show(bad), []);
@@ -93,11 +108,29 @@ test('a domain/ folder never imports platform/: what a domain may share lives in
   assert.deepEqual(show(bad), []);
 });
 
-test('radio uses trainers only, and no context knows radio exists', () => {
+test('each folder of src/ uses only the folders its row in USES names', () => {
   const bad = imports.filter(({ file, target }) => {
-    const [from, to] = [contextOf(file), contextOf(target)];
-    if (!from || !to || from === to) return false;
-    return to === 'radio' || (from === 'radio' && to !== 'trainers');
+    const [from, to] = [folderOf(file), folderOf(target)];
+    return from in USES && to in USES && from !== to && !USES[from].includes(to);
   });
+  assert.deepEqual(show(bad), []);
+});
+
+test('every folder of src/ has a row in USES or is plumbing: a new folder says what it uses', () => {
+  const folders = readdirSync(SRC, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  assert.deepEqual(folders.sort(), [...CONTEXTS, ...PLUMBING].sort());
+});
+
+test('inside a context, each layer imports only the layers its row in LAYER_USES names', () => {
+  const bad = imports.filter(({ file, target }) => {
+    const [from, to] = [layerOf(file), layerOf(target)];
+    if (!contextOf(file) || contextOf(file) !== contextOf(target) || !(from in LAYER_USES) || !(to in LAYER_USES)) return false;
+    return from !== to && !LAYER_USES[from].includes(to);
+  });
+  assert.deepEqual(show(bad), []);
+});
+
+test('the move and ability rules never import the engine that runs them', () => {
+  const bad = imports.filter(({ file, target }) => file.startsWith('combat/domain/rules/') && target.startsWith('combat/domain/engine/'));
   assert.deepEqual(show(bad), []);
 });
