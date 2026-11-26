@@ -392,6 +392,9 @@ escritura que lee primero (`+=`, `??=`, `++`) llega a los dos.
   cuenta como escondidos sus handlers y sus métodos de repositorio, y rara vez es superficial. En este repo la regla
   muerde a `src/catalog/domain` y a las carpetas dentro de una capa. El original juzga cada carpeta: es una
   diferencia, no un arreglo.
+- Con un alcance y `--allow`, una entrada del archivo de excepciones cuenta como arreglada solo si nada en todo el
+  proyecto la sigue cumpliendo. El original la compara con lo que reporta el alcance, así que avisa como arreglada
+  una entrada que vive fuera de él.
 
 **Lo que no ve, a propósito (lista cerrada):**
 
