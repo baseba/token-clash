@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as radio from '../../../public/radio.js';
+import { notFound, unavailable } from '../../shared/domain/errors.js';
 import { PROJECT_ROOT } from '../../shared/paths.js';
 
 export type RadioTrackId = string;
@@ -15,7 +16,7 @@ const DURATIONS_FILE = 'src/radio/data/radio-durations.json';
 const MEASURED = JSON.parse(readFileSync(join(PROJECT_ROOT, DURATIONS_FILE), 'utf8')) as Record<RadioTrackId, number>;
 
 const unmeasured = RADIO_TRACK_IDS.filter((id) => !(MEASURED[id] > 0));
-if (unmeasured.length) throw new Error(`Faltan las duraciones de ${unmeasured.join(', ')} en ${DURATIONS_FILE}: corre npm run radio.`);
+if (unmeasured.length) throw unavailable(`Faltan las duraciones de ${unmeasured.join(', ')} en ${DURATIONS_FILE}: corre npm run radio.`);
 
 const DURATIONS = new Map(RADIO_TRACK_IDS.map((id) => [id, MEASURED[id]]));
 
@@ -23,6 +24,6 @@ export const isRadioTrack = (id: RadioTrackId): boolean => DURATIONS.has(id);
 
 export function radioTrackDuration(id: RadioTrackId): number {
   const duration = DURATIONS.get(id);
-  if (duration === undefined) throw new Error(`La canción ${id} no está en la radio.`);
+  if (duration === undefined) throw notFound(`La canción ${id} no está en la radio.`);
   return duration;
 }

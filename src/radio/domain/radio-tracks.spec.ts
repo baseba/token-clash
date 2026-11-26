@@ -11,8 +11,8 @@ test('every radio song has a measured length, between a few seconds and a few mi
   }
 });
 
-test('a song that is not on the radio has no length: asking for it throws instead of returning nothing', () => {
+test('a song that is not on the radio has no length: asking for it says not found instead of returning nothing', () => {
   assert.equal(isRadioTrack('bw/victory_gym'), true);
   assert.equal(isRadioTrack('removed_song'), false);
-  assert.throws(() => radioTrackDuration('removed_song'), /removed_song/);
+  assert.throws(() => radioTrackDuration('removed_song'), { kind: 'not-found', message: /removed_song/ });
 });
