@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
-import { type Import, importsOf, readSources, SRC } from '../test/source-files.js';
+import { type Import, importsOf, readSources, SRC, valueImportsOf } from '../test/source-files.js';
 
 const USES: Record<string, readonly string[]> = {
   catalog: [],
@@ -26,6 +26,7 @@ const LAYER_USES: Record<string, readonly string[]> = {
 
 const sources = readSources();
 const imports = sources.flatMap(importsOf);
+const valueImports = sources.flatMap(valueImportsOf);
 
 const contextOf = (path: string) => CONTEXTS.find((context) => path.startsWith(`${context}/`));
 const folderOf = (path: string) => path.split('/')[0];
@@ -127,10 +128,15 @@ test('a foreign key points at a table of its own schema file: other contexts are
 });
 
 test('only the Jev client leaves the server: nobody else fetches or opens a socket', () => {
-  const networkModules = ['node:https', 'node:http2', 'node:net', 'node:tls', 'node:dns', 'node:dgram', 'undici'];
+  const networkModules = ['http', 'https', 'http2', 'net', 'tls', 'dns', 'dgram', 'undici', 'ws'];
   const jev = (file: string) => file.startsWith('combat/infrastructure/jev/');
-  const fetching = sources.filter(({ file, code }) => !jev(file) && /(?<![-\w'".])fetch\b(?![-'"])/.test(code)).map(({ file }) => `${file} uses fetch`);
-  const sockets = imports.filter(({ target }) => networkModules.includes(target)).map(({ file, target }) => `${file} → ${target}`);
-  const servers = sources.filter(({ file, code }) => !jev(file) && /^\s*import\s+(?!type\b)[^'"]*from\s+'node:http'/m.test(code)).map(({ file }) => `${file} imports node:http as a value`);
-  assert.deepEqual([...fetching, ...sockets, ...servers], []);
+  const mayConnect = (file: string, module: string) => jev(file) || (module === 'ws' && file.startsWith('realtime/'));
+  const fetching = sources.filter(({ file, code }) => !jev(file) && /(?<![-\w'"])fetch\b(?![-'"])/.test(code)).map(({ file }) => `${file} uses fetch`);
+  const connecting = valueImports.filter(({ file, target }) => {
+    const module = target.replace(/^node:/, '');
+    return networkModules.includes(module) && !mayConnect(file, module);
+  });
+  assert.ok(valueImports.some((i) => i.file === 'combat/infrastructure/jev/jev-proxy.ts' && i.target === 'node:http'));
+  assert.ok(!valueImports.some((i) => i.file === 'platform/http/client-ip.ts'));
+  assert.deepEqual([...fetching, ...show(connecting)], []);
 });
