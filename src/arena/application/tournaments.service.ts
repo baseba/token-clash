@@ -86,36 +86,28 @@ export class TournamentsService implements OnModuleInit {
   }
 
   leave(tournament: Tournament, trainer: Trainer): void {
-    tournament.assertLobby();
-    if (tournament.hostId === trainer.id) return this.close(tournament);
+    if (tournament.hostId === trainer.id) return this.close(tournament, trainer.id);
     if (!tournament.leave(trainer.id)) throw conflict('No estás en este torneo.');
     this.afterSeatsChange(tournament);
   }
 
   closeByHost(tournament: Tournament, trainer: Trainer): void {
-    tournament.assertHost(trainer.id, 'cerrar el torneo');
-    tournament.assertLobby();
-    this.close(tournament);
+    this.close(tournament, trainer.id);
   }
 
   setReady(tournament: Tournament, trainer: Trainer, ready: boolean): void {
-    tournament.assertLobby();
     tournament.setReady(trainer.id, ready);
     this.afterSeatsChange(tournament);
   }
 
   addAis(tournament: Tournament, trainer: Trainer, { level, count }: { level: string; count: number }): void {
-    tournament.assertHost(trainer.id, 'agregar IAs');
-    tournament.assertLobby();
     this.skynet.assertOffered(level);
-    tournament.addAis(level, count);
+    tournament.addAis(trainer.id, level, count);
     this.afterSeatsChange(tournament);
   }
 
   kick(tournament: Tournament, trainer: Trainer, seat: number): void {
-    tournament.assertHost(trainer.id, 'quitar jugadores');
-    tournament.assertLobby();
-    tournament.kick(seat);
+    tournament.kick(trainer.id, seat);
     this.afterSeatsChange(tournament);
   }
 
@@ -154,8 +146,8 @@ export class TournamentsService implements OnModuleInit {
     this.broadcast(tournament);
   }
 
-  private close(tournament: Tournament): void {
-    tournament.close();
+  private close(tournament: Tournament, trainerId: string): void {
+    tournament.close(trainerId);
     this.tournaments.save(tournament);
     this.broadcast(tournament);
     this.lobby.notify();
@@ -167,7 +159,7 @@ export class TournamentsService implements OnModuleInit {
     const timer = setTimeout(() => {
       this.seatTimers.delete(key);
       if (tournament.status !== 'open' || this.presence.inTournament(tournament.id, trainerId)) return;
-      if (trainerId === tournament.hostId) return this.close(tournament);
+      if (trainerId === tournament.hostId) return this.close(tournament, trainerId);
       if (tournament.leave(trainerId)) this.afterSeatsChange(tournament);
     }, this.timings.seatGraceMs);
     timer.unref();
