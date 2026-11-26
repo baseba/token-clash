@@ -1,7 +1,7 @@
-import type { Boosts, MajorStatus, Weather } from '../../catalog/domain/creatures.js';
-import type { AbilityEffect, AbilityEngine, AbilityHook, BoostOptions, ChainArgs, ChainHook, Hook, HookArgs, MultiplierHook } from './rules/ability-effects.js';
-import { HELD_ITEMS } from '../../catalog/domain/held-items.js';
-import type { AbilityDetails, AnyMove, BattleFighter, BattleState } from './battle-types.js';
+import type { Boosts, MajorStatus, Weather } from '../../../catalog/domain/creatures.js';
+import type { AbilityEffect, AbilityEngine, AbilityHook, BoostOptions, ChainArgs, ChainHook, Hook, HookArgs, MultiplierHook } from '../rules/ability-effects.js';
+import { HELD_ITEMS } from '../../../catalog/domain/held-items.js';
+import type { AbilityDetails, AnyMove, BattleFighter, BattleState } from '../battle-types.js';
 import { type AbilityTriggers, addToxicSpikes, addVolatileWithTriggers, asleep, boostWithTriggers, breakIllusion, changeForm, clearScreens, clearTerrainWithTriggers, clearWeatherWithTriggers, cure, currentWeather, grounded, heal, hurt, setStatusWithTriggers, setTerrainWithTriggers, setTypes, setWeatherWithTriggers, speedOfWithTriggers, transform, typeEffectiveness } from './effects.js';
 import { emit, foeOf, hasBench, lookOf, nameOf, sideIndexOf } from './state.js';
 import { abilityDef, abilityKey, anyActiveHas, itemDef, setAbility, showAbility } from './abilities.js';
