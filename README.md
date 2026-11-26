@@ -188,8 +188,8 @@ Metaláser cuestan la mitad de los PS máximos, las patadas que fallan dañan al
 lo debilitan (Humedad las bloquea) y los costos de PS de Tambor, Sustituto o Maldición no los evita Muro Mágico.
 Los movimientos de apoyo pensados para un aliado (Pulso Cura, Cura Floral, Purificación, Decoración, Niebla
 Aromática, Entrenamiento, Acupresión y Poder Polen) dejan elegir sobre quién se usan: tu Pokémon o el rival.
-Las habilidades están en
-`src/combat/domain/rules/ability-effects.ts` y las reglas especiales de cada movimiento en `src/combat/domain/rules/move-rules.ts`.
+Las habilidades están en `src/combat/domain/rules/ability-effects.ts` y las reglas especiales de cada movimiento
+en `src/combat/domain/rules/move-rules.ts`.
 
 No hay objetos ni combates dobles: los movimientos y habilidades que dependen de eso no tienen efecto en Token
 Clash y no se pueden elegir. Si un save trae uno, se reemplaza por otro al azar de los que sí funcionan; si no
