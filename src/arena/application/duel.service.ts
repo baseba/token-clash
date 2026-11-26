@@ -9,7 +9,6 @@ import type { Trainer } from '../../trainers/domain/trainer.js';
 import { ChallengeRepository } from '../domain/arena.repositories.js';
 import { Challenge, type BattleMode, type Staging } from '../domain/challenge.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
-import { aiName } from '../domain/tournament.js';
 import { ArenaViews } from './arena-views.js';
 import type { ClientConnection } from './connection.js';
 import { LobbyService } from './lobby.service.js';
@@ -40,7 +39,7 @@ export class DuelService {
       id: newId(),
       host: trainer,
       hostTeam,
-      ai: { id: aiTrainerId(level), name: aiName(level).name, level },
+      ai: { id: aiTrainerId(level), level },
       aiTeam,
       mode,
       at: now(),
