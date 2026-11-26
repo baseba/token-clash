@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DomainError } from '../../shared/domain/errors.js';
-import { Challenge, isHumanDuel, ROOM_MAX_AGE_MS } from './challenge.js';
+import { AI_NAMES, aiName, Challenge, isHumanDuel, ROOM_MAX_AGE_MS } from './challenge.js';
 
 const ana = { id: 'ana', name: 'Ana' };
 const beto = { id: 'beto', name: 'Beto' };
@@ -101,4 +101,25 @@ test('a room already fighting, finished or of a tournament never expires', () =>
   const done = seated();
   done.finish(result);
   assert.equal(done.expire(10 * ROOM_MAX_AGE_MS, { readyCheck: false }), false);
+});
+
+test('a battle against the AI names its AI unless it already has a name', () => {
+  const againstAi = (name?: string) =>
+    Challenge.againstAi({ id: 'c2', host: ana, hostTeam: [], ai: { id: 'ai:hard', level: 'hard', ...(name ? { name } : {}) }, aiTeam: [], mode: 'team', at: 1 });
+  assert.match(againstAi().guestName!, / ai - difícil$/);
+  assert.equal(againstAi('Líder Brock').guestName, 'Líder Brock');
+  assert.equal(againstAi().ai, 'hard');
+});
+
+test('AI names come from the list, carry the difficulty and never repeat inside a tournament', () => {
+  const taken = [];
+  for (let i = 0; i < AI_NAMES.length; i++) {
+    const { base, name } = aiName('veryhard', taken);
+    assert.ok(AI_NAMES.includes(base));
+    assert.ok(!taken.includes(base));
+    assert.equal(name, `${base} - muy difícil`);
+    taken.push(base);
+  }
+  assert.equal(new Set(taken).size, AI_NAMES.length);
+  assert.equal(aiName('easy', [], () => 0).name, 'crubio ai - fácil');
 });
