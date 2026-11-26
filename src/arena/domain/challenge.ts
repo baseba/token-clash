@@ -1,9 +1,11 @@
-import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
+import { uniqueSpecies, type RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { conflict, type DomainError, forbidden, gone, invalid } from '../../shared/domain/errors.js';
 
 export type ChallengeStatus = 'open' | 'active' | 'finished' | 'cancelled' | 'abandoned' | 'expired';
 
 export const ROOM_MAX_AGE_MS = 20 * 60_000;
+export const AI_NAMES = ['crubio ai', 'andy ai', 'bryan ai', 'esteban ai', 'ferlo ai', 'gon ai', 'joa ai', 'nacho juan ai', 'nico santi ai', 'nora ai', 'valde ai', 'mirror ai', 'tom ai', 'yuwen ai', 'alvaro ai'];
+const DIFFICULTY_NAMES: Record<string, string> = { easy: 'fácil', mid: 'media', hard: 'difícil', veryhard: 'muy difícil', skynet: 'skynet' };
 export const BATTLE_MODES = ['team', 'random'] as const;
 export type BattleMode = (typeof BATTLE_MODES)[number];
 export const VISIBILITIES = ['public', 'private'] as const;
@@ -48,6 +50,14 @@ export interface ChallengeState {
   staging?: Staging;
 }
 
+export function aiName(level: string, taken: string[] = [], random = Math.random): { base: string; name: string } {
+  const used = new Set(taken);
+  const free = AI_NAMES.filter((n) => !used.has(n));
+  const pool = free.length ? free : AI_NAMES;
+  const base = pool[Math.floor(random() * pool.length)];
+  return { base, name: `${base} - ${DIFFICULTY_NAMES[level] ?? level}` };
+}
+
 export const isHumanDuel = (challenge: Pick<ChallengeState, 'ai' | 'tournamentId'>): boolean => !challenge.ai && !challenge.tournamentId;
 
 interface Player {
@@ -90,14 +100,14 @@ export class Challenge implements ChallengeState {
     return new Challenge({ id: input.id, hostId: input.host.id, hostName: input.host.name, hostTeam: input.hostTeam, mode: input.mode, visibility: input.visibility, status: 'open', createdAt: input.at });
   }
 
-  static againstAi(input: { id: string; host: Player; hostTeam: RosterEntry[]; ai: Player & { level: string }; aiTeam: RosterEntry[]; mode: BattleMode; at: number; staging?: Staging }): Challenge {
+  static againstAi(input: { id: string; host: Player; hostTeam: RosterEntry[]; ai: { id: string; level: string; name?: string }; aiTeam: RosterEntry[]; mode: BattleMode; at: number; staging?: Staging }): Challenge {
     return new Challenge({
       id: input.id,
       hostId: input.host.id,
       hostName: input.host.name,
       hostTeam: input.hostTeam,
       guestId: input.ai.id,
-      guestName: input.ai.name,
+      guestName: input.ai.name ?? aiName(input.ai.level).name,
       guestTeam: input.aiTeam,
       mode: input.mode,
       visibility: 'private',
@@ -194,11 +204,6 @@ export class Challenge implements ChallengeState {
     return true;
   }
 
-  abandon(): void {
-    this.assertActive();
-    this.status = 'abandoned';
-  }
-
   finish(result: { winnerId: string | null; turns: number; final: FinalBattleState; at: number }): void {
     this.assertActive();
     this.status = 'finished';
@@ -212,9 +217,13 @@ export class Challenge implements ChallengeState {
     if (this.status !== 'active') throw conflict('Esta pelea no está en curso.');
   }
 
-  dropRepeatedSpecies(unique: (team: RosterEntry[]) => RosterEntry[]): boolean {
+  recoverAfterRestart(): boolean {
+    if (this.status === 'active') {
+      this.status = 'abandoned';
+      return true;
+    }
     if (this.status !== 'open' || !Array.isArray(this.hostTeam)) return false;
-    const team = unique(this.hostTeam);
+    const team = uniqueSpecies(this.hostTeam);
     if (team.length === this.hostTeam.length) return false;
     this.hostTeam = team;
     return true;
