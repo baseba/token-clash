@@ -154,3 +154,22 @@ test('a connection inside a room or a tournament refuses to enter another one, a
   );
   stop();
 });
+
+test('a connection keeps the first trainer it signs in as, so a later sign-in without a token or with another one changes nothing', () => {
+  const { gateway, entered, connect, ws, stop } = connectedGateway();
+  const mistySocket = connect();
+  const ashSocket = connect();
+  gateway.onTour(ws(mistySocket), { t: 'tour', id: 'tour-1', token: undefined });
+  gateway.onTour(ws(ashSocket), { t: 'tour', id: 'tour-1', token: undefined });
+  const [anonymousAtFirst, ash] = entered;
+  anonymousAtFirst.signIn(undefined);
+  assert.equal(anonymousAtFirst.trainerId, null);
+  anonymousAtFirst.signIn({ id: 'misty' });
+  assert.equal(anonymousAtFirst.trainerId, 'misty');
+  ash.signIn({ id: 'ash' });
+  ash.signIn(undefined);
+  assert.equal(ash.trainerId, 'ash');
+  ash.signIn({ id: 'gary' });
+  assert.equal(ash.trainerId, 'ash');
+  stop();
+});

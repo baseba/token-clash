@@ -426,6 +426,52 @@ test('a tournament page ignores a room or another tournament, and can still open
   await call(`/api/challenges/${room}`, { method: 'DELETE', token: host.token });
 });
 
+test('a host whose tournament page opens the lobby without a token keeps the seat while the page is open and loses it on leaving', async () => {
+  const host = await trainer('Abandona');
+  const id = (await call('/api/tournaments', { method: 'POST', token: host.token, body: { size: 4, mode: 'team', visibility: 'private' } })).data.tournament.id;
+  const page = new Client({ t: 'tour', id, token: host.token });
+  await page.next((f) => f.t === 'watch');
+  page.send({ t: 'lobby', token: null });
+  await page.next((f) => f.t === 'rooms');
+  await sleep(SEAT_GRACE_MS * 2);
+  assert.equal((await call(`/api/tournaments/${id}`)).data.tournament.status, 'open', 'the page keeps the seat while it is open');
+
+  const viewer = new Client({ t: 'tour', id, token: null });
+  await viewer.next((f) => f.t === 'watch');
+  await page.close();
+  await viewer.next((f) => f.t === 'tour' && f.tournament.status === 'cancelled');
+  await viewer.close();
+});
+
+test('a host whose tournament page opens the lobby without a token after the seat grace still frees the seat on leaving', async () => {
+  const host = await trainer('Tarde');
+  const id = (await call('/api/tournaments', { method: 'POST', token: host.token, body: { size: 4, mode: 'team', visibility: 'private' } })).data.tournament.id;
+  const page = new Client({ t: 'tour', id, token: host.token });
+  await page.next((f) => f.t === 'watch');
+  await sleep(SEAT_GRACE_MS * 2);
+  page.send({ t: 'lobby', token: null });
+  await page.next((f) => f.t === 'rooms');
+
+  const viewer = new Client({ t: 'tour', id, token: null });
+  await viewer.next((f) => f.t === 'watch');
+  await page.close();
+  await viewer.next((f) => f.t === 'tour' && f.tournament.status === 'cancelled');
+  await viewer.close();
+});
+
+test('a socket sent to a room that does not exist is not signed in, so its next entry signs in with its own token', async () => {
+  const host = await trainer('Firma');
+  const stranger = await trainer('Perdido');
+  const id = (await call('/api/challenges', { method: 'POST', token: host.token, body: { visibility: 'public' } })).data.challenge.id;
+  const socket = new Client({ t: 'hello', room: 'no-existe', token: stranger.token });
+  assert.deepEqual(await socket.next((f) => f.t === 'error'), { t: 'error', error: 'Ese desafío no existe.' });
+  socket.send({ t: 'lobby', token: host.token });
+  assert.equal((await socket.next((f) => f.t === 'rooms')).rooms.find((room: any) => room.id === id)?.mine, true);
+
+  await socket.close();
+  await call(`/api/challenges/${id}`, { method: 'DELETE', token: host.token });
+});
+
 test('an AI-only match waits for the people watching to see each turn before playing the next', async (context) => {
   const paced = appProcess({ ...FAST_TIMINGS, MATCH_MS: '3000', AI_WATCH_MS: '10000', TRUST_CF_CONNECTING_IP: '1', JEV_API_KEY: '', JEV_API_URL: '' }, 22000);
   context.after(() => paced.kill());

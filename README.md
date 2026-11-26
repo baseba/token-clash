@@ -380,7 +380,7 @@ escritura que lee primero (`+=`, `??=`, `++`) llega a los dos.
 - Un método de trabajo que entrega un campo (`checked() { …; return this.items; }`). Es la regla del original.
 - Un método que escribe en un campo un valor que él decide y no un parámetro (`close() { this.state = 'closed'; }`).
   Es trabajo propio de la clase, como en el original, que exige que el tipo del campo esté en la firma del accesor.
-- Un método que escribe en un campo una parte de su argumento (`signIn(trainer) { this.#trainerId = trainer?.id ?? null; }`).
+- Un método que escribe en un campo una parte de su argumento (`assign(owner) { this.#ownerId = owner.id; }`).
   También es trabajo propio, como en el original, porque el tipo del campo no está en la firma. Un setter escrito así
   sigue siendo un setter: el chequeo no lo ve, y la revisión sí.
 - Un método que implementa un método de una interfaz nunca es accesor, como en el original: un setter llamado a
