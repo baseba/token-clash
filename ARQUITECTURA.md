@@ -274,9 +274,10 @@ Los unitarios viven con su código, así que al mover o borrar un archivo su tes
 entera, sin pertenecer a ningún dominio, y por eso van en `test/`. `tsconfig.json` deja los `*.spec.ts` fuera del
 build (no llegan a la imagen). `npm test` hace primero el typecheck estricto de `src/`, compila los tests con
 `tsconfig.test.json` y las herramientas de `tools/` con `tsconfig.tools.json` (estricto), falla si encuentra un
-comentario (`tools/no-comments.ts`) y corre todo, también los specs de `tools/deslop/`. `npm run deslop` todavía no es
-parte de `npm test`. Hoy reporta la deuda de estructura de `src/` y no falla el build. Sus reglas están en el README,
-en [Chequeo de estructura](README.md#chequeo-de-estructura-npm-run-deslop).
+comentario (`tools/no-comments.ts`) o un diagnóstico de estructura (`npm run deslop`) y corre todo, también los specs
+de `tools/deslop/`. La única excepción de `npm run deslop` está en `tools/deslop/debt.allow`: el catálogo es una
+biblioteca de consulta y sigue mostrando más de lo que esconde. Sus reglas están en el README, en
+[Chequeo de estructura](README.md#chequeo-de-estructura-npm-run-deslop).
 
 ## 8. Decisiones y deudas conocidas
 

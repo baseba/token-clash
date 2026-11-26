@@ -307,7 +307,13 @@ antes de partir si la de tu terminal es más vieja (`scripts/check-node.mjs`).
 ### Chequeo de estructura (`npm run deslop`)
 
 `tools/deslop/` es un port de [`deslop-please`](https://github.com/deterministic-machines/deslop-please) a
-TypeScript. Revisa `src/` con seis reglas. Hoy solo reporta y no corre en `npm test`.
+TypeScript. Revisa `src/` con seis reglas y corre en `npm test`: cualquier diagnóstico hace fallar el test.
+
+Hay una sola excepción, en `tools/deslop/debt.allow`: `shallow-module` en `src::catalog::domain`. El catálogo es
+una biblioteca de consulta que usan seis contextos, y cada uno le pregunta cosas distintas: ningún llamador hace algo
+que se pueda bajar al catálogo. `npm run deslop` y `npm test` pasan ese archivo con `--allow`; para ver también lo
+que excusa, corre `node dist/tools/deslop/main.js` sin `--allow`. Un diagnóstico nuevo se arregla en el código, no
+agregándolo al archivo.
 
 | Regla | Reporta |
 | --- | --- |
@@ -437,7 +443,7 @@ Por carpeta:
 | `public/` | El frontend: `index.html`, `style.css`, `app.js` (toda la interfaz) y un módulo por tema. |
 | `public/upstream.js`, `public/upstream/` | De qué commit de cada repo externo salen los sprites, gritos, sonidos y música, y los manifiestos que dicen dónde está cada archivo. |
 | `scripts/` | Descargas e importaciones de datos externos (detalle abajo). |
-| `tools/` | Chequeos del código, compilados con `tsconfig.tools.json`. `no-comments.ts` corre en `npm test`: falla con cualquier comentario y los borra con `npm run no-comments -- --fix`. `deslop/` revisa la estructura de `src/` con `npm run deslop` (ver [Chequeo de estructura](#chequeo-de-estructura-npm-run-deslop)); sus specs corren en `npm test`, el chequeo todavía no. |
+| `tools/` | Chequeos del código, compilados con `tsconfig.tools.json`. `no-comments.ts` corre en `npm test`: falla con cualquier comentario y los borra con `npm run no-comments -- --fix`. `deslop/` revisa la estructura de `src/` con `npm run deslop` (ver [Chequeo de estructura](#chequeo-de-estructura-npm-run-deslop)); el chequeo y sus specs corren en `npm test`, con una sola excepción en `deslop/debt.allow`. |
 | `assets/` | Archivos que usa solo el servidor: la fuente Nunito (OFL) de la miniatura de los links. |
 | `deploy/` | Imagen, contenedores, redes y el deploy automático (ver [Deploy](#deploy-podman--cloudflare-tunnel)). |
 
