@@ -2,9 +2,9 @@ import { poisoned } from './conditions.js';
 import type { BattleFighter, BattleState, SideCondition } from './battle-types.js';
 import { computeDamage } from './damage.js';
 import { faint, settle } from './switching.js';
-import { boost, clearTerrain, clearWeather, currentWeather, grounded, heal, hurt, SCREEN_KINDS, setStatus, speedOf, typeEffectiveness } from './effects.js';
+import { currentWeather, grounded, heal, hurt, SCREEN_KINDS, typeEffectiveness } from './effects.js';
 import { activeFighters, activeOf, emit, foeOf, nameOf, onField, sideIndexOf } from './state.js';
-import { chain, run } from './ability-engine.js';
+import { boost, chain, clearTerrain, clearWeather, run, setStatus, speedOf } from './ability-engine.js';
 import { abilityDef, flag } from './abilities.js';
 
 const SAND_PROOF = ['rock', 'ground', 'steel'];

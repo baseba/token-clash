@@ -141,8 +141,11 @@ export interface AbilityEffect {
 }
 
 export type AbilityHook = { [K in keyof AbilityEffect]-?: NonNullable<AbilityEffect[K]> extends (...args: never[]) => unknown ? K : never }[keyof AbilityEffect];
-
-
+export type Hook<H extends AbilityHook> = NonNullable<AbilityEffect[H]>;
+export type HookArgs<H extends AbilityHook> = Parameters<Hook<H>> extends [AbilityEngine, BattleFighter, ...infer Args] ? Args : never;
+export type MultiplierHook = 'onBasePower' | 'onIncoming' | 'onAttack' | 'onDefense' | 'onAttackerFinal' | 'onDefenderFinal';
+export type ChainHook = 'onSpeed' | 'onAccuracy' | 'onEvasion' | 'onCritStage' | 'onEffectiveness' | 'onDamage' | 'onModifyPriority' | 'onStatusDamage';
+export type ChainArgs<H extends ChainHook> = HookArgs<H> extends [...infer Args, number] ? Args : never;
 
 const isAttack = (move: MoveData): boolean => move.category !== 'status';
 const physical = (move: MoveData): boolean => move.category === 'physical';
