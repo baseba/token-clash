@@ -174,7 +174,7 @@ dominio no sabe que existe HTTP.
 petición: tipos, valores permitidos y defaults. `mode` es `team` o `random`, y si no viene es `team`. Si no cumple,
 responde 400 antes de llegar al controller. Lo que depende del estado sigue siendo del dominio: si ese Pokémon conoce
 ese movimiento, o si al torneo le queda lugar. Nest lo aplica solo con `@Body({ schema: NewChallengeDto })`, gracias
-al `StandardSchemaValidationPipe` registrado en `app.module.ts`, y el esquema da también el tipo:
+al `StandardSchemaValidationPipe` que registra `HttpModule` (`shared/http/http.module.ts`), y el esquema da también el tipo:
 `type NewChallengeDto = z.infer<typeof NewChallengeDto>`.
 
 Las otras dos entradas siguen la misma regla: se leen una vez, en el borde, y adentro se confía en los tipos. Los
