@@ -153,3 +153,28 @@ test('EVs can be spread up to 252 per stat and 510 in all', () => {
   assert.throws(() => trainer.chooseEvs('m1', { hp: 0, atk: 253, def: 0, satk: 0, sdef: 0, spd: 0 }), /252/);
   assert.throws(() => trainer.chooseEvs('m1', { hp: 252, atk: 252, def: 8, satk: 0, sdef: 0, spd: 0 }), /510/);
 });
+
+const zigzagoonLine = (finalID: number, stage: number) => ({ id: 'aaaaaaaa-0000-0000-0000-000000000009', finalID, baseID: 263, rarity: 'common', shiny: false, level: 100, ivs: { hp: 31, atk: 31, def: 31, satk: 31, sdef: 31, spd: 31 }, stage, chainLen: stage + 1 }) as any;
+
+test('a Pokémon that was evolved into a regional-form evolution by mistake goes back, losing the choices its form cannot use', () => {
+  const ana = Trainer.restore({ id: 't10', name: 'Ana', tokenHash: 'h', roster: [{ ...zigzagoonLine(862, 2), moveset: ['obstruct', 'tackle'], abilityChoice: 'reckless', natureChoice: 'adamant' }], team: ['aaaaaaaa-0000-0000-0000-000000000009'], wins: 0, losses: 0, totalTokens: 0, createdAt: 0 });
+  assert.equal(ana.revertRegionalEvolutions(), true);
+  const [linoone] = ana.roster;
+  assert.deepEqual([linoone.finalID, linoone.stage, linoone.chainLen], [264, 1, 2]);
+  assert.equal(linoone.moveset, undefined, 'Obstruct is not a Linoone move');
+  assert.equal(linoone.abilityChoice, undefined, 'Reckless is not a Linoone ability');
+  assert.equal(linoone.natureChoice, 'adamant');
+  assert.deepEqual(ana.team, ['aaaaaaaa-0000-0000-0000-000000000009']);
+  assert.equal(ana.revertRegionalEvolutions(), false, 'nothing left to fix');
+});
+
+test('updating the save keeps the moves and ability chosen for a Pokémon only while its species can use them', () => {
+  const ana = Trainer.restore({ id: 't11', name: 'Ana', tokenHash: 'h', roster: [{ ...zigzagoonLine(862, 2), moveset: ['obstruct'], abilityChoice: 'reckless' }], team: [], wins: 0, losses: 0, totalTokens: 0, createdAt: 0 });
+  ana.importSave({ roster: [zigzagoonLine(264, 1)], duplicates: [], totalTokens: 0 } as any, 1);
+  assert.equal(ana.roster[0].moveset, undefined);
+  assert.equal(ana.roster[0].abilityChoice, undefined);
+  const kept = Trainer.restore({ id: 't12', name: 'Ana', tokenHash: 'h', roster: [{ ...zigzagoonLine(264, 1), moveset: ['tackle'], abilityChoice: 'quick-feet' }], team: [], wins: 0, losses: 0, totalTokens: 0, createdAt: 0 });
+  kept.importSave({ roster: [zigzagoonLine(264, 1)], duplicates: [], totalTokens: 0 } as any, 1);
+  assert.deepEqual(kept.roster[0].moveset, ['tackle']);
+  assert.equal(kept.roster[0].abilityChoice, 'quick-feet');
+});
