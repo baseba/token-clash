@@ -151,6 +151,9 @@ test('a folder that is not a layer is judged on its own, as before', () => {
 
 test('a folder named like a layer is judged on its own when it is not a direct child of a context', () => {
   assert.deepEqual(keys(layered('arena::kernel', 'domain', 7)), ['p::arena::kernel::domain']);
+  const nestedModule = splitInFolders('arena::kernel', 'domain', 7);
+  nestedModule.module('arena::kernel::kernel.module');
+  assert.deepEqual(keys(nestedModule), ['p::arena::kernel::domain']);
   const atTheRoot = splitInFolders('', 'domain', 7);
   atTheRoot.module('app.module');
   assert.deepEqual(keys(atTheRoot), ['p::domain']);

@@ -322,7 +322,8 @@ El código de test no cuenta en ninguna regla. `load.ts` descarta los `*.spec.ts
 carpetas `test/`, `tests/` y `__tests__/` antes de armar el modelo, así que tampoco suman en `wide-directory` ni en
 `long-file`. Si una carpeta muestra las mismas funciones que otra de más adentro y tiene el mismo total,
 `shallow-module` reporta solo la de más adentro. Una capa de un dominio con módulo de Nest no se juzga sola (ver las
-diferencias con el original), así que un `--scope` sobre una capa no reporta `shallow-module`.
+diferencias con el original): con `npm run deslop -- src::<dominio>::<capa>` la capa misma no se reporta, pero las
+carpetas de adentro sí.
 
 **La regla de `field-leak`.** Un campo es una propiedad de instancia de una clase que no guarda una función, o una
 propiedad de parámetro del constructor. Las propiedades estáticas son constantes. Una clase guarda sus campos cuando
@@ -378,12 +379,12 @@ escritura que lee primero (`+=`, `??=`, `++`) llega a los dos.
 - `shallow-module` no juzga sola una capa de un dominio con módulo de Nest: una carpeta
   `src/<dominio>/{domain,application,infrastructure,interface}` cuando `src/<dominio>` tiene su propio `*.module.ts`.
   Se juzga `src/<dominio>`, que suma las funciones de sus capas como siempre. Las otras carpetas hermanas, las
-  carpetas dentro de una capa y las capas de una carpeta sin `*.module.ts` (como `catalog` y `shared`) se juzgan
-  como cualquier otra. La unidad es el módulo de Nest: cuenta lo que cruza el borde del dominio, en la capa que sea, y una
-  llamada de afuera a una capa cuenta como algo que muestra el dominio. Por eso un dominio en capas cuenta como
-  escondidos sus handlers y sus métodos de repositorio, y rara vez es superficial. En este repo la regla muerde a
-  `catalog`, a `shared` y a las carpetas dentro de una capa. El original juzga cada carpeta: es una diferencia, no un
-  arreglo.
+  carpetas dentro de una capa y las capas de una carpeta sin `*.module.ts` propio (como `catalog` y `shared`) se
+  juzgan como cualquier otra. La unidad es el módulo de Nest: cuenta lo que cruza el borde del dominio, en la capa
+  que sea, y una llamada de afuera a una capa cuenta como algo que muestra el dominio. Por eso un dominio en capas
+  cuenta como escondidos sus handlers y sus métodos de repositorio, y rara vez es superficial. En este repo la regla
+  reporta `src/catalog/domain`, `shared` y carpetas dentro de una capa. El original juzga cada carpeta: es una
+  diferencia, no un arreglo.
 
 **Lo que no ve, a propósito (lista cerrada):**
 
