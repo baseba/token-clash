@@ -3,9 +3,9 @@ import { MOVE_RULES, type MoveRuleApi } from './rules/move-rules.js';
 import { isRain, isSun, poisoned, stageMult } from './conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState } from './battle-types.js';
 import { dragOut, faint } from './switching.js';
-import { addVolatile, asleep, boost, clearHazards, clearScreens, clearTerrain, cure, currentWeather, grounded, heal, hurt, setStatus, setTypes, STAGE_LIMIT, typeEffectiveness, weatherFor } from './effects.js';
+import { asleep, clearHazards, clearScreens, cure, currentWeather, grounded, heal, hurt, setTypes, STAGE_LIMIT, typeEffectiveness, weatherFor } from './effects.js';
 import { clamp, emit, freshBoosts, hasBench, nameOf, sideIndexOf } from './state.js';
-import { chain, mul, run } from './ability-engine.js';
+import { addVolatile, boost, chain, clearTerrain, mul, run, setStatus } from './ability-engine.js';
 import { abilityDef, anyActiveHas, flag, otherActiveHas, showAbility } from './abilities.js';
 
 const accuracyMult = (stage: number): number => (stage >= 0 ? (3 + stage) / 3 : 3 / (3 - stage));
