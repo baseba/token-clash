@@ -217,7 +217,7 @@ export function makeMoveApi(battle: BattleState, callMove: MoveRuleApi['callMove
 
 let metronomePool: string[] | null = null;
 function METRONOME_POOL(): string[] {
-  metronomePool ??= Object.keys(MOVE_RULES).concat(ALL_MOVE_IDS()).filter((id, i, all) => all.indexOf(id) === i).filter((id) => {
+  metronomePool ??= Object.keys(MOVE_RULES).concat(ALL_MOVE_IDS).filter((id, i, all) => all.indexOf(id) === i).filter((id) => {
     const move = moveData(id);
     return move && move.supported && move.flags.includes('metronome') && !move.flags.includes('charge');
   });
