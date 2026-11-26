@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DomainError } from '../../shared/domain/errors.js';
-import { STATION_QUEUE_MAX } from '../../catalog/domain/radio-tracks.js';
+import { STATION_QUEUE_MAX } from './radio-tracks.js';
 import { Station } from './station.js';
 
 const LENGTHS: Record<string, number> = { intro: 60_000, gym: 100_000, champion: 150_000 };

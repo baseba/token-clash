@@ -1,4 +1,4 @@
-import { STATION_NAME_MAX, STATION_QUEUE_MAX, type RadioTrackId } from '../../catalog/domain/radio-tracks.js';
+import { STATION_NAME_MAX, STATION_QUEUE_MAX, type RadioTrackId } from './radio-tracks.js';
 import { conflict, invalid } from '../../shared/domain/errors.js';
 
 export type TrackDuration = (track: RadioTrackId) => number;

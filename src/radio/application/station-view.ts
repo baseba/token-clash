@@ -1,4 +1,4 @@
-import type { RadioTrackId } from '../../catalog/domain/radio-tracks.js';
+import type { RadioTrackId } from '../domain/radio-tracks.js';
 import type { NowPlaying, Station } from '../domain/station.js';
 
 export interface StationView {

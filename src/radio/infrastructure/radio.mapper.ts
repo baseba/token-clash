@@ -1,4 +1,4 @@
-import { isRadioTrack } from '../../catalog/domain/radio-tracks.js';
+import { isRadioTrack } from '../domain/radio-tracks.js';
 import { Station } from '../domain/station.js';
 import type { StationRow } from './radio.schema.js';
 

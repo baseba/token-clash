@@ -7,7 +7,7 @@ import { UPSTREAM } from '../public/upstream.js';
 import { fetchUpstream, manifestJSON, mapLimit } from './upstream-files.js';
 
 const MANIFEST = new URL('../public/upstream/pokerogue.json', import.meta.url);
-const DURATIONS = new URL('../src/catalog/data/radio-durations.json', import.meta.url);
+const DURATIONS = new URL('../src/radio/data/radio-durations.json', import.meta.url);
 
 const BITRATES = {
   mpeg1layer1: [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448],
@@ -94,7 +94,7 @@ export async function syncRadio({ log = (msg) => process.stderr.write(`${msg}\n`
   for (const [id, track] of mismatched) log(`  ${id}: el tag dice ${track.taggedFrames} frames y el archivo tiene ${track.walkedFrames}`);
   writeFileSync(DURATIONS, manifestJSON(Object.fromEntries(RADIO_TRACKS.map(({ id }) => [id, measured.get(id).ms]))));
   const untagged = [...measured.values()].filter((track) => track.taggedFrames == null).length;
-  log(`Duraciones escritas en src/catalog/data/radio-durations.json (${untagged} sin tag, medidas frame a frame; ${mismatched.length} con tag y frames distintos).`);
+  log(`Duraciones escritas en src/radio/data/radio-durations.json (${untagged} sin tag, medidas frame a frame; ${mismatched.length} con tag y frames distintos).`);
   return measured;
 }
 

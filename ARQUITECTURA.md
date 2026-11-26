@@ -9,22 +9,22 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 
 | Dominio | De qué se trata | Dueño de |
 | --- | --- | --- |
-| `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI y Pokémon Showdown), la Pokédex, los artículos de la tienda, los sprites de entrenador y las canciones de la radio con su duración | archivos `src/catalog/data/*.json` y las listas compartidas de `public/` |
+| `catalog` | Especies, movimientos, habilidades y tipos (datos de PokeAPI y Pokémon Showdown), la Pokédex, los artículos de la tienda y los sprites de entrenador | archivos `src/catalog/data/*.json` y las listas compartidas de `public/` |
 | `combat` | Cómo se pelea: motor de batalla, qué movimientos se pueden usar, elegir 3 de 6, sorteo aleatorio, IA, Skynet | nada (es puro) |
 | `trainers` | Quién juega: entrenador, colección, equipo, cuenta y sesiones, importar el save | tablas `trainers`, `roster_entries`, `trainer_sessions` |
 | `arena` | Dónde se pelea: salas, emparejamiento, peleas en vivo, torneos | tablas `challenges`, `tournaments`, `tournament_seats`, `tournament_matches` |
 | `chat` | Mensajes en salas y torneos | memoria (se borra al reiniciar, a propósito) |
-| `radio` | Las estaciones de los entrenadores: la cola que elige el dueño, qué suena y quién escucha | tabla `radio_stations` (los oyentes, en memoria) |
+| `radio` | Las estaciones de los entrenadores: la cola que elige el dueño, qué suena y quién escucha, y las canciones de la radio con su duración | tabla `radio_stations` (los oyentes, en memoria) y `src/radio/data/radio-durations.json` |
 | `tower` | La Torre: subidas con tu colección, pisos y caminos, experiencia, evolución, premios y récords | tabla `tower_runs` |
 | `stats` | La página de stats y los logros | nada: lee de los otros dominios y le pide los cambios a `trainers` |
 
-Más cinco piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
-(archivos estáticos, health checks y la vista previa de los links, que lee la arena con `ArenaQueries`), `shared` (lo
-que un `domain/` puede importar: los errores de dominio, el reloj, la aleatoriedad con semilla y la raíz del
-proyecto), `platform` (la plomería de Nest: configuración, HTTP y base de datos) y `app` (la raíz de composición:
-`app.module.ts`, que junta los módulos, y la importación única de `data/db.json`). Un `domain/` nunca importa `platform/`, `shared/` no importa Nest, Drizzle
-ni `node:http`, y ni `shared` ni `platform` importan un dominio: las flechas solo entran. `main.ts` y `jev-proxy.main.ts`
-quedan en la raíz de `src/`: son los dos procesos que arrancan.
+Más cinco piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web` (archivos
+estáticos, health checks y la vista previa de los links, que lee la arena con `ArenaQueries`), `shared` (lo que un
+`domain/` puede importar: los errores de dominio, el reloj, la aleatoriedad con semilla y la raíz del proyecto),
+`platform` (la plomería de Nest: configuración, HTTP y base de datos) y `app` (la raíz de composición: `app.module.ts`,
+que junta los módulos, y la importación única de `data/db.json`). Un `domain/` nunca importa `platform/`, `shared/` no
+importa Nest, Drizzle ni `node:http`, y ni `shared` ni `platform` importan un dominio: las flechas solo entran.
+`main.ts` y `jev-proxy.main.ts` quedan en la raíz de `src/`: son los dos procesos que arrancan.
 
 ```
            realtime (WS)   web          HTTP controllers de cada dominio
@@ -37,7 +37,6 @@ quedan en la raíz de `src/`: son los dos procesos que arrancan.
      └─────────┴───────────────┘
 
    realtime (WS), HTTP ──▶ radio ──▶ trainers
-                             └─────▶ catalog
 
    HTTP ──▶ tower ──▶ arena (cada piso es una sala contra la IA)
               ├────▶ trainers (tu colección)
@@ -46,8 +45,8 @@ quedan en la raíz de `src/`: son los dos procesos que arrancan.
 
 Las flechas son "usa a". Nunca hay una flecha de vuelta: `trainers` no sabe que existen las salas, `combat` no
 sabe que existen los entrenadores, `catalog` no sabe que existe el motor, y `chat` guarda mensajes por canal sin
-saber qué es una sala. `radio` usa `catalog` (qué canciones hay y cuánto dura cada una) y `trainers` (el nombre
-del DJ), y nadie sabe que existe: escuchar una estación no tiene nada que ver con las salas, y un jugador puede
+saber qué es una sala. `radio` usa solo `trainers` (el nombre del DJ): las canciones y cuánto dura cada una son
+suyas. Nadie sabe que existe: escuchar una estación no tiene nada que ver con las salas, y un jugador puede
 escucharla mientras pelea. `tower` usa `arena` para jugar cada piso: le pide una sala contra la IA con sus
 propios equipos y su puesta en escena (`Staging`: escenario, música, sprite del rival, a dónde volver y la etiqueta del piso) y escucha
 `matchFinished` para avanzar la subida, como un torneo. La arena no sabe que la torre existe.
@@ -94,11 +93,12 @@ exports: [TrainersService, AccountsService, ShopService],
 ```
 
 `combat` y `catalog` son casi solo `domain/`: funciones puras con la aleatoriedad inyectada (`random = Math.random`),
-así que sus tests reproducen una pelea entera con una semilla fija. La única lectura es la del catálogo: sus JSON
-se leen una vez, al cargar el módulo, y la tabla de tipos es `public/types.js`, la misma que usa el navegador
-(`catalog/domain/type-chart.ts` explica cómo). La tienda (`public/shop.js`) y los entrenadores
-(`public/trainer-sprites.js`, `public/trainer-variants.js`) siguen el mismo camino: el catálogo les pone tipos en
-`catalog/domain/shop.ts` y `trainer-sprites.ts`, y `tsconfig.json` los incluye en el build.
+así que sus tests reproducen una pelea entera con una semilla fija. Las únicas lecturas son las del catálogo y la de la
+radio (`radio/domain/radio-tracks.ts`): sus JSON se leen una vez, al cargar el módulo. La tabla de tipos es
+`public/types.js`, la misma que usa el navegador (`catalog/domain/type-chart.ts` explica cómo). La tienda
+(`public/shop.js`) y los entrenadores (`public/trainer-sprites.js`, `public/trainer-variants.js`) siguen el mismo
+camino: el catálogo les pone tipos en `catalog/domain/shop.ts` y `trainer-sprites.ts`, y `tsconfig.json` los incluye en
+el build.
 
 En general, un dominio tiene solo las capas que usa: `chat` no tiene HTTP propio (sus mensajes le llegan por la arena) y `stats` no guarda nada.
 
