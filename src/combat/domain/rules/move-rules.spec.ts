@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { moveData } from './moves.js';
+import { moveData } from '../moves.js';
 import { MOVE_RULES } from './move-rules.js';
 
 test('useOn rules are for status moves aimed at the foe or that the trainer aims, use rules for the rest', () => {

@@ -1,6 +1,6 @@
 import type { Weather } from '../../catalog/domain/creatures.js';
 import { aimedTarget, hiddenPowerType, moveAt, moveData, type MoveData, type MoveTarget, STRUGGLE, STRUGGLE_MOVE } from './moves.js';
-import { MOVE_RULES } from './move-rules.js';
+import { MOVE_RULES } from './rules/move-rules.js';
 import { isSun, stageMult } from './conditions.js';
 import type { AnyMove, BattleFighter, BattleMove, BattleState, MoveEvent, OrderReason } from './battle-types.js';
 import { attack, baseDamage, blockedByProtection, bypassesSub, damageRoll, HIDDEN_BY, hiddenFrom, hits, typeEffectiveness } from './damage.js';

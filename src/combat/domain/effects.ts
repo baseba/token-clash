@@ -1,5 +1,5 @@
 import { type BoostKey, type Boosts, formData, type MajorStatus, statsFor, type Weather } from '../../catalog/domain/creatures.js';
-import type { BoostChanges, BoostOptions } from './ability-effects.js';
+import type { BoostChanges, BoostOptions } from './rules/ability-effects.js';
 import { isSun, poisoned, stageMult } from './conditions.js';
 import type { BattleEvent, BattleFighter, BattleSide, BattleState, Look } from './battle-types.js';
 import { anyActiveHas, chain, flag, run, showAbility } from './ability-engine.js';

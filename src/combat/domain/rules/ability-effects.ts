@@ -1,6 +1,6 @@
-import type { Boosts, BoostKey, MajorStatus, StatKey, Weather } from '../../catalog/domain/creatures.js';
-import { isIcy, isMajorStatus, isRain, isSun, poisoned, stageMult } from './conditions.js';
-import type { AbilityDetails, AnyMove, BattleFighter, BattleMove, BattleState, Look, MoveData } from './battle-types.js';
+import type { Boosts, BoostKey, MajorStatus, StatKey, Weather } from '../../../catalog/domain/creatures.js';
+import { isIcy, isMajorStatus, isRain, isSun, poisoned, stageMult } from '../conditions.js';
+import type { AbilityDetails, AnyMove, BattleFighter, BattleMove, BattleState, Look, MoveData } from '../battle-types.js';
 
 export type BoostChanges = Record<string, number>;
 
