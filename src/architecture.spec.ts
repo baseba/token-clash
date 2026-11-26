@@ -5,7 +5,6 @@ import { dirname, join, normalize, relative } from 'node:path';
 import { PROJECT_ROOT } from './shared/paths.js';
 
 const SRC = join(PROJECT_ROOT, 'src');
-const CONTEXTS = ['arena', 'catalog', 'chat', 'combat', 'radio', 'stats', 'tower', 'trainers'];
 const USES: Record<string, readonly string[]> = {
   catalog: [],
   combat: ['catalog'],
@@ -18,6 +17,7 @@ const USES: Record<string, readonly string[]> = {
   realtime: ['arena', 'radio'],
   web: ['arena', 'catalog'],
 };
+const CONTEXTS = Object.keys(USES);
 const PLUMBING = ['app', 'platform', 'shared'];
 const LAYER_USES: Record<string, readonly string[]> = {
   domain: [],
@@ -118,7 +118,7 @@ test('each folder of src/ uses only the folders its row in USES names', () => {
 
 test('every folder of src/ has a row in USES or is plumbing: a new folder says what it uses', () => {
   const folders = readdirSync(SRC, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-  assert.deepEqual(folders.sort(), [...Object.keys(USES), ...PLUMBING].sort());
+  assert.deepEqual(folders.sort(), [...CONTEXTS, ...PLUMBING].sort());
 });
 
 test('inside a context, each layer imports only the layers its row in LAYER_USES names', () => {
