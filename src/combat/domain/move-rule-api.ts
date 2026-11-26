@@ -20,7 +20,7 @@ export function moveApi(battle: BattleState): MoveRuleApi {
   return api;
 }
 
-function makeMoveApi(battle: BattleState) {
+function makeMoveApi(battle: BattleState): MoveRuleApi {
   const sideOf = (fighter: BattleFighter) => sideIndexOf(battle, fighter);
   const stallFails = (fighter: BattleFighter): boolean => {
     const stalls = fighter.volatiles.stall ?? 0;
