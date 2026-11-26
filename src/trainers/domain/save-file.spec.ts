@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSave, firstOfEachSpecies, carryTeam } from './save-file.js';
+import { parseSave, firstOfEachSpecies, carryTeam, evolvedGraduate } from './save-file.js';
 import { DomainError } from '../../shared/domain/errors.js';
 import { uniqueSpecies, uniqueVariants } from '../../catalog/domain/roster-entry.js';
 import { PROJECT_ROOT } from '../../shared/paths.js';
@@ -25,6 +25,30 @@ test('reads an export: finished + active, skips released', () => {
   const old = roster.find((e) => e.finalID === 144);
   assert.equal(old.level, 100);
   assert.ok(old.ivs.hp >= 8 && old.ivs.hp <= 23);
+});
+
+const graduate = (finalID: number, level = 100): any => ({ id: `grad-${finalID}`, finalID, baseID: finalID, rarity: 'common', shiny: false, level, ivs: { hp: 31, atk: 31, def: 31, satk: 31, sdef: 31, spd: 31 }, stage: 1, chainLen: 2 });
+
+test('a graduate at level 100 that ended its chain in PokeTokenBar takes the evolution later generations added', () => {
+  const kingambit = evolvedGraduate(graduate(625), [624, 625]);
+  assert.equal(kingambit.finalID, 983);
+  assert.deepEqual([kingambit.stage, kingambit.chainLen], [2, 3]);
+  assert.equal(kingambit.id, 'grad-625', 'it is the same Pokémon');
+  assert.equal(evolvedGraduate(graduate(57), [56, 57]).finalID, 979, 'Primeape becomes Annihilape');
+});
+
+test('a Pokémon below level 100, mid chain, or already final stays as it is', () => {
+  assert.equal(evolvedGraduate(graduate(625, 80), [624, 625]).finalID, 625);
+  assert.equal(evolvedGraduate(graduate(624), [624, 625]).finalID, 624, 'Pawniard had not finished its chain');
+  assert.equal(evolvedGraduate(graduate(3), [1, 2, 3]).finalID, 3);
+  assert.equal(evolvedGraduate(graduate(625), null).finalID, 625, 'no chain in the save, no guess');
+});
+
+test('reading a save evolves its graduates, but not the Pokémon still being raised', () => {
+  const dex = [{ id: 'aaaaaaaa-0000-0000-0000-000000000001', baseID: 216, finalID: 217, chainOrder: [216, 217], caughtAt: '2026-11-01T00:00:00Z', profile: { level: 100 } }];
+  const active = { baseID: 624, pathIDs: [624, 625], plannedPathIDs: [624, 625], stageIndex: 1, profile: { level: 100 } };
+  const { roster } = parseSave(JSON.stringify({ format: 'poketokenbar.save', schema: 2, state: { dex, active } }));
+  assert.deepEqual(roster.map((entry) => entry.finalID).sort((a, b) => a - b), [625, 901]);
 });
 
 test('keeps every species of a full dex, normal and shiny, with no cap', () => {
