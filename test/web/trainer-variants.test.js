@@ -103,14 +103,17 @@ test('the avatar centers on the head even when an arm is raised higher than it',
 });
 
 test('every legendary and mythical Pokémon of the game unlocks a recolor of a related trainer', async () => {
-  const LEGENDS = [144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649];
+  const LEGENDS = [144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 716, 717, 718, 719, 720, 721, 773, 785, 786, 787, 788, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 804, 805, 806, 807, 809, 888, 889, 890, 892, 893, 894, 895, 896, 897, 898, 905, 1001, 1002, 1003, 1004, 1007, 1008, 1009, 1010, 1014, 1015, 1016, 1017, 1020, 1021, 1022, 1023, 1024, 1025];
   const withPokemon = new Set(TRAINER_VARIANTS.filter((variant) => variant.pokemon).map((variant) => variant.pokemon));
   for (const id of LEGENDS) assert.ok(withPokemon.has(id), `#${id}`);
 });
 
-test('every recolor themed on a Pokémon has a shiny version painted with that Pokémon\'s shiny colors', async () => {
+test('every recolor themed on a Pokémon whose shiny colors differ has a shiny version painted with them', async () => {
   const { HANDMADE_VARIANT_MAPS } = await import('../../public/trainer-variants.js');
-  const themed = TRAINER_VARIANTS.filter((variant) => variant.pokemon && !variant.shiny);
+  const { HANDMADE_VARIANTS } = await import('../../public/trainer-sprites.js');
+  const withoutShiny = new Set(HANDMADE_VARIANTS.filter((variant) => variant.withoutShiny).map((variant) => variant.key));
+  assert.deepEqual([...withoutShiny], ['mustard_urshifu', 'atticus_munkidori'], 'Urshifu and Munkidori look the same shiny');
+  const themed = TRAINER_VARIANTS.filter((variant) => variant.pokemon && !variant.shiny && !withoutShiny.has(variant.key));
   for (const variant of themed) {
     const shiny = TRAINER_VARIANTS.find((other) => other.key === `${variant.key}_shiny`);
     assert.ok(shiny, variant.key);

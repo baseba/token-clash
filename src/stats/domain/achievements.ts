@@ -15,6 +15,12 @@ const REGION_ORDER = ['kanto', 'johto', 'hoenn', 'sinnoh', 'unova', 'kalos', 'al
 type Region = (typeof REGION_ORDER)[number];
 const REGIONS = Object.fromEntries(REGION_ORDER.map((region, i) => [region, GENERATIONS[i]])) as Record<Region, [number, number]>;
 const RED_DEX = 250;
+const ULTRA_BEASTS = [793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806];
+const ULTRA_BEASTS_NEED = 3;
+const RUINOUS = [1001, 1002, 1003, 1004];
+const RUINOUS_NEED = 2;
+const MYTHICAL_REGIONS: Readonly<Record<number, Region>> = { 719: 'kalos', 720: 'kalos', 721: 'kalos', 801: 'alola', 802: 'alola', 807: 'alola', 809: 'alola', 893: 'galar', 1025: 'paldea' };
+const MYTHICAL_DEX_SHARE = 0.3;
 const GYM_STEPS = [3, 6, 10, 15];
 const ELITE_SPECIES = 12;
 const ELITE_WINS = 10;
@@ -266,14 +272,21 @@ function buildUnlocks(): Map<string, Unlock> {
     unlocks.set(key, { ...unlock, ways: [...unlock.ways, [ownsNamed(ace), second]] });
   }
   const ownsSpecies = (id: number): GoalRule => ownsAnyOf([id]);
+  const ownsSeveral = (ids: readonly number[], need: number, label: string): GoalRule => (r) => ({ ...goal(`${label} distintos en tu colección`, ids.filter((id) => r.species.includes(id)).length, need), hint: `Cuentan: ${ids.map(nameOf).join(', ')}` });
+  const otherWayFor = (pokemon: number): GoalRule | null => {
+    if (ULTRA_BEASTS.includes(pokemon)) return ownsSeveral(ULTRA_BEASTS, ULTRA_BEASTS_NEED, 'Ultraentes');
+    if (RUINOUS.includes(pokemon)) return ownsSeveral(RUINOUS, RUINOUS_NEED, 'Tesoros funestos');
+    const region = MYTHICAL_REGIONS[pokemon];
+    return region ? dex(region, Math.round((REGIONS[region][1] - REGIONS[region][0] + 1) * MYTHICAL_DEX_SHARE)) : null;
+  };
   const reached = (rule: GoalRule, r: PlayerRecord) => {
     const g = rule(r);
     return g.have >= g.need;
   };
   const hasOriginal = (base: string): GoalRule => (r) => goal(`Desbloquear a ${displayName(base)}`, unlocks.get(base)?.ways.some((way) => way.every((rule) => reached(rule, r))) ?? true, 1);
-  const variantOf = (key: string, base: string, extra: GoalRule) => {
+  const variantOf = (key: string, base: string, ...extras: GoalRule[]) => {
     const original = unlocks.get(base)!;
-    add([key], { group: original.group, title: `${original.title} · variante de colores`, ways: [[hasOriginal(base), extra]] });
+    add([key], { group: original.group, title: `${original.title} · variante de colores`, ways: extras.map((extra) => [hasOriginal(base), extra]) });
   };
 
   special('collector', [[shinies(1)]]);
@@ -284,7 +297,11 @@ function buildUnlocks(): Map<string, Unlock> {
   for (const key of ['cheren', 'hugh']) special(key, [[(r) => goal('Equipo de 6 sin tipos repetidos', r.diverseTeam, 1)]]);
   for (const key of ['emmet', 'ingo']) special(key, [[(r) => goal('Victoria sin que se debilite ninguno de tus Pokémon', r.flawlessWins, 1)]]);
   for (const key of ['bede', 'marnie']) special(key, [[(r) => goal(`Victoria con Pokémon de nivel menor a ${LOW_LEVEL} en tu save`, r.lowLevelWins, 1)]]);
-  for (const variant of TRAINER_VARIANTS) if (variant.pokemon && !variant.shiny) variantOf(variant.key, variant.base, ownsSpecies(variant.pokemon));
+  for (const variant of TRAINER_VARIANTS) {
+    if (!variant.pokemon || variant.shiny) continue;
+    const other = otherWayFor(variant.pokemon);
+    variantOf(variant.key, variant.base, ownsSpecies(variant.pokemon), ...(other ? [other] : []));
+  }
   for (const variant of SHINY_VARIANTS) {
     const original = unlocks.get(variant.original)!;
     add([variant.key], { group: original.group, title: `${unlocks.get(variant.base)!.title} · variante shiny`, ways: [[hasOriginal(variant.base), ownsShinyOf(variant.pokemon)]] });
