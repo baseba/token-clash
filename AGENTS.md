@@ -1,81 +1,83 @@
 # AGENTS.md
 
-Token Clash es un backend de NestJS 12 + TypeScript (ESM) + SQLite con Drizzle, armado por dominios, y un frontend de
-JS de módulos sin build en `public/`. Es también una demo didáctica de cómo construir por dominios: el código tiene que
-leerse de arriba abajo sin ayuda.
+Token Clash es un backend de NestJS 12 + TypeScript (ESM) + SQLite con Drizzle, con una carpeta de `src/` por
+dominio, y un frontend de JS de módulos sin build en `public/`. Es una demo de cómo construir por dominios: el
+código se lee de arriba abajo sin ayuda. No hay más documentación que este archivo y el [README](README.md), que
+explica [cómo está armado](README.md#cómo-está-armado), el deploy y tu primer PR.
 
-## Antes de tocar algo
+## Las reglas son chequeos
 
-1. Ubica dónde vive lo que vas a cambiar en el índice del README, [Dónde está cada cosa](README.md#dónde-está-cada-cosa).
-2. Si el cambio cruza un dominio, agrega una tabla o un endpoint, lee [ARQUITECTURA.md](ARQUITECTURA.md). Ahí están
-   los dominios y sus flechas (§1), las capas (§2), las reglas entre dominios (§3), DTO o dominio (§4), la
-   persistencia (§6), los tests (§7) y un ejemplo completo de cómo agregar algo (§9).
-3. Lee "Ojo con" en [CONTRIBUTING.md](CONTRIBUTING.md): producción no tiene internet, los datos de PokeAPI se
-   commitean y los cambios de `deploy/` se instalan a mano.
+`npm test` tiene que pasar antes de abrir el PR, y el CI construye además la imagen con `npm run build`. Corre:
 
-`ARQUITECTURA.md` es la fuente de verdad de la estructura. Este archivo solo agrega lo que se acordó y no está
-escrito ahí.
+- el typecheck estricto, con `noUnusedLocals`: el código muerto se borra;
+- `tools/no-comments.ts`: ningún comentario ni directiva en JS, TS, CSS, HTML, SVG ni `tsconfig*.json`, salvo en
+  `deploy/`, `.github/` y `drizzle/`. Lo que un comentario explicaría va en un nombre, en el nombre de un test o en
+  el PR;
+- `tools/deslop/`: la estructura de `src/` (ciclos, enredos, campos que se filtran, módulos superficiales, carpetas
+  anchas, archivos largos). Su única excepción y sus reglas están en el README;
+- `src/architecture.spec.ts`: qué carpeta de `src/` usa a cuál (`USES`) y qué capa importa a cuál (`LAYER_USES`);
+  `domain/` sin Nest, Drizzle ni HTTP; nadie entra a la `infrastructure/` ni al repositorio de otro dominio; solo
+  `infrastructure/` usa Drizzle; ningún módulo exporta su repositorio; las foreign keys no salen de su schema; solo
+  el cliente de Jev sale a la red;
+- `src/conventions.spec.ts`: `domain/` nunca llama a `Math.random()`; ningún `catch` vacío; `domain/` y
+  `application/` solo lanzan `DomainError`; las excepciones de Nest quedan en `platform/http/` y `web/`; cada
+  `@Body()` y `@Query()` tiene schema; un DTO toma sus enums del dominio y aparece en el `*-dtos.spec.ts` de su
+  carpeta; un test que lee una carpeta descargada al instalar se salta si falta; las dependencias son las de la
+  lista y `public/` solo importa archivos de `public/`;
+- los specs, los e2e (`test/*.e2e-spec.ts`) y los tests del frontend (`test/web/*.test.js`).
 
-## Convenciones de Nest
+Si un chequeo falla, arregla el código. Cambiar un chequeo, una fila de sus tablas o `tools/deslop/debt.allow` es
+una decisión de arquitectura: pregunta antes. Lo mismo para la pila (Zod, `app-config.ts`, `node:test` con
+`node:assert/strict`, funciones puras con la aleatoriedad inyectada) y para cualquier dependencia nueva: proponer
+`@nestjs/config`, class-validator, Jest o `TestingModule` se pregunta.
 
-Las capas, los DTOs de Zod, `DomainError` y las reglas entre dominios están en `ARQUITECTURA.md` §2 a §4. Encima de
-eso:
+## Lo que ningún chequeo ve
 
-- El módulo de un dominio exporta servicios de aplicación (y consultas de solo lectura, como `ArenaQueries`). Nunca
-  exporta su repositorio.
-- Un endpoint nuevo va en el controller del dominio dueño de lo que cambia. El controller lee la petición y llama a
-  un caso de uso. La regla vive en el agregado o en una función pura de `domain/`, con su spec al lado.
-- Para un valor que ya existe como unión en el dominio, exporta la lista desde el dominio y úsala en el DTO con
-  `z.enum(...)`.
-- En `src/`, una regla que dice que no lanza un `DomainError`. Ningún `catch` vacío.
-- Agrega un puerto (clase abstracta que sirve de token) solo si el adaptador puede cambiar o hay que reemplazarlo en
-  los tests. Si hay un solo adaptador, impórtalo directo, como `SkynetService` con el cliente de Jev.
-- La pila es la que hay: Zod para validar, `app-config.ts` para la configuración, `node:test` con
-  `node:assert/strict` para los tests y funciones puras con la aleatoriedad inyectada en vez de mocks de Nest.
-  Proponer `@nestjs/config`, class-validator, Jest o `TestingModule` es una decisión de arquitectura: pregunta antes.
+- La regla vive en el agregado o en una función pura de `domain/`, con su spec al lado. El DTO revisa la forma de
+  la petición y el dominio, lo que depende del estado. El endpoint va en el controller del dominio dueño de lo que
+  cambia, y el controller solo llama a un caso de uso.
+- Un puerto (clase abstracta que sirve de token) solo si el adaptador puede cambiar o hay que reemplazarlo en los
+  tests. Con un solo adaptador, impórtalo directo, como `SkynetService` con el cliente de Jev.
+- Nombres completos, también en los specs: nada de una letra, salvo `i` y `j`, el parámetro de un callback de una
+  sola expresión, los comparadores `(a, b)`, los genéricos `<T>` y el generador pseudoaleatorio.
+- Un concepto, un nombre, un lugar: si renombras, renombra en todos lados, y un valor compartido se importa.
+- Identificadores en inglés. Los textos que ve el jugador, este archivo y el README, en español.
+- Peleas, presencia y chat viven en memoria a propósito: no los persistas.
+- Código viejo que rompe una regla no es un precedente.
 
-`ARQUITECTURA.md` §8 lista las deudas conocidas, por ejemplo cómo entra la tienda. Ese código no es un precedente:
-sigue las reglas de arriba aunque el archivo vecino no lo haga.
+## Deudas conocidas
 
-## Código
+- La tienda entra por `stats`: `AchievementsController` expone la tienda porque comprar un entrenador pide tener al
+  original (`buyBlocker`). `equip` podría pasar a `TrainersController`.
+- `combat` lleva cosméticos: `BattleState` guarda entrenador, marco y Poké Ball de cada lado solo para la vista.
 
-- Nombres completos, también en los specs. Sin variables, parámetros ni alias de tipo de una letra. Se aceptan los
-  índices `i` y `j`, el parámetro de un callback de una sola expresión (`(m) => m.id`), los comparadores de
-  `sort` (`(a, b) =>`), los parámetros de tipo genéricos (`<T>`) y el generador pseudoaleatorio. Quedan letras sueltas
-  en código viejo: no las copies.
-- Un concepto, un nombre en todo el código. Si renombras, renombra en todos lados (con un codemod si son muchos).
-- Identificadores en inglés. Los textos que ve el jugador y la documentación van en español.
-- Sin comentarios en el código, tampoco directivas como `@ts-expect-error`: `npm test` falla si encuentra uno.
-  `tools/no-comments.ts` revisa JS, TS, CSS, HTML, SVG y los `tsconfig*.json`, salvo `deploy/`, `.github/` y
-  `drizzle/`. Lo que un comentario explicaría va en un nombre, en el nombre de un test o en el PR.
-- `tsconfig.json` tiene `noUnusedLocals`: borra el código muerto, no lo comentes.
-- Un valor compartido (un default, una lista) vive en un solo lugar y se importa. Por ejemplo, `DEFAULT_BALL` de
-  `catalog/domain/shop.ts`.
+## Producción
+
+- El servidor no tiene salida a internet. Los datos externos se bajan con `scripts/` (`npm run sprites`, `cries`,
+  `anims`, `radio` y `node scripts/import-pokeapi.mjs`), y lo que generan en `src/*/data/` y `public/upstream/` se
+  commitea.
+- Sprites, gritos, sonidos y música los baja el navegador de jsDelivr, fijados a un commit en `public/upstream.js`.
+  Lo que transformamos (animaciones, entrenadores, tiles) se genera en `npm install` y no se versiona.
+- El merge a `main` despliega solo cuando el CI pasa y no hay peleas en curso. Cada PR tiene que poder salir a
+  producción por sí mismo, y lo que no está commiteado no llega.
+- Un cambio en `deploy/*.container`, `*.network`, `*.service`, `*.timer` o `deploy/deploy.sh` no se aplica solo y
+  frena el deploy automático hasta que alguien lo instale a mano (README, Deploy): va en un PR propio y se avisa.
 
 ## Datos y migraciones
 
-- Al cambiar un `*.schema.ts`, actualiza también el mapper (el resto está en "Ojo con" de `CONTRIBUTING.md`).
-- Para volver obligatoria una columna o borrarla, usa dos PRs (expand y contract, `ARQUITECTURA.md` §6). Un deploy
-  que falla vuelve a la imagen anterior, y esa imagen tiene que seguir funcionando con la base nueva.
+- Al cambiar un `*.schema.ts`: actualiza el mapper, corre `npm run db:generate` y commitea la migración de
+  `drizzle/`. Una migración publicada no se edita.
+- Un deploy que falla vuelve a la imagen anterior, y esa imagen tiene que funcionar con la base nueva. Para volver
+  obligatoria una columna o borrarla: dos PRs, expand (rellenar y seguir aceptando NULL) y contract.
 - Una migración que reescribe datos se prueba sobre una copia de la base de producción antes del merge.
 
 ## Tests
 
-- `npm test` corre el typecheck estricto, los specs, los e2e y los tests del frontend. Tiene que pasar antes de
-  abrir el PR. Corre también `npm run build`.
-- Specs unitarios al lado del archivo que prueban. E2e en `test/*.e2e-spec.ts`. Frontend en `test/web/*.test.js`.
-- Cada regla nueva trae su spec. Cada endpoint nuevo aparece en `test/app.e2e-spec.ts`. Cada DTO nuevo, en el
-  `*-dtos.spec.ts` de su dominio.
-- Un test no depende de archivos que se descargan al instalar (`public/sprites`, `public/trainers`…). Si los
-  necesita, se salta cuando faltan, como el test de `LEGACY_DB`.
-- `npm test` también corre el chequeo de estructura (`node dist/tools/deslop/main.js --allow
-  tools/deslop/debt.allow`); un diagnóstico nuevo se arregla en el código, no en el archivo de excepciones.
-- `src/combat/domain/battle.replays.spec.ts` fija 40 batallas completas. Si un cambio del motor las mueve a propósito,
-  actualiza el snapshot con `UPDATE_SNAPSHOTS=1` en un commit propio y explica el cambio en el PR.
+- Cada regla nueva trae su spec; cada endpoint nuevo, su paso en `test/app.e2e-spec.ts`.
+- `src/combat/domain/battle.replays.spec.ts` fija 40 batallas. Si el motor las mueve a propósito, actualiza el
+  snapshot con `UPDATE_SNAPSHOTS=1` en un commit propio y explica el cambio en el PR.
 
 ## PRs
 
 - Un PR hace una cosa. Un refactor no cambia comportamiento: un bug que encuentres va en su propio commit.
-- El merge a `main` despliega solo, así que cada PR tiene que poder salir a producción por sí mismo.
-- Si el PR cambia la estructura o una regla escrita, actualiza `ARQUITECTURA.md` y el índice del README en el mismo PR.
-- Título `type(scope): subject`. El cuerpo en español, corto, con `## Why` primero.
+- Título `type(scope): subject`. Cuerpo en español, corto, con `## Why` primero.
