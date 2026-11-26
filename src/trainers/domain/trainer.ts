@@ -6,7 +6,7 @@ import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
 import { conflict, forbidden, invalid, notFound } from '../../shared/domain/errors.js';
 import { isShopTrainer, isTrainerSprite, STARTER_SPRITES, trainerSpriteFor } from '../../catalog/domain/trainer-sprites.js';
 import { DEFAULT_BALL, isFreeItem, shopItem, shopItemOf, type ShopItem } from '../../catalog/domain/shop.js';
-import { carryTeam, type ParsedSave } from './save-file.js';
+import { carryTeam, withoutRegionalEvolution, type ParsedSave } from './save-file.js';
 import { recycledTokens, recycleReward, type Duplicate, type RecycledRecord } from './recycling.js';
 
 export interface TrainerState {
@@ -46,6 +46,13 @@ export type EquipKind = (typeof EQUIP_KINDS)[number];
 export type Equipped = Partial<Record<EquipKind, string>>;
 
 const RARITY_RANK = { legendary: 3, rare: 2, uncommon: 1, common: 0 } as const;
+
+export function withValidChoices(entry: RosterEntry): RosterEntry {
+  const valid = { ...entry };
+  if (valid.moveset && !validMoveset(valid, valid.moveset)) delete valid.moveset;
+  if (valid.abilityChoice && (!abilityOptions(valid).some((option) => option.key === valid.abilityChoice) || !usableAbility(valid.abilityChoice))) delete valid.abilityChoice;
+  return valid;
+}
 
 export function cleanName(raw: string, max = 24): string {
   return raw
@@ -259,7 +266,7 @@ export class Trainer implements TrainerState {
     this.roster = parsed.roster.map((entry) => {
       const keptFields = kept.get(entry.id);
       if (!keptFields) return entry;
-      return Object.fromEntries(Object.entries({ ...entry, ...keptFields }).filter(([, v]) => v !== undefined)) as unknown as RosterEntry;
+      return withValidChoices(Object.fromEntries(Object.entries({ ...entry, ...keptFields }).filter(([, v]) => v !== undefined)) as unknown as RosterEntry);
     });
     this.team = carryTeam(this.team, previous, this.roster);
     if (!this.team.length) this.team = defaultTeam(this.roster);
@@ -320,6 +327,17 @@ export class Trainer implements TrainerState {
 
   recordLoss(): void {
     this.losses += 1;
+  }
+
+  revertRegionalEvolutions(): boolean {
+    const roster = (this.roster ?? []).map((entry) => {
+      const reverted = withoutRegionalEvolution(entry);
+      return reverted === entry ? entry : withValidChoices(reverted);
+    });
+    if (roster.every((entry, i) => entry === this.roster[i])) return false;
+    this.roster = roster;
+    this.team = carryTeam(this.team ?? [], roster, roster);
+    return true;
   }
 
   dropRepeatedSpecies(): boolean {

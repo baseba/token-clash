@@ -177,10 +177,12 @@ export function family(id: number): { id: number; stage: number }[] {
   return out;
 }
 
+export const REGIONAL_FORM_EVOLUTIONS: ReadonlySet<number> = new Set([862, 863, 864, 865, 866, 867, 902, 903, 904, 980]);
+
 export function finalForms(id: number, maxId = Infinity): number[] {
   const finals: number[] = [];
   const visit = (cur: number) => {
-    const next = (CHILDREN.get(cur) ?? []).filter((child) => child <= maxId);
+    const next = (CHILDREN.get(cur) ?? []).filter((child) => child <= maxId && !REGIONAL_FORM_EVOLUTIONS.has(child));
     if (!next.length) finals.push(cur);
     next.forEach(visit);
   };

@@ -1376,7 +1376,8 @@ function importCard({ onDone, compact: small = false } = {}) {
   );
 }
 
-const POKETOKENBAR_GEN9_GRADUATES = 'Primeape, Farfetch’d, Mr. Mime, Girafarig, Dunsparce, Qwilfish, Ursaring, Corsola, Stantler, Linoone, Basculin y Bisharp';
+const POKETOKENBAR_ANCHOR = 'poketokenbar';
+const POKETOKENBAR_GEN9_GRADUATES = 'Primeape, Girafarig, Dunsparce, Ursaring, Stantler y Bisharp';
 
 const poketokenbarInstallCommand = (origin) => `curl -fsSL ${origin}/poketokenbar/install.sh | bash -s ${origin}`;
 
@@ -4551,8 +4552,9 @@ async function teamPage(seq) {
     reimport.hidden = !reimport.hidden;
     reimportBtn.setAttribute('aria-expanded', String(!reimport.hidden));
   } });
-  const gen9 = h('div', { class: 'reimport', hidden: true }, poketokenbarGen9Card());
-  const gen9Btn = toolButton({ icon: glyph('sparkle'), label: 'PokeTokenBar 6.ª a 9.ª', note: 'Cría Kalos a Paldea', 'aria-expanded': 'false', onclick: () => {
+  const askedForPatch = location.hash === `#${POKETOKENBAR_ANCHOR}`;
+  const gen9 = h('div', { class: 'reimport', id: POKETOKENBAR_ANCHOR, hidden: !askedForPatch }, poketokenbarGen9Card());
+  const gen9Btn = toolButton({ icon: glyph('sparkle'), label: 'PokeTokenBar 6.ª a 9.ª', note: 'Cría Kalos a Paldea', 'aria-expanded': String(askedForPatch), onclick: () => {
     gen9.hidden = !gen9.hidden;
     gen9Btn.setAttribute('aria-expanded', String(!gen9.hidden));
   } });

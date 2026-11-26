@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSave, firstOfEachSpecies, carryTeam, evolvedGraduate } from './save-file.js';
+import { parseSave, firstOfEachSpecies, carryTeam, evolvedGraduate, withoutRegionalEvolution } from './save-file.js';
 import { DomainError } from '../../shared/domain/errors.js';
 import { uniqueSpecies, uniqueVariants } from '../../catalog/domain/roster-entry.js';
 import { PROJECT_ROOT } from '../../shared/paths.js';
@@ -42,6 +42,26 @@ test('a Pokémon below level 100, mid chain, or already final stays as it is', (
   assert.equal(evolvedGraduate(graduate(624), [624, 625]).finalID, 624, 'Pawniard had not finished its chain');
   assert.equal(evolvedGraduate(graduate(3), [1, 2, 3]).finalID, 3);
   assert.equal(evolvedGraduate(graduate(625), null).finalID, 625, 'no chain in the save, no guess');
+});
+
+test('a graduate whose next evolution needs a regional form PokeTokenBar does not raise keeps its form', () => {
+  const regular = [[264, [263, 264]], [83, [83]], [122, [439, 122]], [222, [222]], [211, [211]], [550, [550]]] as const;
+  for (const [finalID, chain] of regular) assert.equal(evolvedGraduate(graduate(finalID), chain).finalID, finalID, `#${finalID}`);
+});
+
+test('a Pokémon that evolved into a regional-form evolution goes back to the form it came from', () => {
+  const obstagoon = withoutRegionalEvolution({ ...graduate(862), baseID: 263, stage: 2, chainLen: 3 });
+  assert.deepEqual([obstagoon.finalID, obstagoon.stage, obstagoon.chainLen], [264, 1, 2]);
+  assert.equal(obstagoon.id, 'grad-862', 'it is the same Pokémon');
+  assert.equal(withoutRegionalEvolution({ ...graduate(83), stage: undefined, chainLen: undefined }).finalID, 83);
+  const kingambit = graduate(983);
+  assert.equal(withoutRegionalEvolution(kingambit), kingambit);
+});
+
+test('a save that already brings the regional-form evolution reads it as the form it came from', () => {
+  const dex = [{ id: 'aaaaaaaa-0000-0000-0000-000000000003', baseID: 263, finalID: 862, chainOrder: [263, 264, 862], caughtAt: '2026-11-01T00:00:00Z', profile: { level: 100 } }];
+  const { roster } = parseSave(JSON.stringify({ format: 'poketokenbar.save', schema: 2, state: { dex } }));
+  assert.deepEqual(roster.map((entry) => [entry.finalID, entry.stage, entry.chainLen]), [[264, 1, 2]]);
 });
 
 test('reading a save evolves its graduates, but not the Pokémon still being raised', () => {
