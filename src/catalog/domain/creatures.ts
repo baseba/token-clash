@@ -153,7 +153,7 @@ const between = (random: Random, lo: number, hi: number) => lo + Math.floor(rand
 
 const MOVEDEX = JSON.parse(readFileSync(catalogFile('movedex.json'), 'utf8')) as Record<string, MoveEntry>;
 
-export const ALL_MOVE_IDS = (): string[] => Object.keys(MOVEDEX);
+export const ALL_MOVE_IDS: readonly string[] = Object.keys(MOVEDEX);
 export const moveEntry = (id: string): MoveEntry | null => MOVEDEX[id] ?? null;
 
 export function lineage(id: number): number[] {
