@@ -36,7 +36,7 @@ test('seats lay out in one row up to 8 and in two rows of 8 for 16, inside the a
 });
 
 test('the duel card is 1200×630, escapes the name and draws the host', () => {
-  const svg = previewCardSvg(duelPreview({ open: true, mode: 'team', visibility: 'private', host: { name: 'Beto <b>', avatar: 'blue' } }).card!, ART);
+  const svg = previewCardSvg(duelPreview({ open: true, mode: 'team', visibility: 'private', host: { name: 'Beto <b>', avatar: 'blue' }, partySize: 6 }).card!, ART);
   assert.ok(svg.startsWith(`<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${CARD_HEIGHT}"`));
   assert.ok(svg.includes('Beto &lt;b&gt;'));
   assert.ok(!svg.includes('<b>'));

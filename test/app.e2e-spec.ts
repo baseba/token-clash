@@ -163,6 +163,7 @@ test('import → challenge → accept → live battle → leaderboard', async ()
   assert.equal(stats.data.recent[0].id, id);
   assert.ok(stats.data.topMons.length >= 1);
   assert.equal(typeof stats.data.live.battles, 'number');
+  assert.equal(stats.data.live.version, versioned[1], 'the stats page reports the same deploy version the assets carry');
   assert.equal(stats.data.totals.activeNow, 1);
   const profile = (await call(`/api/stats/trainers/${a.data.me.id}`)).data.trainer;
   assert.equal(profile.name, 'Ana');
@@ -187,6 +188,7 @@ test('random battle rolls a party from each collection', async () => {
   assert.equal(ch.data.challenge.mode, 'random');
   assert.deepEqual(ch.data.challenge.hostTeam, []);
   assert.equal(ch.data.challenge.hostTeamSize, 4);
+  assert.match(await (await fetch(`${base}/b/${id}`)).text(), /los dados sortean 6 Pokémon de la colección de cada uno/, 'the share link says how many Pokémon the dice draw');
 
   const host = player(id, a.data.token);
   await new Promise<any>((r) => host.ws.on('open', r));

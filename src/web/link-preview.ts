@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import type { SharedDuel, SharedTournament } from '../arena/application/arena-queries.js';
-import { PARTY_SIZE } from '../combat/domain/team-preview.js';
 
 export interface DuelCard {
   kind: 'duel';
@@ -44,7 +43,7 @@ export function duelPreview(duel: SharedDuel): LinkPreview {
   if (!duel.open) return { title: 'Esta sala ya no está abierta', description: 'La pelea ya empezó o la sala se cerró. Entra a Token Clash para buscar otra.', card: null };
   const host = shortName(duel.host.name);
   const random = duel.mode === 'random';
-  const how = random ? `los dados sortean ${PARTY_SIZE} Pokémon de la colección de cada uno` : 'cada uno pelea con el equipo que armó';
+  const how = random ? `los dados sortean ${duel.partySize} Pokémon de la colección de cada uno` : 'cada uno pelea con el equipo que armó';
   const who = duel.visibility === 'public' ? 'Sala abierta: el primero que entre pelea' : 'Sala privada: entra antes de que venza';
   return {
     title: `${host} te desafía a una batalla`,

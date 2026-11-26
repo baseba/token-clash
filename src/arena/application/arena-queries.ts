@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { PARTY_SIZE } from '../../combat/domain/team-preview.js';
 import { ChallengeRepository, TournamentRepository } from '../domain/arena.repositories.js';
 import { isHumanDuel, type BattleMode, type Challenge, type Visibility } from '../domain/challenge.js';
 import type { Tournament, TournamentStatus } from '../domain/tournament.js';
@@ -15,6 +16,7 @@ export interface SharedDuel {
   mode: BattleMode;
   visibility: Visibility;
   host: SharedTrainer;
+  partySize: number;
 }
 
 export interface SharedTournament {
@@ -55,6 +57,7 @@ export class ArenaQueries {
       mode: challenge.mode,
       visibility: challenge.visibility,
       host: { name: this.views.nameOf(challenge.hostId, challenge.hostName) ?? challenge.hostName, avatar: this.views.avatarOf(challenge.hostId, challenge) },
+      partySize: PARTY_SIZE,
     };
   }
 
