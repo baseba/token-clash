@@ -1,9 +1,55 @@
 import type { Boosts, BoostKey, MajorStatus, StatKey, Weather } from '../../catalog/domain/creatures.js';
-import type { AbilityEngine } from './ability-engine.js';
 import { isIcy, isMajorStatus, isRain, isSun, poisoned, stageMult } from './conditions.js';
-import type { BattleFighter, BattleMove, MoveData } from './battle-types.js';
+import type { AbilityDetails, AnyMove, BattleFighter, BattleMove, BattleState, Look, MoveData } from './battle-types.js';
 
 export type BoostChanges = Record<string, number>;
+
+export interface BoostOptions {
+  cap?: number;
+  ability?: BattleFighter;
+  effect?: string;
+}
+
+export interface AbilityEngine {
+  battle: BattleState;
+  rand(): number;
+  foe(fighter: BattleFighter): BattleFighter | null;
+  has(fighter: BattleFighter, key: string): boolean;
+  anyActiveHas(key: string): boolean;
+  show(fighter: BattleFighter, note?: string | null, details?: AbilityDetails): void;
+  immune(fighter: BattleFighter): number;
+  boost(fighter: BattleFighter, changes: Boosts, source?: BattleFighter | null, opts?: BoostOptions): Boosts;
+  damage(fighter: BattleFighter, amount: number, cause?: string): number;
+  heal(fighter: BattleFighter, amount: number, opts?: { silent?: boolean }): number;
+  setStatus(fighter: BattleFighter, status: MajorStatus, source?: BattleFighter | null, opts?: { ability?: BattleFighter }): boolean;
+  addVolatile(
+    fighter: BattleFighter,
+    kind: string,
+    source?: BattleFighter | null,
+    opts?: { ability?: BattleFighter; move?: { key: string; name: string } },
+  ): boolean;
+  cure(fighter: BattleFighter, announce?: boolean): void;
+  weather(): Weather | null;
+  terrain(): string | null;
+  setWeather(weather: Weather, source: BattleFighter | null): boolean;
+  setTerrain(terrain: string, source: BattleFighter | null): boolean;
+  grounded(fighter: BattleFighter): boolean;
+  asleep(fighter: BattleFighter): boolean;
+  effectiveness(move: AnyMove, attacker: BattleFighter, target: BattleFighter): number;
+  setTypes(fighter: BattleFighter, types: readonly string[]): void;
+  setAbility(fighter: BattleFighter, key: string | null): void;
+  hasMoved(fighter: BattleFighter): boolean;
+  hasBench(fighter: BattleFighter): boolean;
+  faintedAllies(fighter: BattleFighter): number;
+  addToxicSpikes(fighter: BattleFighter): boolean;
+  clearScreens(sideIndex: number, cause: string): boolean;
+  transform(fighter: BattleFighter, into: BattleFighter): void;
+  changeForm(fighter: BattleFighter, form: string | null, opts?: { permanent?: boolean }): void;
+  breakIllusion(fighter: BattleFighter): boolean;
+  look(fighter: BattleFighter): Look;
+  showItem(fighter: BattleFighter): void;
+  useUpItem(fighter: BattleFighter): void;
+}
 
 export interface HitInfo {
   crit: boolean;
