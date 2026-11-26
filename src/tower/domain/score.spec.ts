@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rng } from '../../catalog/domain/creatures.js';
+import { rng } from '../../shared/domain/random.js';
 import { floorAt } from './floors.js';
 import { foeTeam } from './foe-team.js';
 import { DIFFICULTY_MULTIPLIER, floorScore, teamPoints, totalPoints } from './score.js';

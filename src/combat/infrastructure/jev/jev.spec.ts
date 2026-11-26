@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBattle, submit, validActions } from '../../domain/battle.js';
-import { rng } from '../../../catalog/domain/creatures.js';
+import { rng } from '../../../shared/domain/random.js';
 import { jevState, jevOptions, chooseJevAction } from './jev.js';
 
 const mon = (id, finalID, moves, extra: any = {}): any => ({ id, finalID, baseID: finalID, rarity: 'rare', level: 50, ivs: { hp: 20, atk: 20, def: 20, satk: 20, sdef: 20, spd: 20 }, learned: moves, moveset: moves, ...extra });

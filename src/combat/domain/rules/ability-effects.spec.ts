@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { createBattle, submit, autoAction, needsAction, validActions, publicState, viewEvents } from '../battle.js';
 import { INERT, abilityInfo } from '../../../catalog/domain/abilities.js';
 import { ABILITIES } from './ability-effects.js';
-import { abilityFor, floats, rng, moveOrigins } from '../../../catalog/domain/creatures.js';
+import { abilityFor, floats, moveOrigins } from '../../../catalog/domain/creatures.js';
+import { rng } from '../../../shared/domain/random.js';
 import { movepool, buildFighter } from '../fighter.js';
 import { catalogFile } from '../../../catalog/domain/data-file.js';
 

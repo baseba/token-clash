@@ -2,10 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseSave } from '../../trainers/domain/save-file.js';
-import { rng, learnedMoves, abilityOptions, abilityFor, usableAbility, NATURE_NAMES } from '../../catalog/domain/creatures.js';
+import { learnedMoves, abilityOptions, abilityFor, usableAbility, NATURE_NAMES } from '../../catalog/domain/creatures.js';
+import { rng } from '../../shared/domain/random.js';
 import { hiddenPowerType, moveData } from './moves.js';
 import { validMoveset, movesetFor, buildFighter, movepool, MOVES_PER_FIGHTER } from './fighter.js';
-import { alwaysDamages, randomEvs, randomParty, randomize, randomAbility, reroll, shuffled, GUARANTEED_ATTACKS } from './random-party.js';
+import { alwaysDamages, randomEvs, randomParty, randomize, randomAbility, reroll, GUARANTEED_ATTACKS } from './random-party.js';
 import { canReroll, createPreview, pick, previewView } from './team-preview.js';
 import { aiRerollCandidates, aiRerollIndex, buildAiRandomParty, buildAiTeam, AI_LEVELS } from './ai.js';
 import { usableMovepool } from './fighter.js';
@@ -16,13 +17,6 @@ import { join } from 'node:path';
 const { roster } = parseSave(readFileSync(join(PROJECT_ROOT, 'test', 'fixtures', 'export.json'), 'utf8'));
 
 const bigRoster = [1, 4, 7, 25, 52, 68, 94, 122, 143, 6, 9, 3].map((finalID, i): any => ({ id: `mon-${i}`, finalID, baseID: finalID, rarity: 'rare', level: 50, ivs: { hp: 15, atk: 15, def: 15, spd: 15 } }));
-
-test('shuffled keeps every item once and leaves the input alone', () => {
-  const items = [1, 2, 3, 4, 5, 6, 7];
-  const out = shuffled(items, rng('s'));
-  assert.deepEqual([...out].sort(), items);
-  assert.deepEqual(items, [1, 2, 3, 4, 5, 6, 7]);
-});
 
 test('a random party has six distinct mons from the roster', () => {
   const party = randomParty(bigRoster, rng('party'));

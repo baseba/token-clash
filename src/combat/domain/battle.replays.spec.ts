@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { rng } from '../../catalog/domain/creatures.js';
+import { rng } from '../../shared/domain/random.js';
 import { PROJECT_ROOT } from '../../shared/paths.js';
 import { createBattle, needsAction, publicState, submit, viewEvents } from './battle.js';
 import { aiPicks, buildAiTeam, buildAiRandomParty, chooseAction } from './ai.js';

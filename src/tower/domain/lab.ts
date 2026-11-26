@@ -1,4 +1,5 @@
-import { hash, NATURE_KEYS, shuffled, speciesData, type Random } from '../../catalog/domain/creatures.js';
+import { NATURE_KEYS, speciesData } from '../../catalog/domain/creatures.js';
+import { hash, shuffled, type Random } from '../../shared/domain/random.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { LAB_OFFERS, PROFESSOR } from '../../catalog/domain/tower-cast.js';
 import { baseStatTotal, evolutionPath, formAtLevel, movesAtLevel } from './growth.js';

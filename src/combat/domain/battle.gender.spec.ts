@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBattle, submit } from './battle.js';
-import { rng, genderFor, speciesData } from '../../catalog/domain/creatures.js';
+import { genderFor, speciesData } from '../../catalog/domain/creatures.js';
+import { rng } from '../../shared/domain/random.js';
 import { buildFighter } from './fighter.js';
 
 test('gender follows the real ratio of each species', () => {

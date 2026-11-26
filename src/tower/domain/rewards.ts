@@ -1,4 +1,5 @@
-import { abilityOptions, moveOrigins, NATURE_KEYS, natureInfo, shuffled, speciesData, statsFor, type Random } from '../../catalog/domain/creatures.js';
+import { abilityOptions, moveOrigins, NATURE_KEYS, natureInfo, speciesData, statsFor } from '../../catalog/domain/creatures.js';
+import { shuffled, type Random } from '../../shared/domain/random.js';
 import type { Ivs } from '../../catalog/domain/roster-entry.js';
 import type { TwistKey } from '../../catalog/domain/tower-cast.js';
 import { HELD_ITEMS, boosterOf, type ItemTier } from '../../catalog/domain/held-items.js';

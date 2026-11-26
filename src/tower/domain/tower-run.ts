@@ -1,4 +1,5 @@
-import { abilityFor, abilityOptions, hash, rng, type Random } from '../../catalog/domain/creatures.js';
+import { abilityFor, abilityOptions } from '../../catalog/domain/creatures.js';
+import { hash, rng, type Random } from '../../shared/domain/random.js';
 import type { Ivs, RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { MAX_LEVEL, PARTY_LIMIT, RECRUIT_LINE, ROOMS, START_LEVEL, STARTERS, TWIST_KEYS, type RoomKind, type TwistKey } from '../../catalog/domain/tower-cast.js';
 import type { AiLevel } from '../../combat/domain/ai.js';

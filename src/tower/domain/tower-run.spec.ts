@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rng, speciesIdByName } from '../../catalog/domain/creatures.js';
+import { speciesIdByName } from '../../catalog/domain/creatures.js';
+import { rng } from '../../shared/domain/random.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { DomainError } from '../../shared/domain/errors.js';
 import { DETOURS, levelCap } from './floors.js';

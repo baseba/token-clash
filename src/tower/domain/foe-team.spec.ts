@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { moveOrigins, rng, speciesData } from '../../catalog/domain/creatures.js';
+import { moveOrigins, speciesData } from '../../catalog/domain/creatures.js';
+import { rng } from '../../shared/domain/random.js';
 import { moveData } from '../../combat/domain/moves.js';
 import type { RosterEntry } from '../../catalog/domain/roster-entry.js';
 import { fitToParty, floorAt, levelCap, roomsAt } from './floors.js';

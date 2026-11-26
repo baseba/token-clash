@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rng } from '../../catalog/domain/creatures.js';
+import { rng } from '../../shared/domain/random.js';
 import { buildAiTeam } from '../../combat/domain/ai.js';
 import { createBattle } from '../../combat/domain/battle.js';
 import { Challenge } from '../domain/challenge.js';

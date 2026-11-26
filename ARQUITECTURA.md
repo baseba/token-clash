@@ -20,9 +20,9 @@ Cada carpeta de `src/` es un dominio con su propio lenguaje y sus propias reglas
 
 Más cinco piezas que no son dominios sino entradas y plomería: `realtime` (el protocolo WebSocket), `web`
 (archivos estáticos, health checks y la vista previa de los links, que lee la arena con `ArenaQueries`), `shared` (lo
-que un `domain/` puede importar: los errores de dominio, el reloj y la raíz del proyecto), `platform` (la plomería de
-Nest: configuración, HTTP y base de datos) y `app` (la raíz de composición: `app.module.ts`, que junta los módulos, y
-la importación única de `data/db.json`). Un `domain/` nunca importa `platform/`, `shared/` no importa Nest, Drizzle
+que un `domain/` puede importar: los errores de dominio, el reloj, la aleatoriedad con semilla y la raíz del
+proyecto), `platform` (la plomería de Nest: configuración, HTTP y base de datos) y `app` (la raíz de composición:
+`app.module.ts`, que junta los módulos, y la importación única de `data/db.json`). Un `domain/` nunca importa `platform/`, `shared/` no importa Nest, Drizzle
 ni `node:http`, y ni `shared` ni `platform` importan un dominio: las flechas solo entran. `main.ts` y `jev-proxy.main.ts`
 quedan en la raíz de `src/`: son los dos procesos que arrancan.
 
