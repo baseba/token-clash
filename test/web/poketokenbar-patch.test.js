@@ -85,3 +85,9 @@ test('every patch ships with its own version, which the installer bakes into the
   assert.match(patch, /<key>TokenClashOrigin<\/key><string>\$\{TOKEN_CLASH_ORIGIN:-\}<\/string>/);
   assert.match(patch, /poketokenbar\/version\.json/);
 });
+
+test('the patched app signs in to Token Clash and uploads the save to the same endpoint as the Terminal sync', () => {
+  assert.match(patch, /appendingPathComponent\("api\/sync"\)/);
+  assert.match(patch, /"Basic " \+ Data\("\\\(credentials\.name\):\\\(credentials\.password\)"\.utf8\)\.base64EncodedString\(\)/);
+  assert.match(patch, /minimumUploadInterval: TimeInterval = 300/);
+});
