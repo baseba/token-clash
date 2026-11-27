@@ -1,7 +1,7 @@
 From bd0236b1afbaf94215c0e8a23ebf3b33d5fee00a Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Thu, 26 Nov 2026 12:00:00 +0000
-Subject: [PATCH 1/6] feat(dex): open the National Dex to #1025, Kalos to
+Subject: [PATCH 1/7] feat(dex): open the National Dex to #1025, Kalos to
  Paldea
 
 Eggs hatch from every base species up to #1025 and evolution trees are no longer cut at #649. Evolutions that need a regional form this app does not raise (Obstagoon, Sirfetch'd, Clodsire, Sneasler, ...) stay out of the trees, as in Token Clash. The base index is cached under a name tied to the cap, so an index cached by the official build is not reused. The egg pool was measured again (540 bases): a rare egg still beats repeated uncommon eggs.
@@ -197,7 +197,7 @@ index 4f2c89a..ac106df 100644
 From df9251e83836ef4fc53f0cfb3c7d803feb0fc4e2 Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Thu, 26 Nov 2026 12:00:00 +0000
-Subject: [PATCH 2/6] feat(sprites): animate #650 to #1025 like Token Clash
+Subject: [PATCH 2/7] feat(sprites): animate #650 to #1025 like Token Clash
 
 The Essentials Animated Pokemon System strips (pinned at rh-hideout-chinese/pokemon-engine) are sliced into GIFs when downloaded, cropped to what every frame shows, with the same frame delays as Token Clash. A shiny strip drawn at several times its normal's size is shrunk to match, and Xerneas's front comes from Showdown's gen5ani, since its strip is still.
 ---
@@ -889,7 +889,7 @@ index 0000000..c625f0f
 From b3a74988999f26375e936bacaccd35c8ef123610 Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Thu, 26 Nov 2026 12:00:00 +0000
-Subject: [PATCH 3/6] feat(save): graduates that stopped short of their final
+Subject: [PATCH 3/7] feat(save): graduates that stopped short of their final
  form evolve on load
 
 A level 100 graduate whose saved chain ends at a form that now evolves (Primeape, Bisharp, Ursaring, ...) moves to its final form when the save loads, keeping profile and rarity, and the new final is recorded. It follows Token Clash's rule: same table of later finals, same hash of the entry id to pick one, so the app and the game show the same species. A graduate already at its final, or whose next evolution needs a regional form (Linoone, Farfetch'd), keeps its form.
@@ -1034,7 +1034,7 @@ index 0000000..2cbeaa4
 From 977b1697d749d9eeb5f272376765c0bfa960a200 Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Thu, 26 Nov 2026 12:00:00 +0000
-Subject: [PATCH 4/6] feat(update): offer only Token Clash's builds of the
+Subject: [PATCH 4/7] feat(update): offer only Token Clash's builds of the
  patch
 
 The installer bakes Token Clash's address and the patch version (the official version plus a build number) into Info.plist. The update check reads /poketokenbar/version.json from that address instead of the official releases, and its banner opens Collection with the install command, so an update never swaps this build for the official one. build-app.sh also takes extra swift build flags, which the installer uses to build past stale files a partial Command Line Tools update leaves behind.
@@ -1235,7 +1235,7 @@ index aa8cc1c..005b2af 100755
 From 6fc10ffec967d3125db23ab6d84eb987e9b78cca Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Fri, 27 Nov 2026 12:00:00 +0000
-Subject: [PATCH 5/6] feat(sync): sign in to Token Clash and the save uploads
+Subject: [PATCH 5/7] feat(sync): sign in to Token Clash and the save uploads
  itself
 
 Settings gets a Token Clash section: sign in with the trainer name and password and the app posts the save to /api/sync right away, which also checks the credentials, then again whenever the save changes, at most every five minutes. The password lives in the Keychain. The popover footer gets a button that opens Token Clash. Nothing to type in the Terminal, unlike the LaunchAgent sync.
@@ -1695,7 +1695,7 @@ index 0000000..f00e29b
 From 6e44847a51512b285099953937df90c5feeee103 Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Fri, 27 Nov 2026 12:00:00 +0000
-Subject: [PATCH 6/6] feat(sync): pick up the sign-in of the Terminal sync
+Subject: [PATCH 6/7] feat(sync): pick up the sign-in of the Terminal sync
 
 When the Terminal sync is set up (its usuario file and the token-clash Keychain item), the app signs in with it at launch, once per name, so a player who already had the automatic save does not type anything. A failed or declined read is not retried until the name changes, and Settings offers to use it by hand. Signed in, Settings notes that the LaunchAgent is still on and no longer needed.
 ---
@@ -1942,3 +1942,202 @@ index f00e29b..91162bd 100644
  }
  
  private final class CallCount: @unchecked Sendable {
+
+From 00c9430d0176f5cea4fe9b99b283bb4fe1dc66cb Mon Sep 17 00:00:00 2001
+From: Token Clash <token-clash@users.noreply.github.com>
+Date: Fri, 27 Nov 2026 12:00:00 +0000
+Subject: [PATCH 7/7] feat(update): the update button installs the new patch by
+ itself
+
+Update runs Token Clash's installer in the background (the same command Collection shows, from the address saved at install), logging to ~/Library/Logs/TokenClash/update.log. The current app keeps running while it builds; the installer swaps it and reopens the new one. If it fails, this version is still there and the banner says so, with a button to the log.
+---
+ .../Core/TokenClashInstaller.swift            | 43 +++++++++++++++++++
+ .../PokeTokenBar/Core/TokenClashStrings.swift |  3 ++
+ Sources/PokeTokenBar/Core/UpdateChecker.swift | 23 ++++++++--
+ Sources/PokeTokenBar/UI/PopoverView.swift     | 11 ++++-
+ .../TokenClashInstallerTests.swift            | 37 ++++++++++++++++
+ 5 files changed, 113 insertions(+), 4 deletions(-)
+ create mode 100644 Sources/PokeTokenBar/Core/TokenClashInstaller.swift
+ create mode 100644 Tests/PokeTokenBarTests/TokenClashInstallerTests.swift
+
+diff --git a/Sources/PokeTokenBar/Core/TokenClashInstaller.swift b/Sources/PokeTokenBar/Core/TokenClashInstaller.swift
+new file mode 100644
+index 0000000..3465b1b
+--- /dev/null
++++ b/Sources/PokeTokenBar/Core/TokenClashInstaller.swift
+@@ -0,0 +1,43 @@
++import Foundation
++
++enum TokenClashInstaller {
++    nonisolated static let script = """
++    set -o pipefail
++    printf '%s Actualizando desde %s\\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1"
++    /usr/bin/curl -fsSL --proto '=https,http' "$1/poketokenbar/install.sh" | /bin/bash -s "$1"
++    """
++
++    nonisolated static let path = "/usr/bin:/bin:/usr/sbin:/sbin"
++
++    nonisolated static func arguments(origin: URL) -> [String] {
++        ["-c", script, "token-clash-update", origin.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))]
++    }
++
++    nonisolated static func logFile() -> URL {
++        FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
++            .appendingPathComponent("Logs/TokenClash/update.log")
++    }
++
++    @discardableResult
++    nonisolated static func run(origin: URL, log: URL = logFile(),
++                                onFailure: @escaping @Sendable (Int32) -> Void) -> Bool {
++        try? FileManager.default.createDirectory(at: log.deletingLastPathComponent(), withIntermediateDirectories: true)
++        guard FileManager.default.createFile(atPath: log.path, contents: nil),
++              let output = try? FileHandle(forWritingTo: log) else { return false }
++        let process = Process()
++        process.executableURL = URL(fileURLWithPath: "/bin/bash")
++        process.arguments = arguments(origin: origin)
++        var environment = ProcessInfo.processInfo.environment
++        environment["PATH"] = path
++        process.environment = environment
++        process.standardInput = FileHandle.nullDevice
++        process.standardOutput = output
++        process.standardError = output
++        process.terminationHandler = { finished in
++            try? output.close()
++            if finished.terminationStatus != 0 { onFailure(finished.terminationStatus) }
++        }
++        do { try process.run() } catch { return false }
++        return true
++    }
++}
+diff --git a/Sources/PokeTokenBar/Core/TokenClashStrings.swift b/Sources/PokeTokenBar/Core/TokenClashStrings.swift
+index 8e9b172..5274b8e 100644
+--- a/Sources/PokeTokenBar/Core/TokenClashStrings.swift
++++ b/Sources/PokeTokenBar/Core/TokenClashStrings.swift
+@@ -12,6 +12,9 @@ extension L {
+     func tokenClashTerminalFound(_ name: String) -> String { t("터미널 자동 세이브에서 \(name) 계정을 찾았어요.", "Found the Terminal automatic save, signed in as \(name).", "ターミナルの自動セーブで \(name) を見つけました。", "Encontré tu save automático por Terminal, como \(name).", "Synchro automatique par Terminal trouvée, en tant que \(name).", "Encontrei seu save automático pelo Terminal, como \(name).", "Automatischer Spielstand per Terminal gefunden, als \(name).", "Найдено автосохранение через Терминал: \(name).") }
+     var tokenClashUseTerminal: String { t("그 계정 사용", "Use that sign-in", "そのアカウントを使う", "Usar esa sesión", "Utiliser cette session", "Usar essa sessão", "Diese Anmeldung nutzen", "Использовать этот вход") }
+     var tokenClashTerminalStillOn: String { t("터미널 자동 세이브도 켜져 있어요. 이제 없어도 돼요.", "The Terminal automatic save is still on. You no longer need it.", "ターミナルの自動セーブもオンです。もう必要ありません。", "El save automático por Terminal también sigue activo. Ya no lo necesitas.", "La synchro par Terminal est encore active. Tu n'en as plus besoin.", "O save automático pelo Terminal continua ativo. Você não precisa mais dele.", "Der automatische Spielstand per Terminal läuft noch. Du brauchst ihn nicht mehr.", "Автосохранение через Терминал тоже включено. Оно больше не нужно.") }
++    var tokenClashUpdatingHint: String { t("업데이트 중… 몇 분 걸리고, 끝나면 앱이 다시 열려요.", "Updating… It takes a few minutes and the app reopens when done.", "アップデート中… 数分かかり、終わるとアプリが再起動します。", "Actualizando… Tarda unos minutos y la app se vuelve a abrir al terminar.", "Mise à jour… Quelques minutes, puis l'app se rouvre.", "Atualizando… Leva alguns minutos e o app reabre ao terminar.", "Wird aktualisiert… Dauert ein paar Minuten, danach öffnet sich die App neu.", "Обновление… Займёт несколько минут, затем приложение откроется заново.") }
++    var tokenClashUpdateFailed: String { t("업데이트하지 못했어요. 지금 버전은 그대로예요.", "The update failed. This version keeps running.", "アップデートできませんでした。今のバージョンはそのままです。", "No se pudo actualizar. Sigues con esta versión.", "La mise à jour a échoué. Cette version continue.", "Não foi possível atualizar. Você continua nesta versão.", "Die Aktualisierung ist fehlgeschlagen. Diese Version läuft weiter.", "Не удалось обновить. Текущая версия продолжает работать.") }
++    var tokenClashShowLog: String { t("기록 보기", "Show log", "ログを見る", "Ver registro", "Voir le journal", "Ver registro", "Protokoll anzeigen", "Показать журнал") }
+     var tokenClashSyncing: String { t("올리는 중…", "Uploading…", "アップロード中…", "Subiendo…", "Envoi…", "Enviando…", "Wird hochgeladen…", "Загрузка…") }
+     func tokenClashSignedIn(_ name: String) -> String { t("\(name)(으)로 로그인됨 · 자동 세이브 켜짐", "Signed in as \(name) · automatic save on", "\(name) でログイン中 · 自動セーブ オン", "Sesión iniciada como \(name) · save automático activado", "Connecté en tant que \(name) · sauvegarde auto activée", "Conectado como \(name) · save automático ativado", "Angemeldet als \(name) · automatischer Spielstand an", "Вы вошли как \(name) · автосохранение включено") }
+     func tokenClashSynced(_ count: Int) -> String { t("\(count)마리 업로드됨", "\(count) Pokémon uploaded", "\(count)匹アップロード済み", "\(count) Pokémon subidos", "\(count) Pokémon envoyés", "\(count) Pokémon enviados", "\(count) Pokémon hochgeladen", "Загружено покемонов: \(count)") }
+diff --git a/Sources/PokeTokenBar/Core/UpdateChecker.swift b/Sources/PokeTokenBar/Core/UpdateChecker.swift
+index 425cb0a..713f515 100644
+--- a/Sources/PokeTokenBar/Core/UpdateChecker.swift
++++ b/Sources/PokeTokenBar/Core/UpdateChecker.swift
+@@ -25,6 +25,7 @@ final class UpdateChecker {
+     /// Newer release the user chose to skip. Hidden from the banner, still shown in Settings.
+     private(set) var skipped: Available?
+     private(set) var isUpdating = false
++    private(set) var updateFailure: Int32?
+ 
+     let currentVersion: String
+     private let clock: () -> Date
+@@ -170,14 +171,30 @@ final class UpdateChecker {
+     /// 업데이트 적용: brew cask 설치본이면 `brew upgrade` 후 재시작, 아니면 릴리스 페이지.
+     func applyUpdate() {
+         guard let update = updateTarget, !isUpdating else { return }
++        updateFailure = nil
++        guard let origin = Self.tokenClashOrigin else {
++            AppLog.write("update: no Token Clash address → opening the release page")
++            if let u = URL(string: update.url) { NSWorkspace.shared.open(u) }
++            return
++        }
+         isUpdating = true
+-        Task { @MainActor in
++        AppLog.write("update: running the Token Clash installer for \(update.version)")
++        let started = TokenClashInstaller.run(origin: origin) { status in
++            Task { @MainActor [weak self] in
++                self?.isUpdating = false
++                self?.updateFailure = status
++            }
++        }
++        if !started {
+             isUpdating = false
+-            AppLog.write("update: Token Clash build → opening the release page instead of brew upgrade")
+-            if let u = URL(string: update.url) { NSWorkspace.shared.open(u) }
++            updateFailure = -1
+         }
+     }
+ 
++    func showUpdateLog() {
++        NSWorkspace.shared.open(TokenClashInstaller.logFile())
++    }
++
+     // MARK: 버전 비교
+ 
+     /// a 가 b 보다 높은 semver 인가. ("2.0.10" > "2.0.9" 등 숫자 비교)
+diff --git a/Sources/PokeTokenBar/UI/PopoverView.swift b/Sources/PokeTokenBar/UI/PopoverView.swift
+index 84b3a6c..942eb08 100644
+--- a/Sources/PokeTokenBar/UI/PopoverView.swift
++++ b/Sources/PokeTokenBar/UI/PopoverView.swift
+@@ -130,7 +130,7 @@ struct PopoverView: View {
+                 HStack(spacing: 8) {
+                     Spacer()
+                     if updater.isUpdating {
+-                        Text(l.updating).font(.caption2).foregroundStyle(.secondary)
++                        Text(l.tokenClashUpdatingHint).font(.caption2).foregroundStyle(.secondary)
+                         ProgressView().controlSize(.small)
+                     } else {
+                         Button(l.skipThisVersion) { updater.skipCurrent() }
+@@ -139,6 +139,15 @@ struct PopoverView: View {
+                             .buttonStyle(.borderedProminent).controlSize(.small)
+                     }
+                 }
++                if updater.updateFailure != nil, !updater.isUpdating {
++                    HStack(spacing: 8) {
++                        Text(l.tokenClashUpdateFailed).font(.caption2).foregroundStyle(.orange)
++                            .fixedSize(horizontal: false, vertical: true)
++                        Spacer()
++                        Button(l.tokenClashShowLog) { updater.showUpdateLog() }
++                            .buttonStyle(.borderless).controlSize(.small)
++                    }
++                }
+             }
+             .padding(8)
+             .background(Color.accentColor.opacity(0.12))
+diff --git a/Tests/PokeTokenBarTests/TokenClashInstallerTests.swift b/Tests/PokeTokenBarTests/TokenClashInstallerTests.swift
+new file mode 100644
+index 0000000..f0de3cd
+--- /dev/null
++++ b/Tests/PokeTokenBarTests/TokenClashInstallerTests.swift
+@@ -0,0 +1,37 @@
++import XCTest
++@testable import PokeTokenBar
++
++final class TokenClashInstallerTests: XCTestCase {
++    func testTheUpdateRunsTheSameInstallerAsCollectionWithTheSavedAddress() {
++        let arguments = TokenClashInstaller.arguments(origin: URL(string: "https://tokenclash.example/")!)
++        XCTAssertEqual(arguments.first, "-c")
++        XCTAssertEqual(arguments.last, "https://tokenclash.example")
++        XCTAssertTrue(arguments[1].contains(#""$1/poketokenbar/install.sh" | /bin/bash -s "$1""#))
++        XCTAssertTrue(arguments[1].contains("set -o pipefail"), "a failed download must fail the update")
++    }
++
++    func testTheLogGoesWithTheOtherTokenClashLogs() {
++        XCTAssertTrue(TokenClashInstaller.logFile().path.hasSuffix("Library/Logs/TokenClash/update.log"))
++    }
++
++    func testAnUpdateThatCannotReachTokenClashReportsTheFailureAndKeepsTheLog() async throws {
++        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
++        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
++        let log = folder.appendingPathComponent("update.log")
++        let failure = FailureBox()
++        let started = TokenClashInstaller.run(origin: URL(string: "http://127.0.0.1:9")!, log: log) { failure.set($0) }
++        XCTAssertTrue(started)
++        for _ in 0..<100 where failure.value == nil { try await Task.sleep(for: .milliseconds(100)) }
++        XCTAssertNotNil(failure.value)
++        XCTAssertNotEqual(failure.value, 0)
++        let text = try String(contentsOf: log, encoding: .utf8)
++        XCTAssertTrue(text.contains("Actualizando desde http://127.0.0.1:9"))
++    }
++}
++
++private final class FailureBox: @unchecked Sendable {
++    private let lock = NSLock()
++    private var status: Int32?
++    var value: Int32? { lock.withLock { status } }
++    func set(_ value: Int32) { lock.withLock { status = value } }
++}

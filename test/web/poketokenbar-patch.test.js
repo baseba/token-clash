@@ -100,3 +100,9 @@ test('the patched app picks up the sign-in of the Terminal sync, reading what it
   assert.match(patch, /appendingPathComponent\("TokenClash"\)/);
   assert.match(patch, /terminalSyncAgentName = "com\.token-clash\.sync\.plist"/);
 });
+
+test('the update button of the patched app runs this same installer from the saved address', () => {
+  assert.match(patch, /"\$1\/poketokenbar\/install\.sh" \| \/bin\/bash -s "\$1"/);
+  assert.match(patch, /TokenClashInstaller\.run\(origin: origin\)/);
+  assert.match(installer, /^open "\/Applications\/PokeTokenBar\.app"$/m, 'the installer reopens the app the update closed');
+});
