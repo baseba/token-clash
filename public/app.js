@@ -1403,7 +1403,7 @@ function poketokenbarGen9Card() {
     ),
     poketokenbarInstallRow(),
     h('p', null, 'Después, en PokeTokenBar → Ajustes → Token Clash, inicia sesión con tu nombre de entrenador y tu contraseña: tu save se sube solo cada vez que cambia, sin comandos.'),
-    h('p', { class: 'muted small' }, `Tu Pokédex, tus objetos y tus ajustes se quedan donde están, y si ya tenías el save automático por Terminal sigue funcionando. Los graduados que ahora tienen una evolución nueva (${POKETOKENBAR_GEN9_GRADUATES}) pasan a su forma final al abrir el save, con el mismo perfil y la misma rareza. Las ramas nuevas, como Kleavor o Sylveon, salen criándolas con esta versión: Token Clash usa la forma que trae tu save.`),
+    h('p', { class: 'muted small' }, `Tu Pokédex, tus objetos y tus ajustes se quedan donde están, y si ya tenías el save automático por Terminal, la app encuentra tu sesión y la usa sola. Los graduados que ahora tienen una evolución nueva (${POKETOKENBAR_GEN9_GRADUATES}) pasan a su forma final al abrir el save, con el mismo perfil y la misma rareza. Las ramas nuevas, como Kleavor o Sylveon, salen criándolas con esta versión: Token Clash usa la forma que trae tu save.`),
   );
 }
 
@@ -1517,7 +1517,7 @@ function hackerGuide() {
       { class: 'hk-body' },
       h('h2', null, h('span', { class: 'hk-hash', 'aria-hidden': 'true' }, '# '), 'Save automático'),
       h('p', null, 'Tu Mac sube el save de PokeTokenBar cada vez que cambia (como mucho cada 5 minutos). Solo necesitas la Terminal y tu nombre de entrenador y contraseña de Token Clash.'),
-      h('p', null, 'Con el PokeTokenBar de Token Clash no hace falta: inicia sesión en Ajustes → Token Clash y la app lo sube sola. ', h('a', { href: `/coleccion#${POKETOKENBAR_ANCHOR}`, 'data-link': true }, 'Instalarlo →')),
+      h('p', null, 'Con el PokeTokenBar de Token Clash no hace falta: inicia sesión en Ajustes → Token Clash y la app lo sube sola. Si ya tienes este save automático, la app encuentra tu sesión y la usa sin que escribas nada. ', h('a', { href: `/coleccion#${POKETOKENBAR_ANCHOR}`, 'data-link': true }, 'Instalarlo →')),
 
       heading('Qué se envía'),
       h('p', null, 'Tu archivo ', h('code', null, 'companion-state.json'), ' por HTTPS. El servidor guarda solo tus Pokémon y tus tokens; el resto del archivo se descarta.'),

@@ -91,3 +91,12 @@ test('the patched app signs in to Token Clash and uploads the save to the same e
   assert.match(patch, /"Basic " \+ Data\("\\\(credentials\.name\):\\\(credentials\.password\)"\.utf8\)\.base64EncodedString\(\)/);
   assert.match(patch, /minimumUploadInterval: TimeInterval = 300/);
 });
+
+test('the patched app picks up the sign-in of the Terminal sync, reading what its script stores', () => {
+  const terminalService = /security add-generic-password -U -s ([\w-]+) -a "\$USUARIO" -w/.exec(readFileSync(new URL('../../public/app.js', import.meta.url), 'utf8'))?.[1];
+  assert.equal(terminalService, 'token-clash');
+  assert.match(patch, new RegExp(`terminalKeychainService = "${terminalService}"`));
+  assert.match(patch, /appendingPathComponent\("usuario"\)/);
+  assert.match(patch, /appendingPathComponent\("TokenClash"\)/);
+  assert.match(patch, /terminalSyncAgentName = "com\.token-clash\.sync\.plist"/);
+});

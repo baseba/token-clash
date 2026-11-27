@@ -1,7 +1,7 @@
 From bd0236b1afbaf94215c0e8a23ebf3b33d5fee00a Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Thu, 26 Nov 2026 12:00:00 +0000
-Subject: [PATCH 1/5] feat(dex): open the National Dex to #1025, Kalos to
+Subject: [PATCH 1/6] feat(dex): open the National Dex to #1025, Kalos to
  Paldea
 
 Eggs hatch from every base species up to #1025 and evolution trees are no longer cut at #649. Evolutions that need a regional form this app does not raise (Obstagoon, Sirfetch'd, Clodsire, Sneasler, ...) stay out of the trees, as in Token Clash. The base index is cached under a name tied to the cap, so an index cached by the official build is not reused. The egg pool was measured again (540 bases): a rare egg still beats repeated uncommon eggs.
@@ -197,7 +197,7 @@ index 4f2c89a..ac106df 100644
 From df9251e83836ef4fc53f0cfb3c7d803feb0fc4e2 Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Thu, 26 Nov 2026 12:00:00 +0000
-Subject: [PATCH 2/5] feat(sprites): animate #650 to #1025 like Token Clash
+Subject: [PATCH 2/6] feat(sprites): animate #650 to #1025 like Token Clash
 
 The Essentials Animated Pokemon System strips (pinned at rh-hideout-chinese/pokemon-engine) are sliced into GIFs when downloaded, cropped to what every frame shows, with the same frame delays as Token Clash. A shiny strip drawn at several times its normal's size is shrunk to match, and Xerneas's front comes from Showdown's gen5ani, since its strip is still.
 ---
@@ -889,7 +889,7 @@ index 0000000..c625f0f
 From b3a74988999f26375e936bacaccd35c8ef123610 Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Thu, 26 Nov 2026 12:00:00 +0000
-Subject: [PATCH 3/5] feat(save): graduates that stopped short of their final
+Subject: [PATCH 3/6] feat(save): graduates that stopped short of their final
  form evolve on load
 
 A level 100 graduate whose saved chain ends at a form that now evolves (Primeape, Bisharp, Ursaring, ...) moves to its final form when the save loads, keeping profile and rarity, and the new final is recorded. It follows Token Clash's rule: same table of later finals, same hash of the entry id to pick one, so the app and the game show the same species. A graduate already at its final, or whose next evolution needs a regional form (Linoone, Farfetch'd), keeps its form.
@@ -1034,7 +1034,7 @@ index 0000000..2cbeaa4
 From 977b1697d749d9eeb5f272376765c0bfa960a200 Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Thu, 26 Nov 2026 12:00:00 +0000
-Subject: [PATCH 4/5] feat(update): offer only Token Clash's builds of the
+Subject: [PATCH 4/6] feat(update): offer only Token Clash's builds of the
  patch
 
 The installer bakes Token Clash's address and the patch version (the official version plus a build number) into Info.plist. The update check reads /poketokenbar/version.json from that address instead of the official releases, and its banner opens Collection with the install command, so an update never swaps this build for the official one. build-app.sh also takes extra swift build flags, which the installer uses to build past stale files a partial Command Line Tools update leaves behind.
@@ -1235,7 +1235,7 @@ index aa8cc1c..005b2af 100755
 From 6fc10ffec967d3125db23ab6d84eb987e9b78cca Mon Sep 17 00:00:00 2001
 From: Token Clash <token-clash@users.noreply.github.com>
 Date: Fri, 27 Nov 2026 12:00:00 +0000
-Subject: [PATCH 5/5] feat(sync): sign in to Token Clash and the save uploads
+Subject: [PATCH 5/6] feat(sync): sign in to Token Clash and the save uploads
  itself
 
 Settings gets a Token Clash section: sign in with the trainer name and password and the app posts the save to /api/sync right away, which also checks the credentials, then again whenever the save changes, at most every five minutes. The password lives in the Keychain. The popover footer gets a button that opens Token Clash. Nothing to type in the Terminal, unlike the LaunchAgent sync.
@@ -1691,3 +1691,254 @@ index 0000000..f00e29b
 +    var value: Int { lock.withLock { count } }
 +    func add() { lock.withLock { count += 1 } }
 +}
+
+From 6e44847a51512b285099953937df90c5feeee103 Mon Sep 17 00:00:00 2001
+From: Token Clash <token-clash@users.noreply.github.com>
+Date: Fri, 27 Nov 2026 12:00:00 +0000
+Subject: [PATCH 6/6] feat(sync): pick up the sign-in of the Terminal sync
+
+When the Terminal sync is set up (its usuario file and the token-clash Keychain item), the app signs in with it at launch, once per name, so a player who already had the automatic save does not type anything. A failed or declined read is not retried until the name changes, and Settings offers to use it by hand. Signed in, Settings notes that the LaunchAgent is still on and no longer needed.
+---
+ .../PokeTokenBar/Core/TokenClashStrings.swift |  4 ++
+ .../PokeTokenBar/Core/TokenClashSync.swift    | 59 +++++++++++++++++--
+ .../UI/TokenClashSettingsSection.swift        | 17 +++++-
+ .../TokenClashSyncTests.swift                 | 42 +++++++++++++
+ 4 files changed, 117 insertions(+), 5 deletions(-)
+
+diff --git a/Sources/PokeTokenBar/Core/TokenClashStrings.swift b/Sources/PokeTokenBar/Core/TokenClashStrings.swift
+index c4980eb..8e9b172 100644
+--- a/Sources/PokeTokenBar/Core/TokenClashStrings.swift
++++ b/Sources/PokeTokenBar/Core/TokenClashStrings.swift
+@@ -9,6 +9,9 @@ extension L {
+     var tokenClashSignIn: String { t("로그인", "Sign in", "ログイン", "Iniciar sesión", "Se connecter", "Entrar", "Anmelden", "Войти") }
+     var tokenClashSignOut: String { t("로그아웃", "Sign out", "ログアウト", "Cerrar sesión", "Se déconnecter", "Sair", "Abmelden", "Выйти") }
+     var tokenClashUploadNow: String { t("지금 올리기", "Upload now", "今すぐアップロード", "Subir ahora", "Envoyer maintenant", "Enviar agora", "Jetzt hochladen", "Загрузить сейчас") }
++    func tokenClashTerminalFound(_ name: String) -> String { t("터미널 자동 세이브에서 \(name) 계정을 찾았어요.", "Found the Terminal automatic save, signed in as \(name).", "ターミナルの自動セーブで \(name) を見つけました。", "Encontré tu save automático por Terminal, como \(name).", "Synchro automatique par Terminal trouvée, en tant que \(name).", "Encontrei seu save automático pelo Terminal, como \(name).", "Automatischer Spielstand per Terminal gefunden, als \(name).", "Найдено автосохранение через Терминал: \(name).") }
++    var tokenClashUseTerminal: String { t("그 계정 사용", "Use that sign-in", "そのアカウントを使う", "Usar esa sesión", "Utiliser cette session", "Usar essa sessão", "Diese Anmeldung nutzen", "Использовать этот вход") }
++    var tokenClashTerminalStillOn: String { t("터미널 자동 세이브도 켜져 있어요. 이제 없어도 돼요.", "The Terminal automatic save is still on. You no longer need it.", "ターミナルの自動セーブもオンです。もう必要ありません。", "El save automático por Terminal también sigue activo. Ya no lo necesitas.", "La synchro par Terminal est encore active. Tu n'en as plus besoin.", "O save automático pelo Terminal continua ativo. Você não precisa mais dele.", "Der automatische Spielstand per Terminal läuft noch. Du brauchst ihn nicht mehr.", "Автосохранение через Терминал тоже включено. Оно больше не нужно.") }
+     var tokenClashSyncing: String { t("올리는 중…", "Uploading…", "アップロード中…", "Subiendo…", "Envoi…", "Enviando…", "Wird hochgeladen…", "Загрузка…") }
+     func tokenClashSignedIn(_ name: String) -> String { t("\(name)(으)로 로그인됨 · 자동 세이브 켜짐", "Signed in as \(name) · automatic save on", "\(name) でログイン中 · 自動セーブ オン", "Sesión iniciada como \(name) · save automático activado", "Connecté en tant que \(name) · sauvegarde auto activée", "Conectado como \(name) · save automático ativado", "Angemeldet als \(name) · automatischer Spielstand an", "Вы вошли как \(name) · автосохранение включено") }
+     func tokenClashSynced(_ count: Int) -> String { t("\(count)마리 업로드됨", "\(count) Pokémon uploaded", "\(count)匹アップロード済み", "\(count) Pokémon subidos", "\(count) Pokémon envoyés", "\(count) Pokémon enviados", "\(count) Pokémon hochgeladen", "Загружено покемонов: \(count)") }
+@@ -17,6 +20,7 @@ extension L {
+         case .badCredentials: return t("이름이나 비밀번호가 틀렸어요. 계정에 비밀번호가 없다면 Token Clash 프로필에서 추가하세요.", "Wrong name or password. If your account has no password, add one in your Token Clash profile.", "名前かパスワードが違います。パスワードがない場合は Token Clash のプロフィールで追加してください。", "Nombre o contraseña incorrectos. Si tu cuenta no tiene contraseña, agrégala en tu perfil de Token Clash.", "Nom ou mot de passe incorrect. Si ton compte n'a pas de mot de passe, ajoutes-en un dans ton profil Token Clash.", "Nome ou senha incorretos. Se sua conta não tem senha, adicione uma no seu perfil do Token Clash.", "Name oder Passwort falsch. Hat dein Konto kein Passwort, füge eins in deinem Token-Clash-Profil hinzu.", "Неверное имя или пароль. Если у аккаунта нет пароля, добавьте его в профиле Token Clash.")
+         case .rateLimited: return t("업로드가 너무 많아요. 몇 분 뒤에 다시 시도할게요.", "Too many uploads. It will try again in a few minutes.", "アップロードが多すぎます。数分後に再試行します。", "Demasiadas subidas. Vuelve a intentarlo en unos minutos.", "Trop d'envois. Nouvel essai dans quelques minutes.", "Envios demais. Tenta de novo em alguns minutos.", "Zu viele Uploads. In ein paar Minuten erneut.", "Слишком много загрузок. Повтор через несколько минут.")
+         case .offline: return t("Token Clash에 연결할 수 없어요. 다음에 다시 시도할게요.", "Can't reach Token Clash. It will try again later.", "Token Clash に接続できません。あとで再試行します。", "No pude llegar a Token Clash. Vuelvo a intentarlo más tarde.", "Impossible de joindre Token Clash. Nouvel essai plus tard.", "Não consegui acessar o Token Clash. Tento de novo depois.", "Token Clash nicht erreichbar. Später erneut.", "Не удаётся связаться с Token Clash. Повтор позже.")
++        case .terminalPasswordUnreadable: return t("Llavero에서 터미널 자동 세이브 비밀번호를 읽지 못했어요. 직접 로그인하세요.", "Couldn't read the Terminal sync password from the Keychain. Sign in by hand.", "キーチェーンからターミナル同期のパスワードを読めませんでした。手動でログインしてください。", "No pude leer del Llavero la contraseña del save por Terminal. Inicia sesión a mano.", "Impossible de lire dans le trousseau le mot de passe de la synchro Terminal. Connecte-toi à la main.", "Não consegui ler no Chaveiro a senha do save pelo Terminal. Entre manualmente.", "Das Passwort der Terminal-Synchronisierung ließ sich nicht aus dem Schlüsselbund lesen. Melde dich von Hand an.", "Не удалось прочитать пароль синхронизации из Терминала в Связке ключей. Войдите вручную.")
+         case .server(let code): return t("Token Clash 오류 (\(code)).", "Token Clash error (\(code)).", "Token Clash エラー (\(code))。", "Error de Token Clash (\(code)).", "Erreur Token Clash (\(code)).", "Erro do Token Clash (\(code)).", "Token-Clash-Fehler (\(code)).", "Ошибка Token Clash (\(code)).")
+         }
+     }
+diff --git a/Sources/PokeTokenBar/Core/TokenClashSync.swift b/Sources/PokeTokenBar/Core/TokenClashSync.swift
+index 582b215..e923d47 100644
+--- a/Sources/PokeTokenBar/Core/TokenClashSync.swift
++++ b/Sources/PokeTokenBar/Core/TokenClashSync.swift
+@@ -10,6 +10,7 @@ final class TokenClashSync {
+         case badCredentials
+         case rateLimited
+         case offline
++        case terminalPasswordUnreadable
+         case server(Int)
+     }
+ 
+@@ -30,11 +31,16 @@ final class TokenClashSync {
+     nonisolated static let trainerNameKey = "tokenClashTrainerName"
+     nonisolated static let minimumUploadInterval: TimeInterval = 300
+     nonisolated static let checkInterval: TimeInterval = 60
++    nonisolated static let terminalKeychainService = "token-clash"
++    nonisolated static let terminalCheckedKey = "tokenClashTerminalSignInChecked"
++    nonisolated static let terminalSyncAgentName = "com.token-clash.sync.plist"
+ 
+     let origin: URL?
+     private(set) var trainerName: String?
+     private(set) var status: Status = .idle
+     private let saveFile: URL
++    private let terminalSyncFolder: URL
++    private let launchAgentsFolder: URL
+     private let defaults: UserDefaults
+     private let send: @Sendable (URLRequest) async -> (Data, Int)?
+     private var lastAttempt: Date?
+@@ -42,10 +48,14 @@ final class TokenClashSync {
+     private var timer: Timer?
+ 
+     init(origin: URL? = UpdateChecker.tokenClashOrigin, saveFile: URL = CompanionStore.defaultURL(),
++         terminalSyncFolder: URL = TokenClashSync.defaultTerminalSyncFolder(),
++         launchAgentsFolder: URL = TokenClashSync.defaultLaunchAgentsFolder(),
+          defaults: UserDefaults = .standard,
+          send: @escaping @Sendable (URLRequest) async -> (Data, Int)? = TokenClashSync.liveSend) {
+         self.origin = origin
+         self.saveFile = saveFile
++        self.terminalSyncFolder = terminalSyncFolder
++        self.launchAgentsFolder = launchAgentsFolder
+         self.defaults = defaults
+         self.send = send
+         trainerName = defaults.string(forKey: Self.trainerNameKey)
+@@ -53,7 +63,29 @@ final class TokenClashSync {
+ 
+     var isSignedIn: Bool { trainerName != nil }
+ 
++    var terminalTrainerName: String? { Self.terminalTrainerName(in: terminalSyncFolder) }
++
++    var terminalSyncIsOn: Bool {
++        FileManager.default.fileExists(atPath: launchAgentsFolder.appendingPathComponent(Self.terminalSyncAgentName).path)
++    }
++
++    @discardableResult
++    func useTerminalSignIn() async -> Bool {
++        guard let name = terminalTrainerName else { return false }
++        defaults.set(name, forKey: Self.terminalCheckedKey)
++        guard let password = Self.password(for: name, service: Self.terminalKeychainService) else {
++            status = .failed(.terminalPasswordUnreadable)
++            return false
++        }
++        return await signIn(name: name, password: password)
++    }
++
+     func start() {
++        if Self.shouldAdoptTerminalSignIn(signedIn: isSignedIn, terminalName: terminalTrainerName,
++                                          alreadyChecked: defaults.string(forKey: Self.terminalCheckedKey)),
++           origin != nil, AppEnv.isBundledApp {
++            Task { await useTerminalSignIn() }
++        }
+         guard origin != nil, AppEnv.isBundledApp, timer == nil else { return }
+         timer = Timer.scheduledTimer(withTimeInterval: Self.checkInterval, repeats: true) { [weak self] _ in
+             Task { @MainActor in await self?.uploadIfChanged() }
+@@ -159,13 +191,32 @@ final class TokenClashSync {
+         return modifiedAt > lastUploadedModification
+     }
+ 
++    nonisolated static func shouldAdoptTerminalSignIn(signedIn: Bool, terminalName: String?, alreadyChecked: String?) -> Bool {
++        guard !signedIn, let terminalName else { return false }
++        return terminalName != alreadyChecked
++    }
++
++    nonisolated static func terminalTrainerName(in folder: URL) -> String? {
++        guard let text = try? String(contentsOf: folder.appendingPathComponent("usuario"), encoding: .utf8) else { return nil }
++        let name = text.trimmingCharacters(in: .whitespacesAndNewlines)
++        return name.isEmpty ? nil : name
++    }
++
++    nonisolated static func defaultTerminalSyncFolder() -> URL {
++        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TokenClash")
++    }
++
++    nonisolated static func defaultLaunchAgentsFolder() -> URL {
++        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/LaunchAgents")
++    }
++
+     nonisolated static func liveSend(_ request: URLRequest) async -> (Data, Int)? {
+         guard let (data, response) = try? await URLSession.shared.data(for: request) else { return nil }
+         return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
+     }
+ 
+-    private nonisolated static func keychainQuery(_ name: String) -> [CFString: Any] {
+-        [kSecClass: kSecClassGenericPassword, kSecAttrService: keychainService, kSecAttrAccount: name]
++    private nonisolated static func keychainQuery(_ name: String, service: String = keychainService) -> [CFString: Any] {
++        [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: name]
+     }
+ 
+     nonisolated static func storePassword(_ password: String, for name: String) {
+@@ -175,8 +226,8 @@ final class TokenClashSync {
+         SecItemAdd(item as CFDictionary, nil)
+     }
+ 
+-    nonisolated static func password(for name: String) -> String? {
+-        var query = keychainQuery(name)
++    nonisolated static func password(for name: String, service: String = keychainService) -> String? {
++        var query = keychainQuery(name, service: service)
+         query[kSecReturnData] = true
+         query[kSecMatchLimit] = kSecMatchLimitOne
+         var result: CFTypeRef?
+diff --git a/Sources/PokeTokenBar/UI/TokenClashSettingsSection.swift b/Sources/PokeTokenBar/UI/TokenClashSettingsSection.swift
+index 9f88dd5..d1136d4 100644
+--- a/Sources/PokeTokenBar/UI/TokenClashSettingsSection.swift
++++ b/Sources/PokeTokenBar/UI/TokenClashSettingsSection.swift
+@@ -26,6 +26,14 @@ struct TokenClashSettingsSection: View {
+ 
+     private var signInForm: some View {
+         VStack(alignment: .leading, spacing: 8) {
++            if let terminal = sync.terminalTrainerName {
++                HStack {
++                    Label(l.tokenClashTerminalFound(terminal), systemImage: "terminal").font(.caption)
++                    Spacer()
++                    Button(l.tokenClashUseTerminal) { Task { await sync.useTerminalSignIn() } }
++                        .disabled(sync.status == .syncing)
++                }
++            }
+             Text(l.tokenClashSignInHint).font(.caption2).foregroundStyle(.tertiary)
+             TextField(l.tokenClashTrainerName, text: $name).textFieldStyle(.roundedBorder)
+             SecureField(l.tokenClashPassword, text: $password).textFieldStyle(.roundedBorder)
+@@ -38,7 +46,11 @@ struct TokenClashSettingsSection: View {
+                 Button(l.tokenClashOpen) { sync.openTokenClash() }.buttonStyle(.borderless)
+             }
+         }
+-        .onAppear { if name.isEmpty { name = UserDefaults.standard.string(forKey: TokenClashSync.trainerNameKey) ?? "" } }
++        .onAppear {
++            if name.isEmpty {
++                name = UserDefaults.standard.string(forKey: TokenClashSync.trainerNameKey) ?? sync.terminalTrainerName ?? ""
++            }
++        }
+     }
+ 
+     private func signedIn(_ trainer: String) -> some View {
+@@ -52,6 +64,9 @@ struct TokenClashSettingsSection: View {
+                 Spacer()
+                 Button(l.tokenClashSignOut, role: .destructive) { sync.signOut() }.buttonStyle(.borderless)
+             }
++            if sync.terminalSyncIsOn {
++                Text(l.tokenClashTerminalStillOn).font(.caption2).foregroundStyle(.tertiary)
++            }
+         }
+     }
+ 
+diff --git a/Tests/PokeTokenBarTests/TokenClashSyncTests.swift b/Tests/PokeTokenBarTests/TokenClashSyncTests.swift
+index f00e29b..91162bd 100644
+--- a/Tests/PokeTokenBarTests/TokenClashSyncTests.swift
++++ b/Tests/PokeTokenBarTests/TokenClashSyncTests.swift
+@@ -66,6 +66,48 @@ final class TokenClashSyncTests: XCTestCase {
+         XCTAssertFalse(signedIn)
+         XCTAssertEqual(calls.value, 0)
+     }
++
++    func testTheTerminalSyncNameIsReadFromItsUsuarioFile() throws {
++        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
++        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
++        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
++        XCTAssertNil(TokenClashSync.terminalTrainerName(in: folder))
++        try Data("Ana\n".utf8).write(to: folder.appendingPathComponent("usuario"))
++        XCTAssertEqual(TokenClashSync.terminalTrainerName(in: folder), "Ana")
++        try Data("  \n".utf8).write(to: folder.appendingPathComponent("usuario"))
++        XCTAssertNil(TokenClashSync.terminalTrainerName(in: folder))
++    }
++
++    func testTheTerminalSignInIsTakenOnceAndNeverOverAnAppSignIn() {
++        XCTAssertTrue(TokenClashSync.shouldAdoptTerminalSignIn(signedIn: false, terminalName: "Ana", alreadyChecked: nil))
++        XCTAssertFalse(TokenClashSync.shouldAdoptTerminalSignIn(signedIn: true, terminalName: "Ana", alreadyChecked: nil))
++        XCTAssertFalse(TokenClashSync.shouldAdoptTerminalSignIn(signedIn: false, terminalName: nil, alreadyChecked: nil))
++        XCTAssertFalse(TokenClashSync.shouldAdoptTerminalSignIn(signedIn: false, terminalName: "Ana", alreadyChecked: "Ana"), "signed out on purpose, or the Keychain said no")
++        XCTAssertTrue(TokenClashSync.shouldAdoptTerminalSignIn(signedIn: false, terminalName: "Beto", alreadyChecked: "Ana"), "a new Terminal sign-in is worth a try")
++    }
++
++    @MainActor
++    func testATerminalSignInWithoutItsKeychainPasswordSaysSoAndIsNotRetried() async throws {
++        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
++        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
++        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
++        let name = "nadie-\(UUID().uuidString)"
++        try Data(name.utf8).write(to: folder.appendingPathComponent("usuario"))
++        let defaults = UserDefaults(suiteName: "TokenClashSyncTests.\(UUID().uuidString)")!
++        let calls = CallCount()
++        let sync = TokenClashSync(origin: origin, saveFile: folder.appendingPathComponent("save.json"), terminalSyncFolder: folder,
++                                  launchAgentsFolder: folder, defaults: defaults) { _ in
++            calls.add()
++            return nil
++        }
++        XCTAssertEqual(sync.terminalTrainerName, name)
++        XCTAssertFalse(sync.terminalSyncIsOn)
++        let adopted = await sync.useTerminalSignIn()
++        XCTAssertFalse(adopted)
++        XCTAssertEqual(sync.status, .failed(.terminalPasswordUnreadable))
++        XCTAssertEqual(calls.value, 0)
++        XCTAssertEqual(defaults.string(forKey: TokenClashSync.terminalCheckedKey), name)
++    }
+ }
+ 
+ private final class CallCount: @unchecked Sendable {
