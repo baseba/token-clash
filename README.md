@@ -63,7 +63,8 @@ y cambia `TAG` y `COMMIT` en `install.sh`.
 Cada cambio al parche lleva una versión nueva en `version.json`: la versión oficial más un número de build
 (`2.5.7.1`, `2.5.7.2`…) y el `sha256` del parche, que el test exige. El instalador la graba en la app junto a la
 dirección de Token Clash, y la app parchada solo ofrece actualizarse cuando `version.json` trae una más nueva: el
-aviso abre Colección con el comando, nunca la versión oficial.
+botón «Actualizar» corre este mismo instalador en segundo plano (log en `~/Library/Logs/TokenClash/update.log`) y
+reabre la app al terminar, nunca instala la versión oficial.
 
 ### Chequeo de estructura (`npm run deslop`)
 
