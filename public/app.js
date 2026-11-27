@@ -1402,7 +1402,8 @@ function poketokenbarGen9Card() {
       h('li', null, 'Pega esto en la Terminal. Baja PokeTokenBar 2.5.7, le aplica el parche, lo compila y lo deja en Aplicaciones en unos minutos:'),
     ),
     poketokenbarInstallRow(),
-    h('p', { class: 'muted small' }, `Tu Pokédex, tus objetos y tus ajustes se quedan donde están, y el save automático sigue subiendo el mismo archivo sin tocar nada. Los graduados que ahora tienen una evolución nueva (${POKETOKENBAR_GEN9_GRADUATES}) pasan a su forma final al abrir el save, con el mismo perfil y la misma rareza. Las ramas nuevas, como Kleavor o Sylveon, salen criándolas con esta versión: Token Clash usa la forma que trae tu save.`),
+    h('p', null, 'Después, en PokeTokenBar → Ajustes → Token Clash, inicia sesión con tu nombre de entrenador y tu contraseña: tu save se sube solo cada vez que cambia, sin comandos.'),
+    h('p', { class: 'muted small' }, `Tu Pokédex, tus objetos y tus ajustes se quedan donde están, y si ya tenías el save automático por Terminal sigue funcionando. Los graduados que ahora tienen una evolución nueva (${POKETOKENBAR_GEN9_GRADUATES}) pasan a su forma final al abrir el save, con el mismo perfil y la misma rareza. Las ramas nuevas, como Kleavor o Sylveon, salen criándolas con esta versión: Token Clash usa la forma que trae tu save.`),
   );
 }
 
@@ -1423,7 +1424,8 @@ function freshStartCard() {
       'ol',
       { class: 'steps', start: 3 },
       h('li', null, 'Sigue trabajando como siempre: tu primer huevo eclosiona a los 5 M de tokens.'),
-      h('li', null, 'Cuando tengas tus primeros Pokémon, vuelve aquí y crea tu cuenta con el save.'),
+      h('li', null, 'Cuando tengas tus primeros Pokémon, vuelve aquí y crea tu cuenta con el save y una contraseña.'),
+      h('li', null, 'En PokeTokenBar → Ajustes → Token Clash, inicia sesión: desde ahí tu save se sube solo.'),
     ),
   );
 }
@@ -1515,6 +1517,7 @@ function hackerGuide() {
       { class: 'hk-body' },
       h('h2', null, h('span', { class: 'hk-hash', 'aria-hidden': 'true' }, '# '), 'Save automático'),
       h('p', null, 'Tu Mac sube el save de PokeTokenBar cada vez que cambia (como mucho cada 5 minutos). Solo necesitas la Terminal y tu nombre de entrenador y contraseña de Token Clash.'),
+      h('p', null, 'Con el PokeTokenBar de Token Clash no hace falta: inicia sesión en Ajustes → Token Clash y la app lo sube sola. ', h('a', { href: `/coleccion#${POKETOKENBAR_ANCHOR}`, 'data-link': true }, 'Instalarlo →')),
 
       heading('Qué se envía'),
       h('p', null, 'Tu archivo ', h('code', null, 'companion-state.json'), ' por HTTPS. El servidor guarda solo tus Pokémon y tus tokens; el resto del archivo se descarta.'),
